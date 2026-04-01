@@ -1,0 +1,2 @@
+hook: cat .cursor/hooks/x.json | .cursor/hooks/stop
+test: elm-test --compiler=lamdera

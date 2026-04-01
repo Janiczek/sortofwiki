@@ -1,3 +1,5 @@
 .DS_Store
 elm-stuff/
 node_modules/
+index.html
+.cursor/hooks/x.json

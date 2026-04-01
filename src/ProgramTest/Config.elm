@@ -1,22 +1,25 @@
-module ProgramTestHelpers exposing (config)
+module ProgramTest.Config exposing (config)
 
 import Backend
 import Effect.Test
 import Frontend
 import Types exposing (BackendModel, BackendMsg, FrontendModel, FrontendMsg, ToBackend, ToFrontend)
-import Url exposing (Url)
+import Url exposing (Protocol(..), Url)
 
 
 {-| Base URL for program-test (matches local `lamdera live`).
 -}
 unsafeDomainUrl : Url
 unsafeDomainUrl =
-    case Url.fromString "http://localhost:8000" of
-        Just url ->
-            url
-
-        Nothing ->
-            Debug.todo "Invalid url"
+    Url.fromString "http://localhost:8000"
+        |> Maybe.withDefault
+            { protocol = Http
+            , host = "localhost"
+            , port_ = Just 8000
+            , path = ""
+            , query = Nothing
+            , fragment = Nothing
+            }
 
 
 {-| Shared Lamdera program-test configuration for SortOfWiki Frontend/Backend.

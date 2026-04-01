@@ -4,8 +4,9 @@ For testing the Elm codebase, use `elm-test --compiler=lamdera`.
 Do not nest another module’s `suite` inside one module's `suite`; keep domain/unit suites in their own modules.
 
 You can test things yourself by running a local Lamdera development server via `lamdera live` and opening http://localhost:8000/ in the browser.
+Even better, if an end-to-end test fails (tests/Story/*), you can open the dev server and open http://localhost:8000/src/ProgramTest/Viewer.elm, select the test and then you can click on the timeline to see how it looked at various steps, show the model, rightclick to diff the models, etc.
 
-Use `github.com/lamdera/program-test` for end-to-end unit tests. See `tests/Viewer.elm` and `tests/Story/` for such. This forces use of these modules instead of their non-`Effect.*` variants:
+Use `github.com/lamdera/program-test` for end-to-end unit tests. See `src/ProgramTest/Viewer.elm`, `src/ProgramTest/Story*.elm` and `tests/Story/*.elm` for such. This forces use of these modules instead of their non-`Effect.*` variants:
 - Effect.Browser.Dom
 - Effect.Browser.Events
 - Effect.Browser.Navigation
