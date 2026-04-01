@@ -42,6 +42,18 @@ suite =
                     |> Url.fromString
                     |> Maybe.map Route.fromUrl
                     |> Expect.equal (Just (Route.WikiHome { slug = "elm-tips" }))
+        , Test.test "/w/demo/articles is WikiArticles demo" <|
+            \_ ->
+                "https://example.com/w/demo/articles"
+                    |> Url.fromString
+                    |> Maybe.map Route.fromUrl
+                    |> Expect.equal (Just (Route.WikiArticles { slug = "demo" }))
+        , Test.test "wiki articles path is not wiki list" <|
+            \_ ->
+                "https://example.com/w/demo/articles"
+                    |> Url.fromString
+                    |> Maybe.map (Route.fromUrl >> Route.isWikiList)
+                    |> Expect.equal (Just False)
         , Test.test "/w is NotFound" <|
             \_ ->
                 "https://example.com/w"
@@ -74,6 +86,13 @@ suite =
                         [ Store.AskForWikiCatalog
                         , Store.AskForWikiFrontendDetails slug
                         ]
+        , Test.fuzz Fuzzers.wikiSlug "storeActions WikiArticles asks catalog and details" <|
+            \slug ->
+                Route.storeActions (Route.WikiArticles { slug = slug })
+                    |> Expect.equal
+                        [ Store.AskForWikiCatalog
+                        , Store.AskForWikiFrontendDetails slug
+                        ]
         , Test.test "storeActions NotFound asks nothing" <|
             \_ ->
                 Url.fromString "https://example.com/nope"
@@ -102,6 +121,9 @@ suite =
                                     False
 
                                 Route.WikiHome _ ->
+                                    False
+
+                                Route.WikiArticles _ ->
                                     False
                         )
                     |> Expect.equal (Just True)

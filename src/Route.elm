@@ -15,6 +15,7 @@ import Url exposing (Url)
 type Route
     = WikiList
     | WikiHome { slug : String }
+    | WikiArticles { slug : String }
     | NotFound Url
 
 
@@ -45,6 +46,13 @@ fromUrl url =
                     else
                         WikiHome { slug = slug }
 
+                [ "w", slug, "articles" ] ->
+                    if slug == "" then
+                        NotFound url
+
+                    else
+                        WikiArticles { slug = slug }
+
                 _ ->
                     NotFound url
 
@@ -70,6 +78,9 @@ isWikiList route =
         WikiHome _ ->
             False
 
+        WikiArticles _ ->
+            False
+
         NotFound _ ->
             False
 
@@ -81,6 +92,9 @@ storeActions route =
             [ AskForWikiCatalog ]
 
         WikiHome { slug } ->
+            [ AskForWikiCatalog, AskForWikiFrontendDetails slug ]
+
+        WikiArticles { slug } ->
             [ AskForWikiCatalog, AskForWikiFrontendDetails slug ]
 
         NotFound _ ->

@@ -24,7 +24,7 @@
 
 1. [x] Viewer can open `/` and see a list of hosted wikis so that they can discover available communities.
 2. [x] Viewer can open `/w/:wikiSlug` so that they can access a specific wiki.
-3. [ ] Viewer can open `/w/:wikiSlug/articles` so that they can browse published articles.
+3. [x] Viewer can open `/w/:wikiSlug/articles` so that they can browse published articles.
 4. [ ] Viewer can open `/w/:wikiSlug/articles/:articleSlug` so that they can read published content.
 5. [ ] Viewer can see backlinks on an article page so that they can find related pages.
 6. [ ] Viewer can only see published revisions so that unreviewed changes are not exposed.
@@ -88,9 +88,7 @@ digraph SortOfWiki {
     color="#9e9e9e";
     style="rounded";
 
-    S1 [label="S1 Catalog on /", fillcolor="#5cb85c"];
     S35 [label="S35 404 unknown URL", fillcolor="#5cb85c"];
-    S2 [label="S2 Wiki entry", fillcolor="#5cb85c"];
     S4 [label="S4 Read published article", fillcolor="#5cb85c"];
     S5 [label="S5 Backlinks on article", fillcolor="#5cb85c"];
     S7 [label="S7 Register contributor", fillcolor="#5bc0de"];
@@ -127,9 +125,6 @@ digraph SortOfWiki {
   S45 [label="S45 Cross-tenant health dashboard", fillcolor="#d9534f"];
 
   // Core dependency edges
-  S1 -> S35;
-  S1 -> S2;
-  S2 -> S4;
   S4 -> S5;
 
   S7 -> S8;

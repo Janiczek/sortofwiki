@@ -23,4 +23,21 @@ suite =
                         |> String.startsWith "/w/"
                         |> Expect.equal True
             ]
+        , Test.describe "articleIndexUrlPath"
+            [ Test.test "demo wiki articles index" <|
+                \() ->
+                    Wiki.articleIndexUrlPath "demo"
+                        |> Expect.equal "/w/demo/articles"
+            , Test.fuzz Fuzzers.wikiSlug "ends with /articles" <|
+                \slug ->
+                    Wiki.articleIndexUrlPath slug
+                        |> String.endsWith "/articles"
+                        |> Expect.equal True
+            ]
+        , Test.describe "publishedArticleUrlPath"
+            [ Test.test "joins wiki, articles segment, and page slug" <|
+                \() ->
+                    Wiki.publishedArticleUrlPath "demo" "home"
+                        |> Expect.equal "/w/demo/articles/home"
+            ]
         ]

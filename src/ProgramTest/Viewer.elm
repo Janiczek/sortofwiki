@@ -5,6 +5,7 @@ import Effect.Test
 import Frontend
 import ProgramTest.Story01_WikiList as Story01
 import ProgramTest.Story02_WikiHome as Story02
+import ProgramTest.Story03_ArticleIndex as Story03
 import ProgramTest.Story35_NotFound as Story35
 import Types exposing (ToBackend, ToFrontend)
 
@@ -17,6 +18,7 @@ main :
 main =
     [ Story01.endToEndTests
     , Story02.endToEndTests
+    , Story03.endToEndTests
     , Story35.endToEndTests
     ]
         |> List.concat

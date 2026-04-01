@@ -283,6 +283,32 @@ viewWikiHome wikiSlug summary details =
         ]
 
 
+viewArticlesList : Wiki.Slug -> Wiki.Summary -> Wiki.FrontendDetails -> Html Msg
+viewArticlesList wikiSlug summary details =
+    Html.div
+        [ Attr.id "articles-list-page"
+        , Attr.attribute "data-wiki-slug" wikiSlug
+        ]
+        [ Html.h1 [] [ Html.text (summary.name ++ " — Articles") ]
+        , Html.ul
+            [ Attr.id "articles-list-page-list"
+            ]
+            (details.pageSlugs
+                |> List.sort
+                |> List.map
+                    (\articleSlug ->
+                        Html.li []
+                            [ Html.a
+                                [ Attr.href (Wiki.publishedArticleUrlPath wikiSlug articleSlug)
+                                , Attr.attribute "data-article-slug" articleSlug
+                                ]
+                                [ Html.text articleSlug ]
+                            ]
+                    )
+            )
+        ]
+
+
 viewNotFound : Html Msg
 viewNotFound =
     Html.div
@@ -303,6 +329,20 @@ documentTitle ({ store } as model) =
             case Store.get slug store.wikiCatalog of
                 RemoteData.Success summary ->
                     summary.name ++ " — SortOfWiki"
+
+                RemoteData.Failure _ ->
+                    "404 — SortOfWiki"
+
+                RemoteData.Loading ->
+                    "Loading - SortOfWiki"
+
+                RemoteData.NotAsked ->
+                    "Loading - SortOfWiki"
+
+        Route.WikiArticles { slug } ->
+            case Store.get slug store.wikiCatalog of
+                RemoteData.Success summary ->
+                    "Articles - " ++ summary.name ++ " — SortOfWiki"
 
                 RemoteData.Failure _ ->
                     "404 — SortOfWiki"
@@ -344,6 +384,33 @@ viewWikiHomeRoute { store } slug =
             viewWikiHomeLoading
 
 
+viewArticlesListRoute : Model -> Wiki.Slug -> Html Msg
+viewArticlesListRoute { store } slug =
+    case Store.get_ slug store.wikiDetails of
+        RemoteData.Success details ->
+            case Store.get slug store.wikiCatalog of
+                RemoteData.Success summary ->
+                    viewArticlesList slug summary details
+
+                RemoteData.Failure _ ->
+                    viewNotFound
+
+                RemoteData.Loading ->
+                    viewWikiHomeLoading
+
+                RemoteData.NotAsked ->
+                    viewWikiHomeLoading
+
+        RemoteData.Failure _ ->
+            viewNotFound
+
+        RemoteData.Loading ->
+            viewWikiHomeLoading
+
+        RemoteData.NotAsked ->
+            viewWikiHomeLoading
+
+
 viewBody : Model -> Html Msg
 viewBody model =
     case model.route of
@@ -352,6 +419,9 @@ viewBody model =
 
         Route.WikiHome { slug } ->
             viewWikiHomeRoute model slug
+
+        Route.WikiArticles { slug } ->
+            viewArticlesListRoute model slug
 
         Route.NotFound _ ->
             viewNotFound

@@ -3,8 +3,10 @@ module Wiki exposing
     , Slug
     , Summary
     , Wiki
+    , articleIndexUrlPath
     , catalogUrlPath
     , frontendDetails
+    , publishedArticleUrlPath
     , summary
     )
 
@@ -52,3 +54,17 @@ frontendDetails w =
 catalogUrlPath : Summary -> String
 catalogUrlPath s =
     "/w/" ++ s.slug
+
+
+{-| Published article index for a wiki, e.g. `/w/my-wiki/articles`.
+-}
+articleIndexUrlPath : Slug -> String
+articleIndexUrlPath wikiSlug =
+    "/w/" ++ wikiSlug ++ "/articles"
+
+
+{-| Path to a published article, e.g. `/w/my-wiki/articles/page-slug`.
+-}
+publishedArticleUrlPath : Slug -> Page.Slug -> String
+publishedArticleUrlPath wikiSlug articleSlug =
+    articleIndexUrlPath wikiSlug ++ "/" ++ articleSlug

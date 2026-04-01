@@ -22,7 +22,9 @@ seedWikis =
     [ { slug = "demo"
       , name = "Demo Wiki"
       , pages =
-            [ { slug = "home", content = "Welcome to the Demo Wiki." } ]
+            [ { slug = "home", content = "Welcome to the Demo Wiki." }
+            , { slug = "guides", content = "How to use this wiki." }
+            ]
                 |> slugDict
       }
     , { slug = "elm-tips"
