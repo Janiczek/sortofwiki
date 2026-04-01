@@ -1,9 +1,11 @@
 module Fuzzers exposing
-    ( wikiSlug
+    ( pageSlug
+    , wikiSlug
     , wikiSummary
     )
 
 import Fuzz exposing (Fuzzer)
+import Page
 import Wiki
 
 
@@ -16,6 +18,11 @@ wikiSummary =
 
 wikiSlug : Fuzzer Wiki.Slug
 wikiSlug =
+    nonEmptyString
+
+
+pageSlug : Fuzzer Page.Slug
+pageSlug =
     nonEmptyString
 
 

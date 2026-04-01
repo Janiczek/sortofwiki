@@ -4,8 +4,8 @@
 
 - `/` - public homepage with hosted wiki catalog
 - `/w/:wikiSlug` - wiki homepage (latest activity, key navigation)
-- `/w/:wikiSlug/articles` - article index
-- `/w/:wikiSlug/articles/:articleSlug` - published article view
+- `/w/:wikiSlug/pages` - page index
+- `/w/:wikiSlug/p/:pageSlug` - published page view
 - `/w/:wikiSlug/register` - register as wiki contributor
 - `/w/:wikiSlug/login` - login
 - `/w/:wikiSlug/submit/:submissionId` - contributor submission detail
@@ -24,18 +24,18 @@
 
 1. [x] Viewer can open `/` and see a list of hosted wikis so that they can discover available communities.
 2. [x] Viewer can open `/w/:wikiSlug` so that they can access a specific wiki.
-3. [x] Viewer can open `/w/:wikiSlug/articles` so that they can browse published articles.
-4. [ ] Viewer can open `/w/:wikiSlug/articles/:articleSlug` so that they can read published content.
-5. [ ] Viewer can see backlinks on an article page so that they can find related pages.
+3. [x] Viewer can open `/w/:wikiSlug/pages` so that they can browse published pages.
+4. [x] Viewer can open `/w/:wikiSlug/p/:pageSlug` so that they can read published content.
+5. [ ] Viewer can see backlinks on a page so that they can find related pages.
 6. [ ] Viewer can only see published revisions so that unreviewed changes are not exposed.
-7. [ ] Contributor can register at `/w/:wikiSlug/register` so that they can submit article changes.
+7. [ ] Contributor can register at `/w/:wikiSlug/register` so that they can submit page changes.
 8. [ ] Contributor can log in at `/w/:wikiSlug/login` so that their submissions are attributed to them.
-9. [ ] Contributor can submit a new article draft so that it can be reviewed.
-10. [ ]  Contributor can submit edits to an existing article so that they can improve content.
-11. [ ]  Contributor can request article deletion through a submission so that removals are moderated.
+9. [ ] Contributor can submit a new page draft so that it can be reviewed.
+10. [ ]  Contributor can submit edits to an existing page so that they can improve content.
+11. [ ]  Contributor can request page deletion through a submission so that removals are moderated.
 12. [ ]  Contributor can view submission status so that they know whether a change is pending, approved, rejected, or needs revision.
 13. [ ]  Contributor can read reviewer notes on rejected or revision-requested submissions so that they can improve and resubmit.
-14. [ ]  Trusted contributor can publish article create/edit/delete changes immediately so that routine maintenance is fast.
+14. [ ]  Trusted contributor can publish page create/edit/delete changes immediately so that routine maintenance is fast.
 15. [ ]  Trusted contributor can open `/w/:wikiSlug/review` so that they can process pending submissions.
 16. [ ]  Trusted contributor can inspect submission diffs so that they can make informed moderation decisions.
 17. [ ]  Trusted contributor can approve a submission so that it goes live.
@@ -47,7 +47,7 @@
 23. [ ]  Wiki admin can grant admin rights to another trusted contributor so that governance can be shared.
 24. [ ]  Wiki admin can revoke admin rights so that incorrect access can be corrected.
 25. [ ]  Wiki admin can open `/w/:wikiSlug/admin/audit` so that they can see what changed and by whom.
-26. [ ]  Wiki admin can filter audit events by actor, article, and event type so that they can investigate incidents.
+26. [ ]  Wiki admin can filter audit events by actor, page, and event type so that they can investigate incidents.
 27. [ ]  Platform host admin can authenticate at `/admin` using the hidden URL and password so that platform operations remain restricted.
 28. [ ]  Platform host admin can open `/admin/wikis` and see all hosted wikis so that they can manage the catalog.
 29. [ ]  Platform host admin can create a hosted wiki so that new communities can be launched.
@@ -60,13 +60,13 @@
 
 ## 4) Post-MVP User Stories (Numbered)
 
-36. [ ] Viewer can search articles within a wiki so that they can quickly find relevant pages.
+36. [ ] Viewer can search pages within a wiki so that they can quickly find relevant pages.
 37. [ ] Viewer can sort wiki catalog entries by activity so that they can find active communities.
 38. [ ] Contributor can receive in-app notifications for review decisions so that they do not need to poll manually.
 39. [ ] Trusted contributor can view moderation workload metrics so that review throughput can be balanced.
 40. [ ] Wiki admin can suspend or ban abusive users so that repeated abuse can be controlled quickly.
 41. [ ] Wiki admin can export audit logs so that compliance and external review are possible.
-42. [ ] Wiki admin can restore deleted articles from a retention window so that mistakes are reversible.
+42. [ ] Wiki admin can restore deleted pages from a retention window so that mistakes are reversible.
 43. [ ] Platform host admin can enforce optional second-factor login so that host controls have stronger protection.
 44. [ ] Platform host admin can mark wikis as public, unlisted, or private so that visibility policy is explicit.
 45. [ ] Platform host admin can view cross-tenant health dashboards so that operational issues are detected early.
@@ -88,12 +88,10 @@ digraph SortOfWiki {
     color="#9e9e9e";
     style="rounded";
 
-    S35 [label="S35 404 unknown URL", fillcolor="#5cb85c"];
-    S4 [label="S4 Read published article", fillcolor="#5cb85c"];
-    S5 [label="S5 Backlinks on article", fillcolor="#5cb85c"];
+    S5 [label="S5 Backlinks on page", fillcolor="#5cb85c"];
     S7 [label="S7 Register contributor", fillcolor="#5bc0de"];
     S8 [label="S8 Login contributor", fillcolor="#5bc0de"];
-    S10 [label="S10 Submit article edit", fillcolor="#5bc0de"];
+    S10 [label="S10 Submit page edit", fillcolor="#5bc0de"];
     S12 [label="S12 Track submission status", fillcolor="#5bc0de"];
     S14 [label="S14 Trusted direct publish", fillcolor="#f0ad4e"];
     S15 [label="S15 Review queue", fillcolor="#f0ad4e"];
@@ -114,19 +112,17 @@ digraph SortOfWiki {
   }
 
   // Non-MVP nodes outside cluster
-  S36 [label="S36 Article search", fillcolor="#5cb85c"];
+  S36 [label="S36 Page search", fillcolor="#5cb85c"];
   S38 [label="S38 Review notifications", fillcolor="#5bc0de"];
   S39 [label="S39 Moderation metrics", fillcolor="#f0ad4e"];
   S40 [label="S40 Suspend/ban users", fillcolor="#d9534f"];
   S41 [label="S41 Audit export", fillcolor="#d9534f"];
-  S42 [label="S42 Restore deleted articles", fillcolor="#d9534f"];
+  S42 [label="S42 Restore deleted pages", fillcolor="#d9534f"];
   S43 [label="S43 Host 2FA", fillcolor="#d9534f"];
   S44 [label="S44 Public/unlisted/private mode", fillcolor="#d9534f"];
   S45 [label="S45 Cross-tenant health dashboard", fillcolor="#d9534f"];
 
   // Core dependency edges
-  S4 -> S5;
-
   S7 -> S8;
   S8 -> S10;
   S10 -> S12;
@@ -157,7 +153,6 @@ digraph SortOfWiki {
   S34 -> S15;
 
   // Post-MVP dependencies
-  S4 -> S36;
   S12 -> S38;
   S15 -> S39;
   S20 -> S40;

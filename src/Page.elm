@@ -1,4 +1,4 @@
-module Page exposing (Page, Slug)
+module Page exposing (FrontendDetails, Page, Slug, frontendDetails)
 
 
 type alias Page =
@@ -9,3 +9,13 @@ type alias Page =
 
 type alias Slug =
     String
+
+
+type alias FrontendDetails =
+    { markdownSource : String
+    }
+
+
+frontendDetails : Page -> FrontendDetails
+frontendDetails p =
+    { markdownSource = p.content }

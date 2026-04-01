@@ -7,6 +7,7 @@ import Expect
 import Frontend
 import Fuzz
 import Fuzzers
+import Page
 import RemoteData
 import Store exposing (Store)
 import Test exposing (Test)
@@ -61,6 +62,7 @@ suite =
                         store =
                             { wikiCatalog = RemoteData.succeed dict
                             , wikiDetails = Dict.empty
+                            , publishedPages = Dict.empty
                             }
                     in
                     store
@@ -75,6 +77,7 @@ suite =
                                 RemoteData.succeed
                                     (Dict.singleton "x" { slug = "x", name = "X" })
                             , wikiDetails = Dict.empty
+                            , publishedPages = Dict.empty
                             }
                     in
                     store
@@ -96,5 +99,42 @@ suite =
                             ( { store | wikiDetails = Dict.singleton "demo" RemoteData.Loading }
                             , Effect.Lamdera.sendToBackend (RequestWikiFrontendDetails "demo")
                             )
+            , Test.test "AskForPageFrontendDetails starts load from empty" <|
+                \() ->
+                    let
+                        store : Store
+                        store =
+                            Store.empty
+                    in
+                    store
+                        |> Store.perform Frontend.storeConfig (Store.AskForPageFrontendDetails "demo" "home")
+                        |> Expect.equal
+                            ( { store
+                                | publishedPages =
+                                    Dict.singleton ( "demo", "home" ) RemoteData.Loading
+                              }
+                            , Effect.Lamdera.sendToBackend (RequestPageFrontendDetails "demo" "home")
+                            )
+            , Test.fuzz (Fuzz.map2 Tuple.pair Fuzzers.wikiSlug Fuzzers.pageSlug) "AskForPageFrontendDetails skips when already Success" <|
+                \( wikiSlug, pageSlug ) ->
+                    let
+                        key : ( Wiki.Slug, Page.Slug )
+                        key =
+                            ( wikiSlug, pageSlug )
+
+                        store : Store
+                        store =
+                            { wikiCatalog = RemoteData.NotAsked
+                            , wikiDetails = Dict.empty
+                            , publishedPages =
+                                Dict.singleton key
+                                    (RemoteData.succeed
+                                        (Page.frontendDetails { slug = pageSlug, content = "body" })
+                                    )
+                            }
+                    in
+                    store
+                        |> Store.perform Frontend.storeConfig (Store.AskForPageFrontendDetails wikiSlug pageSlug)
+                        |> Expect.equal ( store, Command.none )
             ]
         ]

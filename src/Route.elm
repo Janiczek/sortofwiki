@@ -6,16 +6,19 @@ module Route exposing
     , storeActions
     )
 
+import Page
 import Store exposing (Action(..))
 import Url exposing (Url)
+import Wiki
 
 
 {-| Resolved client route from the URL path.
 -}
 type Route
     = WikiList
-    | WikiHome { slug : String }
-    | WikiArticles { slug : String }
+    | WikiHome Wiki.Slug
+    | WikiPages Wiki.Slug
+    | WikiPage Wiki.Slug Page.Slug
     | NotFound Url
 
 
@@ -44,14 +47,21 @@ fromUrl url =
                         NotFound url
 
                     else
-                        WikiHome { slug = slug }
+                        WikiHome slug
 
-                [ "w", slug, "articles" ] ->
+                [ "w", slug, "pages" ] ->
                     if slug == "" then
                         NotFound url
 
                     else
-                        WikiArticles { slug = slug }
+                        WikiPages slug
+
+                [ "w", wikiSlug, "p", pageSlug ] ->
+                    if wikiSlug == "" || pageSlug == "" then
+                        NotFound url
+
+                    else
+                        WikiPage wikiSlug pageSlug
 
                 _ ->
                     NotFound url
@@ -78,7 +88,10 @@ isWikiList route =
         WikiHome _ ->
             False
 
-        WikiArticles _ ->
+        WikiPages _ ->
+            False
+
+        WikiPage _ _ ->
             False
 
         NotFound _ ->
@@ -91,11 +104,17 @@ storeActions route =
         WikiList ->
             [ AskForWikiCatalog ]
 
-        WikiHome { slug } ->
+        WikiHome slug ->
             [ AskForWikiCatalog, AskForWikiFrontendDetails slug ]
 
-        WikiArticles { slug } ->
+        WikiPages slug ->
             [ AskForWikiCatalog, AskForWikiFrontendDetails slug ]
+
+        WikiPage wikiSlug pageSlug ->
+            [ AskForWikiCatalog
+            , AskForWikiFrontendDetails wikiSlug
+            , AskForPageFrontendDetails wikiSlug pageSlug
+            ]
 
         NotFound _ ->
             []

@@ -6,6 +6,7 @@ module Frontend exposing
     , storeConfig
     )
 
+import PageMarkdown
 import Browser
 import Browser.Navigation
 import Dict exposing (Dict)
@@ -17,6 +18,7 @@ import Effect.Subscription as Subscription exposing (Subscription)
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Lamdera
+import Page
 import RemoteData
 import Route exposing (Route)
 import Store exposing (Store)
@@ -37,6 +39,7 @@ storeConfig : Store.Config ToBackend
 storeConfig =
     { requestWikiCatalog = RequestWikiCatalog
     , requestWikiFrontendDetails = RequestWikiFrontendDetails
+    , requestPageFrontendDetails = RequestPageFrontendDetails
     }
 
 
@@ -194,6 +197,30 @@ updateFromBackend msg ({ store } as model) =
             ( { model | store = newStore }, Command.none )
                 |> runRouteStoreActions
 
+        PageFrontendDetailsResponse wikiSlug pageSlug maybeDetails ->
+            let
+                key : ( Wiki.Slug, Page.Slug )
+                key =
+                    ( wikiSlug, pageSlug )
+
+                nextStore : Store
+                nextStore =
+                    case maybeDetails of
+                        Just details ->
+                            { store
+                                | publishedPages =
+                                    Dict.insert key (RemoteData.succeed details) store.publishedPages
+                            }
+
+                        Nothing ->
+                            { store
+                                | publishedPages =
+                                    Dict.insert key (RemoteData.Failure ()) store.publishedPages
+                            }
+            in
+            ( { model | store = nextStore }, Command.none )
+                |> runRouteStoreActions
+
 
 catalogRows : Dict Wiki.Slug Wiki.Summary -> List Wiki.Summary
 catalogRows wikis =
@@ -283,26 +310,26 @@ viewWikiHome wikiSlug summary details =
         ]
 
 
-viewArticlesList : Wiki.Slug -> Wiki.Summary -> Wiki.FrontendDetails -> Html Msg
-viewArticlesList wikiSlug summary details =
+viewPagesList : Wiki.Slug -> Wiki.Summary -> Wiki.FrontendDetails -> Html Msg
+viewPagesList wikiSlug summary details =
     Html.div
-        [ Attr.id "articles-list-page"
+        [ Attr.id "pages-list-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
         ]
-        [ Html.h1 [] [ Html.text (summary.name ++ " — Articles") ]
+        [ Html.h1 [] [ Html.text (summary.name ++ " — Pages") ]
         , Html.ul
-            [ Attr.id "articles-list-page-list"
+            [ Attr.id "pages-list-page-list"
             ]
             (details.pageSlugs
                 |> List.sort
                 |> List.map
-                    (\articleSlug ->
+                    (\pageSlug ->
                         Html.li []
                             [ Html.a
-                                [ Attr.href (Wiki.publishedArticleUrlPath wikiSlug articleSlug)
-                                , Attr.attribute "data-article-slug" articleSlug
+                                [ Attr.href (Wiki.publishedPageUrlPath wikiSlug pageSlug)
+                                , Attr.attribute "data-page-slug" pageSlug
                                 ]
-                                [ Html.text articleSlug ]
+                                [ Html.text pageSlug ]
                             ]
                     )
             )
@@ -325,7 +352,7 @@ documentTitle ({ store } as model) =
         Route.WikiList ->
             "SortOfWiki"
 
-        Route.WikiHome { slug } ->
+        Route.WikiHome slug ->
             case Store.get slug store.wikiCatalog of
                 RemoteData.Success summary ->
                     summary.name ++ " — SortOfWiki"
@@ -339,10 +366,25 @@ documentTitle ({ store } as model) =
                 RemoteData.NotAsked ->
                     "Loading - SortOfWiki"
 
-        Route.WikiArticles { slug } ->
+        Route.WikiPages slug ->
             case Store.get slug store.wikiCatalog of
                 RemoteData.Success summary ->
-                    "Articles - " ++ summary.name ++ " — SortOfWiki"
+                    "Pages - " ++ summary.name ++ " — SortOfWiki"
+
+                RemoteData.Failure _ ->
+                    "404 — SortOfWiki"
+
+                RemoteData.Loading ->
+                    "Loading - SortOfWiki"
+
+                RemoteData.NotAsked ->
+                    "Loading - SortOfWiki"
+
+        Route.WikiPage wikiSlug pageSlug ->
+            case Store.get wikiSlug store.wikiCatalog of
+                RemoteData.Success summary ->
+                    -- TODO we need the page name, not just the slug
+                    pageSlug ++ " — " ++ summary.name ++ " — SortOfWiki"
 
                 RemoteData.Failure _ ->
                     "404 — SortOfWiki"
@@ -384,13 +426,13 @@ viewWikiHomeRoute { store } slug =
             viewWikiHomeLoading
 
 
-viewArticlesListRoute : Model -> Wiki.Slug -> Html Msg
-viewArticlesListRoute { store } slug =
+viewPagesListRoute : Model -> Wiki.Slug -> Html Msg
+viewPagesListRoute { store } slug =
     case Store.get_ slug store.wikiDetails of
         RemoteData.Success details ->
             case Store.get slug store.wikiCatalog of
                 RemoteData.Success summary ->
-                    viewArticlesList slug summary details
+                    viewPagesList slug summary details
 
                 RemoteData.Failure _ ->
                     viewNotFound
@@ -411,17 +453,75 @@ viewArticlesListRoute { store } slug =
             viewWikiHomeLoading
 
 
+viewPublishedPage : Wiki.Slug -> Page.Slug -> Wiki.Summary -> Page.FrontendDetails -> Html Msg
+viewPublishedPage wikiSlug pageSlug summary pageDetails =
+    Html.div
+        [ Attr.id "page-published-page"
+        , Attr.attribute "data-wiki-slug" wikiSlug
+        , Attr.attribute "data-page-slug" pageSlug
+        ]
+        [ Html.header []
+            [ Html.h1 [] [ Html.text summary.name ]
+            , Html.p [ Attr.class "page-published-slug" ]
+                [ Html.text pageSlug ]
+            ]
+        , PageMarkdown.view pageDetails
+        ]
+
+
+viewPublishedPageRoute : Model -> Wiki.Slug -> Page.Slug -> Html Msg
+viewPublishedPageRoute { store } wikiSlug pageSlug =
+    case
+        ( Store.get_ wikiSlug store.wikiDetails
+        , Store.get wikiSlug store.wikiCatalog
+        , Store.get_ ( wikiSlug, pageSlug ) store.publishedPages
+        )
+    of
+        ( RemoteData.Success _, RemoteData.Success summary, RemoteData.Success pageDetails ) ->
+            viewPublishedPage wikiSlug pageSlug summary pageDetails
+
+        ( _, _, RemoteData.Failure _ ) ->
+            viewNotFound
+
+        ( _, _, RemoteData.Loading ) ->
+            viewWikiHomeLoading
+
+        ( _, _, RemoteData.NotAsked ) ->
+            viewWikiHomeLoading
+
+        ( _, RemoteData.Failure _, _ ) ->
+            viewNotFound
+
+        ( _, RemoteData.Loading, _ ) ->
+            viewWikiHomeLoading
+
+        ( _, RemoteData.NotAsked, _ ) ->
+            viewWikiHomeLoading
+
+        ( RemoteData.Failure _, _, _ ) ->
+            viewNotFound
+
+        ( RemoteData.Loading, _, _ ) ->
+            viewWikiHomeLoading
+
+        ( RemoteData.NotAsked, _, _ ) ->
+            viewWikiHomeLoading
+
+
 viewBody : Model -> Html Msg
 viewBody model =
     case model.route of
         Route.WikiList ->
             viewWikiListBody model.store
 
-        Route.WikiHome { slug } ->
+        Route.WikiHome slug ->
             viewWikiHomeRoute model slug
 
-        Route.WikiArticles { slug } ->
-            viewArticlesListRoute model slug
+        Route.WikiPages slug ->
+            viewPagesListRoute model slug
+
+        Route.WikiPage wikiSlug pageSlug ->
+            viewPublishedPageRoute model wikiSlug pageSlug
 
         Route.NotFound _ ->
             viewNotFound

@@ -23,7 +23,7 @@ seedWikis =
       , name = "Demo Wiki"
       , pages =
             [ { slug = "home", content = "Welcome to the Demo Wiki." }
-            , { slug = "guides", content = "How to use this wiki." }
+            , { slug = "guides", content = "## How to use this wiki\n\nRead the **manual**.\n" }
             ]
                 |> slugDict
       }
@@ -81,6 +81,18 @@ updateFromFrontend _ clientId msg model =
                     (model.wikis
                         |> Dict.get slug
                         |> Maybe.map Wiki.frontendDetails
+                    )
+                )
+            )
+
+        RequestPageFrontendDetails wikiSlug pageSlug ->
+            ( model
+            , Effect.Lamdera.sendToFrontend clientId
+                (PageFrontendDetailsResponse wikiSlug
+                    pageSlug
+                    (model.wikis
+                        |> Dict.get wikiSlug
+                        |> Maybe.andThen (Wiki.publishedPageFrontendDetails pageSlug)
                     )
                 )
             )
