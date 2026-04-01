@@ -24,6 +24,17 @@ All implemented user stories must have a program test (end-to-end unit test) pre
 Domain types must live in their own modules together with their helper functions, not in `Types.elm`. Foo.barIsBaz, Foo.barFromString, Foo.barDecoder are an antipattern, and Bar (or Foo.Bar) should have its own module.
 
 All domain types need to be both unit-tested (showing examples of usage) and PBT-tested (checking general properties and invariants) if there's something to test (a function with some behaviour, not just the type definition). Edge cases need to be tested via both unit tests and PBT tests.
+The `describe` tree should be: module name > function, so eg.
+```elm
+suite : Test
+suite =
+  Test.describe "Foo"
+    [ Test.describe "bar"
+        [ Test.test "does X" <| \() -> ... Foo.bar someFoo ...
+        , Test.fuzz Fuzzers.foo "does Y" <| \foo -> ... Foo.bar foo ...
+        ]
+    ]
+```
 
 Unqualified imports: only allowed for types of the same name as the module. Values, constructors and functions must be qualified when used.
 * yes: `import Foo exposing (Foo)`
@@ -53,3 +64,18 @@ write:
 Foo.isBar "bar"
     |> Expect.equal True
 ```
+
+When matching on custom types that we define, always list all cases instead of using `_ ->`. When multiple cases share behaviour, you can do
+```elm
+let
+  common : () -> foo
+  common () =
+    ...the common behaviour...
+in
+case bar of
+  Baz -> common ()
+  Quux -> common ()
+  Quuz -> ...something else...
+```
+
+`lamdera live` _REQUIRES_ that there exist `Types.FrontendModel`, `Types.BackendModel`, `Types.FrontendMsg` and `Types.BackendMsg`, and that `Types.ToFrontend` and `Types.ToBackend` aren't aliases.

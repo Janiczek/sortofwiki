@@ -1,15 +1,17 @@
 module ProgramTest.Story35_NotFound exposing (endToEndTests)
 
+import Backend
 import Effect.Lamdera
 import Effect.Test
 import Effect.Time
+import Frontend
 import ProgramTest.Config
 import Test.Html.Query
 import Test.Html.Selector
-import Types exposing (BackendModel, BackendMsg, FrontendModel, FrontendMsg, ToBackend, ToFrontend)
+import Types exposing (ToBackend, ToFrontend)
 
 
-endToEndTests : List (Effect.Test.EndToEndTest ToBackend FrontendMsg FrontendModel ToFrontend BackendMsg BackendModel)
+endToEndTests : List (Effect.Test.EndToEndTest ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model)
 endToEndTests =
     [ Effect.Test.start
         "35 — 404 for unknown URL"

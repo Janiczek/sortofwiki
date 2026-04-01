@@ -3,7 +3,7 @@ module ProgramTest.Config exposing (config)
 import Backend
 import Effect.Test
 import Frontend
-import Types exposing (BackendModel, BackendMsg, FrontendModel, FrontendMsg, ToBackend, ToFrontend)
+import Types exposing (ToBackend, ToFrontend)
 import Url exposing (Protocol(..), Url)
 
 
@@ -22,9 +22,7 @@ unsafeDomainUrl =
             }
 
 
-{-| Shared Lamdera program-test configuration for SortOfWiki Frontend/Backend.
--}
-config : Effect.Test.Config ToBackend FrontendMsg FrontendModel ToFrontend BackendMsg BackendModel
+config : Effect.Test.Config ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model
 config =
     { frontendApp = Frontend.app_
     , backendApp = Backend.app_

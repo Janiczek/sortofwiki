@@ -1,41 +1,58 @@
-module Backend exposing (Model, app, app_)
+module Backend exposing (Model, Msg, app, app_)
 
+import Dict exposing (Dict)
 import Effect.Command as Command exposing (BackendOnly, Command)
 import Effect.Lamdera exposing (ClientId, SessionId)
 import Effect.Subscription as Subscription exposing (Subscription)
 import Lamdera
-import Types
-    exposing
-        ( BackendModel
-        , BackendMsg(..)
-        , ToBackend(..)
-        , ToFrontend(..)
-        )
-import WikiSummary exposing (WikiSummary)
+import Types exposing (BackendModel, BackendMsg(..), ToBackend(..), ToFrontend(..))
+import Wiki exposing (Slug, Wiki)
 
 
 type alias Model =
     BackendModel
 
 
-seedWikis : List WikiSummary
+type alias Msg =
+    BackendMsg
+
+
+seedWikis : Dict Slug Wiki
 seedWikis =
-    [ { slug = "demo", name = "Demo Wiki" }
-    , { slug = "elm-tips", name = "Elm Tips" }
+    [ { slug = "demo"
+      , name = "Demo Wiki"
+      , pages =
+            [ { slug = "home", content = "Welcome to the Demo Wiki." } ]
+                |> slugDict
+      }
+    , { slug = "elm-tips"
+      , name = "Elm Tips"
+      , pages =
+            [ { slug = "home", content = "Tips and notes about Elm." } ]
+                |> slugDict
+      }
     ]
+        |> slugDict
 
 
-init : ( Model, Command BackendOnly ToFrontend BackendMsg )
+slugDict : List { a | slug : String } -> Dict String { a | slug : String }
+slugDict list =
+    list
+        |> List.map (\item -> ( item.slug, item ))
+        |> Dict.fromList
+
+
+init : ( Model, Command BackendOnly ToFrontend Msg )
 init =
     ( { wikis = seedWikis }
     , Command.none
     )
 
 
-update : BackendMsg -> Model -> ( Model, Command BackendOnly ToFrontend BackendMsg )
+update : Msg -> Model -> ( Model, Command BackendOnly ToFrontend Msg )
 update msg model =
     case msg of
-        NoOpBackendMsg ->
+        BackendNoOp ->
             ( model, Command.none )
 
 
@@ -44,30 +61,44 @@ updateFromFrontend :
     -> ClientId
     -> ToBackend
     -> Model
-    -> ( Model, Command BackendOnly ToFrontend BackendMsg )
+    -> ( Model, Command BackendOnly ToFrontend Msg )
 updateFromFrontend _ clientId msg model =
     case msg of
         RequestWikiCatalog ->
             ( model
-            , Effect.Lamdera.sendToFrontend clientId (WikiCatalog model.wikis)
+            , Effect.Lamdera.sendToFrontend clientId
+                (WikiCatalogResponse
+                    (model.wikis |> Dict.map (\_ w -> Wiki.summary w))
+                )
+            )
+
+        RequestWikiFrontendDetails slug ->
+            ( model
+            , Effect.Lamdera.sendToFrontend clientId
+                (WikiFrontendDetailsResponse slug
+                    (model.wikis
+                        |> Dict.get slug
+                        |> Maybe.map Wiki.frontendDetails
+                    )
+                )
             )
 
 
-subscriptions : Model -> Subscription BackendOnly BackendMsg
+subscriptions : Model -> Subscription BackendOnly Msg
 subscriptions _ =
     Subscription.none
 
 
 app_ :
-    { init : ( Model, Command BackendOnly ToFrontend BackendMsg )
-    , update : BackendMsg -> Model -> ( Model, Command BackendOnly ToFrontend BackendMsg )
+    { init : ( Model, Command BackendOnly ToFrontend Msg )
+    , update : Msg -> Model -> ( Model, Command BackendOnly ToFrontend Msg )
     , updateFromFrontend :
         SessionId
         -> ClientId
         -> ToBackend
         -> Model
-        -> ( Model, Command BackendOnly ToFrontend BackendMsg )
-    , subscriptions : Model -> Subscription BackendOnly BackendMsg
+        -> ( Model, Command BackendOnly ToFrontend Msg )
+    , subscriptions : Model -> Subscription BackendOnly Msg
     }
 app_ =
     { init = init
@@ -78,10 +109,10 @@ app_ =
 
 
 app :
-    { init : ( Model, Cmd BackendMsg )
-    , update : BackendMsg -> Model -> ( Model, Cmd BackendMsg )
-    , updateFromFrontend : String -> String -> ToBackend -> Model -> ( Model, Cmd BackendMsg )
-    , subscriptions : Model -> Sub BackendMsg
+    { init : ( Model, Cmd Msg )
+    , update : Msg -> Model -> ( Model, Cmd Msg )
+    , updateFromFrontend : String -> String -> ToBackend -> Model -> ( Model, Cmd Msg )
+    , subscriptions : Model -> Sub Msg
     }
 app =
     Effect.Lamdera.backend Lamdera.broadcast Lamdera.sendToFrontend app_

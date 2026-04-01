@@ -23,7 +23,7 @@
 ## 3) MVP User Stories (Numbered)
 
 1. [x] Viewer can open `/` and see a list of hosted wikis so that they can discover available communities.
-2. [ ] Viewer can open `/w/:wikiSlug` so that they can access a specific wiki.
+2. [x] Viewer can open `/w/:wikiSlug` so that they can access a specific wiki.
 3. [ ] Viewer can open `/w/:wikiSlug/articles` so that they can browse published articles.
 4. [ ] Viewer can open `/w/:wikiSlug/articles/:articleSlug` so that they can read published content.
 5. [ ] Viewer can see backlinks on an article page so that they can find related pages.

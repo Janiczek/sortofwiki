@@ -49,10 +49,16 @@ config =
     , NoSimpleLetBody.rule
     , NoPrematureLetComputation.rule
     , NoUnused.CustomTypeConstructors.rule []
-        |> Rule.ignoreErrorsForFiles [ "src/Types.elm" ]
+        |> Rule.ignoreErrorsForFiles
+            [ "src/Types.elm"
+            , "src/Backend.elm"
+            ]
     , NoUnused.CustomTypeConstructorArgs.rule
     , NoUnused.Exports.rule
-        |> Rule.ignoreErrorsForFiles [ "src/Env.elm" ]
+        |> Rule.ignoreErrorsForFiles
+            [ "src/Env.elm"
+            , "src/Store.elm"
+            ]
     , NoUnused.Parameters.rule
     , NoUnused.Patterns.rule
     , NoUnused.Variables.rule

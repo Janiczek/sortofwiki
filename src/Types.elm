@@ -7,37 +7,41 @@ module Types exposing
     , ToFrontend(..)
     )
 
+import Dict exposing (Dict)
 import Effect.Browser
 import Effect.Browser.Navigation
 import Route exposing (Route)
+import Store exposing (Store)
 import Url exposing (Url)
-import WikiSummary exposing (WikiSummary)
+import Wiki exposing (Wiki)
+
+
+type ToBackend
+    = RequestWikiCatalog
+    | RequestWikiFrontendDetails Wiki.Slug
+
+
+type ToFrontend
+    = WikiCatalogResponse (Dict Wiki.Slug Wiki.Summary)
+    | WikiFrontendDetailsResponse Wiki.Slug (Maybe Wiki.FrontendDetails)
+
+
+type alias BackendModel =
+    { wikis : Dict Wiki.Slug Wiki
+    }
+
+
+type BackendMsg
+    = BackendNoOp
 
 
 type alias FrontendModel =
     { key : Effect.Browser.Navigation.Key
     , route : Route
-    , wikis : List WikiSummary
-    }
-
-
-type alias BackendModel =
-    { wikis : List WikiSummary
+    , store : Store
     }
 
 
 type FrontendMsg
     = UrlClicked Effect.Browser.UrlRequest
     | UrlChanged Url
-
-
-type ToBackend
-    = RequestWikiCatalog
-
-
-type BackendMsg
-    = NoOpBackendMsg
-
-
-type ToFrontend
-    = WikiCatalog (List WikiSummary)

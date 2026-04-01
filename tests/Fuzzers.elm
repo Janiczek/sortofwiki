@@ -1,17 +1,30 @@
-module Fuzzers exposing (wikiSummary)
+module Fuzzers exposing
+    ( wikiSlug
+    , wikiSummary
+    )
 
-import Fuzz
-import WikiSummary
+import Fuzz exposing (Fuzzer)
+import Wiki
 
 
-wikiSummary : Fuzz.Fuzzer WikiSummary.WikiSummary
+wikiSummary : Fuzzer Wiki.Summary
 wikiSummary =
-    Fuzz.map2 WikiSummary.WikiSummary
-        nonEmptyString
-        nonEmptyString
+    Fuzz.map2 Wiki.Summary
+        wikiSlug
+        wikiName
 
 
-nonEmptyString : Fuzz.Fuzzer String
+wikiSlug : Fuzzer Wiki.Slug
+wikiSlug =
+    nonEmptyString
+
+
+wikiName : Fuzzer String
+wikiName =
+    nonEmptyString
+
+
+nonEmptyString : Fuzzer String
 nonEmptyString =
     Fuzz.string
         |> Fuzz.map (\s -> "x" ++ s)

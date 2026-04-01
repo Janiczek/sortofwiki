@@ -4,15 +4,10 @@ set -euo pipefail
 deny() {
   local cmd=$1
   local reason=$2
-  jq -n \
-    --arg cmd "$cmd" \
-    --arg reason "$reason" \
-    '{
-      continue: true,
-      permission: "deny",
-      user_message: ("Command \u0027" + $cmd + "\u0027 failed"),
-      agent_message: ("Command \u0027" + $cmd + "\u0027 failed: " + $reason)
-    }'
+
+  jq -n --arg followup_message "$reason" '{
+    followup_message: $followup_message
+  }'
 }
 
 hook_cwd="${CURSOR_PROJECT_DIR:-$PWD}"

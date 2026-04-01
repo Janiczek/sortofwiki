@@ -1,5 +1,12 @@
-module Route exposing (Route(..), fromUrl, isWikiList)
+module Route exposing
+    ( Route(..)
+    , fromUrl
+    , isWikiList
+    , notFoundPath
+    , storeActions
+    )
 
+import Store exposing (Action(..))
 import Url exposing (Url)
 
 
@@ -7,10 +14,18 @@ import Url exposing (Url)
 -}
 type Route
     = WikiList
+    | WikiHome { slug : String }
     | NotFound Url
 
 
-{-| Map the browser URL to a route; only empty and `/` paths are the wiki catalog list.
+pathSegments : String -> List String
+pathSegments path =
+    path
+        |> String.split "/"
+        |> List.filter (\s -> s /= "")
+
+
+{-| Map the browser URL to a route.
 -}
 fromUrl : Url -> Route
 fromUrl url =
@@ -22,7 +37,26 @@ fromUrl url =
             WikiList
 
         _ ->
-            NotFound url
+            case pathSegments url.path of
+                [ "w", slug ] ->
+                    if slug == "" then
+                        NotFound url
+
+                    else
+                        WikiHome { slug = slug }
+
+                _ ->
+                    NotFound url
+
+
+notFoundPath : Route -> Maybe String
+notFoundPath route =
+    case route of
+        NotFound u ->
+            Just u.path
+
+        _ ->
+            Nothing
 
 
 {-| Whether this route is the public hosted-wikis catalog (`/`).
@@ -33,5 +67,21 @@ isWikiList route =
         WikiList ->
             True
 
+        WikiHome _ ->
+            False
+
         NotFound _ ->
             False
+
+
+storeActions : Route -> List Action
+storeActions route =
+    case route of
+        WikiList ->
+            [ AskForWikiCatalog ]
+
+        WikiHome { slug } ->
+            [ AskForWikiCatalog, AskForWikiFrontendDetails slug ]
+
+        NotFound _ ->
+            []

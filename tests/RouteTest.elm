@@ -2,7 +2,9 @@ module RouteTest exposing (suite)
 
 import Expect
 import Fuzz
+import Fuzzers
 import Route
+import Store
 import Test exposing (Test)
 import Url
 
@@ -22,12 +24,61 @@ suite =
                     |> Url.fromString
                     |> Maybe.map (Route.fromUrl >> Route.isWikiList)
                     |> Expect.equal (Just True)
-        , Test.test "non-empty path is not wiki list" <|
+        , Test.test "wiki home path is not wiki list" <|
             \_ ->
                 "https://example.com/w/demo"
                     |> Url.fromString
                     |> Maybe.map (Route.fromUrl >> Route.isWikiList)
                     |> Expect.equal (Just False)
+        , Test.test "/w/demo is WikiHome demo" <|
+            \_ ->
+                "https://example.com/w/demo"
+                    |> Url.fromString
+                    |> Maybe.map Route.fromUrl
+                    |> Expect.equal (Just (Route.WikiHome { slug = "demo" }))
+        , Test.test "/w/elm-tips is WikiHome elm-tips" <|
+            \_ ->
+                "https://example.com/w/elm-tips"
+                    |> Url.fromString
+                    |> Maybe.map Route.fromUrl
+                    |> Expect.equal (Just (Route.WikiHome { slug = "elm-tips" }))
+        , Test.test "/w is NotFound" <|
+            \_ ->
+                "https://example.com/w"
+                    |> Url.fromString
+                    |> Maybe.map Route.fromUrl
+                    |> Maybe.andThen Route.notFoundPath
+                    |> Expect.equal (Just "/w")
+        , Test.test "/w/ is NotFound" <|
+            \_ ->
+                "https://example.com/w/"
+                    |> Url.fromString
+                    |> Maybe.map Route.fromUrl
+                    |> Maybe.andThen Route.notFoundPath
+                    |> Expect.equal (Just "/w/")
+        , Test.test "/w/demo/extra is NotFound" <|
+            \_ ->
+                "https://example.com/w/demo/extra"
+                    |> Url.fromString
+                    |> Maybe.map Route.fromUrl
+                    |> Maybe.andThen Route.notFoundPath
+                    |> Expect.equal (Just "/w/demo/extra")
+        , Test.test "storeActions WikiList asks for catalog" <|
+            \_ ->
+                Route.storeActions Route.WikiList
+                    |> Expect.equal [ Store.AskForWikiCatalog ]
+        , Test.fuzz Fuzzers.wikiSlug "storeActions WikiHome asks catalog and details" <|
+            \slug ->
+                Route.storeActions (Route.WikiHome { slug = slug })
+                    |> Expect.equal
+                        [ Store.AskForWikiCatalog
+                        , Store.AskForWikiFrontendDetails slug
+                        ]
+        , Test.test "storeActions NotFound asks nothing" <|
+            \_ ->
+                Url.fromString "https://example.com/nope"
+                    |> Maybe.map (Route.fromUrl >> Route.storeActions)
+                    |> Expect.equal (Just [])
         , Test.fuzz Fuzz.string "NotFound preserves url" <|
             \str ->
                 let
@@ -48,6 +99,9 @@ suite =
                                     got == u
 
                                 Route.WikiList ->
+                                    False
+
+                                Route.WikiHome _ ->
                                     False
                         )
                     |> Expect.equal (Just True)
