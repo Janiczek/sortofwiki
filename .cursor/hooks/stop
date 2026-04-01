@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+deny() {
+  local cmd=$1
+  local reason=$2
+  jq -n \
+    --arg cmd "$cmd" \
+    --arg reason "$reason" \
+    '{
+      continue: true,
+      permission: "deny",
+      user_message: ("Command \u0027" + $cmd + "\u0027 failed"),
+      agent_message: ("Command \u0027" + $cmd + "\u0027 failed: " + $reason)
+    }'
+}
+
+hook_cwd="${CURSOR_PROJECT_DIR:-$PWD}"
+
+commands=(
+  '/usr/local/bin/lamdera make --optimize src/**/*.elm --output=/dev/null'
+  '/Users/martin/.nvm/versions/node/v22.15.1/bin/elm-test --compiler=/usr/local/bin/lamdera'
+  '/Users/martin/.nvm/versions/node/v22.15.1/bin/elm-review --fix-all-without-prompt'
+  '/Users/martin/.nvm/versions/node/v22.15.1/bin/elm-format --yes **/*.elm'
+)
+
+for cmd in "${commands[@]}"; do
+  if ! out=$(cd "$hook_cwd" && bash -O globstar -c "$cmd" 2>&1); then
+    deny "$cmd" "$out"
+    exit 2
+  fi
+done
