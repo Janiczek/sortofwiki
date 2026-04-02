@@ -60,6 +60,7 @@
 33. [x]  As any authenticated role, my authorization is checked server-side so that direct URL access cannot bypass permissions.
 34. [x]  As an admin or trusted contributor, all moderation decisions are logged with actor and timestamp so that governance is accountable.
 35. [x] Viewer can open an unknown URL and see a 404 page so that broken or mistyped links are clearly not valid content.
+46. [x] Viewer sees `[[page-slug]]` and `[[page-slug|label]]` in published markdown as links to that page on the current wiki (same `/w/:wikiSlug/p/...` URL space).
 
 ## 4) Post-MVP User Stories (Numbered)
 

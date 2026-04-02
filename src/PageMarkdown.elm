@@ -3,15 +3,18 @@ module PageMarkdown exposing (view)
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Markdown.Parser as MarkdownParser
-import TW
 import Markdown.Renderer as MarkdownRenderer
 import Page
+import TW
+import Wiki
+import WikiMarkdown
 
 
 {-| Render markdown source as HTML using [dillonkearns/elm-markdown](https://package.elm-lang.org/packages/dillonkearns/elm-markdown/latest/).
+Wiki links `[[page-slug]]` and `[[page-slug|label]]` in text become in-wiki links before HTML rendering.
 -}
-view : Page.FrontendDetails -> Html msg
-view pageDetails =
+view : Wiki.Slug -> Page.FrontendDetails -> Html msg
+view wikiSlug pageDetails =
     Html.div
         [ Attr.id "page-markdown"
         , TW.cls "page-markdown-inner"
@@ -25,6 +28,7 @@ view pageDetails =
                             |> List.map MarkdownParser.deadEndToString
                             |> String.join "\n"
                     )
+                |> Result.map (WikiMarkdown.postProcessBlocksWithWikiLinks wikiSlug)
                 |> Result.andThen (MarkdownRenderer.render MarkdownRenderer.defaultHtmlRenderer)
          of
             Ok elements ->

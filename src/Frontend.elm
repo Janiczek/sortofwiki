@@ -5581,7 +5581,7 @@ viewPublishedPage wikiSlug pageSlug summary pageDetails maybeContributorWikiForT
                 ]
                 [ Html.text pageSlug ]
             ]
-        , PageMarkdown.view pageDetails
+        , PageMarkdown.view wikiSlug pageDetails
         , case maybeContributorWikiForThisWiki of
             Just sessionWiki ->
                 if sessionWiki /= wikiSlug then

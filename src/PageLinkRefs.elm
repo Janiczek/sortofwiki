@@ -2,6 +2,7 @@ module PageLinkRefs exposing (linkedPageSlugs)
 
 import Page
 import Set
+import WikiLinkSyntax
 
 
 {-| Published page slugs referenced from markdown in the given wiki (absolute `/w/.../p/...` links,
@@ -13,7 +14,7 @@ linkedPageSlugs wikiSlug markdown =
     [ collectWithPrefix ("](/w/" ++ wikiSlug ++ "/p/") markdown
     , collectWithPrefix "](p/" markdown
     , collectWithPrefix "](./p/" markdown
-    , collectWikiLinks markdown
+    , WikiLinkSyntax.wikiRefSlugsFromPlainText markdown
     ]
         |> List.concat
         |> Set.fromList
@@ -89,68 +90,3 @@ skipToCloseParen s =
         Just ( _, rest ) ->
             skipToCloseParen rest
                 |> Maybe.map (\n -> n + 1)
-
-
-collectWikiLinks : String -> List Page.Slug
-collectWikiLinks content =
-    collectWikiLinksHelp content []
-
-
-collectWikiLinksHelp : String -> List Page.Slug -> List Page.Slug
-collectWikiLinksHelp remaining acc =
-    case String.indexes "[[" remaining |> List.head of
-        Nothing ->
-            acc
-
-        Just i ->
-            let
-                inner : String
-                inner =
-                    remaining
-                        |> String.dropLeft (i + 2)
-            in
-            case parseWikiLink inner of
-                Nothing ->
-                    collectWikiLinksHelp (String.dropLeft (i + 1) remaining) acc
-
-                Just ( slug, consumed ) ->
-                    collectWikiLinksHelp
-                        (String.dropLeft (i + 2 + consumed) remaining)
-                        (slug :: acc)
-
-
-parseWikiLink : String -> Maybe ( Page.Slug, Int )
-parseWikiLink s =
-    let
-        ( slug, slugEnd ) =
-            readSlugChars s 0 ""
-    in
-    if slug == "" then
-        Nothing
-
-    else
-        let
-            afterSlug : String
-            afterSlug =
-                String.dropLeft slugEnd s
-        in
-        if String.startsWith "]]" afterSlug then
-            Just ( slug, slugEnd + 2 )
-
-        else if String.startsWith "|" afterSlug then
-            String.dropLeft 1 afterSlug
-                |> skipToDoubleBracketClose
-                |> Maybe.map (\k -> ( slug, slugEnd + 1 + k ))
-
-        else
-            Nothing
-
-
-skipToDoubleBracketClose : String -> Maybe Int
-skipToDoubleBracketClose s =
-    case String.indexes "]]" s |> List.head of
-        Nothing ->
-            Nothing
-
-        Just j ->
-            Just (j + 2)

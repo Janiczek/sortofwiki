@@ -38,6 +38,7 @@ import ProgramTest.Story32_DeleteHostedWiki as Story32
 import ProgramTest.Story33_BackendAuthorization as Story33
 import ProgramTest.Story34_ModerationAuditTrail as Story34
 import ProgramTest.Story35_NotFound as Story35
+import ProgramTest.Story46_WikiLinksInMarkdown as Story46
 import Types exposing (ToBackend, ToFrontend)
 
 
@@ -82,6 +83,7 @@ main =
     , Story33.endToEndTests
     , Story34.endToEndTests
     , Story35.endToEndTests
+    , Story46.endToEndTests
     ]
         |> List.concat
         |> Effect.Test.viewer
