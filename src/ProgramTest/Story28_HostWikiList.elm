@@ -69,7 +69,7 @@ endToEndTests =
                     (\root ->
                         root
                             |> Test.Html.Query.find
-                                [ Test.Html.Selector.class "host-admin-wiki-row"
+                                [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-context" "host-admin-wiki-row")
                                 , Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "demo")
                                 ]
                             |> Test.Html.Query.has [ Test.Html.Selector.text "Demo Wiki" ]
@@ -78,7 +78,7 @@ endToEndTests =
                     (\root ->
                         root
                             |> Test.Html.Query.find
-                                [ Test.Html.Selector.class "host-admin-wiki-row"
+                                [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-context" "host-admin-wiki-row")
                                 , Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "elm-tips")
                                 ]
                             |> Test.Html.Query.has [ Test.Html.Selector.text "Elm Tips" ]

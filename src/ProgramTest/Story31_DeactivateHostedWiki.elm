@@ -132,7 +132,7 @@ endToEndTests =
                     (\root ->
                         root
                             |> Test.Html.Query.find
-                                [ Test.Html.Selector.class "host-admin-wiki-row"
+                                [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-context" "host-admin-wiki-row")
                                 , Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "elm-tips")
                                 , Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-active" "false")
                                 ]

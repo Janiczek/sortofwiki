@@ -79,7 +79,7 @@ endToEndTests =
                             |> Test.Html.Query.find
                                 [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-admin-user" "wikidemo") ]
                             |> Test.Html.Query.hasNot
-                                [ Test.Html.Selector.class "wiki-admin-revoke-admin" ]
+                                [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-context" "wiki-admin-revoke-admin") ]
                     )
                 , client.click 100
                     (Effect.Browser.Dom.id "wiki-admin-grant-admin-grantadmin_trusted")

@@ -53,7 +53,7 @@ endToEndTests =
                         root
                             |> Test.Html.Query.find
                                 [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-target-username" "grantadmin_trusted")
-                                , Test.Html.Selector.class "wiki-admin-grant-admin"
+                                , Test.Html.Selector.attribute (Html.Attributes.attribute "data-context" "wiki-admin-grant-admin")
                                 ]
                             |> Test.Html.Query.has [ Test.Html.Selector.text "Make admin" ]
                     )

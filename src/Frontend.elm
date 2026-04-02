@@ -27,6 +27,7 @@ import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
 import Store exposing (Store)
 import Submission
+import TW
 import SubmissionReviewDetail
 import Types exposing (FrontendModel, FrontendMsg(..), HostAdminCreateWikiDraft, HostAdminLoginDraft, HostAdminWikiDetailDraft, LoginDraft, NewPageSubmitDraft, PageDeleteSubmitDraft, PageEditSubmitDraft, RegisterDraft, ReviewApproveDraft, ReviewRejectDraft, ReviewRequestChangesDraft, ToBackend(..), ToFrontend(..))
 import Url exposing (Url)
@@ -3063,7 +3064,7 @@ viewWikiRow entry =
           else
             Html.p
                 [ Attr.id ("wiki-catalog-summary-" ++ entry.slug)
-                , Attr.class "wiki-catalog-summary"
+                , Attr.attribute "data-context" "wiki-catalog-summary"
                 ]
                 [ Html.text entry.summary ]
         ]
@@ -3243,7 +3244,7 @@ viewHostAdminWikis model =
 viewHostAdminWikiRow : Wiki.CatalogEntry -> Html Msg
 viewHostAdminWikiRow summary =
     Html.li
-        [ Attr.class "host-admin-wiki-row"
+        [ Attr.attribute "data-context" "host-admin-wiki-row"
         , Attr.attribute "data-wiki-slug" summary.slug
         , Attr.attribute "data-wiki-active"
             (if summary.active then
@@ -3257,7 +3258,7 @@ viewHostAdminWikiRow summary =
             [ Attr.href (Wiki.hostAdminWikiDetailUrlPath summary.slug) ]
             [ Html.text summary.name ]
         , Html.span
-            [ Attr.class "host-admin-wiki-status" ]
+            [ Attr.attribute "data-context" "host-admin-wiki-status" ]
             [ Html.text
                 (if summary.active then
                     "Active"
@@ -4639,7 +4640,7 @@ viewWikiAdminUsersPromoteCell u =
         WikiRole.Contributor ->
             Html.button
                 [ Attr.type_ "button"
-                , Attr.class "wiki-admin-promote-trusted"
+                , Attr.attribute "data-context" "wiki-admin-promote-trusted"
                 , Attr.id ("wiki-admin-promote-trusted-" ++ u.username)
                 , Attr.attribute "data-target-username" u.username
                 , Events.onClick (WikiAdminPromoteToTrustedClicked u.username)
@@ -4662,7 +4663,7 @@ viewWikiAdminUsersDemoteCell u =
         WikiRole.Trusted ->
             Html.button
                 [ Attr.type_ "button"
-                , Attr.class "wiki-admin-demote-trusted"
+                , Attr.attribute "data-context" "wiki-admin-demote-trusted"
                 , Attr.id ("wiki-admin-demote-trusted-" ++ u.username)
                 , Attr.attribute "data-target-username" u.username
                 , Events.onClick (WikiAdminDemoteToContributorClicked u.username)
@@ -4682,7 +4683,7 @@ viewWikiAdminUsersGrantAdminCell u =
         WikiRole.Trusted ->
             Html.button
                 [ Attr.type_ "button"
-                , Attr.class "wiki-admin-grant-admin"
+                , Attr.attribute "data-context" "wiki-admin-grant-admin"
                 , Attr.id ("wiki-admin-grant-admin-" ++ u.username)
                 , Attr.attribute "data-target-username" u.username
                 , Events.onClick (WikiAdminGrantAdminClicked u.username)
@@ -4709,7 +4710,7 @@ viewWikiAdminUsersRevokeAdminCell maybeSelfUsername u =
             else
                 Html.button
                     [ Attr.type_ "button"
-                    , Attr.class "wiki-admin-revoke-admin"
+                    , Attr.attribute "data-context" "wiki-admin-revoke-admin"
                     , Attr.id ("wiki-admin-revoke-admin-" ++ u.username)
                     , Attr.attribute "data-target-username" u.username
                     , Events.onClick (WikiAdminRevokeAdminClicked u.username)
@@ -4883,7 +4884,7 @@ viewWikiAdminAuditBody wikiSlug remote =
 viewWikiAdminAuditFilters : Model -> Html Msg
 viewWikiAdminAuditFilters model =
     Html.div
-        [ Attr.class "wiki-admin-audit-filters" ]
+        [ Attr.attribute "data-context" "wiki-admin-audit-filters" ]
         [ Html.div []
             [ Html.label []
                 [ Html.text "Actor contains "
@@ -5309,7 +5310,7 @@ viewPublishedPage wikiSlug pageSlug summary pageDetails maybeContributorWikiForT
         ]
         [ Html.header []
             [ Html.h1 [] [ Html.text summary.name ]
-            , Html.p [ Attr.class "page-published-slug" ]
+            , Html.p [ Attr.attribute "data-context" "page-published-slug" ]
                 [ Html.text pageSlug ]
             ]
         , PageMarkdown.view pageDetails
@@ -5447,10 +5448,7 @@ view model =
     { title = documentTitle model
     , body =
         [ Html.div
-            [ Attr.style "font-family" "system-ui, sans-serif"
-            , Attr.style "max-width" "40rem"
-            , Attr.style "margin" "2rem auto"
-            , Attr.style "padding" "0 1rem"
+            [ TW.cls "font-sans max-w-[40rem] mx-auto my-8 px-4"
             ]
             [ viewBody model ]
         ]
