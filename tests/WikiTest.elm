@@ -318,14 +318,14 @@ suite =
                                 "Demo"
                                 (Dict.fromList
                                     [ ( "home", Page.withPublishedAndPending "home" "[g](/w/demo/p/guides)" "[[guides]]" )
-                                    , ( "guides", Page.withPublished "guides" "See [[home]]." )
+                                    , ( "guides", Page.withPublished "guides" "No link to home." )
                                     ]
                                 )
                     in
                     Wiki.publishedPageFrontendDetails "guides" w
                         |> Expect.equal
                             (Just
-                                (Page.frontendDetails "See [[home]]." [ "home" ])
+                                (Page.frontendDetails "No link to home." [ "home" ])
                             )
             ]
         ]

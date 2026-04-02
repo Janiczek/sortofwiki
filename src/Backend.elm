@@ -59,7 +59,9 @@ seedWikis =
                 "Welcome to the Demo Wiki. See [guides](/w/demo/p/guides)."
                 "### STORY06_PENDING_LEAK\n\nUnpublished draft only. [[only-pending]]"
             , Page.withPublished "guides"
-                "## How to use this wiki\n\nRead the **manual**.\n\nBack to [[home]].\n"
+                "## How to use this wiki\n\nRead the **manual**.\n\nThe home page links here, so it shows under *Backlinks* below. That list is inbound links only—this page does not link back to home.\n"
+            , Page.withPublished "about"
+                "This page links only to [[home]]. The home page does not link here; *Backlinks* on home still lists this page because other pages pointing **to** the current page are what backlinks mean.\n"
             , Page.pendingOnly "only-pending"
                 "STORY06_PENDING_ONLY visible if leaked."
             ]

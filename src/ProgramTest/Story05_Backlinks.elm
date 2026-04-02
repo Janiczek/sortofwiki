@@ -41,7 +41,7 @@ endToEndTests =
             )
         ]
     , Effect.Test.start
-        "5 — backlinks on home point to guides"
+        "5 — backlinks on home list pages that link here (about → home, not reciprocated)"
         (Effect.Time.millisToPosix 0)
         ProgramTest.Config.config
         [ Effect.Test.connectFrontend
@@ -54,8 +54,8 @@ endToEndTests =
                     (\root ->
                         root
                             |> Test.Html.Query.find [ Test.Html.Selector.id "page-backlinks-list" ]
-                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.href "/w/demo/p/guides") ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-backlink-page-slug" "guides") ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.href "/w/demo/p/about") ]
+                            |> Test.Html.Query.has [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-backlink-page-slug" "about") ]
                     )
                 ]
             )
