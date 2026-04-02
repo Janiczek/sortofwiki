@@ -1,0 +1,142 @@
+module ProgramTest.Story47_FrontendRouteGuards exposing (endToEndTests)
+
+import Backend
+import Dict
+import Effect.Browser.Dom
+import Effect.Lamdera
+import Effect.Test
+import Effect.Time
+import Frontend
+import Html.Attributes
+import ProgramTest.Config
+import Route
+import Test.Html.Query
+import Test.Html.Selector
+import Types exposing (FrontendMsg(..), ToBackend, ToFrontend)
+import Url exposing (Protocol(..), Url)
+
+
+loginWithRedirectUrl : Url
+loginWithRedirectUrl =
+    { protocol = Http
+    , host = "localhost"
+    , port_ = Just 8000
+    , path = "/w/demo/login"
+    , query = Just "redirect=%2Fw%2Fdemo%2Fpages"
+    , fragment = Nothing
+    }
+
+
+pagesUrl : Url
+pagesUrl =
+    { protocol = Http
+    , host = "localhost"
+    , port_ = Just 8000
+    , path = "/w/demo/pages"
+    , query = Nothing
+    , fragment = Nothing
+    }
+
+
+hostNewWikiUrl : Url
+hostNewWikiUrl =
+    { protocol = Http
+    , host = "localhost"
+    , port_ = Just 8000
+    , path = "/admin/wikis/new"
+    , query = Nothing
+    , fragment = Nothing
+    }
+
+
+endToEndTests : List (Effect.Test.EndToEndTest ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model)
+endToEndTests =
+    [ Effect.Test.start
+        "47 — anonymous /review becomes login with redirect; no review queue fetch"
+        (Effect.Time.millisToPosix 0)
+        ProgramTest.Config.config
+        [ Effect.Test.connectFrontend
+            100
+            (Effect.Lamdera.sessionIdFromString "session-story47-anon-review")
+            "/w/demo/review"
+            { width = 800, height = 600 }
+            (\client ->
+                [ client.checkModel 400
+                    (\model ->
+                        case model.route of
+                            Route.WikiLogin "demo" (Just "/w/demo/review") ->
+                                case Dict.get "demo" model.store.reviewQueues of
+                                    Nothing ->
+                                        Ok ()
+
+                                    Just _ ->
+                                        Err "review queue should not be requested before login"
+
+                            _ ->
+                                Err "expected gated login route with redirect back to review"
+                    )
+                , client.checkView 100
+                    (\root ->
+                        root
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-login-page" ]
+                            |> Test.Html.Query.has
+                                [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "demo") ]
+                    )
+                ]
+            )
+        ]
+    , Effect.Test.start
+        "47 — login with redirect navigates to return path after success"
+        (Effect.Time.millisToPosix 0)
+        ProgramTest.Config.config
+        [ Effect.Test.connectFrontend
+            100
+            (Effect.Lamdera.sessionIdFromString "session-story47-login-redirect")
+            "/w/demo/login"
+            { width = 800, height = 600 }
+            (\client ->
+                [ client.update 100 (UrlChanged loginWithRedirectUrl)
+                , client.input 100 (Effect.Browser.Dom.id "wiki-login-username") "trustedpub"
+                , client.input 100 (Effect.Browser.Dom.id "wiki-login-password") "password12"
+                , client.click 100 (Effect.Browser.Dom.id "wiki-login-submit")
+                , client.update 100 (UrlChanged pagesUrl)
+                , client.checkView 400
+                    (\root ->
+                        root
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "pages-list-page" ]
+                            |> Test.Html.Query.has
+                                [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "demo") ]
+                    )
+                ]
+            )
+        ]
+    , Effect.Test.start
+        "47 — anonymous /admin/wikis/new ends on host login with redirect"
+        (Effect.Time.millisToPosix 0)
+        ProgramTest.Config.config
+        [ Effect.Test.connectFrontend
+            200
+            (Effect.Lamdera.sessionIdFromString "session-story47-host-new")
+            "/admin/wikis/new"
+            { width = 800, height = 600 }
+            (\client ->
+                [ client.update 100 (UrlChanged hostNewWikiUrl)
+                , client.checkModel 500
+                    (\model ->
+                        case model.route of
+                            Route.HostAdmin (Just "/admin/wikis/new") ->
+                                Ok ()
+
+                            _ ->
+                                Err "expected host admin login route preserving return path"
+                    )
+                , client.checkView 100
+                    (\root ->
+                        root
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-login-password" ]
+                            |> Test.Html.Query.has []
+                    )
+                ]
+            )
+        ]
+    ]

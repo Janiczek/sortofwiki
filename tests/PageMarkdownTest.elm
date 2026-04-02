@@ -25,6 +25,13 @@ suite =
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "h2" ]
                         |> Test.Html.Query.has [ Test.Html.Selector.text "Hello" ]
+            , Test.test "adds GitHub-style id on headings for TOC anchors" <|
+                \() ->
+                    Page.frontendDetails "## Hello\n" []
+                        |> PageMarkdown.view wiki
+                        |> Test.Html.Query.fromHtml
+                        |> Test.Html.Query.find [ Test.Html.Selector.tag "h2" ]
+                        |> Test.Html.Query.has [ Test.Html.Selector.attribute (Html.Attributes.id "hello") ]
             , Test.test "renders strong emphasis" <|
                 \() ->
                     Page.frontendDetails "**bold**" []

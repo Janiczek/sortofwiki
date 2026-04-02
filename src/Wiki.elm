@@ -10,6 +10,8 @@ module Wiki exposing
     , catalogUrlPath
     , frontendDetails
     , loginUrlPath
+    , loginUrlPathWithRedirect
+    , hostAdminLoginUrlPathWithRedirect
     , pageIndexUrlPath
     , publishNewPageOnWiki
     , publishedPageFrontendDetails
@@ -33,6 +35,7 @@ import Dict exposing (Dict)
 import HostedWikiSlugPolicy
 import Page
 import PageBacklinks
+import Url.Builder as UrlBuilder
 
 
 type alias Slug =
@@ -145,6 +148,22 @@ pageIndexUrlPath wikiSlug =
 loginUrlPath : Slug -> String
 loginUrlPath wikiSlug =
     "/w/" ++ wikiSlug ++ "/login"
+
+
+{-| Wiki login with post-auth return path (must be validated with `SecureRedirect.safeContributorReturnPath`).
+-}
+loginUrlPathWithRedirect : Slug -> String -> String
+loginUrlPathWithRedirect wikiSlug returnPath =
+    loginUrlPath wikiSlug
+        ++ UrlBuilder.toQuery [ UrlBuilder.string "redirect" returnPath ]
+
+
+{-| Host admin login with return path (must be validated with `SecureRedirect.safeHostAdminReturnPath`).
+-}
+hostAdminLoginUrlPathWithRedirect : String -> String
+hostAdminLoginUrlPathWithRedirect returnPath =
+    "/admin"
+        ++ UrlBuilder.toQuery [ UrlBuilder.string "redirect" returnPath ]
 
 
 {-| Contributor registration for a wiki.

@@ -37,6 +37,7 @@ import Wiki exposing (Wiki)
 import WikiAdminUsers
 import WikiAuditLog
 import WikiContributors
+import WikiRole
 import WikiUser
 
 
@@ -84,8 +85,8 @@ type ToFrontend
     | GrantWikiAdminResponse Wiki.Slug String (Result WikiAdminUsers.GrantTrustedToAdminError ())
     | RevokeWikiAdminResponse Wiki.Slug String (Result WikiAdminUsers.RevokeAdminError ())
     | SubmissionDetailsResponse Wiki.Slug String (Result Submission.DetailsError Submission.ContributorView)
-    | RegisterContributorResponse Wiki.Slug (Result ContributorAccount.RegisterContributorError ())
-    | LoginContributorResponse Wiki.Slug (Result ContributorAccount.LoginContributorError ())
+    | RegisterContributorResponse Wiki.Slug (Result ContributorAccount.RegisterContributorError WikiRole.WikiRole)
+    | LoginContributorResponse Wiki.Slug (Result ContributorAccount.LoginContributorError WikiRole.WikiRole)
     | SubmitNewPageResponse Wiki.Slug (Result Submission.SubmitNewPageError Submission.NewPageSubmitSuccess)
     | SubmitPageEditResponse Wiki.Slug (Result Submission.SubmitPageEditError Submission.EditSubmitSuccess)
     | SubmitPageDeleteResponse Wiki.Slug (Result Submission.SubmitPageDeleteError Submission.DeleteSubmitSuccess)
@@ -213,6 +214,7 @@ type alias FrontendModel =
     , route : Route
     , store : Store
     , contributorWikiSession : Maybe Wiki.Slug
+    , contributorWikiRole : Maybe WikiRole.WikiRole
     , contributorDisplayUsername : Maybe String
     , registerDraft : RegisterDraft
     , loginDraft : LoginDraft

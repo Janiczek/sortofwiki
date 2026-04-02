@@ -43,6 +43,16 @@ endToEndTests =
                 , client.checkView 100
                     (\root ->
                         root
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "page-article-toc" ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.tag "a" ]
+                            |> Test.Html.Query.has
+                                [ Test.Html.Selector.text "How to use this wiki"
+                                , Test.Html.Selector.attribute (Html.Attributes.href "#how-to-use-this-wiki")
+                                ]
+                    )
+                , client.checkView 100
+                    (\root ->
+                        root
                             |> Test.Html.Query.find [ Test.Html.Selector.id "page-markdown" ]
                             |> Test.Html.Query.find [ Test.Html.Selector.tag "strong" ]
                             |> Test.Html.Query.has [ Test.Html.Selector.text "manual" ]

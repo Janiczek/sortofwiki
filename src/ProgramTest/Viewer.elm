@@ -39,6 +39,7 @@ import ProgramTest.Story33_BackendAuthorization as Story33
 import ProgramTest.Story34_ModerationAuditTrail as Story34
 import ProgramTest.Story35_NotFound as Story35
 import ProgramTest.Story46_WikiLinksInMarkdown as Story46
+import ProgramTest.Story47_FrontendRouteGuards as Story47
 import Types exposing (ToBackend, ToFrontend)
 
 
@@ -84,6 +85,7 @@ main =
     , Story34.endToEndTests
     , Story35.endToEndTests
     , Story46.endToEndTests
+    , Story47.endToEndTests
     ]
         |> List.concat
         |> Effect.Test.viewer

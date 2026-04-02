@@ -36,6 +36,12 @@ adminWikisUrl =
     }
 
 
+adminLoginReturnToWikisUrl : Url
+adminLoginReturnToWikisUrl =
+    Url.fromString "http://localhost:8000/admin?redirect=%2Fadmin%2Fwikis"
+        |> Maybe.withDefault adminUrl
+
+
 endToEndTests : List (Effect.Test.EndToEndTest ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model)
 endToEndTests =
     [ Effect.Test.start
@@ -55,11 +61,12 @@ endToEndTests =
                             |> Test.Html.Query.has [ Test.Html.Selector.text "Platform host admin" ]
                     )
                 , client.update 100 (UrlChanged adminWikisUrl)
+                , client.update 150 (UrlChanged adminLoginReturnToWikisUrl)
                 , client.checkView 200
                     (\root ->
                         root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-wikis-forbidden" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Host admin sign-in required." ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-login-page" ]
+                            |> Test.Html.Query.has [ Test.Html.Selector.text "Platform host admin" ]
                     )
                 , client.update 100 (UrlChanged adminUrl)
                 , client.input 100 (Effect.Browser.Dom.id "host-admin-login-password") "wrong-password"
@@ -77,6 +84,13 @@ endToEndTests =
                         root
                             |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-login-success" ]
                             |> Test.Html.Query.has [ Test.Html.Selector.text "Signed in as platform host admin." ]
+                    )
+                , client.update 100 (UrlChanged adminWikisUrl)
+                , client.checkView 400
+                    (\root ->
+                        root
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-wikis-list" ]
+                            |> Test.Html.Query.has []
                     )
                 ]
             )

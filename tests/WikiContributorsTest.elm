@@ -8,6 +8,7 @@ import Test exposing (Test)
 import Wiki
 import WikiAdminUsers
 import WikiContributors
+import WikiRole
 
 
 demoWiki : Wiki.Wiki
@@ -97,6 +98,39 @@ suite =
 
                         Err _ ->
                             Expect.fail "expected register to succeed"
+            ]
+        , Test.describe "roleForAccount"
+            [ Test.test "contributor role after register" <|
+                \() ->
+                    case WikiContributors.attemptRegister "demo" "alice" "password12" wikis WikiContributors.emptyRegistry of
+                        Ok ( reg, accountId ) ->
+                            WikiContributors.roleForAccount "demo" accountId reg
+                                |> Expect.equal (Just WikiRole.Contributor)
+
+                        Err _ ->
+                            Expect.fail "expected register to succeed"
+            , Test.test "trusted role after trusted seed" <|
+                \() ->
+                    case WikiContributors.seedTrustedContributorAtWiki "demo" "trusty" "password12" wikis WikiContributors.emptyRegistry of
+                        Ok reg ->
+                            WikiContributors.roleForAccount "demo" (ContributorAccount.newAccountId "demo" "trusty") reg
+                                |> Expect.equal (Just WikiRole.Trusted)
+
+                        Err _ ->
+                            Expect.fail "expected trusted seed to succeed"
+            , Test.test "admin role after admin seed" <|
+                \() ->
+                    case WikiContributors.seedAdminContributorAtWiki "demo" "adminuser" "password12" wikis WikiContributors.emptyRegistry of
+                        Ok reg ->
+                            WikiContributors.roleForAccount "demo" (ContributorAccount.newAccountId "demo" "adminuser") reg
+                                |> Expect.equal (Just WikiRole.Admin)
+
+                        Err _ ->
+                            Expect.fail "expected admin seed to succeed"
+            , Test.test "Nothing for unknown account" <|
+                \() ->
+                    WikiContributors.roleForAccount "demo" (ContributorAccount.newAccountId "demo" "nobody") WikiContributors.emptyRegistry
+                        |> Expect.equal Nothing
             ]
         , Test.describe "seedContributorAtWiki"
             [ Test.test "inserts same as attemptRegister for empty registry" <|

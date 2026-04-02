@@ -24,12 +24,17 @@ import Html.Events as Events
 import Lamdera
 import Page
 import PageMarkdown
+import PageToc
 import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
+import RouteAccess
+import SecureRedirect
 import Store exposing (Store)
 import Submission
-import TW
 import SubmissionReviewDetail
+import Svg
+import Svg.Attributes as SvgAttr
+import TW
 import Types exposing (FrontendModel, FrontendMsg(..), HostAdminCreateWikiDraft, HostAdminLoginDraft, HostAdminWikiDetailDraft, LoginDraft, NewPageSubmitDraft, PageDeleteSubmitDraft, PageEditSubmitDraft, RegisterDraft, ReviewApproveDraft, ReviewRejectDraft, ReviewRequestChangesDraft, ToBackend(..), ToFrontend(..))
 import Url exposing (Url)
 import Wiki
@@ -245,11 +250,11 @@ runRouteStoreActions ( model, cmd ) =
                 Route.WikiList ->
                     Command.none
 
-                Route.HostAdmin ->
+                Route.HostAdmin _ ->
                     Command.none
 
                 Route.HostAdminWikiNew ->
-                    Command.none
+                    Effect.Lamdera.sendToBackend RequestHostWikiList
 
                 Route.HostAdminWikiDetail slug ->
                     Effect.Lamdera.sendToBackend (RequestHostWikiDetail slug)
@@ -266,7 +271,7 @@ runRouteStoreActions ( model, cmd ) =
                 Route.WikiRegister _ ->
                     Command.none
 
-                Route.WikiLogin _ ->
+                Route.WikiLogin _ _ ->
                     Command.none
 
                 Route.WikiSubmitNew _ ->
@@ -301,23 +306,88 @@ runRouteStoreActions ( model, cmd ) =
     )
 
 
+gatedWikiRoute : Model -> Url -> ( Route, Maybe String )
+gatedWikiRoute model url =
+    let
+        parsed : Route
+        parsed =
+            Route.fromUrl url
+    in
+    case
+        RouteAccess.contributorForcedRedirect
+            { contributorWikiSession = model.contributorWikiSession
+            , contributorWikiRole = model.contributorWikiRole
+            }
+            url
+            parsed
+    of
+        Just ( wikiSlug, ret ) ->
+            ( Route.WikiLogin wikiSlug (Just ret)
+            , Just (Wiki.loginUrlPathWithRedirect wikiSlug ret)
+            )
+
+        Nothing ->
+            ( parsed, Nothing )
+
+
+wikiSessionTrustedOnWiki : Wiki.Slug -> Model -> Bool
+wikiSessionTrustedOnWiki wikiSlug model =
+    model.contributorWikiSession
+        == Just wikiSlug
+        && (model.contributorWikiRole
+                |> Maybe.map WikiRole.isTrustedModerator
+                |> Maybe.withDefault False
+           )
+
+
+wikiSessionWikiAdminOnWiki : Wiki.Slug -> Model -> Bool
+wikiSessionWikiAdminOnWiki wikiSlug model =
+    model.contributorWikiSession
+        == Just wikiSlug
+        && (model.contributorWikiRole
+                |> Maybe.map WikiRole.canAccessWikiAdminUsers
+                |> Maybe.withDefault False
+           )
+
+
+wikiNavReviewLis : Wiki.Slug -> Model -> List (Html Msg)
+wikiNavReviewLis wikiSlug model =
+    if wikiSessionTrustedOnWiki wikiSlug model then
+        [ Html.li []
+            [ Html.a [ Attr.href (Wiki.reviewQueueUrlPath wikiSlug) ] [ Html.text "Review" ] ]
+        ]
+
+    else
+        []
+
+
+wikiNavWikiAdminLis : Wiki.Slug -> Model -> List (Html Msg)
+wikiNavWikiAdminLis wikiSlug model =
+    if wikiSessionWikiAdminOnWiki wikiSlug model then
+        [ Html.li []
+            [ Html.a [ Attr.href (Wiki.adminUsersUrlPath wikiSlug) ] [ Html.text "Admin users" ] ]
+        , Html.li []
+            [ Html.a [ Attr.href (Wiki.adminAuditUrlPath wikiSlug) ] [ Html.text "Audit log" ] ]
+        ]
+
+    else
+        []
+
+
 init :
     Url
     -> Effect.Browser.Navigation.Key
     -> ( Model, Command FrontendOnly ToBackend Msg )
 init url key =
     let
-        route : Route
-        route =
-            Route.fromUrl url
-
-        model : Model
-        model =
+        emptySessionModel : Model
+        emptySessionModel =
             { key = key
             , colorTheme = ColorTheme.Dark
-            , route = route
+            , route = Route.WikiList
             , store = Store.empty
             , contributorWikiSession = Nothing
+            , contributorWikiRole = Nothing
             , contributorDisplayUsername = Nothing
             , registerDraft = emptyRegisterDraft
             , loginDraft = emptyLoginDraft
@@ -340,8 +410,57 @@ init url key =
             , hostAdminWikiDetailDraft = emptyHostAdminWikiDetailDraft
             , hostAdminWikis = RemoteData.NotAsked
             }
+
+        ( route, maybeContributorReplace ) =
+            gatedWikiRoute emptySessionModel url
+
+        navCmd : Command FrontendOnly ToBackend Msg
+        navCmd =
+            maybeContributorReplace
+                |> Maybe.map (\target -> Effect.Browser.Navigation.replaceUrl key target)
+                |> Maybe.withDefault Command.none
+
+        model : Model
+        model =
+            { key = key
+            , colorTheme = ColorTheme.Dark
+            , route = route
+            , store = Store.empty
+            , contributorWikiSession = Nothing
+            , contributorWikiRole = Nothing
+            , contributorDisplayUsername = Nothing
+            , registerDraft = emptyRegisterDraft
+            , loginDraft = emptyLoginDraft
+            , newPageSubmitDraft = emptyNewPageSubmitDraft
+            , pageEditSubmitDraft = emptyPageEditSubmitDraft
+            , pageDeleteSubmitDraft = emptyPageDeleteSubmitDraft
+            , reviewApproveDraft = emptyReviewApproveDraft
+            , reviewRejectDraft = emptyReviewRejectDraft
+            , reviewRequestChangesDraft = emptyReviewRequestChangesDraft
+            , adminPromoteError = Nothing
+            , adminDemoteError = Nothing
+            , adminGrantAdminError = Nothing
+            , adminRevokeAdminError = Nothing
+            , wikiAdminAuditFilterActorDraft = ""
+            , wikiAdminAuditFilterPageDraft = ""
+            , wikiAdminAuditFilterSelectedKindTags = []
+            , wikiAdminAuditAppliedFilter = WikiAuditLog.emptyAuditLogFilter
+            , hostAdminLoginDraft = emptyHostAdminLoginDraft
+            , hostAdminCreateWikiDraft = emptyHostAdminCreateWikiDraft
+            , hostAdminWikiDetailDraft = emptyHostAdminWikiDetailDraft
+            , hostAdminWikis =
+                case route of
+                    Route.HostAdminWikis ->
+                        RemoteData.Loading
+
+                    Route.HostAdminWikiNew ->
+                        RemoteData.Loading
+
+                    _ ->
+                        RemoteData.NotAsked
+            }
     in
-    ( model, Command.none )
+    ( model, navCmd )
         |> runRouteStoreActions
 
 
@@ -418,9 +537,14 @@ update msg model =
 
         UrlChanged url ->
             let
-                route : Route
-                route =
-                    Route.fromUrl url
+                ( route, maybeContributorReplace ) =
+                    gatedWikiRoute model url
+
+                navCmd : Command FrontendOnly ToBackend Msg
+                navCmd =
+                    maybeContributorReplace
+                        |> Maybe.map (\target -> Effect.Browser.Navigation.replaceUrl model.key target)
+                        |> Maybe.withDefault Command.none
 
                 storeForRoute : Store
                 storeForRoute =
@@ -430,7 +554,7 @@ update msg model =
                             model.store
                     in
                     case route of
-                        Route.WikiLogin slug ->
+                        Route.WikiLogin slug _ ->
                             { store
                                 | wikiUsers = Dict.remove slug store.wikiUsers
                                 , wikiAuditLogs = Dict.remove slug store.wikiAuditLogs
@@ -466,11 +590,11 @@ update msg model =
                                 Route.WikiList ->
                                     RemoteData.NotAsked
 
-                                Route.HostAdmin ->
+                                Route.HostAdmin _ ->
                                     RemoteData.NotAsked
 
                                 Route.HostAdminWikiNew ->
-                                    RemoteData.NotAsked
+                                    RemoteData.Loading
 
                                 Route.HostAdminWikiDetail _ ->
                                     RemoteData.NotAsked
@@ -487,7 +611,7 @@ update msg model =
                                 Route.WikiRegister _ ->
                                     RemoteData.NotAsked
 
-                                Route.WikiLogin _ ->
+                                Route.WikiLogin _ _ ->
                                     RemoteData.NotAsked
 
                                 Route.WikiSubmitNew _ ->
@@ -539,7 +663,7 @@ update msg model =
                         _ ->
                             baseNext
             in
-            ( next, Command.none )
+            ( next, navCmd )
                 |> runRouteStoreActions
 
         RegisterFormUsernameChanged value ->
@@ -576,7 +700,7 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
-                Route.WikiLogin _ ->
+                Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
                 Route.WikiSubmitNew _ ->
@@ -603,7 +727,7 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
-                Route.HostAdmin ->
+                Route.HostAdmin _ ->
                     ( model, Command.none )
 
                 Route.HostAdminWikis ->
@@ -682,7 +806,7 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
-                Route.WikiLogin wikiSlug ->
+                Route.WikiLogin wikiSlug _ ->
                     let
                         d : LoginDraft
                         d =
@@ -739,7 +863,7 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
-                Route.HostAdmin ->
+                Route.HostAdmin _ ->
                     ( model, Command.none )
 
                 Route.HostAdminWikis ->
@@ -788,7 +912,7 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
-                Route.WikiLogin _ ->
+                Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
                 Route.WikiRegister _ ->
@@ -845,7 +969,7 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
-                Route.HostAdmin ->
+                Route.HostAdmin _ ->
                     ( model, Command.none )
 
                 Route.HostAdminWikis ->
@@ -884,7 +1008,7 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
-                Route.WikiLogin _ ->
+                Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
                 Route.WikiRegister _ ->
@@ -941,7 +1065,7 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
-                Route.HostAdmin ->
+                Route.HostAdmin _ ->
                     ( model, Command.none )
 
                 Route.HostAdminWikis ->
@@ -980,7 +1104,7 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
-                Route.WikiLogin _ ->
+                Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
                 Route.WikiRegister _ ->
@@ -1037,7 +1161,7 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
-                Route.HostAdmin ->
+                Route.HostAdmin _ ->
                     ( model, Command.none )
 
                 Route.HostAdminWikis ->
@@ -1076,7 +1200,7 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
-                Route.WikiLogin _ ->
+                Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
                 Route.WikiRegister _ ->
@@ -1103,7 +1227,7 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
-                Route.HostAdmin ->
+                Route.HostAdmin _ ->
                     ( model, Command.none )
 
                 Route.HostAdminWikis ->
@@ -1154,7 +1278,7 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
-                Route.WikiLogin _ ->
+                Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
                 Route.WikiRegister _ ->
@@ -1181,7 +1305,7 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
-                Route.HostAdmin ->
+                Route.HostAdmin _ ->
                     ( model, Command.none )
 
                 Route.HostAdminWikis ->
@@ -1232,7 +1356,7 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
-                Route.WikiLogin _ ->
+                Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
                 Route.WikiRegister _ ->
@@ -1259,7 +1383,7 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
-                Route.HostAdmin ->
+                Route.HostAdmin _ ->
                     ( model, Command.none )
 
                 Route.HostAdminWikis ->
@@ -1293,7 +1417,7 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
-                Route.WikiLogin _ ->
+                Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
                 Route.WikiRegister _ ->
@@ -1320,7 +1444,7 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
-                Route.HostAdmin ->
+                Route.HostAdmin _ ->
                     ( model, Command.none )
 
                 Route.HostAdminWikis ->
@@ -1354,7 +1478,7 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
-                Route.WikiLogin _ ->
+                Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
                 Route.WikiRegister _ ->
@@ -1381,7 +1505,7 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
-                Route.HostAdmin ->
+                Route.HostAdmin _ ->
                     ( model, Command.none )
 
                 Route.HostAdminWikis ->
@@ -1415,7 +1539,7 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
-                Route.WikiLogin _ ->
+                Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
                 Route.WikiRegister _ ->
@@ -1442,7 +1566,7 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
-                Route.HostAdmin ->
+                Route.HostAdmin _ ->
                     ( model, Command.none )
 
                 Route.HostAdminWikis ->
@@ -1476,7 +1600,7 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
-                Route.WikiLogin _ ->
+                Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
                 Route.WikiRegister _ ->
@@ -1503,7 +1627,7 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
-                Route.HostAdmin ->
+                Route.HostAdmin _ ->
                     ( model, Command.none )
 
                 Route.HostAdminWikis ->
@@ -1583,7 +1707,7 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
-                Route.WikiLogin _ ->
+                Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
                 Route.WikiRegister _ ->
@@ -1610,7 +1734,7 @@ update msg model =
                 Route.WikiAdminUsers _ ->
                     ( model, Command.none )
 
-                Route.HostAdmin ->
+                Route.HostAdmin _ ->
                     ( model, Command.none )
 
                 Route.HostAdminWikis ->
@@ -1692,7 +1816,7 @@ update msg model =
                 Route.WikiList ->
                     ( model, Command.none )
 
-                Route.HostAdmin ->
+                Route.HostAdmin _ ->
                     ( model, Command.none )
 
                 Route.HostAdminWikis ->
@@ -1713,7 +1837,7 @@ update msg model =
                 Route.WikiRegister _ ->
                     ( model, Command.none )
 
-                Route.WikiLogin _ ->
+                Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
                 Route.WikiSubmitNew _ ->
@@ -1830,7 +1954,7 @@ update msg model =
                 Route.WikiList ->
                     ( model, Command.none )
 
-                Route.HostAdmin ->
+                Route.HostAdmin _ ->
                     ( model, Command.none )
 
                 Route.HostAdminWikis ->
@@ -1851,7 +1975,7 @@ update msg model =
                 Route.WikiRegister _ ->
                     ( model, Command.none )
 
-                Route.WikiLogin _ ->
+                Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
                 Route.WikiSubmitNew _ ->
@@ -1984,7 +2108,7 @@ update msg model =
 
         HostAdminLoginSubmitted ->
             case model.route of
-                Route.HostAdmin ->
+                Route.HostAdmin _ ->
                     let
                         d : HostAdminLoginDraft
                         d =
@@ -2024,7 +2148,7 @@ update msg model =
                 Route.WikiRegister _ ->
                     ( model, Command.none )
 
-                Route.WikiLogin _ ->
+                Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
                 Route.WikiSubmitNew _ ->
@@ -2152,8 +2276,38 @@ updateFromBackend msg model =
                         | wikiUsers =
                             Dict.insert wikiSlug (RemoteData.succeed result) store.wikiUsers
                     }
+
+                nextContributorWikiRole : Maybe WikiRole.WikiRole
+                nextContributorWikiRole =
+                    case result of
+                        Ok users ->
+                            if model.contributorWikiSession == Just wikiSlug then
+                                model.contributorDisplayUsername
+                                    |> Maybe.andThen
+                                        (\uname ->
+                                            users
+                                                |> List.filter (\u -> u.username == uname)
+                                                |> List.head
+                                                |> Maybe.map .role
+                                        )
+                                    |> (\found ->
+                                            case found of
+                                                Just r ->
+                                                    Just r
+
+                                                Nothing ->
+                                                    model.contributorWikiRole
+                                       )
+
+                            else
+                                model.contributorWikiRole
+
+                        Err _ ->
+                            model.contributorWikiRole
             in
-            ( { model | store = nextStore }, Command.none )
+            ( { model | store = nextStore, contributorWikiRole = nextContributorWikiRole }
+            , Command.none
+            )
                 |> runRouteStoreActions
 
         WikiAuditLogResponse wikiSlug filter result ->
@@ -2299,7 +2453,7 @@ updateFromBackend msg model =
                 nextDraft =
                     if d.inFlight then
                         case result of
-                            Ok () ->
+                            Ok _ ->
                                 { username = ""
                                 , password = ""
                                 , inFlight = False
@@ -2309,7 +2463,7 @@ updateFromBackend msg model =
                             Err _ ->
                                 { d
                                     | inFlight = False
-                                    , lastResult = Just result
+                                    , lastResult = Just (Result.map (always ()) result)
                                 }
 
                     else
@@ -2319,7 +2473,7 @@ updateFromBackend msg model =
                 nextContributorWiki =
                     if d.inFlight then
                         case result of
-                            Ok () ->
+                            Ok _ ->
                                 Just wikiSlug
 
                             Err _ ->
@@ -2328,11 +2482,24 @@ updateFromBackend msg model =
                     else
                         model.contributorWikiSession
 
+                nextContributorWikiRole : Maybe WikiRole.WikiRole
+                nextContributorWikiRole =
+                    if d.inFlight then
+                        case result of
+                            Ok role ->
+                                Just role
+
+                            Err _ ->
+                                model.contributorWikiRole
+
+                    else
+                        model.contributorWikiRole
+
                 nextContributorDisplayUsername : Maybe String
                 nextContributorDisplayUsername =
                     if d.inFlight then
                         case result of
-                            Ok () ->
+                            Ok _ ->
                                 Just (ContributorAccount.normalizeUsername d.username)
 
                             Err _ ->
@@ -2350,7 +2517,7 @@ updateFromBackend msg model =
                     in
                     if d.inFlight then
                         case result of
-                            Ok () ->
+                            Ok _ ->
                                 { store
                                     | wikiUsers = Dict.remove wikiSlug store.wikiUsers
                                     , wikiAuditLogs = Dict.remove wikiSlug store.wikiAuditLogs
@@ -2361,15 +2528,27 @@ updateFromBackend msg model =
 
                     else
                         store
+
+                nextModel : Model
+                nextModel =
+                    { model
+                        | registerDraft = nextDraft
+                        , contributorWikiSession = nextContributorWiki
+                        , contributorWikiRole = nextContributorWikiRole
+                        , contributorDisplayUsername = nextContributorDisplayUsername
+                        , store = nextStore
+                    }
+
+                afterRegisterCmd : Command FrontendOnly ToBackend Msg
+                afterRegisterCmd =
+                    case ( nextModel.route, result ) of
+                        ( Route.WikiLogin _ (Just path), Ok _ ) ->
+                            Effect.Browser.Navigation.pushUrl nextModel.key path
+
+                        _ ->
+                            Command.none
             in
-            ( { model
-                | registerDraft = nextDraft
-                , contributorWikiSession = nextContributorWiki
-                , contributorDisplayUsername = nextContributorDisplayUsername
-                , store = nextStore
-              }
-            , Command.none
-            )
+            ( nextModel, afterRegisterCmd )
                 |> runRouteStoreActions
 
         LoginContributorResponse wikiSlug result ->
@@ -2382,7 +2561,7 @@ updateFromBackend msg model =
                 nextDraft =
                     if d.inFlight then
                         case result of
-                            Ok () ->
+                            Ok _ ->
                                 { username = ""
                                 , password = ""
                                 , inFlight = False
@@ -2392,7 +2571,7 @@ updateFromBackend msg model =
                             Err _ ->
                                 { d
                                     | inFlight = False
-                                    , lastResult = Just result
+                                    , lastResult = Just (Result.map (always ()) result)
                                 }
 
                     else
@@ -2402,7 +2581,7 @@ updateFromBackend msg model =
                 nextContributorWiki =
                     if d.inFlight then
                         case result of
-                            Ok () ->
+                            Ok _ ->
                                 Just wikiSlug
 
                             Err _ ->
@@ -2411,11 +2590,24 @@ updateFromBackend msg model =
                     else
                         model.contributorWikiSession
 
+                nextContributorWikiRole : Maybe WikiRole.WikiRole
+                nextContributorWikiRole =
+                    if d.inFlight then
+                        case result of
+                            Ok role ->
+                                Just role
+
+                            Err _ ->
+                                model.contributorWikiRole
+
+                    else
+                        model.contributorWikiRole
+
                 nextContributorDisplayUsername : Maybe String
                 nextContributorDisplayUsername =
                     if d.inFlight then
                         case result of
-                            Ok () ->
+                            Ok _ ->
                                 Just (ContributorAccount.normalizeUsername d.username)
 
                             Err _ ->
@@ -2433,7 +2625,7 @@ updateFromBackend msg model =
                     in
                     if d.inFlight then
                         case result of
-                            Ok () ->
+                            Ok _ ->
                                 { store
                                     | wikiUsers = Dict.remove wikiSlug store.wikiUsers
                                     , wikiAuditLogs = Dict.remove wikiSlug store.wikiAuditLogs
@@ -2444,15 +2636,27 @@ updateFromBackend msg model =
 
                     else
                         store
+
+                nextModel : Model
+                nextModel =
+                    { model
+                        | loginDraft = nextDraft
+                        , contributorWikiSession = nextContributorWiki
+                        , contributorWikiRole = nextContributorWikiRole
+                        , contributorDisplayUsername = nextContributorDisplayUsername
+                        , store = nextStore
+                    }
+
+                afterLoginCmd : Command FrontendOnly ToBackend Msg
+                afterLoginCmd =
+                    case ( nextModel.route, result ) of
+                        ( Route.WikiLogin _ (Just path), Ok _ ) ->
+                            Effect.Browser.Navigation.pushUrl nextModel.key path
+
+                        _ ->
+                            Command.none
             in
-            ( { model
-                | loginDraft = nextDraft
-                , contributorWikiSession = nextContributorWiki
-                , contributorDisplayUsername = nextContributorDisplayUsername
-                , store = nextStore
-              }
-            , Command.none
-            )
+            ( nextModel, afterLoginCmd )
                 |> runRouteStoreActions
 
         SubmitNewPageResponse wikiSlug result ->
@@ -2742,11 +2946,52 @@ updateFromBackend msg model =
 
                     else
                         d
+
+                hostAfterLoginCmd : Command FrontendOnly ToBackend Msg
+                hostAfterLoginCmd =
+                    case ( model.route, result ) of
+                        ( Route.HostAdmin maybeRedirect, Ok () ) ->
+                            case maybeRedirect of
+                                Just _ ->
+                                    let
+                                        dest : String
+                                        dest =
+                                            maybeRedirect
+                                                |> Maybe.andThen SecureRedirect.safeHostAdminReturnPath
+                                                |> Maybe.withDefault Wiki.hostAdminWikisUrlPath
+                                    in
+                                    Effect.Browser.Navigation.pushUrl model.key dest
+
+                                Nothing ->
+                                    Command.none
+
+                        _ ->
+                            Command.none
             in
-            ( { model | hostAdminLoginDraft = nextDraft }, Command.none )
+            ( { model | hostAdminLoginDraft = nextDraft }, hostAfterLoginCmd )
 
         HostAdminWikiListResponse result ->
-            ( { model | hostAdminWikis = RemoteData.Success result }, Command.none )
+            case ( model.route, result ) of
+                ( Route.HostAdminWikis, Err HostAdmin.NotHostAuthenticated ) ->
+                    ( { model
+                        | hostAdminWikis = RemoteData.Success result
+                        , route = Route.HostAdmin (Just Wiki.hostAdminWikisUrlPath)
+                      }
+                    , Effect.Browser.Navigation.replaceUrl model.key
+                        (Wiki.hostAdminLoginUrlPathWithRedirect Wiki.hostAdminWikisUrlPath)
+                    )
+
+                ( Route.HostAdminWikiNew, Err HostAdmin.NotHostAuthenticated ) ->
+                    ( { model
+                        | hostAdminWikis = RemoteData.Success result
+                        , route = Route.HostAdmin (Just Wiki.hostAdminNewWikiUrlPath)
+                      }
+                    , Effect.Browser.Navigation.replaceUrl model.key
+                        (Wiki.hostAdminLoginUrlPathWithRedirect Wiki.hostAdminNewWikiUrlPath)
+                    )
+
+                _ ->
+                    ( { model | hostAdminWikis = RemoteData.Success result }, Command.none )
 
         CreateHostedWikiResponse result ->
             let
@@ -2815,7 +3060,23 @@ updateFromBackend msg model =
                             Err _ ->
                                 { d0 | load = RemoteData.Success result }
                 in
-                ( { model | hostAdminWikiDetailDraft = nextDraft }, Command.none )
+                case result of
+                    Err HostAdmin.HostWikiDetailNotHostAuthenticated ->
+                        let
+                            returnPath : String
+                            returnPath =
+                                Wiki.hostAdminWikiDetailUrlPath wikiSlug
+                        in
+                        ( { model
+                            | hostAdminWikiDetailDraft = nextDraft
+                            , route = Route.HostAdmin (Just returnPath)
+                          }
+                        , Effect.Browser.Navigation.replaceUrl model.key
+                            (Wiki.hostAdminLoginUrlPathWithRedirect returnPath)
+                        )
+
+                    _ ->
+                        ( { model | hostAdminWikiDetailDraft = nextDraft }, Command.none )
 
         UpdateHostedWikiMetadataResponse wikiSlug result ->
             let
@@ -3184,184 +3445,218 @@ viewNotFound =
         ]
 
 
+themeToggleIconSun : Html Msg
+themeToggleIconSun =
+    Svg.svg
+        [ SvgAttr.width "22"
+        , SvgAttr.height "22"
+        , SvgAttr.viewBox "0 0 24 24"
+        , SvgAttr.fill "none"
+        , SvgAttr.stroke "currentColor"
+        , SvgAttr.strokeWidth "1.5"
+        , SvgAttr.strokeLinecap "round"
+        ]
+        [ Svg.circle
+            [ SvgAttr.cx "12"
+            , SvgAttr.cy "12"
+            , SvgAttr.r "4"
+            ]
+            []
+        , Svg.path
+            [ SvgAttr.d "M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" ]
+            []
+        ]
+
+
+themeToggleIconMoon : Html Msg
+themeToggleIconMoon =
+    Svg.svg
+        [ SvgAttr.width "22"
+        , SvgAttr.height "22"
+        , SvgAttr.viewBox "0 0 24 24"
+        , SvgAttr.fill "none"
+        , SvgAttr.stroke "currentColor"
+        , SvgAttr.strokeWidth "1.5"
+        , SvgAttr.strokeLinecap "round"
+        , SvgAttr.strokeLinejoin "round"
+        ]
+        [ Svg.path
+            [ SvgAttr.d "M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" ]
+            []
+        ]
+
+
 viewThemeToggle : Model -> Html Msg
 viewThemeToggle model =
     Html.button
         [ Attr.type_ "button"
         , Attr.id "color-theme-toggle"
+        , TW.cls "theme-toggle-btn"
         , Events.onClick ColorThemeToggled
+        , case model.colorTheme of
+            ColorTheme.Light ->
+                Attr.attribute "aria-label" "Switch to dark mode"
+
+            ColorTheme.Dark ->
+                Attr.attribute "aria-label" "Switch to light mode"
         ]
-        [ Html.text
-            (case model.colorTheme of
-                ColorTheme.Light ->
-                    "Dark mode"
+        [ case model.colorTheme of
+            ColorTheme.Light ->
+                themeToggleIconMoon
 
-                ColorTheme.Dark ->
-                    "Light mode"
-            )
+            ColorTheme.Dark ->
+                themeToggleIconSun
         ]
 
 
-viewCatalogChromeBar : Model -> Html Msg
-viewCatalogChromeBar model =
-    let
-        chromeSep : Html Msg
-        chromeSep =
-            Html.span [ TW.cls "chrome-sep" ] [ Html.text "·" ]
-
-        segment : List (Html Msg) -> List (Html Msg)
-        segment items =
-            chromeSep :: List.intersperse chromeSep items
-    in
-    Html.div
-        [ TW.cls "chrome-bar" ]
-        (List.concat
-            [ [ Html.span [] [ Html.text "SortOfWiki" ] ]
-            , segment [ Html.a [ Attr.href "/admin" ] [ Html.text "Host admin" ] ]
-            , segment [ Html.a [ Attr.href Wiki.hostAdminWikisUrlPath ] [ Html.text "Hosted wikis (admin)" ] ]
-            , segment [ viewThemeToggle model ]
+viewCatalogSideNav : Html Msg
+viewCatalogSideNav =
+    Html.nav
+        [ TW.cls "side-nav"
+        , Attr.attribute "aria-label" "Catalog"
+        ]
+        [ Html.ul [ TW.cls "side-nav-list" ]
+            [ Html.li [] [ Html.a [ Attr.href "/admin" ] [ Html.text "Host admin" ] ]
+            , Html.li [] [ Html.a [ Attr.href Wiki.hostAdminWikisUrlPath ] [ Html.text "Hosted wikis (admin)" ] ]
             ]
-        )
+        ]
 
 
-viewHostAdminChromeBar : Model -> Html Msg
-viewHostAdminChromeBar model =
-    let
-        chromeSep : Html Msg
-        chromeSep =
-            Html.span [ TW.cls "chrome-sep" ] [ Html.text "·" ]
-
-        segment : List (Html Msg) -> List (Html Msg)
-        segment items =
-            chromeSep :: List.intersperse chromeSep items
-    in
-    Html.div
-        [ TW.cls "chrome-bar" ]
-        (List.concat
-            [ [ Html.a [ Attr.href "/" ] [ Html.text "Public catalog" ] ]
-            , segment [ Html.a [ Attr.href Wiki.hostAdminWikisUrlPath ] [ Html.text "Hosted wikis" ] ]
-            , segment [ Html.a [ Attr.href "/admin" ] [ Html.text "Host admin sign-in" ] ]
-            , segment [ viewThemeToggle model ]
+viewHostAdminSideNav : Html Msg
+viewHostAdminSideNav =
+    Html.nav
+        [ TW.cls "side-nav"
+        , Attr.attribute "aria-label" "Host admin"
+        ]
+        [ Html.ul [ TW.cls "side-nav-list" ]
+            [ Html.li [] [ Html.a [ Attr.href "/" ] [ Html.text "Public catalog" ] ]
+            , Html.li [] [ Html.a [ Attr.href Wiki.hostAdminWikisUrlPath ] [ Html.text "Hosted wikis" ] ]
+            , Html.li [] [ Html.a [ Attr.href "/admin" ] [ Html.text "Host admin sign-in" ] ]
             ]
-        )
+        ]
 
 
-viewWikiChromeBar : Wiki.Slug -> Model -> Html Msg
-viewWikiChromeBar wikiSlug model =
+viewWikiSideNav : Wiki.Slug -> Model -> Html Msg
+viewWikiSideNav wikiSlug model =
     let
         wikiHomePath : String
         wikiHomePath =
             "/w/" ++ wikiSlug
 
-        chromeSep : Html Msg
-        chromeSep =
-            Html.span [ TW.cls "chrome-sep" ] [ Html.text "·" ]
-
-        authSegment : List (Html Msg)
-        authSegment =
+        authItems : List (Html Msg)
+        authItems =
             case model.contributorWikiSession of
                 Just sessionWiki ->
                     if sessionWiki /= wikiSlug then
-                        [ Html.a [ Attr.href (Wiki.loginUrlPath wikiSlug) ] [ Html.text "Log in" ]
-                        , Html.a [ Attr.href (Wiki.registerUrlPath wikiSlug) ] [ Html.text "Register" ]
+                        [ Html.li [] [ Html.a [ Attr.href (Wiki.loginUrlPath wikiSlug) ] [ Html.text "Log in" ] ]
+                        , Html.li [] [ Html.a [ Attr.href (Wiki.registerUrlPath wikiSlug) ] [ Html.text "Register" ] ]
                         ]
 
                     else
-                        [ Html.span []
-                            [ Html.text
-                                ("Logged in"
-                                    ++ (model.contributorDisplayUsername
-                                            |> Maybe.map (\u -> " as " ++ u)
-                                            |> Maybe.withDefault ""
-                                       )
-                                )
+                        [ Html.li []
+                            [ Html.span []
+                                [ Html.text
+                                    ("Logged in"
+                                        ++ (model.contributorDisplayUsername
+                                                |> Maybe.map (\u -> " as " ++ u)
+                                                |> Maybe.withDefault ""
+                                           )
+                                    )
+                                ]
                             ]
-                        , Html.a [ Attr.href (Wiki.submitNewPageUrlPath wikiSlug) ] [ Html.text "Submit page" ]
+                        , Html.li [] [ Html.a [ Attr.href (Wiki.submitNewPageUrlPath wikiSlug) ] [ Html.text "Submit page" ] ]
                         ]
 
                 Nothing ->
-                    [ Html.a [ Attr.href (Wiki.loginUrlPath wikiSlug) ] [ Html.text "Log in" ]
-                    , Html.a [ Attr.href (Wiki.registerUrlPath wikiSlug) ] [ Html.text "Register" ]
+                    [ Html.li [] [ Html.a [ Attr.href (Wiki.loginUrlPath wikiSlug) ] [ Html.text "Log in" ] ]
+                    , Html.li [] [ Html.a [ Attr.href (Wiki.registerUrlPath wikiSlug) ] [ Html.text "Register" ] ]
                     ]
-
-        segment : List (Html Msg) -> List (Html Msg)
-        segment items =
-            chromeSep :: List.intersperse chromeSep items
     in
-    Html.div
-        [ TW.cls "chrome-bar" ]
-        (List.concat
-            [ [ Html.a [ Attr.href "/" ] [ Html.text "All wikis" ] ]
-            , segment [ Html.a [ Attr.href wikiHomePath ] [ Html.text "Wiki home" ] ]
-            , segment [ Html.a [ Attr.href (Wiki.pageIndexUrlPath wikiSlug) ] [ Html.text "Pages" ] ]
-            , segment authSegment
-            , segment [ Html.a [ Attr.href (Wiki.reviewQueueUrlPath wikiSlug) ] [ Html.text "Review" ] ]
-            , segment [ Html.a [ Attr.href (Wiki.adminUsersUrlPath wikiSlug) ] [ Html.text "Admin users" ] ]
-            , segment [ Html.a [ Attr.href (Wiki.adminAuditUrlPath wikiSlug) ] [ Html.text "Audit log" ] ]
-            , segment [ viewThemeToggle model ]
-            ]
-        )
+    Html.nav
+        [ TW.cls "side-nav"
+        , Attr.attribute "aria-label" "Wiki"
+        ]
+        [ Html.ul [ TW.cls "side-nav-list" ]
+            (List.concat
+                [ [ Html.li [] [ Html.a [ Attr.href "/" ] [ Html.text "All wikis" ] ] ]
+                , [ Html.li [] [ Html.a [ Attr.href wikiHomePath ] [ Html.text "Wiki home" ] ] ]
+                , [ Html.li [] [ Html.a [ Attr.href (Wiki.pageIndexUrlPath wikiSlug) ] [ Html.text "Pages" ] ] ]
+                , authItems
+                , wikiNavReviewLis wikiSlug model
+                , wikiNavWikiAdminLis wikiSlug model
+                ]
+            )
+        ]
 
 
-viewRouteChrome : Model -> Html Msg
-viewRouteChrome model =
+viewRouteSideNav : Model -> Html Msg
+viewRouteSideNav model =
     case model.route of
         Route.WikiList ->
-            viewCatalogChromeBar model
+            viewCatalogSideNav
 
         Route.NotFound _ ->
-            viewCatalogChromeBar model
+            viewCatalogSideNav
 
-        Route.HostAdmin ->
-            viewHostAdminChromeBar model
+        Route.HostAdmin _ ->
+            viewHostAdminSideNav
 
         Route.HostAdminWikis ->
-            viewHostAdminChromeBar model
+            viewHostAdminSideNav
 
         Route.HostAdminWikiNew ->
-            viewHostAdminChromeBar model
+            viewHostAdminSideNav
 
         Route.HostAdminWikiDetail _ ->
-            viewHostAdminChromeBar model
+            viewHostAdminSideNav
 
         Route.WikiHome slug ->
-            viewWikiChromeBar slug model
+            viewWikiSideNav slug model
 
         Route.WikiPages slug ->
-            viewWikiChromeBar slug model
+            viewWikiSideNav slug model
 
         Route.WikiPage slug _ ->
-            viewWikiChromeBar slug model
+            viewWikiSideNav slug model
 
         Route.WikiRegister slug ->
-            viewWikiChromeBar slug model
+            viewWikiSideNav slug model
 
-        Route.WikiLogin slug ->
-            viewWikiChromeBar slug model
+        Route.WikiLogin slug _ ->
+            viewWikiSideNav slug model
 
         Route.WikiSubmitNew slug ->
-            viewWikiChromeBar slug model
+            viewWikiSideNav slug model
 
         Route.WikiSubmitEdit slug _ ->
-            viewWikiChromeBar slug model
+            viewWikiSideNav slug model
 
         Route.WikiSubmitDelete slug _ ->
-            viewWikiChromeBar slug model
+            viewWikiSideNav slug model
 
         Route.WikiSubmissionDetail slug _ ->
-            viewWikiChromeBar slug model
+            viewWikiSideNav slug model
 
         Route.WikiReview slug ->
-            viewWikiChromeBar slug model
+            viewWikiSideNav slug model
 
         Route.WikiReviewDetail slug _ ->
-            viewWikiChromeBar slug model
+            viewWikiSideNav slug model
 
         Route.WikiAdminUsers slug ->
-            viewWikiChromeBar slug model
+            viewWikiSideNav slug model
 
         Route.WikiAdminAudit slug ->
-            viewWikiChromeBar slug model
+            viewWikiSideNav slug model
+
+
+viewAppHeader : Model -> Html Msg
+viewAppHeader model =
+    Html.header [ TW.cls "layout-header" ]
+        [ Html.h1 [ TW.cls "app-header-title" ]
+            [ Html.text (documentHeading model) ]
+        , viewThemeToggle model
+        ]
 
 
 viewHostAdminLoginFeedback : Maybe (Result HostAdmin.LoginError ()) -> Html Msg
@@ -3443,10 +3738,10 @@ viewHostAdminWikis model =
             RemoteData.Failure () ->
                 Html.p [] [ Html.text "Could not load." ]
 
-            RemoteData.Success (Err e) ->
+            RemoteData.Success (Err HostAdmin.NotHostAuthenticated) ->
                 Html.div
                     [ Attr.id "host-admin-wikis-forbidden" ]
-                    [ Html.p [] [ Html.text (HostAdmin.protectedErrorToUserText e) ] ]
+                    [ Html.p [] [ Html.text "Redirecting to host admin sign-in…" ] ]
 
             RemoteData.Success (Ok summaries) ->
                 Html.table
@@ -3518,56 +3813,81 @@ viewHostAdminCreateWikiFeedback maybeResult =
 
 viewHostAdminCreateWiki : Model -> Html Msg
 viewHostAdminCreateWiki model =
-    let
-        draft : HostAdminCreateWikiDraft
-        draft =
-            model.hostAdminCreateWikiDraft
-    in
     Html.div
         [ Attr.id "host-admin-create-wiki-page" ]
         [ Html.h1 [] [ Html.text "Create hosted wiki" ]
-        , Html.p []
-            [ Html.a
-                [ Attr.href Wiki.hostAdminWikisUrlPath ]
-                [ Html.text "Back to wiki list" ]
-            ]
-        , Html.form
-            [ Attr.id "host-admin-create-wiki-form"
-            , Events.onSubmit HostAdminCreateWikiSubmitted
-            ]
-            [ Html.div []
-                [ Html.label [ Attr.for "host-admin-create-wiki-slug" ]
-                    [ Html.text "Wiki slug" ]
-                , Html.input
-                    [ Attr.id "host-admin-create-wiki-slug"
-                    , Attr.type_ "text"
-                    , Attr.value draft.slug
-                    , Events.onInput HostAdminCreateWikiSlugChanged
-                    , Attr.disabled draft.inFlight
-                    ]
-                    []
-                ]
-            , Html.div []
-                [ Html.label [ Attr.for "host-admin-create-wiki-name" ]
-                    [ Html.text "Wiki name" ]
-                , Html.input
-                    [ Attr.id "host-admin-create-wiki-name"
-                    , Attr.type_ "text"
-                    , Attr.value draft.name
-                    , Events.onInput HostAdminCreateWikiNameChanged
-                    , Attr.disabled draft.inFlight
-                    ]
-                    []
-                ]
-            , Html.button
-                [ Attr.id "host-admin-create-wiki-submit"
-                , Attr.type_ "button"
-                , Events.onClick HostAdminCreateWikiSubmitted
-                , Attr.disabled draft.inFlight
-                ]
-                [ Html.text "Create wiki" ]
-            ]
-        , viewHostAdminCreateWikiFeedback draft.lastResult
+        , case model.hostAdminWikis of
+            RemoteData.Success (Err HostAdmin.NotHostAuthenticated) ->
+                Html.p
+                    [ Attr.id "host-admin-create-wiki-sign-in-needed" ]
+                    [ Html.text "Redirecting to host admin sign-in…" ]
+
+            RemoteData.Success (Ok _) ->
+                let
+                    draft : HostAdminCreateWikiDraft
+                    draft =
+                        model.hostAdminCreateWikiDraft
+
+                    formBody : List (Html Msg)
+                    formBody =
+                        [ Html.p []
+                            [ Html.a
+                                [ Attr.href Wiki.hostAdminWikisUrlPath ]
+                                [ Html.text "Back to wiki list" ]
+                            ]
+                        , Html.form
+                            [ Attr.id "host-admin-create-wiki-form"
+                            , Events.onSubmit HostAdminCreateWikiSubmitted
+                            ]
+                            [ Html.div []
+                                [ Html.label [ Attr.for "host-admin-create-wiki-slug" ]
+                                    [ Html.text "Wiki slug" ]
+                                , Html.input
+                                    [ Attr.id "host-admin-create-wiki-slug"
+                                    , Attr.type_ "text"
+                                    , Attr.value draft.slug
+                                    , Events.onInput HostAdminCreateWikiSlugChanged
+                                    , Attr.disabled draft.inFlight
+                                    ]
+                                    []
+                                ]
+                            , Html.div []
+                                [ Html.label [ Attr.for "host-admin-create-wiki-name" ]
+                                    [ Html.text "Wiki name" ]
+                                , Html.input
+                                    [ Attr.id "host-admin-create-wiki-name"
+                                    , Attr.type_ "text"
+                                    , Attr.value draft.name
+                                    , Events.onInput HostAdminCreateWikiNameChanged
+                                    , Attr.disabled draft.inFlight
+                                    ]
+                                    []
+                                ]
+                            , Html.button
+                                [ Attr.id "host-admin-create-wiki-submit"
+                                , Attr.type_ "button"
+                                , Events.onClick HostAdminCreateWikiSubmitted
+                                , Attr.disabled draft.inFlight
+                                ]
+                                [ Html.text "Create wiki" ]
+                            ]
+                        , viewHostAdminCreateWikiFeedback draft.lastResult
+                        ]
+                in
+                Html.div [] formBody
+
+            RemoteData.Loading ->
+                Html.p
+                    [ Attr.id "host-admin-create-wiki-session-loading" ]
+                    [ Html.text "Loading…" ]
+
+            RemoteData.NotAsked ->
+                Html.p
+                    [ Attr.id "host-admin-create-wiki-session-loading" ]
+                    [ Html.text "Loading…" ]
+
+            RemoteData.Failure () ->
+                Html.p [] [ Html.text "Could not verify host session." ]
         ]
 
 
@@ -3802,7 +4122,7 @@ documentTitle ({ store } as model) =
         Route.WikiList ->
             "SortOfWiki"
 
-        Route.HostAdmin ->
+        Route.HostAdmin _ ->
             "Host admin — SortOfWiki"
 
         Route.HostAdminWikis ->
@@ -3871,7 +4191,7 @@ documentTitle ({ store } as model) =
                 RemoteData.NotAsked ->
                     "Loading - SortOfWiki"
 
-        Route.WikiLogin slug ->
+        Route.WikiLogin slug _ ->
             case Store.get slug store.wikiCatalog of
                 RemoteData.Success summary ->
                     "Log in — " ++ summary.name ++ " — SortOfWiki"
@@ -3999,6 +4319,33 @@ documentTitle ({ store } as model) =
 
         Route.NotFound _ ->
             "404 — SortOfWiki"
+
+
+documentHeading : Model -> String
+documentHeading model =
+    let
+        t : String
+        t =
+            documentTitle model
+
+        suffixEmDash : String
+        suffixEmDash =
+            " — SortOfWiki"
+    in
+    if String.endsWith suffixEmDash t then
+        String.dropRight (String.length suffixEmDash) t
+
+    else
+        let
+            suffixHyphen : String
+            suffixHyphen =
+                " - SortOfWiki"
+        in
+        if String.endsWith suffixHyphen t then
+            String.dropRight (String.length suffixHyphen) t
+
+        else
+            t
 
 
 viewWikiHomeRoute : Model -> Wiki.Slug -> Html Msg
@@ -5654,7 +6001,7 @@ viewBody model =
         Route.WikiList ->
             viewWikiListBody model.store
 
-        Route.HostAdmin ->
+        Route.HostAdmin _ ->
             viewHostAdminLogin model
 
         Route.HostAdminWikis ->
@@ -5678,7 +6025,7 @@ viewBody model =
         Route.WikiRegister slug ->
             viewRegisterRoute model slug
 
-        Route.WikiLogin slug ->
+        Route.WikiLogin slug _ ->
             viewLoginRoute model slug
 
         Route.WikiSubmitNew slug ->
@@ -5709,8 +6056,58 @@ viewBody model =
             viewNotFound
 
 
+articleTocEntries : Model -> List PageToc.Entry
+articleTocEntries model =
+    case model.route of
+        Route.WikiPage wikiSlug pageSlug ->
+            case
+                ( Store.get_ wikiSlug model.store.wikiDetails
+                , Store.get wikiSlug model.store.wikiCatalog
+                , Store.get_ ( wikiSlug, pageSlug ) model.store.publishedPages
+                )
+            of
+                ( Success _, Success _, Success pageDetails ) ->
+                    PageToc.entries wikiSlug pageDetails
+
+                _ ->
+                    []
+
+        _ ->
+            []
+
+
 view : Model -> Effect.Browser.Document Msg
 view model =
+    let
+        tocEntries : List PageToc.Entry
+        tocEntries =
+            articleTocEntries model
+
+        holyGrailClass : String
+        holyGrailClass =
+            if List.isEmpty tocEntries then
+                "layout-holy-grail layout-holy-grail--no-toc-right"
+
+            else
+                "layout-holy-grail"
+
+        mainColumns : List (Html Msg)
+        mainColumns =
+            List.concat
+                [ [ Html.aside [ TW.cls "layout-aside layout-aside-left" ]
+                        [ viewRouteSideNav model ]
+                  , Html.main_ [ TW.cls "layout-main" ]
+                        [ viewBody model ]
+                  ]
+                , if List.isEmpty tocEntries then
+                    []
+
+                  else
+                    [ Html.aside [ TW.cls "layout-aside layout-aside-right layout-aside-toc" ]
+                        [ PageToc.view tocEntries ]
+                    ]
+                ]
+    in
     { title = documentTitle model
     , body =
         [ Html.div
@@ -5722,8 +6119,8 @@ view model =
                     ColorTheme.Dark ->
                         "app-root dark"
             ]
-            [ viewRouteChrome model
-            , viewBody model
+            [ viewAppHeader model
+            , Html.div [ TW.cls holyGrailClass ] mainColumns
             ]
         ]
     }

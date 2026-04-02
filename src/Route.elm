@@ -7,6 +7,7 @@ module Route exposing
     )
 
 import Page
+import SecureRedirect
 import Store exposing (Action(..))
 import Url exposing (Url)
 import Wiki
@@ -17,14 +18,14 @@ import WikiAuditLog
 -}
 type Route
     = WikiList
-    | HostAdmin
+    | HostAdmin (Maybe String)
     | HostAdminWikis
     | HostAdminWikiNew
     | HostAdminWikiDetail Wiki.Slug
     | WikiHome Wiki.Slug
     | WikiPages Wiki.Slug
     | WikiPage Wiki.Slug Page.Slug
-    | WikiLogin Wiki.Slug
+    | WikiLogin Wiki.Slug (Maybe String)
     | WikiRegister Wiki.Slug
     | WikiSubmitNew Wiki.Slug
     | WikiSubmitEdit Wiki.Slug Page.Slug
@@ -58,7 +59,7 @@ fromUrl url =
         _ ->
             case pathSegments url.path of
                 [ "admin" ] ->
-                    HostAdmin
+                    HostAdmin (SecureRedirect.hostAdminRedirectFromQuery url.query)
 
                 [ "admin", "wikis" ] ->
                     HostAdminWikis
@@ -99,7 +100,7 @@ fromUrl url =
                         NotFound url
 
                     else
-                        WikiLogin slug
+                        WikiLogin slug (SecureRedirect.contributorRedirectFromQuery slug url.query)
 
                 [ "w", slug, "register" ] ->
                     if slug == "" then
@@ -187,7 +188,7 @@ isWikiList route =
         WikiList ->
             True
 
-        HostAdmin ->
+        HostAdmin _ ->
             False
 
         HostAdminWikis ->
@@ -208,7 +209,7 @@ isWikiList route =
         WikiPage _ _ ->
             False
 
-        WikiLogin _ ->
+        WikiLogin _ _ ->
             False
 
         WikiRegister _ ->
@@ -248,7 +249,7 @@ storeActions route =
         WikiList ->
             [ AskForWikiCatalog ]
 
-        HostAdmin ->
+        HostAdmin _ ->
             []
 
         HostAdminWikis ->
@@ -272,7 +273,7 @@ storeActions route =
             , AskForPageFrontendDetails wikiSlug pageSlug
             ]
 
-        WikiLogin slug ->
+        WikiLogin slug _ ->
             [ AskForWikiCatalog, AskForWikiFrontendDetails slug ]
 
         WikiRegister slug ->

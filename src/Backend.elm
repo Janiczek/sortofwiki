@@ -18,6 +18,7 @@ import Wiki exposing (Slug, Wiki)
 import WikiAdminUsers
 import WikiAuditLog
 import WikiContributors
+import WikiRole
 import WikiUser
 
 
@@ -732,7 +733,7 @@ updateFromFrontend sessionId clientId msg model =
                         , contributorSessions = nextSessions
                       }
                     , Effect.Lamdera.sendToFrontend clientId
-                        (RegisterContributorResponse wikiSlug (Ok ()))
+                        (RegisterContributorResponse wikiSlug (Ok WikiRole.Contributor))
                     )
 
         LoginContributor wikiSlug username password ->
@@ -752,10 +753,15 @@ updateFromFrontend sessionId clientId msg model =
                         nextSessions : WikiUser.SessionTable
                         nextSessions =
                             WikiUser.bindContributor sessionKey wikiSlug accountId model.contributorSessions
+
+                        role : WikiRole.WikiRole
+                        role =
+                            WikiContributors.roleForAccount wikiSlug accountId model.contributors
+                                |> Maybe.withDefault WikiRole.Contributor
                     in
                     ( { model | contributorSessions = nextSessions }
                     , Effect.Lamdera.sendToFrontend clientId
-                        (LoginContributorResponse wikiSlug (Ok ()))
+                        (LoginContributorResponse wikiSlug (Ok role))
                     )
 
         SubmitNewPage wikiSlug rawSlug rawMarkdown ->

@@ -7,6 +7,7 @@ module WikiContributors exposing
     , emptyRegistry
     , isAdminForWiki
     , isTrustedForWiki
+    , roleForAccount
     , demoteTrustedToContributorAtWiki
     , grantTrustedToAdminAtWiki
     , promoteContributorToTrustedAtWiki
@@ -109,6 +110,19 @@ displayUsernameForAccount wikiSlug accountId registry =
                 |> List.filter (\( _, stored ) -> stored.id == accountId)
                 |> List.head
                 |> Maybe.map Tuple.first
+
+
+{-| Role for an account on a wiki, if registered there.
+-}
+roleForAccount : Wiki.Slug -> ContributorAccount.Id -> Registry -> Maybe WikiRole.WikiRole
+roleForAccount wikiSlug accountId registry =
+    registry
+        |> Dict.get wikiSlug
+        |> Maybe.withDefault Dict.empty
+        |> Dict.values
+        |> List.filter (\stored -> stored.id == accountId)
+        |> List.head
+        |> Maybe.map .role
 
 
 {-| True when `accountId` is a contributor on `wikiSlug` with trusted-moderator status (trusted or admin).

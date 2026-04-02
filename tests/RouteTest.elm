@@ -21,7 +21,7 @@ suite =
             , ( "https://example.com/w/demo/p/guides", Route.WikiPage "demo" "guides" )
             , ( "https://example.com/w/demo/pages/", Route.WikiPages "demo" )
             , ( "https://example.com/w/demo/register", Route.WikiRegister "demo" )
-            , ( "https://example.com/w/demo/login", Route.WikiLogin "demo" )
+            , ( "https://example.com/w/demo/login", Route.WikiLogin "demo" Nothing )
             , ( "https://example.com/w/demo/submit/new", Route.WikiSubmitNew "demo" )
             , ( "https://example.com/w/demo/submit/edit/guides", Route.WikiSubmitEdit "demo" "guides" )
             , ( "https://example.com/w/demo/submit/delete/guides", Route.WikiSubmitDelete "demo" "guides" )
@@ -30,7 +30,7 @@ suite =
             , ( "https://example.com/w/demo/review/sub_queue_demo", Route.WikiReviewDetail "demo" "sub_queue_demo" )
             , ( "https://example.com/w/demo/admin/users", Route.WikiAdminUsers "demo" )
             , ( "https://example.com/w/demo/admin/audit", Route.WikiAdminAudit "demo" )
-            , ( "https://example.com/admin", Route.HostAdmin )
+            , ( "https://example.com/admin", Route.HostAdmin Nothing )
             , ( "https://example.com/admin/wikis", Route.HostAdminWikis )
             , ( "https://example.com/admin/wikis/new", Route.HostAdminWikiNew )
             , ( "https://example.com/admin/wikis/demo", Route.HostAdminWikiDetail "demo" )
@@ -128,7 +128,7 @@ suite =
                                 ]
                , Test.fuzz Fuzzers.wikiSlug "storeActions WikiLogin asks catalog and details" <|
                     \slug ->
-                        Route.storeActions (Route.WikiLogin slug)
+                        Route.storeActions (Route.WikiLogin slug Nothing)
                             |> Expect.equal
                                 [ Store.AskForWikiCatalog
                                 , Store.AskForWikiFrontendDetails slug
@@ -206,7 +206,7 @@ suite =
                                 ]
                , Test.test "storeActions HostAdmin asks nothing" <|
                     \_ ->
-                        Route.storeActions Route.HostAdmin
+                        Route.storeActions (Route.HostAdmin Nothing)
                             |> Expect.equal []
                , Test.test "storeActions HostAdminWikis asks nothing" <|
                     \_ ->
@@ -259,7 +259,7 @@ suite =
                                         Route.WikiRegister _ ->
                                             False
 
-                                        Route.WikiLogin _ ->
+                                        Route.WikiLogin _ _ ->
                                             False
 
                                         Route.WikiSubmitNew _ ->
@@ -286,7 +286,7 @@ suite =
                                         Route.WikiAdminAudit _ ->
                                             False
 
-                                        Route.HostAdmin ->
+                                        Route.HostAdmin _ ->
                                             False
 
                                         Route.HostAdminWikis ->
@@ -313,5 +313,23 @@ suite =
                             |> Maybe.map Route.fromUrl
                             |> Maybe.andThen Route.notFoundPath
                             |> Expect.equal (Just "/w/demo/login/extra")
+               , Test.test "wiki login parses validated redirect query" <|
+                    \_ ->
+                        "https://example.com/w/demo/login?redirect=%2Fw%2Fdemo%2Freview"
+                            |> Url.fromString
+                            |> Maybe.map Route.fromUrl
+                            |> Expect.equal (Just (Route.WikiLogin "demo" (Just "/w/demo/review")))
+               , Test.test "wiki login drops unsafe redirect query" <|
+                    \_ ->
+                        "https://example.com/w/demo/login?redirect=https%3A%2F%2Fevil.com"
+                            |> Url.fromString
+                            |> Maybe.map Route.fromUrl
+                            |> Expect.equal (Just (Route.WikiLogin "demo" Nothing))
+               , Test.test "host admin login parses validated redirect query" <|
+                    \_ ->
+                        "https://example.com/admin?redirect=%2Fadmin%2Fwikis%2Fnew"
+                            |> Url.fromString
+                            |> Maybe.map Route.fromUrl
+                            |> Expect.equal (Just (Route.HostAdmin (Just "/admin/wikis/new")))
                ]
         )
