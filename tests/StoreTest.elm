@@ -7,12 +7,23 @@ import Expect
 import Frontend
 import Fuzz
 import Fuzzers
+import HostedWikiSlugPolicy
+import Effect.Command as Command
 import Page
 import RemoteData
 import Store exposing (Store)
+import Submission
+import SubmissionReviewDetail
 import Test exposing (Test)
 import Types exposing (ToBackend(..))
 import Wiki
+import WikiAdminUsers
+import WikiAuditLog
+
+
+emptyAuditFilterCacheKey : String
+emptyAuditFilterCacheKey =
+    WikiAuditLog.auditLogFilterCacheKey WikiAuditLog.emptyAuditLogFilter
 
 
 suite : Test
@@ -49,10 +60,10 @@ suite =
                             ( { store | wikiCatalog = RemoteData.Loading }
                             , Command.none
                             )
-            , Test.fuzz (Fuzz.list Fuzzers.wikiSummary) "AskForWikiCatalog skips when catalog Success" <|
+            , Test.fuzz (Fuzz.list Fuzzers.wikiCatalogEntry) "AskForWikiCatalog skips when catalog Success" <|
                 \summaries ->
                     let
-                        dict : Dict Wiki.Slug Wiki.Summary
+                        dict : Dict Wiki.Slug Wiki.CatalogEntry
                         dict =
                             summaries
                                 |> List.map (\s -> ( s.slug, s ))
@@ -63,6 +74,11 @@ suite =
                             { wikiCatalog = RemoteData.succeed dict
                             , wikiDetails = Dict.empty
                             , publishedPages = Dict.empty
+                            , reviewQueues = Dict.empty
+                            , submissionDetails = Dict.empty
+                            , reviewSubmissionDetails = Dict.empty
+                            , wikiUsers = Dict.empty
+                            , wikiAuditLogs = Dict.empty
                             }
                     in
                     store
@@ -75,9 +91,21 @@ suite =
                         store =
                             { wikiCatalog =
                                 RemoteData.succeed
-                                    (Dict.singleton "x" { slug = "x", name = "X" })
+                                    (Dict.singleton "x"
+                                        { slug = "x"
+                                        , name = "X"
+                                        , summary = ""
+                                        , slugPolicy = HostedWikiSlugPolicy.StrictSlugs
+                                        , active = True
+                                        }
+                                    )
                             , wikiDetails = Dict.empty
                             , publishedPages = Dict.empty
+                            , reviewQueues = Dict.empty
+                            , submissionDetails = Dict.empty
+                            , reviewSubmissionDetails = Dict.empty
+                            , wikiUsers = Dict.empty
+                            , wikiAuditLogs = Dict.empty
                             }
                     in
                     store
@@ -99,6 +127,77 @@ suite =
                             ( { store | wikiDetails = Dict.singleton "demo" RemoteData.Loading }
                             , Effect.Lamdera.sendToBackend (RequestWikiFrontendDetails "demo")
                             )
+            , Test.test "AskForSubmissionDetails starts load from empty" <|
+                \() ->
+                    Store.empty
+                        |> Store.perform Frontend.storeConfig (Store.AskForSubmissionDetails "demo" "sub_1")
+                        |> Expect.equal
+                            ( { wikiCatalog = RemoteData.NotAsked
+                              , wikiDetails = Dict.empty
+                              , publishedPages = Dict.empty
+                              , reviewQueues = Dict.empty
+                              , submissionDetails =
+                                    Dict.singleton ( "demo", "sub_1" ) RemoteData.Loading
+                              , reviewSubmissionDetails = Dict.empty
+                              , wikiUsers = Dict.empty
+                              , wikiAuditLogs = Dict.empty
+                              }
+                            , Effect.Lamdera.sendToBackend (RequestSubmissionDetails "demo" "sub_1")
+                            )
+            , Test.test "AskForSubmissionDetails refetches after prior error result" <|
+                \() ->
+                    let
+                        store : Store
+                        store =
+                            { wikiCatalog = RemoteData.NotAsked
+                              , wikiDetails = Dict.empty
+                              , publishedPages = Dict.empty
+                              , reviewQueues = Dict.empty
+                              , submissionDetails =
+                                Dict.singleton ( "demo", "sub_1" )
+                                    (RemoteData.succeed (Err Submission.DetailsNotLoggedIn))
+                              , reviewSubmissionDetails = Dict.empty
+                              , wikiUsers = Dict.empty
+                              , wikiAuditLogs = Dict.empty
+                            }
+                    in
+                    store
+                        |> Store.perform Frontend.storeConfig (Store.AskForSubmissionDetails "demo" "sub_1")
+                        |> Expect.equal
+                            ( { store
+                                | submissionDetails =
+                                    Dict.singleton ( "demo", "sub_1" ) RemoteData.Loading
+                              }
+                            , Effect.Lamdera.sendToBackend (RequestSubmissionDetails "demo" "sub_1")
+                            )
+            , Test.test "AskForSubmissionDetails skips when already Success Ok" <|
+                \() ->
+                    let
+                        store : Store
+                        store =
+                            { wikiCatalog = RemoteData.NotAsked
+                              , wikiDetails = Dict.empty
+                              , publishedPages = Dict.empty
+                              , reviewQueues = Dict.empty
+                              , submissionDetails =
+                                Dict.singleton ( "demo", "sub_1" )
+                                    (RemoteData.succeed
+                                        (Ok
+                                            { id = Submission.idFromCounter 1
+                                            , status = Submission.Pending
+                                            , kindSummary = "New page: x"
+                                            , reviewerNote = Nothing
+                                            }
+                                        )
+                                    )
+                              , reviewSubmissionDetails = Dict.empty
+                              , wikiUsers = Dict.empty
+                              , wikiAuditLogs = Dict.empty
+                            }
+                    in
+                    store
+                        |> Store.perform Frontend.storeConfig (Store.AskForSubmissionDetails "demo" "sub_1")
+                        |> Expect.equal ( store, Command.none )
             , Test.test "AskForPageFrontendDetails starts load from empty" <|
                 \() ->
                     let
@@ -129,12 +228,301 @@ suite =
                             , publishedPages =
                                 Dict.singleton key
                                     (RemoteData.succeed
-                                        (Page.frontendDetails { slug = pageSlug, content = "body" })
+                                        (Page.frontendDetails "body" [])
                                     )
+                            , reviewQueues = Dict.empty
+                            , submissionDetails = Dict.empty
+                            , reviewSubmissionDetails = Dict.empty
+                            , wikiUsers = Dict.empty
+                            , wikiAuditLogs = Dict.empty
                             }
                     in
                     store
                         |> Store.perform Frontend.storeConfig (Store.AskForPageFrontendDetails wikiSlug pageSlug)
                         |> Expect.equal ( store, Command.none )
+            , Test.test "AskForReviewQueue starts load from empty" <|
+                \() ->
+                    let
+                        store : Store
+                        store =
+                            Store.empty
+                    in
+                    store
+                        |> Store.perform Frontend.storeConfig (Store.AskForReviewQueue "demo")
+                        |> Expect.equal
+                            ( { store
+                                | reviewQueues = Dict.singleton "demo" RemoteData.Loading
+                              }
+                            , Effect.Lamdera.sendToBackend (RequestReviewQueue "demo")
+                            )
+            , Test.test "AskForReviewQueue skips when already Success Ok" <|
+                \() ->
+                    let
+                        store : Store
+                        store =
+                            { wikiCatalog = RemoteData.NotAsked
+                            , wikiDetails = Dict.empty
+                            , publishedPages = Dict.empty
+                            , reviewQueues =
+                                Dict.singleton "demo"
+                                    (RemoteData.succeed (Ok []))
+                            , submissionDetails = Dict.empty
+                            , reviewSubmissionDetails = Dict.empty
+                            , wikiUsers = Dict.empty
+                            , wikiAuditLogs = Dict.empty
+                            }
+                    in
+                    store
+                        |> Store.perform Frontend.storeConfig (Store.AskForReviewQueue "demo")
+                        |> Expect.equal ( store, Command.none )
+            , Test.test "AskForReviewQueue refetches after prior error result" <|
+                \() ->
+                    let
+                        store : Store
+                        store =
+                            { wikiCatalog = RemoteData.NotAsked
+                            , wikiDetails = Dict.empty
+                            , publishedPages = Dict.empty
+                            , reviewQueues =
+                                Dict.singleton "demo"
+                                    (RemoteData.succeed (Err Submission.ReviewQueueForbidden))
+                            , submissionDetails = Dict.empty
+                            , reviewSubmissionDetails = Dict.empty
+                            , wikiUsers = Dict.empty
+                            , wikiAuditLogs = Dict.empty
+                            }
+                    in
+                    store
+                        |> Store.perform Frontend.storeConfig (Store.AskForReviewQueue "demo")
+                        |> Expect.equal
+                            ( { store
+                                | reviewQueues = Dict.singleton "demo" RemoteData.Loading
+                              }
+                            , Effect.Lamdera.sendToBackend (RequestReviewQueue "demo")
+                            )
+            , Test.test "AskForReviewSubmissionDetail starts load from empty" <|
+                \() ->
+                    Store.empty
+                        |> Store.perform Frontend.storeConfig (Store.AskForReviewSubmissionDetail "demo" "sub_1")
+                        |> Expect.equal
+                            ( { wikiCatalog = RemoteData.NotAsked
+                              , wikiDetails = Dict.empty
+                              , publishedPages = Dict.empty
+                              , reviewQueues = Dict.empty
+                              , submissionDetails = Dict.empty
+                              , reviewSubmissionDetails =
+                                    Dict.singleton ( "demo", "sub_1" ) RemoteData.Loading
+                              , wikiUsers = Dict.empty
+                              , wikiAuditLogs = Dict.empty
+                              }
+                            , Effect.Lamdera.sendToBackend (RequestReviewSubmissionDetail "demo" "sub_1")
+                            )
+            , Test.test "AskForReviewSubmissionDetail refetches after prior error result" <|
+                \() ->
+                    let
+                        store : Store
+                        store =
+                            { wikiCatalog = RemoteData.NotAsked
+                              , wikiDetails = Dict.empty
+                              , publishedPages = Dict.empty
+                              , reviewQueues = Dict.empty
+                              , submissionDetails = Dict.empty
+                              , reviewSubmissionDetails =
+                                Dict.singleton ( "demo", "sub_1" )
+                                    (RemoteData.succeed (Err SubmissionReviewDetail.ReviewSubmissionDetailForbidden))
+                              , wikiUsers = Dict.empty
+                              , wikiAuditLogs = Dict.empty
+                            }
+                    in
+                    store
+                        |> Store.perform Frontend.storeConfig (Store.AskForReviewSubmissionDetail "demo" "sub_1")
+                        |> Expect.equal
+                            ( { store
+                                | reviewSubmissionDetails =
+                                    Dict.singleton ( "demo", "sub_1" ) RemoteData.Loading
+                              }
+                            , Effect.Lamdera.sendToBackend (RequestReviewSubmissionDetail "demo" "sub_1")
+                            )
+            , Test.test "AskForReviewSubmissionDetail skips when already Success Ok" <|
+                \() ->
+                    let
+                        store : Store
+                        store =
+                            { wikiCatalog = RemoteData.NotAsked
+                              , wikiDetails = Dict.empty
+                              , publishedPages = Dict.empty
+                              , reviewQueues = Dict.empty
+                              , submissionDetails = Dict.empty
+                              , reviewSubmissionDetails =
+                                Dict.singleton ( "demo", "sub_1" )
+                                    (RemoteData.succeed
+                                        (Ok
+                                            (SubmissionReviewDetail.NewPageDiff
+                                                { pageSlug = "x"
+                                                , proposedMarkdown = "# hi"
+                                                }
+                                            )
+                                        )
+                                    )
+                              , wikiUsers = Dict.empty
+                              , wikiAuditLogs = Dict.empty
+                            }
+                    in
+                    store
+                        |> Store.perform Frontend.storeConfig (Store.AskForReviewSubmissionDetail "demo" "sub_1")
+                        |> Expect.equal ( store, Command.none )
+            , Test.test "AskForWikiUsers starts load from empty" <|
+                \() ->
+                    Store.empty
+                        |> Store.perform Frontend.storeConfig (Store.AskForWikiUsers "demo")
+                        |> Expect.equal
+                            ( { wikiCatalog = RemoteData.NotAsked
+                              , wikiDetails = Dict.empty
+                              , publishedPages = Dict.empty
+                              , reviewQueues = Dict.empty
+                              , submissionDetails = Dict.empty
+                              , reviewSubmissionDetails = Dict.empty
+                              , wikiUsers = Dict.singleton "demo" RemoteData.Loading
+                              , wikiAuditLogs = Dict.empty
+                              }
+                            , Effect.Lamdera.sendToBackend (RequestWikiUsers "demo")
+                            )
+            , Test.test "AskForWikiUsers skips when already Success Ok" <|
+                \() ->
+                    let
+                        store : Store
+                        store =
+                            { wikiCatalog = RemoteData.NotAsked
+                            , wikiDetails = Dict.empty
+                            , publishedPages = Dict.empty
+                            , reviewQueues = Dict.empty
+                            , submissionDetails = Dict.empty
+                            , reviewSubmissionDetails = Dict.empty
+                            , wikiUsers =
+                                Dict.singleton "demo"
+                                    (RemoteData.succeed (Ok []))
+                            , wikiAuditLogs = Dict.empty
+                            }
+                    in
+                    store
+                        |> Store.perform Frontend.storeConfig (Store.AskForWikiUsers "demo")
+                        |> Expect.equal ( store, Command.none )
+            , Test.test "AskForWikiUsers refetches after prior error result" <|
+                \() ->
+                    let
+                        store : Store
+                        store =
+                            { wikiCatalog = RemoteData.NotAsked
+                            , wikiDetails = Dict.empty
+                            , publishedPages = Dict.empty
+                            , reviewQueues = Dict.empty
+                            , submissionDetails = Dict.empty
+                            , reviewSubmissionDetails = Dict.empty
+                            , wikiUsers =
+                                Dict.singleton "demo"
+                                    (RemoteData.succeed (Err WikiAdminUsers.Forbidden))
+                            , wikiAuditLogs = Dict.empty
+                            }
+                    in
+                    store
+                        |> Store.perform Frontend.storeConfig (Store.AskForWikiUsers "demo")
+                        |> Expect.equal
+                            ( { store
+                                | wikiUsers = Dict.singleton "demo" RemoteData.Loading
+                              }
+                            , Effect.Lamdera.sendToBackend (RequestWikiUsers "demo")
+                            )
+            , Test.test "AskForWikiAuditLog starts load from empty" <|
+                \() ->
+                    Store.empty
+                        |> Store.perform Frontend.storeConfig (Store.AskForWikiAuditLog "demo" WikiAuditLog.emptyAuditLogFilter)
+                        |> Expect.equal
+                            ( { wikiCatalog = RemoteData.NotAsked
+                              , wikiDetails = Dict.empty
+                              , publishedPages = Dict.empty
+                              , reviewQueues = Dict.empty
+                              , submissionDetails = Dict.empty
+                              , reviewSubmissionDetails = Dict.empty
+                              , wikiUsers = Dict.empty
+                              , wikiAuditLogs =
+                                    Dict.singleton "demo"
+                                        (Dict.singleton emptyAuditFilterCacheKey RemoteData.Loading)
+                              }
+                            , Effect.Lamdera.sendToBackend (RequestWikiAuditLog "demo" WikiAuditLog.emptyAuditLogFilter)
+                            )
+            , Test.test "AskForWikiAuditLog skips when already Success Ok" <|
+                \() ->
+                    let
+                        store : Store
+                        store =
+                            { wikiCatalog = RemoteData.NotAsked
+                            , wikiDetails = Dict.empty
+                            , publishedPages = Dict.empty
+                            , reviewQueues = Dict.empty
+                            , submissionDetails = Dict.empty
+                            , reviewSubmissionDetails = Dict.empty
+                            , wikiUsers = Dict.empty
+                            , wikiAuditLogs =
+                                Dict.singleton "demo"
+                                    (Dict.singleton emptyAuditFilterCacheKey (RemoteData.succeed (Ok [])))
+                            }
+                    in
+                    store
+                        |> Store.perform Frontend.storeConfig (Store.AskForWikiAuditLog "demo" WikiAuditLog.emptyAuditLogFilter)
+                        |> Expect.equal ( store, Command.none )
+            , Test.test "AskForWikiAuditLog refetches after prior error result" <|
+                \() ->
+                    let
+                        store : Store
+                        store =
+                            { wikiCatalog = RemoteData.NotAsked
+                            , wikiDetails = Dict.empty
+                            , publishedPages = Dict.empty
+                            , reviewQueues = Dict.empty
+                            , submissionDetails = Dict.empty
+                            , reviewSubmissionDetails = Dict.empty
+                            , wikiUsers = Dict.empty
+                            , wikiAuditLogs =
+                                Dict.singleton "demo"
+                                    (Dict.singleton emptyAuditFilterCacheKey (RemoteData.succeed (Err WikiAuditLog.Forbidden)))
+                            }
+                    in
+                    store
+                        |> Store.perform Frontend.storeConfig (Store.AskForWikiAuditLog "demo" WikiAuditLog.emptyAuditLogFilter)
+                        |> Expect.equal
+                            ( { store
+                                | wikiAuditLogs =
+                                    Dict.singleton "demo"
+                                        (Dict.singleton emptyAuditFilterCacheKey RemoteData.Loading)
+                              }
+                            , Effect.Lamdera.sendToBackend (RequestWikiAuditLog "demo" WikiAuditLog.emptyAuditLogFilter)
+                            )
+            , Test.test "RefreshWikiAuditLog sends even when same filter already Success Ok" <|
+                \() ->
+                    let
+                        store : Store
+                        store =
+                            { wikiCatalog = RemoteData.NotAsked
+                            , wikiDetails = Dict.empty
+                            , publishedPages = Dict.empty
+                            , reviewQueues = Dict.empty
+                            , submissionDetails = Dict.empty
+                            , reviewSubmissionDetails = Dict.empty
+                            , wikiUsers = Dict.empty
+                            , wikiAuditLogs =
+                                Dict.singleton "demo"
+                                    (Dict.singleton emptyAuditFilterCacheKey (RemoteData.succeed (Ok [])))
+                            }
+                    in
+                    store
+                        |> Store.perform Frontend.storeConfig (Store.RefreshWikiAuditLog "demo" WikiAuditLog.emptyAuditLogFilter)
+                        |> Expect.equal
+                            ( { store
+                                | wikiAuditLogs =
+                                    Dict.singleton "demo"
+                                        (Dict.singleton emptyAuditFilterCacheKey RemoteData.Loading)
+                              }
+                            , Effect.Lamdera.sendToBackend (RequestWikiAuditLog "demo" WikiAuditLog.emptyAuditLogFilter)
+                            )
             ]
         ]

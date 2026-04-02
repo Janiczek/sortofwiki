@@ -1,0 +1,76 @@
+module ProgramTest.Story08_Login exposing (endToEndTests)
+
+import Backend
+import Effect.Browser.Dom
+import Effect.Lamdera
+import Effect.Test
+import Effect.Time
+import Frontend
+import Html.Attributes
+import ProgramTest.Config
+import Test.Html.Query
+import Test.Html.Selector
+import Types exposing (FrontendMsg(..), ToBackend, ToFrontend)
+import Url exposing (Protocol(..), Url)
+
+
+demoLoginUrl : Url
+demoLoginUrl =
+    { protocol = Http
+    , host = "localhost"
+    , port_ = Just 8000
+    , path = "/w/demo/login"
+    , query = Nothing
+    , fragment = Nothing
+    }
+
+
+endToEndTests : List (Effect.Test.EndToEndTest ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model)
+endToEndTests =
+    [ Effect.Test.start
+        "8 — login contributor /w/demo/login"
+        (Effect.Time.millisToPosix 0)
+        ProgramTest.Config.config
+        [ Effect.Test.connectFrontend
+            100
+            (Effect.Lamdera.sessionIdFromString "session-story08-login")
+            "/w/demo/register"
+            { width = 800, height = 600 }
+            (\client ->
+                [ client.checkView 100
+                    (\root ->
+                        root
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-register-page" ]
+                            |> Test.Html.Query.has
+                                [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "demo") ]
+                    )
+                , client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story08user"
+                , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
+                , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
+                , client.checkView 300
+                    (\root ->
+                        root
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-register-success" ]
+                            |> Test.Html.Query.has [ Test.Html.Selector.text "Registration complete" ]
+                    )
+                , client.update 100 (UrlChanged demoLoginUrl)
+                , client.checkView 100
+                    (\root ->
+                        root
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-login-page" ]
+                            |> Test.Html.Query.has
+                                [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "demo") ]
+                    )
+                , client.input 100 (Effect.Browser.Dom.id "wiki-login-username") "story08user"
+                , client.input 100 (Effect.Browser.Dom.id "wiki-login-password") "password12"
+                , client.click 100 (Effect.Browser.Dom.id "wiki-login-submit")
+                , client.checkView 300
+                    (\root ->
+                        root
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-login-success" ]
+                            |> Test.Html.Query.has [ Test.Html.Selector.text "You are logged in" ]
+                    )
+                ]
+            )
+        ]
+    ]

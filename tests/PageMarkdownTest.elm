@@ -14,24 +14,21 @@ suite =
         [ Test.describe "view"
             [ Test.test "renders heading from markdown" <|
                 \() ->
-                    Page.frontendDetails { slug = "p", content = "## Hello\n" }
+                    Page.frontendDetails "## Hello\n" []
                         |> PageMarkdown.view
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "h2" ]
                         |> Test.Html.Query.has [ Test.Html.Selector.text "Hello" ]
             , Test.test "renders strong emphasis" <|
                 \() ->
-                    Page.frontendDetails { slug = "p", content = "**bold**" }
+                    Page.frontendDetails "**bold**" []
                         |> PageMarkdown.view
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "strong" ]
                         |> Test.Html.Query.has [ Test.Html.Selector.text "bold" ]
             , Test.fuzz (Fuzz.map String.fromInt (Fuzz.intRange 0 999999)) "heading line with numeric title renders as h2 text" <|
                 \title ->
-                    Page.frontendDetails
-                        { slug = "p"
-                        , content = "## " ++ title ++ "\n"
-                        }
+                    Page.frontendDetails ("## " ++ title ++ "\n") []
                         |> PageMarkdown.view
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "h2" ]

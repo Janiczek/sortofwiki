@@ -10,18 +10,52 @@ suite : Test
 suite =
     Test.describe "Page"
         [ Test.describe "frontendDetails"
-            [ Test.test "maps stored content to markdownSource" <|
+            [ Test.test "maps markdown argument to markdownSource" <|
                 \() ->
-                    Page.frontendDetails { slug = "home", content = "## Hi\n" }
-                        |> Expect.equal { markdownSource = "## Hi\n" }
-            , Test.fuzz Fuzz.string "markdownSource equals page content" <|
-                \content ->
+                    Page.frontendDetails "## Hi\n" []
+                        |> Expect.equal { markdownSource = "## Hi\n", backlinks = [] }
+            , Test.fuzz Fuzz.string "markdownSource equals first argument" <|
+                \markdownSource ->
                     let
                         fd : Page.FrontendDetails
                         fd =
-                            Page.frontendDetails { slug = "p", content = content }
+                            Page.frontendDetails markdownSource []
                     in
                     fd.markdownSource
-                        |> Expect.equal content
+                        |> Expect.equal markdownSource
+            ]
+        , Test.describe "hasPublished"
+            [ Test.test "False for pending-only" <|
+                \() ->
+                    Page.pendingOnly "x" "draft"
+                        |> Page.hasPublished
+                        |> Expect.equal False
+            , Test.test "True when published present" <|
+                \() ->
+                    Page.withPublished "x" "hi"
+                        |> Page.hasPublished
+                        |> Expect.equal True
+            , Test.fuzz Fuzz.string "withPublished always hasPublished" <|
+                \s ->
+                    Page.withPublished "slug" s
+                        |> Page.hasPublished
+                        |> Expect.equal True
+            ]
+        , Test.describe "publishedMarkdownForLinks"
+            [ Test.test "empty when not published" <|
+                \() ->
+                    Page.pendingOnly "a" "[[b]]"
+                        |> Page.publishedMarkdownForLinks
+                        |> Expect.equal ""
+            , Test.test "uses published, ignores pending link targets" <|
+                \() ->
+                    Page.withPublishedAndPending "a" "no link here" "[[secret]]"
+                        |> Page.publishedMarkdownForLinks
+                        |> Expect.equal "no link here"
+            , Test.fuzz Fuzz.string "withPublished body equals publishedMarkdownForLinks" <|
+                \s ->
+                    Page.withPublished "slug" s
+                        |> Page.publishedMarkdownForLinks
+                        |> Expect.equal s
             ]
         ]
