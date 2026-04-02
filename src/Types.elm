@@ -18,6 +18,7 @@ module Types exposing
     , ToFrontend(..)
     )
 
+import ColorTheme exposing (ColorTheme)
 import ContributorAccount
 import Dict exposing (Dict)
 import Effect.Browser
@@ -208,6 +209,7 @@ type alias ReviewRequestChangesDraft =
 
 type alias FrontendModel =
     { key : Effect.Browser.Navigation.Key
+    , colorTheme : ColorTheme
     , route : Route
     , store : Store
     , contributorWikiSession : Maybe Wiki.Slug
@@ -238,6 +240,7 @@ type alias FrontendModel =
 type FrontendMsg
     = UrlClicked Effect.Browser.UrlRequest
     | UrlChanged Url
+    | ColorThemeToggled
     | RegisterFormUsernameChanged String
     | RegisterFormPasswordChanged String
     | RegisterFormSubmitted

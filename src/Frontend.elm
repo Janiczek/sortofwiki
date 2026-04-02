@@ -8,6 +8,7 @@ module Frontend exposing
 
 import Browser
 import Browser.Navigation
+import ColorTheme
 import ContributorAccount
 import Dict exposing (Dict)
 import Effect.Browser exposing (UrlRequest)
@@ -313,6 +314,7 @@ init url key =
         model : Model
         model =
             { key = key
+            , colorTheme = ColorTheme.Dark
             , route = route
             , store = Store.empty
             , contributorWikiSession = Nothing
@@ -397,6 +399,11 @@ afterRejectSubmissionCaches wikiSlug submissionId store =
 update : Msg -> Model -> ( Model, Command FrontendOnly ToBackend Msg )
 update msg model =
     case msg of
+        ColorThemeToggled ->
+            ( { model | colorTheme = ColorTheme.toggle model.colorTheme }
+            , Command.none
+            )
+
         UrlClicked urlRequest ->
             case urlRequest of
                 Browser.Internal url ->
@@ -3013,13 +3020,23 @@ viewWikiList wikis =
         [ Attr.id "catalog-page"
         ]
         [ Html.h1 [] [ Html.text "Hosted wikis" ]
-        , Html.ul
-            [ Attr.id "wiki-catalog"
+        , Html.table
+            [ TW.cls "data-table"
+            , Attr.id "wiki-catalog"
             ]
-            (wikis
-                |> catalogRows
-                |> List.map viewWikiRow
-            )
+            [ Html.thead []
+                [ Html.tr []
+                    [ Html.th [] [ Html.text "Wiki" ]
+                    , Html.th [] [ Html.text "Slug" ]
+                    , Html.th [] [ Html.text "Summary" ]
+                    ]
+                ]
+            , Html.tbody []
+                (wikis
+                    |> catalogRows
+                    |> List.map viewWikiRow
+                )
+            ]
         ]
 
 
@@ -3052,21 +3069,26 @@ viewWikiListLoading =
 
 viewWikiRow : Wiki.CatalogEntry -> Html Msg
 viewWikiRow entry =
-    Html.li []
-        [ Html.a
-            [ Attr.href (Wiki.catalogUrlPath entry)
-            , Attr.attribute "data-wiki-slug" entry.slug
+    Html.tr
+        [ Attr.attribute "data-wiki-slug" entry.slug
+        ]
+        [ Html.td []
+            [ Html.a
+                [ Attr.href (Wiki.catalogUrlPath entry) ]
+                [ Html.text entry.name ]
             ]
-            [ Html.text entry.name ]
-        , if String.isEmpty entry.summary then
-            Html.text ""
+        , Html.td [] [ Html.text entry.slug ]
+        , Html.td []
+            [ if String.isEmpty entry.summary then
+                Html.text ""
 
-          else
-            Html.p
-                [ Attr.id ("wiki-catalog-summary-" ++ entry.slug)
-                , Attr.attribute "data-context" "wiki-catalog-summary"
-                ]
-                [ Html.text entry.summary ]
+              else
+                Html.span
+                    [ Attr.id ("wiki-catalog-summary-" ++ entry.slug)
+                    , Attr.attribute "data-context" "wiki-catalog-summary"
+                    ]
+                    [ Html.text entry.summary ]
+            ]
         ]
 
 
@@ -3095,6 +3117,35 @@ viewWikiLoginLoading =
         [ Html.p [] [ Html.text "Loading…" ] ]
 
 
+viewWikiPublishedSlugTable : String -> Wiki.Slug -> List Page.Slug -> Html Msg
+viewWikiPublishedSlugTable tbodyId wikiSlug pageSlugs =
+    Html.table
+        [ TW.cls "data-table" ]
+        [ Html.thead []
+            [ Html.tr []
+                [ Html.th [] [ Html.text "Page" ]
+                ]
+            ]
+        , Html.tbody
+            [ Attr.id tbodyId ]
+            (pageSlugs
+                |> List.sort
+                |> List.map
+                    (\pageSlug ->
+                        Html.tr []
+                            [ Html.td []
+                                [ Html.a
+                                    [ Attr.href (Wiki.publishedPageUrlPath wikiSlug pageSlug)
+                                    , Attr.attribute "data-page-slug" pageSlug
+                                    ]
+                                    [ Html.text pageSlug ]
+                                ]
+                            ]
+                    )
+            )
+        ]
+
+
 viewWikiHome : Wiki.Slug -> Wiki.CatalogEntry -> Wiki.FrontendDetails -> Html Msg
 viewWikiHome wikiSlug summary details =
     Html.div
@@ -3102,13 +3153,13 @@ viewWikiHome wikiSlug summary details =
         , Attr.attribute "data-wiki-slug" wikiSlug
         ]
         [ Html.h1 [] [ Html.text summary.name ]
+        , if String.isEmpty summary.summary then
+            Html.text ""
+
+          else
+            Html.p [] [ Html.text summary.summary ]
         , Html.h2 [] [ Html.text "Pages" ]
-        , Html.ul
-            [ Attr.id "wiki-home-page-slugs"
-            ]
-            (details.pageSlugs
-                |> List.map (\ps -> Html.li [] [ Html.text ps ])
-            )
+        , viewWikiPublishedSlugTable "wiki-home-page-slugs" wikiSlug details.pageSlugs
         ]
 
 
@@ -3119,22 +3170,7 @@ viewPagesList wikiSlug summary details =
         , Attr.attribute "data-wiki-slug" wikiSlug
         ]
         [ Html.h1 [] [ Html.text (summary.name ++ " — Pages") ]
-        , Html.ul
-            [ Attr.id "pages-list-page-list"
-            ]
-            (details.pageSlugs
-                |> List.sort
-                |> List.map
-                    (\pageSlug ->
-                        Html.li []
-                            [ Html.a
-                                [ Attr.href (Wiki.publishedPageUrlPath wikiSlug pageSlug)
-                                , Attr.attribute "data-page-slug" pageSlug
-                                ]
-                                [ Html.text pageSlug ]
-                            ]
-                    )
-            )
+        , viewWikiPublishedSlugTable "pages-list-page-list" wikiSlug details.pageSlugs
         ]
 
 
@@ -3146,6 +3182,186 @@ viewNotFound =
         [ Html.h1 [] [ Html.text "Page not found" ]
         , Html.p [] [ Html.text "This URL is not part of SortOfWiki yet." ]
         ]
+
+
+viewThemeToggle : Model -> Html Msg
+viewThemeToggle model =
+    Html.button
+        [ Attr.type_ "button"
+        , Attr.id "color-theme-toggle"
+        , Events.onClick ColorThemeToggled
+        ]
+        [ Html.text
+            (case model.colorTheme of
+                ColorTheme.Light ->
+                    "Dark mode"
+
+                ColorTheme.Dark ->
+                    "Light mode"
+            )
+        ]
+
+
+viewCatalogChromeBar : Model -> Html Msg
+viewCatalogChromeBar model =
+    let
+        chromeSep : Html Msg
+        chromeSep =
+            Html.span [ TW.cls "chrome-sep" ] [ Html.text "·" ]
+
+        segment : List (Html Msg) -> List (Html Msg)
+        segment items =
+            chromeSep :: List.intersperse chromeSep items
+    in
+    Html.div
+        [ TW.cls "chrome-bar" ]
+        (List.concat
+            [ [ Html.span [] [ Html.text "SortOfWiki" ] ]
+            , segment [ Html.a [ Attr.href "/admin" ] [ Html.text "Host admin" ] ]
+            , segment [ Html.a [ Attr.href Wiki.hostAdminWikisUrlPath ] [ Html.text "Hosted wikis (admin)" ] ]
+            , segment [ viewThemeToggle model ]
+            ]
+        )
+
+
+viewHostAdminChromeBar : Model -> Html Msg
+viewHostAdminChromeBar model =
+    let
+        chromeSep : Html Msg
+        chromeSep =
+            Html.span [ TW.cls "chrome-sep" ] [ Html.text "·" ]
+
+        segment : List (Html Msg) -> List (Html Msg)
+        segment items =
+            chromeSep :: List.intersperse chromeSep items
+    in
+    Html.div
+        [ TW.cls "chrome-bar" ]
+        (List.concat
+            [ [ Html.a [ Attr.href "/" ] [ Html.text "Public catalog" ] ]
+            , segment [ Html.a [ Attr.href Wiki.hostAdminWikisUrlPath ] [ Html.text "Hosted wikis" ] ]
+            , segment [ Html.a [ Attr.href "/admin" ] [ Html.text "Host admin sign-in" ] ]
+            , segment [ viewThemeToggle model ]
+            ]
+        )
+
+
+viewWikiChromeBar : Wiki.Slug -> Model -> Html Msg
+viewWikiChromeBar wikiSlug model =
+    let
+        wikiHomePath : String
+        wikiHomePath =
+            "/w/" ++ wikiSlug
+
+        chromeSep : Html Msg
+        chromeSep =
+            Html.span [ TW.cls "chrome-sep" ] [ Html.text "·" ]
+
+        authSegment : List (Html Msg)
+        authSegment =
+            case model.contributorWikiSession of
+                Just sessionWiki ->
+                    if sessionWiki /= wikiSlug then
+                        [ Html.a [ Attr.href (Wiki.loginUrlPath wikiSlug) ] [ Html.text "Log in" ]
+                        , Html.a [ Attr.href (Wiki.registerUrlPath wikiSlug) ] [ Html.text "Register" ]
+                        ]
+
+                    else
+                        [ Html.span []
+                            [ Html.text
+                                ("Logged in"
+                                    ++ (model.contributorDisplayUsername
+                                            |> Maybe.map (\u -> " as " ++ u)
+                                            |> Maybe.withDefault ""
+                                       )
+                                )
+                            ]
+                        , Html.a [ Attr.href (Wiki.submitNewPageUrlPath wikiSlug) ] [ Html.text "Submit page" ]
+                        ]
+
+                Nothing ->
+                    [ Html.a [ Attr.href (Wiki.loginUrlPath wikiSlug) ] [ Html.text "Log in" ]
+                    , Html.a [ Attr.href (Wiki.registerUrlPath wikiSlug) ] [ Html.text "Register" ]
+                    ]
+
+        segment : List (Html Msg) -> List (Html Msg)
+        segment items =
+            chromeSep :: List.intersperse chromeSep items
+    in
+    Html.div
+        [ TW.cls "chrome-bar" ]
+        (List.concat
+            [ [ Html.a [ Attr.href "/" ] [ Html.text "All wikis" ] ]
+            , segment [ Html.a [ Attr.href wikiHomePath ] [ Html.text "Wiki home" ] ]
+            , segment [ Html.a [ Attr.href (Wiki.pageIndexUrlPath wikiSlug) ] [ Html.text "Pages" ] ]
+            , segment authSegment
+            , segment [ Html.a [ Attr.href (Wiki.reviewQueueUrlPath wikiSlug) ] [ Html.text "Review" ] ]
+            , segment [ Html.a [ Attr.href (Wiki.adminUsersUrlPath wikiSlug) ] [ Html.text "Admin users" ] ]
+            , segment [ Html.a [ Attr.href (Wiki.adminAuditUrlPath wikiSlug) ] [ Html.text "Audit log" ] ]
+            , segment [ viewThemeToggle model ]
+            ]
+        )
+
+
+viewRouteChrome : Model -> Html Msg
+viewRouteChrome model =
+    case model.route of
+        Route.WikiList ->
+            viewCatalogChromeBar model
+
+        Route.NotFound _ ->
+            viewCatalogChromeBar model
+
+        Route.HostAdmin ->
+            viewHostAdminChromeBar model
+
+        Route.HostAdminWikis ->
+            viewHostAdminChromeBar model
+
+        Route.HostAdminWikiNew ->
+            viewHostAdminChromeBar model
+
+        Route.HostAdminWikiDetail _ ->
+            viewHostAdminChromeBar model
+
+        Route.WikiHome slug ->
+            viewWikiChromeBar slug model
+
+        Route.WikiPages slug ->
+            viewWikiChromeBar slug model
+
+        Route.WikiPage slug _ ->
+            viewWikiChromeBar slug model
+
+        Route.WikiRegister slug ->
+            viewWikiChromeBar slug model
+
+        Route.WikiLogin slug ->
+            viewWikiChromeBar slug model
+
+        Route.WikiSubmitNew slug ->
+            viewWikiChromeBar slug model
+
+        Route.WikiSubmitEdit slug _ ->
+            viewWikiChromeBar slug model
+
+        Route.WikiSubmitDelete slug _ ->
+            viewWikiChromeBar slug model
+
+        Route.WikiSubmissionDetail slug _ ->
+            viewWikiChromeBar slug model
+
+        Route.WikiReview slug ->
+            viewWikiChromeBar slug model
+
+        Route.WikiReviewDetail slug _ ->
+            viewWikiChromeBar slug model
+
+        Route.WikiAdminUsers slug ->
+            viewWikiChromeBar slug model
+
+        Route.WikiAdminAudit slug ->
+            viewWikiChromeBar slug model
 
 
 viewHostAdminLoginFeedback : Maybe (Result HostAdmin.LoginError ()) -> Html Msg
@@ -3233,17 +3449,27 @@ viewHostAdminWikis model =
                     [ Html.p [] [ Html.text (HostAdmin.protectedErrorToUserText e) ] ]
 
             RemoteData.Success (Ok summaries) ->
-                Html.ul
-                    [ Attr.id "host-admin-wikis-list" ]
-                    (summaries
-                        |> List.map viewHostAdminWikiRow
-                    )
+                Html.table
+                    [ TW.cls "data-table" ]
+                    [ Html.thead []
+                        [ Html.tr []
+                            [ Html.th [] [ Html.text "Wiki" ]
+                            , Html.th [] [ Html.text "Slug" ]
+                            , Html.th [] [ Html.text "Status" ]
+                            ]
+                        ]
+                    , Html.tbody
+                        [ Attr.id "host-admin-wikis-list" ]
+                        (summaries
+                            |> List.map viewHostAdminWikiRow
+                        )
+                    ]
         ]
 
 
 viewHostAdminWikiRow : Wiki.CatalogEntry -> Html Msg
 viewHostAdminWikiRow summary =
-    Html.li
+    Html.tr
         [ Attr.attribute "data-context" "host-admin-wiki-row"
         , Attr.attribute "data-wiki-slug" summary.slug
         , Attr.attribute "data-wiki-active"
@@ -3254,18 +3480,23 @@ viewHostAdminWikiRow summary =
                 "false"
             )
         ]
-        [ Html.a
-            [ Attr.href (Wiki.hostAdminWikiDetailUrlPath summary.slug) ]
-            [ Html.text summary.name ]
-        , Html.span
-            [ Attr.attribute "data-context" "host-admin-wiki-status" ]
-            [ Html.text
-                (if summary.active then
-                    "Active"
+        [ Html.td []
+            [ Html.a
+                [ Attr.href (Wiki.hostAdminWikiDetailUrlPath summary.slug) ]
+                [ Html.text summary.name ]
+            ]
+        , Html.td [] [ Html.text summary.slug ]
+        , Html.td []
+            [ Html.span
+                [ Attr.attribute "data-context" "host-admin-wiki-status" ]
+                [ Html.text
+                    (if summary.active then
+                        "Active"
 
-                 else
-                    "Deactivated"
-                )
+                     else
+                        "Deactivated"
+                    )
+                ]
             ]
         ]
 
@@ -4495,39 +4726,65 @@ viewReviewQueueBody wikiSlug remote =
                     [ Html.text "No pending submissions." ]
 
             else
-                Html.ul
-                    [ Attr.id "wiki-review-queue-list" ]
-                    (items
-                        |> List.map
-                            (\item ->
-                                let
-                                    idStr : String
-                                    idStr =
-                                        Submission.idToString item.id
-                                in
-                                Html.li
-                                    [ Attr.attribute "data-review-queue-item" idStr
-                                    ]
-                                    [ Html.a
-                                        [ Attr.href (Wiki.reviewDetailUrlPath wikiSlug idStr)
-                                        , Attr.attribute "data-submission-id" idStr
+                Html.table
+                    [ TW.cls "data-table" ]
+                    [ Html.thead []
+                        [ Html.tr []
+                            [ Html.th [] [ Html.text "Submission" ]
+                            , Html.th [] [ Html.text "Kind" ]
+                            , Html.th [] [ Html.text "Author" ]
+                            , Html.th [] [ Html.text "Page" ]
+                            ]
+                        ]
+                    , Html.tbody
+                        [ Attr.id "wiki-review-queue-list" ]
+                        (items
+                            |> List.map
+                                (\item ->
+                                    let
+                                        idStr : String
+                                        idStr =
+                                            Submission.idToString item.id
+                                    in
+                                    Html.tr
+                                        [ Attr.attribute "data-review-queue-item" idStr
                                         ]
-                                        [ Html.text item.kindLabel
-                                        , Html.text " — "
-                                        , Html.text item.authorDisplay
-                                        , case item.maybePageSlug of
-                                            Nothing ->
-                                                Html.text ""
+                                        [ Html.td []
+                                            [ Html.a
+                                                [ Attr.href (Wiki.reviewDetailUrlPath wikiSlug idStr)
+                                                , Attr.attribute "data-submission-id" idStr
+                                                ]
+                                                [ Html.text item.kindLabel
+                                                , Html.text " — "
+                                                , Html.text item.authorDisplay
+                                                , case item.maybePageSlug of
+                                                    Nothing ->
+                                                        Html.text ""
 
-                                            Just pageSlug ->
-                                                Html.span
-                                                    [ Attr.attribute "data-page-slug" pageSlug
-                                                    ]
-                                                    [ Html.text (" (" ++ pageSlug ++ ")") ]
+                                                    Just pageSlug ->
+                                                        Html.span
+                                                            [ Attr.attribute "data-page-slug" pageSlug
+                                                            ]
+                                                            [ Html.text (" (" ++ pageSlug ++ ")") ]
+                                                ]
+                                            ]
+                                        , Html.td [] [ Html.text item.kindLabel ]
+                                        , Html.td [] [ Html.text item.authorDisplay ]
+                                        , Html.td []
+                                            [ case item.maybePageSlug of
+                                                Nothing ->
+                                                    Html.text ""
+
+                                                Just pageSlug ->
+                                                    Html.span
+                                                        [ Attr.attribute "data-page-slug" pageSlug
+                                                        ]
+                                                        [ Html.text pageSlug ]
+                                            ]
                                         ]
-                                    ]
-                            )
-                    )
+                                )
+                        )
+                    ]
 
 
 viewReviewQueueLoaded : Wiki.Slug -> Wiki.CatalogEntry -> Store -> Html Msg
@@ -4601,7 +4858,9 @@ viewWikiAdminUsersBody wikiSlug maybeSelfUsername remote =
 
         RemoteData.Success (Ok users) ->
             Html.table
-                [ Attr.id "wiki-admin-users-table" ]
+                [ Attr.id "wiki-admin-users-table"
+                , TW.cls "data-table"
+                ]
                 [ Html.thead []
                     [ Html.tr []
                         [ Html.th [] [ Html.text "Username" ]
@@ -5284,20 +5543,25 @@ viewBacklinks wikiSlug backlinks =
     Html.section
         [ Attr.id "page-backlinks" ]
         [ Html.h2 [] [ Html.text "Backlinks" ]
-        , Html.ul
-            [ Attr.id "page-backlinks-list" ]
-            (backlinks
-                |> List.map
-                    (\slug ->
-                        Html.li []
-                            [ Html.a
-                                [ Attr.href (Wiki.publishedPageUrlPath wikiSlug slug)
-                                , Attr.attribute "data-backlink-page-slug" slug
+        , Html.table
+            [ TW.cls "data-table" ]
+            [ Html.tbody
+                [ Attr.id "page-backlinks-list" ]
+                (backlinks
+                    |> List.map
+                        (\slug ->
+                            Html.tr []
+                                [ Html.td []
+                                    [ Html.a
+                                        [ Attr.href (Wiki.publishedPageUrlPath wikiSlug slug)
+                                        , Attr.attribute "data-backlink-page-slug" slug
+                                        ]
+                                        [ Html.text slug ]
+                                    ]
                                 ]
-                                [ Html.text slug ]
-                            ]
-                    )
-            )
+                        )
+                )
+            ]
         ]
 
 
@@ -5308,9 +5572,13 @@ viewPublishedPage wikiSlug pageSlug summary pageDetails maybeContributorWikiForT
         , Attr.attribute "data-wiki-slug" wikiSlug
         , Attr.attribute "data-page-slug" pageSlug
         ]
-        [ Html.header []
+        [ Html.header
+            [ TW.cls "page-published-header" ]
             [ Html.h1 [] [ Html.text summary.name ]
-            , Html.p [ Attr.attribute "data-context" "page-published-slug" ]
+            , Html.p
+                [ TW.cls "page-published-meta"
+                , Attr.attribute "data-context" "page-published-slug"
+                ]
                 [ Html.text pageSlug ]
             ]
         , PageMarkdown.view pageDetails
@@ -5320,21 +5588,19 @@ viewPublishedPage wikiSlug pageSlug summary pageDetails maybeContributorWikiForT
                     Html.text ""
 
                 else
-                    Html.div []
-                        [ Html.p []
-                            [ Html.a
-                                [ Attr.id "wiki-page-propose-edit"
-                                , Attr.href (Wiki.submitEditUrlPath wikiSlug pageSlug)
-                                ]
-                                [ Html.text "Propose edit" ]
+                    Html.div
+                        [ TW.cls "page-published-actions" ]
+                        [ Html.a
+                            [ Attr.id "wiki-page-propose-edit"
+                            , Attr.href (Wiki.submitEditUrlPath wikiSlug pageSlug)
                             ]
-                        , Html.p []
-                            [ Html.a
-                                [ Attr.id "wiki-page-request-deletion"
-                                , Attr.href (Wiki.submitDeleteUrlPath wikiSlug pageSlug)
-                                ]
-                                [ Html.text "Request deletion" ]
+                            [ Html.text "Propose edit" ]
+                        , Html.text " · "
+                        , Html.a
+                            [ Attr.id "wiki-page-request-deletion"
+                            , Attr.href (Wiki.submitDeleteUrlPath wikiSlug pageSlug)
                             ]
+                            [ Html.text "Request deletion" ]
                         ]
 
             Nothing ->
@@ -5448,8 +5714,16 @@ view model =
     { title = documentTitle model
     , body =
         [ Html.div
-            [ TW.cls "font-sans max-w-[40rem] mx-auto my-8 px-4"
+            [ TW.cls <|
+                case model.colorTheme of
+                    ColorTheme.Light ->
+                        "app-root"
+
+                    ColorTheme.Dark ->
+                        "app-root dark"
             ]
-            [ viewBody model ]
+            [ viewRouteChrome model
+            , viewBody model
+            ]
         ]
     }

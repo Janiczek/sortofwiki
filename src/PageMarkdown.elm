@@ -3,6 +3,7 @@ module PageMarkdown exposing (view)
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Markdown.Parser as MarkdownParser
+import TW
 import Markdown.Renderer as MarkdownRenderer
 import Page
 
@@ -12,7 +13,9 @@ import Page
 view : Page.FrontendDetails -> Html msg
 view pageDetails =
     Html.div
-        [ Attr.id "page-markdown" ]
+        [ Attr.id "page-markdown"
+        , TW.cls "page-markdown-inner"
+        ]
         (case
             pageDetails.markdownSource
                 |> MarkdownParser.parse

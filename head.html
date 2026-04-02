@@ -1,1 +1,328 @@
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link
+  href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap"
+  rel="stylesheet"
+/>
+<style>
+  :root {
+    --font-serif: "Source Serif 4", "Iowan Old Style", "Palatino Linotype",
+      Palatino, Georgia, "Times New Roman", serif;
+  }
+
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-size: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background-color: #0a0e0c;
+  }
+
+  /* Theme tokens live on .app-root so Tailwind-style `class="dark"` on the same node switches palette. */
+  .app-root {
+    --bg: #f4faf7;
+    --bg-grid: rgba(10, 61, 41, 0.06);
+    --fg: #0c1a14;
+    --fg-muted: #2a4a3a;
+    --link: #0a3d29;
+    --link-hover: #062818;
+    --border: #6b8f7c;
+    --border-dash: #7a9a8a;
+    --chrome-bg: #e8f2ec;
+    --btn-bg: #0d4a32;
+    --btn-fg: #f8fdf9;
+    --btn-border: #062818;
+    --danger: #6b1010;
+    --danger-bg: #fce8e8;
+    --code-bg: #dfece4;
+    --focus-ring: #0a5c3d;
+    --input-bg: #ffffff;
+    --table-stripe: rgba(232, 242, 236, 0.45);
+
+    min-height: 100vh;
+    padding: 0.25rem 0.5rem 0.5rem;
+    font-family: var(--font-serif);
+    background-color: var(--bg);
+    color: var(--fg);
+    line-height: 1.35;
+    background-image: linear-gradient(var(--bg-grid) 1px, transparent 1px),
+      linear-gradient(90deg, var(--bg-grid) 1px, transparent 1px);
+    background-size: 12px 12px;
+  }
+
+  .app-root.dark {
+    --bg: #0c1612;
+    --bg-grid: rgba(130, 210, 170, 0.055);
+    --fg: #eaf6f0;
+    --fg-muted: #9ebfb0;
+    --link: #7ad4b0;
+    --link-hover: #b0edd4;
+    --border: #4a7a62;
+    --border-dash: #5d8f73;
+    --chrome-bg: #142620;
+    --btn-bg: #3cb87f;
+    --btn-fg: #06120c;
+    --btn-border: #1f6b4a;
+    --danger: #ffb4b4;
+    --danger-bg: #2c1418;
+    --code-bg: #1a2e24;
+    --focus-ring: #7ad4b0;
+    --input-bg: #111f19;
+    --table-stripe: rgba(30, 58, 44, 0.55);
+  }
+
+  .app-root a {
+    color: var(--link);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .app-root a:hover {
+    color: var(--link-hover);
+  }
+
+  .app-root a:focus-visible,
+  .app-root button:focus-visible,
+  .app-root input:focus-visible,
+  .app-root textarea:focus-visible,
+  .app-root select:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  .app-root h1,
+  .app-root h2,
+  .app-root h3 {
+    margin: 0.35rem 0 0.2rem;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  .app-root h1 {
+    font-size: 1.35rem;
+  }
+
+  .app-root h2 {
+    font-size: 1.1rem;
+  }
+
+  .app-root h3 {
+    font-size: 1rem;
+  }
+
+  .app-root p {
+    margin: 0.25rem 0;
+  }
+
+  .chrome-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.75rem;
+    padding: 0.2rem 0.35rem;
+    margin: 0 0 0.35rem;
+    background: var(--chrome-bg);
+    border: 1px dashed var(--border-dash);
+    border-radius: 0;
+    font-size: 0.9rem;
+  }
+
+  .chrome-bar a {
+    white-space: nowrap;
+  }
+
+  .chrome-sep {
+    color: var(--border);
+    user-select: none;
+  }
+
+  table.data-table {
+    width: 100%;
+    max-width: 72rem;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    border: 1px solid var(--border);
+  }
+
+  table.data-table th,
+  table.data-table td {
+    padding: 0.15rem 0.35rem;
+    border: 1px dashed var(--border-dash);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  table.data-table thead th {
+    background: var(--chrome-bg);
+    font-weight: 600;
+    border-bottom: 1px solid var(--border);
+  }
+
+  table.data-table tbody tr:nth-child(even) {
+    background: var(--table-stripe);
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 0.85rem;
+    padding: 0.2rem 0.45rem;
+    margin: 0.1rem 0.15rem 0.1rem 0;
+    background: var(--btn-bg);
+    color: var(--btn-fg);
+    border: 1px solid var(--btn-border);
+    cursor: pointer;
+  }
+
+  button:hover {
+    filter: brightness(1.08);
+  }
+
+  button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  input[type="text"],
+  input[type="password"],
+  textarea,
+  select {
+    font-family: inherit;
+    font-size: 0.9rem;
+    padding: 0.15rem 0.3rem;
+    margin: 0.1rem 0 0.2rem;
+    border: 1px solid var(--border);
+    background: var(--input-bg);
+    color: var(--fg);
+    max-width: 100%;
+  }
+
+  textarea {
+    min-height: 5rem;
+    width: 100%;
+    max-width: 48rem;
+  }
+
+  label {
+    display: block;
+    margin-top: 0.25rem;
+    font-size: 0.88rem;
+    color: var(--fg-muted);
+  }
+
+  .page-published-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.35rem 0.75rem;
+    padding: 0.15rem 0.25rem;
+    margin: 0 0 0.25rem;
+    border: 1px dashed var(--border-dash);
+    background: var(--chrome-bg);
+  }
+
+  .page-published-header h1 {
+    margin: 0;
+    font-size: 1.15rem;
+  }
+
+  .page-published-meta {
+    margin: 0;
+    font-size: 0.88rem;
+    color: var(--fg-muted);
+  }
+
+  .page-published-actions {
+    margin: 0.15rem 0 0.25rem;
+    font-size: 0.88rem;
+  }
+
+  .page-published-actions a {
+    margin-right: 0.75rem;
+  }
+
+  #page-markdown {
+    max-width: 52rem;
+    font-size: 0.95rem;
+  }
+
+  #page-markdown h1,
+  #page-markdown h2,
+  #page-markdown h3,
+  #page-markdown h4,
+  #page-markdown h5,
+  #page-markdown h6 {
+    margin-top: 0.5rem;
+    margin-bottom: 0.25rem;
+    font-weight: 600;
+    color: var(--fg);
+  }
+
+  #page-markdown p {
+    margin: 0.35rem 0;
+  }
+
+  #page-markdown a {
+    color: var(--link);
+  }
+
+  #page-markdown ul,
+  #page-markdown ol {
+    margin: 0.25rem 0;
+    padding-left: 1.35rem;
+  }
+
+  #page-markdown li {
+    margin: 0.1rem 0;
+  }
+
+  #page-markdown code {
+    font-family: ui-monospace, "Cascadia Code", "Source Code Pro", Menlo,
+      Consolas, monospace;
+    font-size: 0.88em;
+    background: var(--code-bg);
+    padding: 0.05rem 0.2rem;
+    border: 1px dashed var(--border-dash);
+  }
+
+  #page-markdown pre {
+    margin: 0.35rem 0;
+    padding: 0.35rem 0.45rem;
+    overflow-x: auto;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+
+  #page-markdown pre code {
+    border: none;
+    padding: 0;
+    background: transparent;
+  }
+
+  #page-markdown blockquote {
+    margin: 0.35rem 0;
+    padding: 0.2rem 0.5rem;
+    border-left: 3px solid var(--border);
+    color: var(--fg-muted);
+  }
+
+  #page-backlinks {
+    margin-top: 0.5rem;
+    max-width: 52rem;
+  }
+
+  #page-backlinks h2 {
+    margin: 0.2rem 0 0.15rem;
+    font-size: 0.95rem;
+  }
+</style>
 <script src="/tailwind_browser_4.2.2.min.js"></script>
