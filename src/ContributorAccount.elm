@@ -3,6 +3,7 @@ module ContributorAccount exposing
     , LoginContributorError(..)
     , RegisterContributorError(..)
     , Verifier
+    , idDecoder
     , idToString
     , loginErrorToUserText
     , newAccountId
@@ -11,10 +12,13 @@ module ContributorAccount exposing
     , remapIdForWikiSlug
     , validateLoginFields
     , validateRegistrationFields
+    , verifierDecoder
     , verifierFromPassword
+    , verifierHexString
     , verifierMatchesPassword
     )
 
+import Json.Decode as Decode
 import SHA256
 import Wiki
 
@@ -28,6 +32,28 @@ type Id
 idToString : Id -> String
 idToString (Id s) =
     s
+
+
+{-| JSON restore (host-admin data export).
+-}
+idDecoder : Decode.Decoder Id
+idDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                if String.isEmpty s then
+                    Decode.fail "empty contributor account id"
+
+                else
+                    Decode.succeed (Id s)
+            )
+
+
+{-| Stored password hash hex from JSON backup.
+-}
+verifierDecoder : Decode.Decoder Verifier
+verifierDecoder =
+    Decode.map Verifier Decode.string
 
 
 newAccountId : Wiki.Slug -> String -> Id
@@ -72,6 +98,13 @@ verifierMatchesPassword password (Verifier storedHex) =
     case verifierFromPassword password of
         Verifier hex ->
             hex == storedHex
+
+
+{-| Hex digest string stored in JSON backup.
+-}
+verifierHexString : Verifier -> String
+verifierHexString (Verifier hex) =
+    hex
 
 
 type LoginContributorError

@@ -30,6 +30,8 @@ type alias Store =
     , publishedPages : Dict ( Wiki.Slug, Page.Slug ) (RemoteData () Page.FrontendDetails)
     , reviewQueues :
         Dict Wiki.Slug (RemoteData () (Result Submission.ReviewQueueError (List Submission.ReviewQueueItem)))
+    , myPendingSubmissions :
+        Dict Wiki.Slug (RemoteData () (Result Submission.MyPendingSubmissionsError (List Submission.MyPendingSubmissionListItem)))
     , submissionDetails :
         Dict ( Wiki.Slug, String ) (RemoteData () (Result Submission.DetailsError Submission.ContributorView))
     , reviewSubmissionDetails :
@@ -45,6 +47,7 @@ type Action
     = AskForWikiCatalog
     | AskForWikiFrontendDetails Wiki.Slug
     | AskForPageFrontendDetails Wiki.Slug Page.Slug
+    | AskForMyPendingSubmissions Wiki.Slug
     | AskForReviewQueue Wiki.Slug
     | AskForReviewSubmissionDetail Wiki.Slug String
     | AskForWikiUsers Wiki.Slug
@@ -59,6 +62,7 @@ empty =
     , wikiDetails = Dict.empty
     , publishedPages = Dict.empty
     , reviewQueues = Dict.empty
+    , myPendingSubmissions = Dict.empty
     , submissionDetails = Dict.empty
     , reviewSubmissionDetails = Dict.empty
     , wikiUsers = Dict.empty
@@ -70,6 +74,7 @@ type alias Config toBackend =
     { requestWikiCatalog : toBackend
     , requestWikiFrontendDetails : Wiki.Slug -> toBackend
     , requestPageFrontendDetails : Wiki.Slug -> Page.Slug -> toBackend
+    , requestMyPendingSubmissions : Wiki.Slug -> toBackend
     , requestReviewQueue : Wiki.Slug -> toBackend
     , requestReviewSubmissionDetail : Wiki.Slug -> String -> toBackend
     , requestWikiUsers : Wiki.Slug -> toBackend
@@ -151,6 +156,34 @@ perform config action store =
                     )
             in
             case Dict.get wikiSlug store.reviewQueues |> join of
+                Success (Ok _) ->
+                    ( store, Command.none )
+
+                Success (Err _) ->
+                    startLoad
+
+                Loading ->
+                    ( store, Command.none )
+
+                Failure _ ->
+                    startLoad
+
+                NotAsked ->
+                    startLoad
+
+        AskForMyPendingSubmissions wikiSlug ->
+            let
+                startLoad : ( Store, Command FrontendOnly toBackend msg )
+                startLoad =
+                    ( { store
+                        | myPendingSubmissions =
+                            Dict.insert wikiSlug Loading store.myPendingSubmissions
+                      }
+                    , Effect.Lamdera.sendToBackend
+                        (config.requestMyPendingSubmissions wikiSlug)
+                    )
+            in
+            case Dict.get wikiSlug store.myPendingSubmissions |> join of
                 Success (Ok _) ->
                     ( store, Command.none )
 

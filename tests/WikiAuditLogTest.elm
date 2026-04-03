@@ -3,6 +3,7 @@ module WikiAuditLogTest exposing (suite)
 import Dict
 import Expect
 import Test exposing (Test)
+import Time
 import WikiAuditLog
 
 
@@ -62,22 +63,30 @@ suite =
                         |> Expect.equal "Trusted publish: deleted page gone"
             ]
         , Test.describe "formatEventRowText"
-            [ Test.test "includes time label, actor, and kind text" <|
+            [ Test.test "includes UTC YYYY-MM-DD HH:mm:ss.sss, actor, and kind text" <|
                 \() ->
-                    { atMillis = 1704067200000
+                    { at = Time.millisToPosix 1704067200000
                     , actorUsername = "mod"
                     , kind =
                         WikiAuditLog.ApprovedSubmission { submissionId = "s1", pageSlug = "p" }
                     }
                         |> WikiAuditLog.formatEventRowText
-                        |> Expect.equal "t=1704067200000 · mod — Approved submission s1 (page p)"
+                        |> Expect.equal "2024-01-01 00:00:00.000 · mod — Approved submission s1 (page p)"
+            , Test.test "pads UTC milliseconds to three digits" <|
+                \() ->
+                    { at = Time.millisToPosix 1
+                    , actorUsername = "a"
+                    , kind = WikiAuditLog.GrantedWikiAdmin { targetUsername = "x" }
+                    }
+                        |> WikiAuditLog.formatEventRowText
+                        |> Expect.equal "1970-01-01 00:00:00.001 · a — Granted wiki admin to x"
             ]
         , Test.describe "append"
             [ Test.test "appends in chronological order for one wiki" <|
                 \() ->
                     Dict.empty
-                        |> WikiAuditLog.append "w" 1 "a" (WikiAuditLog.GrantedWikiAdmin { targetUsername = "x" })
-                        |> WikiAuditLog.append "w" 2 "b" (WikiAuditLog.RevokedWikiAdmin { targetUsername = "x" })
+                        |> WikiAuditLog.append "w" (Time.millisToPosix 1) "a" (WikiAuditLog.GrantedWikiAdmin { targetUsername = "x" })
+                        |> WikiAuditLog.append "w" (Time.millisToPosix 2) "b" (WikiAuditLog.RevokedWikiAdmin { targetUsername = "x" })
                         |> Dict.get "w"
                         |> Maybe.map (List.map .actorUsername)
                         |> Expect.equal (Just [ "a", "b" ])
@@ -88,7 +97,7 @@ suite =
                     let
                         ev : WikiAuditLog.AuditEvent
                         ev =
-                            { atMillis = 1
+                            { at = Time.millisToPosix 1
                             , actorUsername = "alice"
                             , kind = WikiAuditLog.GrantedWikiAdmin { targetUsername = "bob" }
                             }
@@ -100,7 +109,7 @@ suite =
                     let
                         ev : WikiAuditLog.AuditEvent
                         ev =
-                            { atMillis = 1
+                            { at = Time.millisToPosix 1
                             , actorUsername = "WikiDemo"
                             , kind = WikiAuditLog.PromotedContributorToTrusted { targetUsername = "x" }
                             }
@@ -119,7 +128,7 @@ suite =
                     let
                         ev : WikiAuditLog.AuditEvent
                         ev =
-                            { atMillis = 1
+                            { at = Time.millisToPosix 1
                             , actorUsername = "a"
                             , kind = WikiAuditLog.GrantedWikiAdmin { targetUsername = "x" }
                             }
@@ -138,7 +147,7 @@ suite =
                     let
                         ev : WikiAuditLog.AuditEvent
                         ev =
-                            { atMillis = 1
+                            { at = Time.millisToPosix 1
                             , actorUsername = "r"
                             , kind = WikiAuditLog.ApprovedSubmission { submissionId = "s1", pageSlug = "guides-home" }
                             }
@@ -157,7 +166,7 @@ suite =
                     let
                         evGrant : WikiAuditLog.AuditEvent
                         evGrant =
-                            { atMillis = 1
+                            { at = Time.millisToPosix 1
                             , actorUsername = "a"
                             , kind = WikiAuditLog.GrantedWikiAdmin { targetUsername = "x" }
                             }
@@ -179,7 +188,7 @@ suite =
                     let
                         ev : WikiAuditLog.AuditEvent
                         ev =
-                            { atMillis = 1
+                            { at = Time.millisToPosix 1
                             , actorUsername = "a"
                             , kind = WikiAuditLog.PromotedContributorToTrusted { targetUsername = "x" }
                             }
@@ -193,5 +202,38 @@ suite =
                     in
                     WikiAuditLog.eventMatchesFilter f ev
                         |> Expect.equal False
+            ]
+        , Test.describe "allScopedEventsFromDict"
+            [ Test.test "merges wikis and sorts by time" <|
+                \() ->
+                    Dict.empty
+                        |> WikiAuditLog.append "B" (Time.millisToPosix 200) "a" (WikiAuditLog.GrantedWikiAdmin { targetUsername = "x" })
+                        |> WikiAuditLog.append "A" (Time.millisToPosix 100) "b" (WikiAuditLog.GrantedWikiAdmin { targetUsername = "y" })
+                        |> WikiAuditLog.allScopedEventsFromDict
+                        |> List.map (\e -> ( e.wikiSlug, Time.posixToMillis e.at ))
+                        |> Expect.equal [ ( "A", 100 ), ( "B", 200 ) ]
+            ]
+        , Test.describe "scopedEventMatchesFilter"
+            [ Test.test "wiki slug substring is case-insensitive" <|
+                \() ->
+                    let
+                        ev : WikiAuditLog.ScopedAuditEvent
+                        ev =
+                            { wikiSlug = "Demo"
+                            , at = Time.millisToPosix 1
+                            , actorUsername = "a"
+                            , kind = WikiAuditLog.GrantedWikiAdmin { targetUsername = "x" }
+                            }
+
+                        f : WikiAuditLog.HostAuditLogFilter
+                        f =
+                            { wikiSlugSubstring = "emo"
+                            , actorUsernameSubstring = ""
+                            , pageSlugSubstring = ""
+                            , eventKindTags = []
+                            }
+                    in
+                    WikiAuditLog.scopedEventMatchesFilter f ev
+                        |> Expect.equal True
             ]
         ]

@@ -28,7 +28,7 @@ suite =
                             , authorId = ContributorAccount.newAccountId "demo" "statusdemo"
                             , kind =
                                 Submission.NewPage
-                                    { pageSlug = "queue-demo-page"
+                                    { pageSlug = "QueueDemoPage"
                                     , markdown = "Seeded pending submission for the trusted review queue (story 15)."
                                     }
                             , status = Submission.Pending
@@ -38,7 +38,7 @@ suite =
                     SubmissionReviewDetail.reviewDetailFromWikiAndSubmission wiki sub
                         |> Expect.equal
                             (SubmissionReviewDetail.NewPageDiff
-                                { pageSlug = "queue-demo-page"
+                                { pageSlug = "QueueDemoPage"
                                 , proposedMarkdown = "Seeded pending submission for the trusted review queue (story 15)."
                                 }
                             )

@@ -1,37 +1,26 @@
 module ProgramTest.Story46_WikiLinksInMarkdown exposing (endToEndTests)
 
-import Backend
-import Effect.Lamdera
-import Effect.Test
-import Effect.Time
-import Frontend
-import Html.Attributes
 import ProgramTest.Config
-import Test.Html.Query
-import Test.Html.Selector
-import Types exposing (ToBackend, ToFrontend)
+import ProgramTest.Query
+import ProgramTest.Start
 
 
-endToEndTests : List (Effect.Test.EndToEndTest ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model)
+endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ Effect.Test.start
-        "46 — [[Home]] on published page renders as same-wiki link"
-        (Effect.Time.millisToPosix 0)
-        ProgramTest.Config.config
-        [ Effect.Test.connectFrontend
-            100
-            (Effect.Lamdera.sessionIdFromString "session-wiki-links-about")
-            "/w/demo/p/About"
-            { width = 800, height = 600 }
-            (\client ->
+    [ ProgramTest.Start.start
+        { name = "46 — [[Home]] on published page renders as same-wiki link"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , sessionId = "session-wiki-links-about"
+        , path = "/w/Demo/p/About"
+        , connectClientMs = Nothing
+        , clientSteps =
+            \client ->
                 [ client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "page-markdown" ]
-                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.href "/w/demo/p/Home") ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Home" ]
+                    (ProgramTest.Query.withinId "page-markdown"
+                        (ProgramTest.Query.withinHref "/w/Demo/p/Home"
+                            (ProgramTest.Query.expectHasText "Home")
+                        )
                     )
                 ]
-            )
-        ]
+        }
     ]

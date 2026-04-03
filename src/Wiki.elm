@@ -13,8 +13,11 @@ module Wiki exposing
     , hostAdminNewWikiUrlPath
     , hostAdminWikiDetailUrlPath
     , hostAdminWikisUrlPath
+    , hostAdminBackupUrlPath
+    , hostAdminAuditUrlPath
     , loginUrlPath
     , loginUrlPathWithRedirect
+    , mySubmissionsUrlPath
     , publicCatalogDict
     , publishNewPageOnWiki
     , publishedPageFrontendDetails
@@ -27,6 +30,9 @@ module Wiki exposing
     , submitDeleteUrlPath
     , submitEditUrlPath
     , submitNewPageUrlPath
+    , submitNewPageUrlPathWithSuggestedSlug
+    , wikiHomeUrlPath
+    , wikiListUrlPath
     , wikiWithPages
     )
 
@@ -136,11 +142,25 @@ pageBySlugCaseInsensitive rawSlug pages =
         |> List.head
 
 
+{-| Global wiki catalog (all wikis). Path: `/`.
+-}
+wikiListUrlPath : String
+wikiListUrlPath =
+    "/"
+
+
+{-| Wiki homepage path for a slug (same as `catalogUrlPath` for that wiki).
+-}
+wikiHomeUrlPath : Slug -> String
+wikiHomeUrlPath wikiSlug =
+    "/w/" ++ wikiSlug
+
+
 {-| Path segment after origin for the wiki homepage, e.g. `/w/my-wiki`.
 -}
 catalogUrlPath : CatalogEntry -> String
 catalogUrlPath s =
-    "/w/" ++ s.slug
+    wikiHomeUrlPath s.slug
 
 
 {-| Contributor login for a wiki.
@@ -180,11 +200,19 @@ submitNewPageUrlPath wikiSlug =
     "/w/" ++ wikiSlug ++ "/submit/new"
 
 
-{-| Propose an edit to a published page (story 10). Path: `/w/:wikiSlug/submit/edit/:pageSlug`.
+{-| `submitNewPageUrlPath` with `?page=` (percent-encoded). Prefills the new-page slug field and keeps it read-only; plain `submitNewPageUrlPath` leaves the slug editable.
+-}
+submitNewPageUrlPathWithSuggestedSlug : Slug -> Page.Slug -> String
+submitNewPageUrlPathWithSuggestedSlug wikiSlug pageSlug =
+    submitNewPageUrlPath wikiSlug
+        ++ UrlBuilder.toQuery [ UrlBuilder.string "page" pageSlug ]
+
+
+{-| Propose an edit to a published page (story 10). Path: `/w/:wikiSlug/edit/:pageSlug`.
 -}
 submitEditUrlPath : Slug -> Page.Slug -> String
 submitEditUrlPath wikiSlug pageSlug =
-    "/w/" ++ wikiSlug ++ "/submit/edit/" ++ pageSlug
+    "/w/" ++ wikiSlug ++ "/edit/" ++ pageSlug
 
 
 {-| Request deletion of a published page for moderation (story 11). Path: `/w/:wikiSlug/submit/delete/:pageSlug`.
@@ -206,6 +234,13 @@ adminUsersUrlPath wikiSlug =
 adminAuditUrlPath : Slug -> String
 adminAuditUrlPath wikiSlug =
     "/w/" ++ wikiSlug ++ "/admin/audit"
+
+
+{-| Contributor list of submissions waiting for review. Path: `/w/:wikiSlug/submissions`.
+-}
+mySubmissionsUrlPath : Slug -> String
+mySubmissionsUrlPath wikiSlug =
+    "/w/" ++ wikiSlug ++ "/submissions"
 
 
 {-| Trusted contributor review queue (story 15). Path: `/w/:wikiSlug/review`.
@@ -241,6 +276,20 @@ hostAdminNewWikiUrlPath =
 hostAdminWikisUrlPath : String
 hostAdminWikisUrlPath =
     "/admin/wikis"
+
+
+{-| Platform host-admin backup and restore. Path: `/admin/backup`.
+-}
+hostAdminBackupUrlPath : String
+hostAdminBackupUrlPath =
+    "/admin/backup"
+
+
+{-| Platform host-admin audit log (all wikis). Path: `/admin/audit`.
+-}
+hostAdminAuditUrlPath : String
+hostAdminAuditUrlPath =
+    "/admin/audit"
 
 
 {-| Platform host-admin wiki detail (story 30). Path: `/admin/wikis/:wikiSlug`.

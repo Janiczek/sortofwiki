@@ -5,7 +5,9 @@ import ContributorAccount
 import Dict
 import Effect.Lamdera
 import Expect
+import ProgramTest.Config
 import Test exposing (Test)
+import Time
 import Types exposing (ToBackend(..))
 import WikiAuditLog
 import WikiUser
@@ -26,23 +28,24 @@ trustedpubOnDemo =
     let
         m : Backend.Model
         m =
-            Tuple.first Backend.app_.init
+            ProgramTest.Config.replayInitStepsOntoModel ProgramTest.Config.demoWikiPagesPlusTwoPendingSubmissionsSteps
     in
     { m
         | contributorSessions =
             Dict.insert sessionKey
-                (WikiUser.Binding "demo" (ContributorAccount.newAccountId "demo" "trustedpub"))
+                (WikiUser.Binding "Demo" (ContributorAccount.newAccountId "Demo" "trustedpub"))
                 m.contributorSessions
     }
 
 
-updateTrusted : ToBackend -> Backend.Model -> Backend.Model
-updateTrusted msg model =
+updateTrusted : Time.Posix -> ToBackend -> Backend.Model -> Backend.Model
+updateTrusted posix msg model =
     Tuple.first
-        (Backend.app_.updateFromFrontend
+        (Backend.updateFromFrontendWithTime
             (Effect.Lamdera.sessionIdFromString sessionKey)
             (Effect.Lamdera.clientIdFromString clientKey)
             msg
+            posix
             model
         )
 
@@ -50,7 +53,7 @@ updateTrusted msg model =
 lastDemoEvent : Backend.Model -> Maybe WikiAuditLog.AuditEvent
 lastDemoEvent model =
     model.wikiAuditEvents
-        |> Dict.get "demo"
+        |> Dict.get "Demo"
         |> Maybe.andThen (\events -> List.head (List.reverse events))
 
 
@@ -69,7 +72,7 @@ suite =
                     let
                         after : Backend.Model
                         after =
-                            updateTrusted (ApproveSubmission "demo" "sub_queue_demo") trustedpubOnDemo
+                            updateTrusted (Time.millisToPosix 0) (ApproveSubmission "Demo" "sub_1") trustedpubOnDemo
                     in
                     case lastDemoEvent after of
                         Nothing ->
@@ -81,8 +84,8 @@ suite =
                                 , \e ->
                                     case e.kind of
                                         WikiAuditLog.ApprovedSubmission { submissionId, pageSlug } ->
-                                            Expect.equal ( submissionId, pageSlug )
-                                                ( "sub_queue_demo", "queue-demo-page" )
+                                            ( submissionId, pageSlug )
+                                                |> Expect.equal ( "sub_1", "QueueDemoPage" )
 
                                         WikiAuditLog.RejectedSubmission _ ->
                                             Expect.fail "expected ApprovedSubmission"
@@ -117,8 +120,8 @@ suite =
                     let
                         after : Backend.Model
                         after =
-                            updateTrusted
-                                (RejectSubmission "demo" "sub_queue_demo" "blocked")
+                            updateTrusted (Time.millisToPosix 0)
+                                (RejectSubmission "Demo" { submissionId = "sub_1", reasonText = "blocked" })
                                 trustedpubOnDemo
                     in
                     case lastDemoEvent after of
@@ -131,8 +134,8 @@ suite =
                                 , \e ->
                                     case e.kind of
                                         WikiAuditLog.RejectedSubmission { submissionId, pageSlug } ->
-                                            Expect.equal ( submissionId, pageSlug )
-                                                ( "sub_queue_demo", "queue-demo-page" )
+                                            ( submissionId, pageSlug )
+                                                |> Expect.equal ( "sub_1", "QueueDemoPage" )
 
                                         WikiAuditLog.ApprovedSubmission _ ->
                                             Expect.fail "expected RejectedSubmission"
@@ -167,8 +170,8 @@ suite =
                     let
                         after : Backend.Model
                         after =
-                            updateTrusted
-                                (RequestSubmissionChanges "demo" "sub_changes_demo" "revise")
+                            updateTrusted (Time.millisToPosix 0)
+                                (RequestSubmissionChanges "Demo" { submissionId = "sub_2", guidanceText = "revise" })
                                 trustedpubOnDemo
                     in
                     case lastDemoEvent after of
@@ -181,8 +184,8 @@ suite =
                                 , \e ->
                                     case e.kind of
                                         WikiAuditLog.RequestedSubmissionChanges { submissionId, pageSlug } ->
-                                            Expect.equal ( submissionId, pageSlug )
-                                                ( "sub_changes_demo", "request-changes-demo-page" )
+                                            ( submissionId, pageSlug )
+                                                |> Expect.equal ( "sub_2", "RequestChangesDemoPage" )
 
                                         WikiAuditLog.ApprovedSubmission _ ->
                                             Expect.fail "expected RequestedSubmissionChanges"
@@ -212,31 +215,36 @@ suite =
                                             Expect.fail "expected RequestedSubmissionChanges"
                                 ]
                                 ev
-            , Test.test "successive moderation audits use increasing atMillis (auditClockMillis)" <|
+            , Test.test "successive moderation audits use increasing timestamps when wall clock advances" <|
                 \() ->
                     let
                         afterApprove : Backend.Model
                         afterApprove =
-                            updateTrusted (ApproveSubmission "demo" "sub_queue_demo") trustedpubOnDemo
+                            updateTrusted (Time.millisToPosix 1000) (ApproveSubmission "Demo" "sub_1") trustedpubOnDemo
 
                         afterBoth : Backend.Model
                         afterBoth =
-                            updateTrusted
-                                (RequestSubmissionChanges "demo" "sub_changes_demo" "second")
+                            updateTrusted (Time.millisToPosix 2000)
+                                (RequestSubmissionChanges "Demo" { submissionId = "sub_2", guidanceText = "second" })
                                 afterApprove
 
                         events : List WikiAuditLog.AuditEvent
                         events =
                             afterBoth.wikiAuditEvents
-                                |> Dict.get "demo"
+                                |> Dict.get "Demo"
                                 |> Maybe.withDefault []
+
+                        lastTwo : List WikiAuditLog.AuditEvent
+                        lastTwo =
+                            List.drop (List.length events - 2) events
                     in
-                    case events of
+                    case lastTwo of
                         [ e0, e1 ] ->
-                            e0.atMillis
-                                |> Expect.lessThan e1.atMillis
+                            Time.posixToMillis e0.at
+                                |> Expect.lessThan (Time.posixToMillis e1.at)
 
                         _ ->
-                            Expect.fail ("expected exactly 2 audit events, got " ++ String.fromInt (List.length events))
+                            Expect.fail
+                                ("expected at least 2 audit events, got " ++ String.fromInt (List.length events))
             ]
         ]

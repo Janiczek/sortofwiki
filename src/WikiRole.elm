@@ -1,5 +1,7 @@
 module WikiRole exposing
     ( WikiRole(..)
+    , backupTagDecoder
+    , backupTagEncode
     , canAccessWikiAdminUsers
     , demoteTrustedToContributor
     , grantTrustedToAdmin
@@ -8,6 +10,9 @@ module WikiRole exposing
     , promoteContributorToTrusted
     , revokeAdminToTrusted
     )
+
+import Json.Decode as Decode
+
 
 {-| Per-wiki contributor capability tier (stories 14, 20).
 -}
@@ -120,3 +125,38 @@ label role =
 
         Admin ->
             "Admin"
+
+
+{-| Host-admin JSON backup (stable string tags).
+-}
+backupTagEncode : WikiRole -> String
+backupTagEncode role =
+    case role of
+        UntrustedContributor ->
+            "untrusted_contributor"
+
+        TrustedContributor ->
+            "trusted_contributor"
+
+        Admin ->
+            "admin"
+
+
+backupTagDecoder : Decode.Decoder WikiRole
+backupTagDecoder =
+    Decode.string
+        |> Decode.andThen
+            (\s ->
+                case s of
+                    "untrusted_contributor" ->
+                        Decode.succeed UntrustedContributor
+
+                    "trusted_contributor" ->
+                        Decode.succeed TrustedContributor
+
+                    "admin" ->
+                        Decode.succeed Admin
+
+                    _ ->
+                        Decode.fail ("unknown wiki role: " ++ s)
+            )

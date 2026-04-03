@@ -10,6 +10,8 @@ module Submission exposing
     , EditSubmitSuccess(..)
     , Id
     , Kind(..)
+    , MyPendingSubmissionListItem
+    , MyPendingSubmissionsError(..)
     , NewPageBody
     , NewPageSubmitSuccess(..)
     , RejectReasonError(..)
@@ -35,9 +37,12 @@ module Submission exposing
     , isStalePendingEditSubmission
     , kindSummaryUserText
     , markStalePendingEditNeedsRevision
+    , myPendingSubmissionListItemFromSubmission
+    , myPendingSubmissionsErrorToUserText
     , pageSlugFromKind
     , pendingEditForAuthorOnPageInUse
     , pendingNewPageSlugInUse
+    , mySubmissionsForAuthorOnWiki
     , pendingSubmissionsForWiki
     , rejectPendingSubmission
     , rejectReasonMaxLength
@@ -321,6 +326,71 @@ reviewQueueItemFromSubmission lookupAuthor sub =
     { id = sub.id
     , kindLabel = kindSummaryUserText sub.kind
     , authorDisplay = authorDisplayForReviewQueue lookupAuthor sub.authorId
+    , maybePageSlug = pageSlugFromKind sub.kind
+    }
+
+
+{-| Contributor-only list of submissions still awaiting review on one wiki.
+-}
+type MyPendingSubmissionsError
+    = MyPendingSubmissionsNotLoggedIn
+    | MyPendingSubmissionsWrongWikiSession
+    | MyPendingSubmissionsWikiInactive
+
+
+myPendingSubmissionsErrorToUserText : MyPendingSubmissionsError -> String
+myPendingSubmissionsErrorToUserText err =
+    case err of
+        MyPendingSubmissionsNotLoggedIn ->
+            "Log in on this wiki to see your submissions waiting for review."
+
+        MyPendingSubmissionsWrongWikiSession ->
+            "Your session is for a different wiki. Log in again on this wiki."
+
+        MyPendingSubmissionsWikiInactive ->
+            "This wiki is currently paused."
+
+
+type alias MyPendingSubmissionListItem =
+    { id : Id
+    , kindLabel : String
+    , maybePageSlug : Maybe Page.Slug
+    }
+
+
+{-| Submissions listed on the contributor **My submissions** page: pending review, needs revision, or rejected (excludes approved).
+-}
+mySubmissionsForAuthorOnWiki : Wiki.Slug -> ContributorAccount.Id -> Dict String Submission -> List Submission
+mySubmissionsForAuthorOnWiki wikiSlug authorId submissions =
+    let
+        listedStatus : Status -> Bool
+        listedStatus status =
+            case status of
+                Pending ->
+                    True
+
+                NeedsRevision ->
+                    True
+
+                Rejected ->
+                    True
+
+                Approved ->
+                    False
+    in
+    submissions
+        |> Dict.values
+        |> List.filter
+            (\sub ->
+                sub.wikiSlug == wikiSlug && sub.authorId == authorId && listedStatus sub.status
+            )
+        |> List.sortBy (\sub -> idToString sub.id)
+
+
+myPendingSubmissionListItemFromSubmission : Submission -> MyPendingSubmissionListItem
+myPendingSubmissionListItemFromSubmission sub =
+    { id = sub.id
+    , kindLabel = kindSummaryUserText sub.kind
     , maybePageSlug = pageSlugFromKind sub.kind
     }
 

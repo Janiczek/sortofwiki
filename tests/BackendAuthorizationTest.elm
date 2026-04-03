@@ -5,7 +5,9 @@ import ContributorAccount
 import Dict
 import Effect.Lamdera
 import Expect
+import ProgramTest.Config
 import Test exposing (Test)
+import Time
 import Types exposing (ToBackend(..))
 import WikiAuditLog
 import WikiUser
@@ -26,6 +28,16 @@ initialModel =
     Tuple.first Backend.app_.init
 
 
+pagesFixture : Backend.Model
+pagesFixture =
+    ProgramTest.Config.replayInitStepsOntoModel ProgramTest.Config.demoWikiPagesSteps
+
+
+moderationFixture : Backend.Model
+moderationFixture =
+    ProgramTest.Config.replayInitStepsOntoModel ProgramTest.Config.demoWikiModerationSteps
+
+
 withContributorSession : WikiUser.Binding -> Backend.Model -> Backend.Model
 withContributorSession binding model =
     { model
@@ -37,37 +49,52 @@ withContributorSession binding model =
 statusdemoOnDemo : Backend.Model
 statusdemoOnDemo =
     withContributorSession
-        (WikiUser.Binding "demo" (ContributorAccount.newAccountId "demo" "statusdemo"))
-        initialModel
+        (WikiUser.Binding "Demo" (ContributorAccount.newAccountId "Demo" "statusdemo"))
+        pagesFixture
 
 
 trustedpubOnDemo : Backend.Model
 trustedpubOnDemo =
     withContributorSession
-        (WikiUser.Binding "demo" (ContributorAccount.newAccountId "demo" "trustedpub"))
-        initialModel
+        (WikiUser.Binding "Demo" (ContributorAccount.newAccountId "Demo" "trustedpub"))
+        pagesFixture
+
+
+statusdemoOnDemoModeration : Backend.Model
+statusdemoOnDemoModeration =
+    withContributorSession
+        (WikiUser.Binding "Demo" (ContributorAccount.newAccountId "Demo" "statusdemo"))
+        moderationFixture
+
+
+trustedpubOnDemoModeration : Backend.Model
+trustedpubOnDemoModeration =
+    withContributorSession
+        (WikiUser.Binding "Demo" (ContributorAccount.newAccountId "Demo" "trustedpub"))
+        moderationFixture
 
 
 {-| Demo wiki `active = False` (hosted wiki deactivated); contributor sessions unchanged.
 -}
 withDemoWikiInactive : Backend.Model -> Backend.Model
 withDemoWikiInactive model =
-    case Dict.get "demo" model.wikis of
+    case Dict.get "Demo" model.wikis of
         Nothing ->
             model
 
         Just w ->
-            { model | wikis = Dict.insert "demo" { w | active = False } model.wikis }
+            { model | wikis = Dict.insert "Demo" { w | active = False } model.wikis }
 
 
 expectUnchanged : Backend.Model -> ToBackend -> Expect.Expectation
 expectUnchanged before msg =
     let
         ( after, _ ) =
-            Backend.app_.updateFromFrontend
+            Backend.updateFromFrontendWithTime
                 (Effect.Lamdera.sessionIdFromString sessionKey)
                 (Effect.Lamdera.clientIdFromString clientKey)
                 msg
+                (Time.millisToPosix 0)
                 before
     in
     after
@@ -85,88 +112,131 @@ suite =
                             \() ->
                                 expectUnchanged initialModel msg
                     )
-                    [ ( "RequestReviewQueue", RequestReviewQueue "demo" )
-                    , ( "RequestReviewSubmissionDetail", RequestReviewSubmissionDetail "demo" "sub_queue_demo" )
-                    , ( "RequestWikiUsers", RequestWikiUsers "demo" )
-                    , ( "RequestWikiAuditLog", RequestWikiAuditLog "demo" WikiAuditLog.emptyAuditLogFilter )
-                    , ( "PromoteContributorToTrusted", PromoteContributorToTrusted "demo" "x" )
-                    , ( "DemoteTrustedToContributor", DemoteTrustedToContributor "demo" "x" )
-                    , ( "GrantWikiAdmin", GrantWikiAdmin "demo" "x" )
-                    , ( "RevokeWikiAdmin", RevokeWikiAdmin "demo" "x" )
-                    , ( "RequestSubmissionDetails", RequestSubmissionDetails "demo" "sub_queue_demo" )
-                    , ( "SubmitNewPage", SubmitNewPage "demo" "new-page" "## Body" )
-                    , ( "SubmitPageEdit", SubmitPageEdit "demo" "home" "## Edit" )
-                    , ( "SubmitPageDelete", SubmitPageDelete "demo" "home" "reason" )
-                    , ( "ApproveSubmission", ApproveSubmission "demo" "sub_queue_demo" )
-                    , ( "RejectSubmission", RejectSubmission "demo" "sub_queue_demo" "no" )
-                    , ( "RequestSubmissionChanges", RequestSubmissionChanges "demo" "sub_queue_demo" "fix it" )
+                    [ ( "RequestMyPendingSubmissions", RequestMyPendingSubmissions "Demo" )
+                    , ( "RequestReviewQueue", RequestReviewQueue "Demo" )
+                    , ( "RequestReviewSubmissionDetail", RequestReviewSubmissionDetail "Demo" "sub_1" )
+                    , ( "RequestWikiUsers", RequestWikiUsers "Demo" )
+                    , ( "RequestWikiAuditLog", RequestWikiAuditLog "Demo" WikiAuditLog.emptyAuditLogFilter )
+                    , ( "PromoteContributorToTrusted", PromoteContributorToTrusted "Demo" "x" )
+                    , ( "DemoteTrustedToContributor", DemoteTrustedToContributor "Demo" "x" )
+                    , ( "GrantWikiAdmin", GrantWikiAdmin "Demo" "x" )
+                    , ( "RevokeWikiAdmin", RevokeWikiAdmin "Demo" "x" )
+                    , ( "RequestSubmissionDetails", RequestSubmissionDetails "Demo" "sub_1" )
+                    , ( "SubmitNewPage", SubmitNewPage "Demo" { rawPageSlug = "NewPage", rawMarkdown = "## Body" } )
+                    , ( "SubmitPageEdit", SubmitPageEdit "Demo" "Home" "## Edit" )
+                    , ( "SubmitPageDelete", SubmitPageDelete "Demo" "Home" "reason" )
+                    , ( "ApproveSubmission", ApproveSubmission "Demo" "sub_1" )
+                    , ( "RejectSubmission", RejectSubmission "Demo" { submissionId = "sub_1", reasonText = "no" } )
+                    , ( "RequestSubmissionChanges", RequestSubmissionChanges "Demo" { submissionId = "sub_1", guidanceText = "fix it" } )
                     , ( "HostAdminLogin wrong password", HostAdminLogin "not-the-host-password" )
                     , ( "RequestHostWikiList", RequestHostWikiList )
-                    , ( "RequestHostWikiDetail", RequestHostWikiDetail "demo" )
-                    , ( "CreateHostedWiki", CreateHostedWiki "newwiki" "Name" )
-                    , ( "UpdateHostedWikiMetadata"
-                      , UpdateHostedWikiMetadata "demo" "N" "S" "demo"
+                    , ( "RequestHostAuditLog", RequestHostAuditLog WikiAuditLog.emptyHostAuditLogFilter )
+                    , ( "RequestHostWikiDetail", RequestHostWikiDetail "Demo" )
+                    , ( "CreateHostedWiki"
+                      , CreateHostedWiki
+                            { rawSlug = "Newwiki"
+                            , rawName = "Name"
+                            , initialAdminUsername = "wikiadmin"
+                            , initialAdminPassword = "password12"
+                            }
                       )
-                    , ( "DeactivateHostedWiki", DeactivateHostedWiki "demo" )
-                    , ( "ReactivateHostedWiki", ReactivateHostedWiki "demo" )
-                    , ( "DeleteHostedWiki", DeleteHostedWiki "demo" "wrong" )
+                    , ( "UpdateHostedWikiMetadata"
+                      , UpdateHostedWikiMetadata "Demo" { rawName = "N", rawSummary = "S", rawSlugDraft = "Demo" }
+                      )
+                    , ( "DeactivateHostedWiki", DeactivateHostedWiki "Demo" )
+                    , ( "ReactivateHostedWiki", ReactivateHostedWiki "Demo" )
+                    , ( "DeleteHostedWiki", DeleteHostedWiki "Demo" "wrong" )
+                    , ( "RequestHostAdminDataExport", RequestHostAdminDataExport )
+                    , ( "ImportHostAdminDataSnapshot", ImportHostAdminDataSnapshot "{}" )
+                    , ( "RequestHostAdminWikiDataExport", RequestHostAdminWikiDataExport "Demo" )
+                    , ( "ImportHostAdminWikiDataSnapshot", ImportHostAdminWikiDataSnapshot "Demo" "{}" )
                     ]
                 )
             , Test.describe "standard contributor on demo"
                 [ Test.test "RequestReviewQueue returns forbidden without changing model" <|
                     \() ->
-                        expectUnchanged statusdemoOnDemo (RequestReviewQueue "demo")
+                        expectUnchanged statusdemoOnDemoModeration (RequestReviewQueue "Demo")
                 , Test.test "RequestReviewSubmissionDetail returns forbidden without changing model" <|
                     \() ->
-                        expectUnchanged statusdemoOnDemo (RequestReviewSubmissionDetail "demo" "sub_queue_demo")
+                        expectUnchanged statusdemoOnDemoModeration (RequestReviewSubmissionDetail "Demo" "sub_1")
                 , Test.test "RequestWikiUsers returns forbidden without changing model" <|
                     \() ->
-                        expectUnchanged statusdemoOnDemo (RequestWikiUsers "demo")
+                        expectUnchanged statusdemoOnDemo (RequestWikiUsers "Demo")
                 , Test.test "RequestWikiAuditLog returns forbidden without changing model" <|
                     \() ->
-                        expectUnchanged statusdemoOnDemo (RequestWikiAuditLog "demo" WikiAuditLog.emptyAuditLogFilter)
+                        expectUnchanged statusdemoOnDemo (RequestWikiAuditLog "Demo" WikiAuditLog.emptyAuditLogFilter)
+                , Test.test "RequestHostAuditLog leaves model unchanged without host session" <|
+                    \() ->
+                        expectUnchanged statusdemoOnDemo (RequestHostAuditLog WikiAuditLog.emptyHostAuditLogFilter)
                 , Test.test "ApproveSubmission returns forbidden without changing model" <|
                     \() ->
-                        expectUnchanged statusdemoOnDemo (ApproveSubmission "demo" "sub_queue_demo")
+                        expectUnchanged statusdemoOnDemoModeration (ApproveSubmission "Demo" "sub_1")
                 , Test.test "RejectSubmission returns forbidden without changing model" <|
                     \() ->
-                        expectUnchanged statusdemoOnDemo (RejectSubmission "demo" "sub_queue_demo" "no")
+                        expectUnchanged statusdemoOnDemoModeration (RejectSubmission "Demo" { submissionId = "sub_1", reasonText = "no" })
                 , Test.test "RequestSubmissionChanges returns forbidden without changing model" <|
                     \() ->
-                        expectUnchanged statusdemoOnDemo (RequestSubmissionChanges "demo" "sub_queue_demo" "note")
+                        expectUnchanged statusdemoOnDemoModeration (RequestSubmissionChanges "Demo" { submissionId = "sub_1", guidanceText = "note" })
                 , Test.test "PromoteContributorToTrusted returns forbidden without changing model" <|
                     \() ->
-                        expectUnchanged statusdemoOnDemo (PromoteContributorToTrusted "demo" "statusdemo")
+                        expectUnchanged statusdemoOnDemo (PromoteContributorToTrusted "Demo" "statusdemo")
                 ]
             , Test.describe "trusted but not wiki admin"
                 [ Test.test "RequestWikiUsers returns forbidden without changing model" <|
                     \() ->
-                        expectUnchanged trustedpubOnDemo (RequestWikiUsers "demo")
+                        expectUnchanged trustedpubOnDemo (RequestWikiUsers "Demo")
                 ]
             , Test.describe "session wiki does not match payload wiki"
                 [ Test.test "SubmitNewPage to other wiki returns wrong session without changing model" <|
                     \() ->
-                        expectUnchanged statusdemoOnDemo (SubmitNewPage "elm-tips" "p" "## x")
+                        expectUnchanged statusdemoOnDemo (SubmitNewPage "ElmTips" { rawPageSlug = "P", rawMarkdown = "## x" })
                 , Test.test "RequestReviewQueue for other wiki returns wrong session without changing model" <|
                     \() ->
-                        expectUnchanged statusdemoOnDemo (RequestReviewQueue "elm-tips")
+                        expectUnchanged statusdemoOnDemo (RequestReviewQueue "ElmTips")
+                , Test.test "RequestMyPendingSubmissions for other wiki returns wrong session without changing model" <|
+                    \() ->
+                        expectUnchanged statusdemoOnDemo (RequestMyPendingSubmissions "ElmTips")
                 ]
             , Test.describe "inactive demo wiki (deactivated tenant)"
                 [ Test.test "trusted RequestReviewQueue leaves model unchanged" <|
                     \() ->
-                        trustedpubOnDemo
+                        trustedpubOnDemoModeration
                             |> withDemoWikiInactive
-                            |> (\m -> expectUnchanged m (RequestReviewQueue "demo"))
+                            |> (\m -> expectUnchanged m (RequestReviewQueue "Demo"))
                 , Test.test "contributor SubmitNewPage leaves model unchanged" <|
                     \() ->
                         statusdemoOnDemo
                             |> withDemoWikiInactive
-                            |> (\m -> expectUnchanged m (SubmitNewPage "demo" "NewPage" "## Body"))
+                            |> (\m -> expectUnchanged m (SubmitNewPage "Demo" { rawPageSlug = "NewPage", rawMarkdown = "## Body" }))
                 , Test.test "trusted ApproveSubmission leaves model unchanged" <|
                     \() ->
-                        trustedpubOnDemo
+                        trustedpubOnDemoModeration
                             |> withDemoWikiInactive
-                            |> (\m -> expectUnchanged m (ApproveSubmission "demo" "sub_queue_demo"))
+                            |> (\m -> expectUnchanged m (ApproveSubmission "Demo" "sub_1"))
+                , Test.test "contributor RequestMyPendingSubmissions leaves model unchanged" <|
+                    \() ->
+                        statusdemoOnDemo
+                            |> withDemoWikiInactive
+                            |> (\m -> expectUnchanged m (RequestMyPendingSubmissions "Demo"))
+                ]
+            , Test.describe "logout"
+                [ Test.test "LogoutContributor with no session leaves contributorSessions empty" <|
+                    \() ->
+                        expectUnchanged initialModel LogoutContributor
+                , Test.test "LogoutContributor clears bound contributor session" <|
+                    \() ->
+                        let
+                            ( after, _ ) =
+                                Backend.updateFromFrontendWithTime
+                                    (Effect.Lamdera.sessionIdFromString sessionKey)
+                                    (Effect.Lamdera.clientIdFromString clientKey)
+                                    LogoutContributor
+                                    (Time.millisToPosix 0)
+                                    statusdemoOnDemo
+                        in
+                        after.contributorSessions
+                            |> Dict.get sessionKey
+                            |> Expect.equal Nothing
                 ]
             ]
         ]

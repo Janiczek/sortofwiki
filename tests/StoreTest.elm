@@ -73,6 +73,7 @@ suite =
                             , wikiDetails = Dict.empty
                             , publishedPages = Dict.empty
                             , reviewQueues = Dict.empty
+                            , myPendingSubmissions = Dict.empty
                             , submissionDetails = Dict.empty
                             , reviewSubmissionDetails = Dict.empty
                             , wikiUsers = Dict.empty
@@ -99,6 +100,7 @@ suite =
                             , wikiDetails = Dict.empty
                             , publishedPages = Dict.empty
                             , reviewQueues = Dict.empty
+                            , myPendingSubmissions = Dict.empty
                             , submissionDetails = Dict.empty
                             , reviewSubmissionDetails = Dict.empty
                             , wikiUsers = Dict.empty
@@ -133,6 +135,7 @@ suite =
                               , wikiDetails = Dict.empty
                               , publishedPages = Dict.empty
                               , reviewQueues = Dict.empty
+                              , myPendingSubmissions = Dict.empty
                               , submissionDetails =
                                     Dict.singleton ( "demo", "sub_1" ) RemoteData.Loading
                               , reviewSubmissionDetails = Dict.empty
@@ -150,6 +153,7 @@ suite =
                             , wikiDetails = Dict.empty
                             , publishedPages = Dict.empty
                             , reviewQueues = Dict.empty
+                            , myPendingSubmissions = Dict.empty
                             , submissionDetails =
                                 Dict.singleton ( "demo", "sub_1" )
                                     (RemoteData.succeed (Err Submission.DetailsNotLoggedIn))
@@ -176,6 +180,7 @@ suite =
                             , wikiDetails = Dict.empty
                             , publishedPages = Dict.empty
                             , reviewQueues = Dict.empty
+                            , myPendingSubmissions = Dict.empty
                             , submissionDetails =
                                 Dict.singleton ( "demo", "sub_1" )
                                     (RemoteData.succeed
@@ -229,6 +234,7 @@ suite =
                                         (Page.frontendDetails "body" [])
                                     )
                             , reviewQueues = Dict.empty
+                            , myPendingSubmissions = Dict.empty
                             , submissionDetails = Dict.empty
                             , reviewSubmissionDetails = Dict.empty
                             , wikiUsers = Dict.empty
@@ -264,6 +270,7 @@ suite =
                             , reviewQueues =
                                 Dict.singleton "demo"
                                     (RemoteData.succeed (Ok []))
+                            , myPendingSubmissions = Dict.empty
                             , submissionDetails = Dict.empty
                             , reviewSubmissionDetails = Dict.empty
                             , wikiUsers = Dict.empty
@@ -284,6 +291,7 @@ suite =
                             , reviewQueues =
                                 Dict.singleton "demo"
                                     (RemoteData.succeed (Err Submission.ReviewQueueForbidden))
+                            , myPendingSubmissions = Dict.empty
                             , submissionDetails = Dict.empty
                             , reviewSubmissionDetails = Dict.empty
                             , wikiUsers = Dict.empty
@@ -298,6 +306,68 @@ suite =
                               }
                             , Effect.Lamdera.sendToBackend (RequestReviewQueue "demo")
                             )
+            , Test.test "AskForMyPendingSubmissions starts load from empty" <|
+                \() ->
+                    let
+                        store : Store
+                        store =
+                            Store.empty
+                    in
+                    store
+                        |> Store.perform Frontend.storeConfig (Store.AskForMyPendingSubmissions "demo")
+                        |> Expect.equal
+                            ( { store
+                                | myPendingSubmissions = Dict.singleton "demo" RemoteData.Loading
+                              }
+                            , Effect.Lamdera.sendToBackend (RequestMyPendingSubmissions "demo")
+                            )
+            , Test.test "AskForMyPendingSubmissions skips when already Success Ok" <|
+                \() ->
+                    let
+                        store : Store
+                        store =
+                            { wikiCatalog = RemoteData.NotAsked
+                            , wikiDetails = Dict.empty
+                            , publishedPages = Dict.empty
+                            , reviewQueues = Dict.empty
+                            , myPendingSubmissions =
+                                Dict.singleton "demo"
+                                    (RemoteData.succeed (Ok []))
+                            , submissionDetails = Dict.empty
+                            , reviewSubmissionDetails = Dict.empty
+                            , wikiUsers = Dict.empty
+                            , wikiAuditLogs = Dict.empty
+                            }
+                    in
+                    store
+                        |> Store.perform Frontend.storeConfig (Store.AskForMyPendingSubmissions "demo")
+                        |> Expect.equal ( store, Command.none )
+            , Test.test "AskForMyPendingSubmissions refetches after prior error result" <|
+                \() ->
+                    let
+                        store : Store
+                        store =
+                            { wikiCatalog = RemoteData.NotAsked
+                            , wikiDetails = Dict.empty
+                            , publishedPages = Dict.empty
+                            , reviewQueues = Dict.empty
+                            , myPendingSubmissions =
+                                Dict.singleton "demo"
+                                    (RemoteData.succeed (Err Submission.MyPendingSubmissionsNotLoggedIn))
+                            , submissionDetails = Dict.empty
+                            , reviewSubmissionDetails = Dict.empty
+                            , wikiUsers = Dict.empty
+                            , wikiAuditLogs = Dict.empty
+                            }
+                    in
+                    store
+                        |> Store.perform Frontend.storeConfig (Store.AskForMyPendingSubmissions "demo")
+                        |> Expect.equal
+                            ( { store
+                                | myPendingSubmissions = Dict.singleton "demo" RemoteData.Loading
+                              }
+                            , Effect.Lamdera.sendToBackend (RequestMyPendingSubmissions "demo")
+                            )
             , Test.test "AskForReviewSubmissionDetail starts load from empty" <|
                 \() ->
                     Store.empty
@@ -307,6 +377,7 @@ suite =
                               , wikiDetails = Dict.empty
                               , publishedPages = Dict.empty
                               , reviewQueues = Dict.empty
+                              , myPendingSubmissions = Dict.empty
                               , submissionDetails = Dict.empty
                               , reviewSubmissionDetails =
                                     Dict.singleton ( "demo", "sub_1" ) RemoteData.Loading
@@ -324,6 +395,7 @@ suite =
                             , wikiDetails = Dict.empty
                             , publishedPages = Dict.empty
                             , reviewQueues = Dict.empty
+                            , myPendingSubmissions = Dict.empty
                             , submissionDetails = Dict.empty
                             , reviewSubmissionDetails =
                                 Dict.singleton ( "demo", "sub_1" )
@@ -350,6 +422,7 @@ suite =
                             , wikiDetails = Dict.empty
                             , publishedPages = Dict.empty
                             , reviewQueues = Dict.empty
+                            , myPendingSubmissions = Dict.empty
                             , submissionDetails = Dict.empty
                             , reviewSubmissionDetails =
                                 Dict.singleton ( "demo", "sub_1" )
@@ -378,6 +451,7 @@ suite =
                               , wikiDetails = Dict.empty
                               , publishedPages = Dict.empty
                               , reviewQueues = Dict.empty
+                              , myPendingSubmissions = Dict.empty
                               , submissionDetails = Dict.empty
                               , reviewSubmissionDetails = Dict.empty
                               , wikiUsers = Dict.singleton "demo" RemoteData.Loading
@@ -394,6 +468,7 @@ suite =
                             , wikiDetails = Dict.empty
                             , publishedPages = Dict.empty
                             , reviewQueues = Dict.empty
+                            , myPendingSubmissions = Dict.empty
                             , submissionDetails = Dict.empty
                             , reviewSubmissionDetails = Dict.empty
                             , wikiUsers =
@@ -414,6 +489,7 @@ suite =
                             , wikiDetails = Dict.empty
                             , publishedPages = Dict.empty
                             , reviewQueues = Dict.empty
+                            , myPendingSubmissions = Dict.empty
                             , submissionDetails = Dict.empty
                             , reviewSubmissionDetails = Dict.empty
                             , wikiUsers =
@@ -439,6 +515,7 @@ suite =
                               , wikiDetails = Dict.empty
                               , publishedPages = Dict.empty
                               , reviewQueues = Dict.empty
+                              , myPendingSubmissions = Dict.empty
                               , submissionDetails = Dict.empty
                               , reviewSubmissionDetails = Dict.empty
                               , wikiUsers = Dict.empty
@@ -457,6 +534,7 @@ suite =
                             , wikiDetails = Dict.empty
                             , publishedPages = Dict.empty
                             , reviewQueues = Dict.empty
+                            , myPendingSubmissions = Dict.empty
                             , submissionDetails = Dict.empty
                             , reviewSubmissionDetails = Dict.empty
                             , wikiUsers = Dict.empty
@@ -477,6 +555,7 @@ suite =
                             , wikiDetails = Dict.empty
                             , publishedPages = Dict.empty
                             , reviewQueues = Dict.empty
+                            , myPendingSubmissions = Dict.empty
                             , submissionDetails = Dict.empty
                             , reviewSubmissionDetails = Dict.empty
                             , wikiUsers = Dict.empty
@@ -504,6 +583,7 @@ suite =
                             , wikiDetails = Dict.empty
                             , publishedPages = Dict.empty
                             , reviewQueues = Dict.empty
+                            , myPendingSubmissions = Dict.empty
                             , submissionDetails = Dict.empty
                             , reviewSubmissionDetails = Dict.empty
                             , wikiUsers = Dict.empty

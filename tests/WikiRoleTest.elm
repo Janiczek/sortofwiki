@@ -2,6 +2,8 @@ module WikiRoleTest exposing (suite)
 
 import Expect
 import Fuzzers
+import Json.Decode as Decode
+import Json.Encode as Encode
 import Test exposing (Test)
 import WikiRole
 
@@ -122,5 +124,14 @@ suite =
                              else
                                 Nothing
                             )
+            ]
+        , Test.describe "backupTagEncode"
+            [ Test.fuzz Fuzzers.wikiRole "backup tag string round-trips through JSON decoder" <|
+                \role ->
+                    WikiRole.backupTagEncode role
+                        |> Encode.string
+                        |> Encode.encode 0
+                        |> Decode.decodeString WikiRole.backupTagDecoder
+                        |> Expect.equal (Ok role)
             ]
         ]

@@ -1,21 +1,30 @@
 module Types exposing
     ( BackendModel
     , BackendMsg(..)
+    , CreateHostedWikiPayload
     , FrontendModel
     , FrontendMsg(..)
     , HostAdminCreateWikiDraft
     , HostAdminLoginDraft
     , HostAdminWikiDetailDraft
+    , LoginContributorPayload
     , LoginDraft
     , NewPageSubmitDraft
     , PageDeleteSubmitDraft
     , PageEditSubmitDraft
+    , RegisterContributorPayload
     , RegisterDraft
+    , RejectSubmissionPayload
+    , RequestSubmissionChangesPayload
+    , ResubmitPageEditPayload
     , ReviewApproveDraft
+    , ReviewDecision(..)
     , ReviewRejectDraft
     , ReviewRequestChangesDraft
+    , SubmitNewPagePayload
     , ToBackend(..)
     , ToFrontend(..)
+    , UpdateHostedWikiMetadataPayload
     )
 
 import ColorTheme exposing (ColorTheme, ColorThemePreference)
@@ -23,6 +32,8 @@ import ContributorAccount
 import Dict exposing (Dict)
 import Effect.Browser
 import Effect.Browser.Navigation
+import Effect.File
+import Effect.Lamdera exposing (ClientId, SessionId)
 import HostAdmin
 import Json.Encode
 import Page
@@ -32,6 +43,7 @@ import Set exposing (Set)
 import Store exposing (Store)
 import Submission
 import SubmissionReviewDetail
+import Time
 import Url exposing (Url)
 import Wiki exposing (Wiki)
 import WikiAdminUsers
@@ -41,10 +53,62 @@ import WikiRole
 import WikiUser
 
 
+type alias CreateHostedWikiPayload =
+    { rawSlug : String
+    , rawName : String
+    , initialAdminUsername : String
+    , initialAdminPassword : String
+    }
+
+
+type alias UpdateHostedWikiMetadataPayload =
+    { rawName : String
+    , rawSummary : String
+    , rawSlugDraft : String
+    }
+
+
+type alias RegisterContributorPayload =
+    { username : String
+    , password : String
+    }
+
+
+type alias LoginContributorPayload =
+    { username : String
+    , password : String
+    }
+
+
+type alias SubmitNewPagePayload =
+    { rawPageSlug : String
+    , rawMarkdown : String
+    }
+
+
+type alias ResubmitPageEditPayload =
+    { submissionId : String
+    , rawMarkdown : String
+    }
+
+
+type alias RejectSubmissionPayload =
+    { submissionId : String
+    , reasonText : String
+    }
+
+
+type alias RequestSubmissionChangesPayload =
+    { submissionId : String
+    , guidanceText : String
+    }
+
+
 type ToBackend
     = RequestWikiCatalog
     | RequestWikiFrontendDetails Wiki.Slug
     | RequestPageFrontendDetails Wiki.Slug Page.Slug
+    | RequestMyPendingSubmissions Wiki.Slug
     | RequestReviewQueue Wiki.Slug
     | RequestReviewSubmissionDetail Wiki.Slug String
     | RequestWikiUsers Wiki.Slug
@@ -54,29 +118,36 @@ type ToBackend
     | GrantWikiAdmin Wiki.Slug String
     | RevokeWikiAdmin Wiki.Slug String
     | RequestSubmissionDetails Wiki.Slug String
-    | RegisterContributor Wiki.Slug String String
-    | LoginContributor Wiki.Slug String String
-    | SubmitNewPage Wiki.Slug String String
+    | RegisterContributor Wiki.Slug RegisterContributorPayload
+    | LoginContributor Wiki.Slug LoginContributorPayload
+    | LogoutContributor
+    | SubmitNewPage Wiki.Slug SubmitNewPagePayload
     | SubmitPageEdit Wiki.Slug Page.Slug String
     | SubmitPageDelete Wiki.Slug Page.Slug String
-    | ResubmitPageEdit Wiki.Slug String String
+    | ResubmitPageEdit Wiki.Slug ResubmitPageEditPayload
     | ApproveSubmission Wiki.Slug String
-    | RejectSubmission Wiki.Slug String String
-    | RequestSubmissionChanges Wiki.Slug String String
+    | RejectSubmission Wiki.Slug RejectSubmissionPayload
+    | RequestSubmissionChanges Wiki.Slug RequestSubmissionChangesPayload
     | HostAdminLogin String
     | RequestHostWikiList
+    | RequestHostAuditLog WikiAuditLog.HostAuditLogFilter
     | RequestHostWikiDetail Wiki.Slug
-    | CreateHostedWiki String String
-    | UpdateHostedWikiMetadata Wiki.Slug String String String
+    | CreateHostedWiki CreateHostedWikiPayload
+    | UpdateHostedWikiMetadata Wiki.Slug UpdateHostedWikiMetadataPayload
     | DeactivateHostedWiki Wiki.Slug
     | ReactivateHostedWiki Wiki.Slug
     | DeleteHostedWiki Wiki.Slug String
+    | RequestHostAdminDataExport
+    | ImportHostAdminDataSnapshot String
+    | RequestHostAdminWikiDataExport Wiki.Slug
+    | ImportHostAdminWikiDataSnapshot Wiki.Slug String
 
 
 type ToFrontend
     = WikiCatalogResponse (Dict Wiki.Slug Wiki.CatalogEntry)
     | WikiFrontendDetailsResponse Wiki.Slug (Maybe Wiki.FrontendDetails)
     | PageFrontendDetailsResponse Wiki.Slug Page.Slug (Maybe Page.FrontendDetails)
+    | MyPendingSubmissionsResponse Wiki.Slug (Result Submission.MyPendingSubmissionsError (List Submission.MyPendingSubmissionListItem))
     | ReviewQueueResponse Wiki.Slug (Result Submission.ReviewQueueError (List Submission.ReviewQueueItem))
     | ReviewSubmissionDetailResponse Wiki.Slug String (Result SubmissionReviewDetail.ReviewSubmissionDetailError SubmissionReviewDetail.SubmissionReviewDetail)
     | WikiUsersResponse Wiki.Slug (Result WikiAdminUsers.Error (List WikiAdminUsers.ListedUser))
@@ -88,6 +159,7 @@ type ToFrontend
     | SubmissionDetailsResponse Wiki.Slug String (Result Submission.DetailsError Submission.ContributorView)
     | RegisterContributorResponse Wiki.Slug (Result ContributorAccount.RegisterContributorError WikiRole.WikiRole)
     | LoginContributorResponse Wiki.Slug (Result ContributorAccount.LoginContributorError WikiRole.WikiRole)
+    | LogoutContributorResponse
     | SubmitNewPageResponse Wiki.Slug (Result Submission.SubmitNewPageError Submission.NewPageSubmitSuccess)
     | SubmitPageEditResponse Wiki.Slug (Result Submission.SubmitPageEditError Submission.EditSubmitSuccess)
     | SubmitPageDeleteResponse Wiki.Slug (Result Submission.SubmitPageDeleteError Submission.DeleteSubmitSuccess)
@@ -97,12 +169,17 @@ type ToFrontend
     | RequestSubmissionChangesResponse Wiki.Slug String (Result Submission.RequestChangesSubmissionError ())
     | HostAdminLoginResponse (Result HostAdmin.LoginError ())
     | HostAdminWikiListResponse (Result HostAdmin.ProtectedError (List Wiki.CatalogEntry))
+    | HostAuditLogResponse WikiAuditLog.HostAuditLogFilter (Result HostAdmin.ProtectedError (List WikiAuditLog.ScopedAuditEvent))
     | CreateHostedWikiResponse (Result HostAdmin.CreateHostedWikiError Wiki.CatalogEntry)
     | HostWikiDetailResponse Wiki.Slug (Result HostAdmin.HostWikiDetailError Wiki.CatalogEntry)
     | UpdateHostedWikiMetadataResponse Wiki.Slug (Result HostAdmin.UpdateHostedWikiMetadataError Wiki.CatalogEntry)
     | DeactivateHostedWikiResponse Wiki.Slug (Result HostAdmin.WikiLifecycleError Wiki.CatalogEntry)
     | ReactivateHostedWikiResponse Wiki.Slug (Result HostAdmin.WikiLifecycleError Wiki.CatalogEntry)
     | DeleteHostedWikiResponse Wiki.Slug (Result HostAdmin.DeleteHostedWikiError ())
+    | HostAdminDataExportResponse (Result HostAdmin.DataExportError String)
+    | HostAdminDataImportResponse (Result HostAdmin.DataImportError ())
+    | HostAdminWikiDataExportResponse Wiki.Slug (Result HostAdmin.WikiDataExportError String)
+    | HostAdminWikiDataImportResponse Wiki.Slug (Result HostAdmin.WikiDataImportError ())
 
 
 type alias BackendModel =
@@ -113,12 +190,11 @@ type alias BackendModel =
     , submissions : Dict String Submission.Submission
     , nextSubmissionCounter : Int
     , wikiAuditEvents : Dict Wiki.Slug (List WikiAuditLog.AuditEvent)
-    , auditClockMillis : Int
     }
 
 
 type BackendMsg
-    = BackendNoOp
+    = ToBackendGotTime SessionId ClientId ToBackend Time.Posix
 
 
 type alias RegisterDraft =
@@ -147,6 +223,8 @@ type alias HostAdminLoginDraft =
 type alias HostAdminCreateWikiDraft =
     { slug : String
     , name : String
+    , initialAdminUsername : String
+    , initialAdminPassword : String
     , inFlight : Bool
     , lastResult : Maybe (Result HostAdmin.CreateHostedWikiError Wiki.CatalogEntry)
     }
@@ -170,6 +248,7 @@ type alias HostAdminWikiDetailDraft =
 
 type alias NewPageSubmitDraft =
     { pageSlug : String
+    , pageSlugLockedFromQuery : Bool
     , markdownBody : String
     , inFlight : Bool
     , lastResult : Maybe (Result Submission.SubmitNewPageError Submission.NewPageSubmitSuccess)
@@ -195,6 +274,14 @@ type alias ReviewApproveDraft =
     { inFlight : Bool
     , lastResult : Maybe (Result Submission.ApproveSubmissionError ())
     }
+
+
+{-| Selected moderation outcome on the review detail form (story 16–19).
+-}
+type ReviewDecision
+    = ReviewDecisionApprove
+    | ReviewDecisionRequestChanges
+    | ReviewDecisionReject
 
 
 type alias ReviewRejectDraft =
@@ -227,6 +314,7 @@ type alias FrontendModel =
     , pageEditSubmitDraft : PageEditSubmitDraft
     , pageDeleteSubmitDraft : PageDeleteSubmitDraft
     , reviewApproveDraft : ReviewApproveDraft
+    , reviewDecision : ReviewDecision
     , reviewRejectDraft : ReviewRejectDraft
     , reviewRequestChangesDraft : ReviewRequestChangesDraft
     , adminPromoteError : Maybe String
@@ -237,11 +325,24 @@ type alias FrontendModel =
     , wikiAdminAuditFilterPageDraft : String
     , wikiAdminAuditFilterSelectedKindTags : List WikiAuditLog.AuditEventKindFilterTag
     , wikiAdminAuditAppliedFilter : WikiAuditLog.AuditLogFilter
+    , hostAdminAuditFilterWikiDraft : String
+    , hostAdminAuditFilterActorDraft : String
+    , hostAdminAuditFilterPageDraft : String
+    , hostAdminAuditFilterSelectedKindTags : List WikiAuditLog.AuditEventKindFilterTag
+    , hostAdminAuditAppliedFilter : WikiAuditLog.HostAuditLogFilter
+    , hostAdminAuditLog : RemoteData () (Result HostAdmin.ProtectedError (List WikiAuditLog.ScopedAuditEvent))
     , hostAdminLoginDraft : HostAdminLoginDraft
     , hostAdminCreateWikiDraft : HostAdminCreateWikiDraft
     , hostAdminWikiDetailDraft : HostAdminWikiDetailDraft
     , hostAdminWikis : RemoteData () (Result HostAdmin.ProtectedError (List Wiki.CatalogEntry))
     , hostAdminSessionAuthenticated : Bool
+    , hostAdminExportInFlight : Bool
+    , hostAdminImportInFlight : Bool
+    , hostAdminBackupNotice : Maybe String
+    , hostAdminWikiExportInFlightSlug : Maybe Wiki.Slug
+    , hostAdminWikiImportInFlightSlug : Maybe Wiki.Slug
+    , hostAdminWikiImportPendingSlug : Maybe Wiki.Slug
+    , hostAdminWikisNotice : Maybe String
     }
 
 
@@ -257,8 +358,9 @@ type FrontendMsg
     | LoginFormUsernameChanged String
     | LoginFormPasswordChanged String
     | LoginFormSubmitted
-    | NewPageSubmitSlugChanged String
+    | ContributorLogoutClicked
     | NewPageSubmitMarkdownChanged String
+    | NewPageSubmitSlugChanged String
     | NewPageSubmitFormSubmitted
     | PageEditSubmitMarkdownChanged String
     | PageEditSubmitFormSubmitted
@@ -266,11 +368,10 @@ type FrontendMsg
     | PageDeleteSubmitFormSubmitted
     | SubmissionConflictResubmitMarkdownChanged String
     | SubmissionConflictResubmitSubmitted
-    | ReviewApproveSubmitted
+    | ReviewDecisionChanged ReviewDecision
+    | ReviewDecisionSubmitted
     | ReviewRejectReasonChanged String
-    | ReviewRejectSubmitted
     | ReviewRequestChangesNoteChanged String
-    | ReviewRequestChangesSubmitted
     | WikiAdminPromoteToTrustedClicked String
     | WikiAdminDemoteToContributorClicked String
     | WikiAdminGrantAdminClicked String
@@ -283,6 +384,8 @@ type FrontendMsg
     | HostAdminLoginSubmitted
     | HostAdminCreateWikiSlugChanged String
     | HostAdminCreateWikiNameChanged String
+    | HostAdminCreateWikiInitialAdminUsernameChanged String
+    | HostAdminCreateWikiInitialAdminPasswordChanged String
     | HostAdminCreateWikiSubmitted
     | HostAdminWikiDetailNameChanged String
     | HostAdminWikiDetailSlugChanged String
@@ -292,3 +395,16 @@ type FrontendMsg
     | HostAdminWikiDetailReactivateClicked
     | HostAdminWikiDetailDeleteConfirmChanged String
     | HostAdminWikiDetailDeleteSubmitted
+    | HostAdminAuditFilterWikiChanged String
+    | HostAdminAuditFilterActorChanged String
+    | HostAdminAuditFilterPageChanged String
+    | HostAdminAuditFilterTypeTagToggled WikiAuditLog.AuditEventKindFilterTag Bool
+    | HostAdminAuditFilterApplyClicked
+    | HostAdminDataExportClicked
+    | HostAdminDataImportPickRequested
+    | HostAdminDataImportFileSelected Effect.File.File
+    | HostAdminDataImportFileRead (Result () String)
+    | HostAdminWikiDataExportClicked Wiki.Slug
+    | HostAdminWikiDataImportPickRequested Wiki.Slug
+    | HostAdminWikiDataImportFileSelected Effect.File.File
+    | HostAdminWikiDataImportFileRead Wiki.Slug (Result () String)

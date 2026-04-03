@@ -1,95 +1,32 @@
 module ProgramTest.Story47_FrontendRouteGuards exposing (endToEndTests)
 
-import Backend
 import Dict
 import Effect.Browser.Dom
-import Effect.Lamdera
-import Effect.Test
-import Effect.Time
 import Env
-import Frontend
-import Html.Attributes
 import ProgramTest.Config
+import ProgramTest.LoginSteps
+import ProgramTest.Query
+import ProgramTest.Start
 import RemoteData
 import Route
-import Test.Html.Query
-import Test.Html.Selector
-import Types exposing (FrontendMsg(..), ToBackend, ToFrontend)
-import Url exposing (Protocol(..), Url)
+import Wiki
 
 
-loginWithRedirectUrl : Url
-loginWithRedirectUrl =
-    { protocol = Http
-    , host = "localhost"
-    , port_ = Just 8000
-    , path = "/w/demo/login"
-    , query = Just "redirect=%2Fw%2Fdemo"
-    , fragment = Nothing
-    }
-
-
-wikiHomeUrl : Url
-wikiHomeUrl =
-    { protocol = Http
-    , host = "localhost"
-    , port_ = Just 8000
-    , path = "/w/demo"
-    , query = Nothing
-    , fragment = Nothing
-    }
-
-
-hostNewWikiUrl : Url
-hostNewWikiUrl =
-    { protocol = Http
-    , host = "localhost"
-    , port_ = Just 8000
-    , path = "/admin/wikis/new"
-    , query = Nothing
-    , fragment = Nothing
-    }
-
-
-adminUrl : Url
-adminUrl =
-    { protocol = Http
-    , host = "localhost"
-    , port_ = Just 8000
-    , path = "/admin"
-    , query = Nothing
-    , fragment = Nothing
-    }
-
-
-hostWikiElmTipsUrl : Url
-hostWikiElmTipsUrl =
-    { protocol = Http
-    , host = "localhost"
-    , port_ = Just 8000
-    , path = "/admin/wikis/elm-tips"
-    , query = Nothing
-    , fragment = Nothing
-    }
-
-
-endToEndTests : List (Effect.Test.EndToEndTest ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model)
+endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ Effect.Test.start
-        "47 — anonymous /review becomes login with redirect; no review queue fetch"
-        (Effect.Time.millisToPosix 0)
-        ProgramTest.Config.config
-        [ Effect.Test.connectFrontend
-            100
-            (Effect.Lamdera.sessionIdFromString "session-story47-anon-review")
-            "/w/demo/review"
-            { width = 800, height = 600 }
-            (\client ->
+    [ ProgramTest.Start.start
+        { name = "47 — anonymous /review becomes login with redirect; no review queue fetch"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , sessionId = "session-story47-anon-review"
+        , path = "/w/Demo/review"
+        , connectClientMs = Nothing
+        , clientSteps =
+            \client ->
                 [ client.checkModel 400
                     (\model ->
                         case model.route of
-                            Route.WikiLogin "demo" (Just "/w/demo/review") ->
-                                case Dict.get "demo" model.store.reviewQueues of
+                            Route.WikiLogin "Demo" (Just "/w/Demo/review") ->
+                                case Dict.get "Demo" model.store.reviewQueues of
                                     Nothing ->
                                         Ok ()
 
@@ -100,52 +37,38 @@ endToEndTests =
                                 Err "expected gated login route with redirect back to review"
                     )
                 , client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-login-page" ]
-                            |> Test.Html.Query.has
-                                [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "demo") ]
-                    )
+                    (ProgramTest.Query.expectWikiLoginPageShowsSlug "Demo")
                 ]
-            )
-        ]
-    , Effect.Test.start
-        "47 — login with redirect navigates to return path after success"
-        (Effect.Time.millisToPosix 0)
-        ProgramTest.Config.config
-        [ Effect.Test.connectFrontend
-            100
-            (Effect.Lamdera.sessionIdFromString "session-story47-login-redirect")
-            "/w/demo/login"
-            { width = 800, height = 600 }
-            (\client ->
-                [ client.update 100 (UrlChanged loginWithRedirectUrl)
-                , client.input 100 (Effect.Browser.Dom.id "wiki-login-username") "trustedpub"
-                , client.input 100 (Effect.Browser.Dom.id "wiki-login-password") "password12"
-                , client.click 100 (Effect.Browser.Dom.id "wiki-login-submit")
-                , client.update 100 (UrlChanged wikiHomeUrl)
-                , client.checkView 400
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-home-page" ]
-                            |> Test.Html.Query.has
-                                [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "demo") ]
-                    )
-                ]
-            )
-        ]
-    , Effect.Test.start
-        "47 — anonymous /admin/wikis/new ends on host login with redirect"
-        (Effect.Time.millisToPosix 0)
-        ProgramTest.Config.config
-        [ Effect.Test.connectFrontend
-            200
-            (Effect.Lamdera.sessionIdFromString "session-story47-host-new")
-            "/admin/wikis/new"
-            { width = 800, height = 600 }
-            (\client ->
-                [ client.update 100 (UrlChanged hostNewWikiUrl)
-                , client.checkModel 500
+        }
+    , ProgramTest.Start.start
+        { name = "47 — login with redirect navigates to return path after success"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , sessionId = "session-story47-login-redirect"
+        , path =
+            Wiki.loginUrlPathWithRedirect "Demo" "/w/Demo"
+        , connectClientMs = Nothing
+        , clientSteps =
+            \client ->
+                List.concat
+                    [ ProgramTest.LoginSteps.submitWikiLoginForm
+                        { username = "trustedpub"
+                        , password = "password12"
+                        }
+                        client
+                    , [ client.checkView 400
+                            (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
+                      ]
+                    ]
+        }
+    , ProgramTest.Start.start
+        { name = "47 — anonymous /admin/wikis/new ends on host login with redirect"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , sessionId = "session-story47-host-new"
+        , path = "/admin/wikis/new"
+        , connectClientMs = Just 200
+        , clientSteps =
+            \client ->
+                [ client.checkModel 500
                     (\model ->
                         case model.route of
                             Route.HostAdmin (Just "/admin/wikis/new") ->
@@ -155,88 +78,73 @@ endToEndTests =
                                 Err "expected host admin login route preserving return path"
                     )
                 , client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-login-password" ]
-                            |> Test.Html.Query.has []
+                    (ProgramTest.Query.withinId "host-admin-login-password"
+                        ProgramTest.Query.expectEmpty
                     )
                 ]
-            )
-        ]
-    , Effect.Test.start
-        "47 — anonymous /admin/wikis/elm-tips ends on host login with redirect"
-        (Effect.Time.millisToPosix 0)
-        ProgramTest.Config.config
-        [ Effect.Test.connectFrontend
-            202
-            (Effect.Lamdera.sessionIdFromString "session-story47-host-wiki-detail-anon")
-            "/admin/wikis/elm-tips"
-            { width = 800, height = 600 }
-            (\client ->
-                [ client.update 100 (UrlChanged hostWikiElmTipsUrl)
-                , client.checkModel 500
+        }
+    , ProgramTest.Start.start
+        { name = "47 — anonymous /admin/wikis/ElmTips ends on host login with redirect"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , sessionId = "session-story47-host-wiki-detail-anon"
+        , path = "/admin/wikis/ElmTips"
+        , connectClientMs = Just 202
+        , clientSteps =
+            \client ->
+                [ client.checkModel 500
                     (\model ->
                         case model.route of
-                            Route.HostAdmin (Just "/admin/wikis/elm-tips") ->
+                            Route.HostAdmin (Just "/admin/wikis/ElmTips") ->
                                 Ok ()
 
                             _ ->
                                 Err "expected host admin login route preserving return path to wiki detail"
                     )
                 , client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-login-password" ]
-                            |> Test.Html.Query.has []
+                    (ProgramTest.Query.withinId "host-admin-login-password"
+                        ProgramTest.Query.expectEmpty
                     )
                 ]
-            )
-        ]
-    , Effect.Test.start
-        "47 — host-authenticated cold open /admin/wikis/elm-tips loads detail (not NotAsked ellipsis)"
-        (Effect.Time.millisToPosix 0)
-        ProgramTest.Config.config
-        [ Effect.Test.connectFrontend
-            203
-            (Effect.Lamdera.sessionIdFromString "session-story47-host-wiki-detail-auth")
-            "/admin"
-            { width = 800, height = 600 }
-            (\client ->
-                [ client.update 100 (UrlChanged adminUrl)
-                , client.input 100 (Effect.Browser.Dom.id "host-admin-login-password") Env.hostAdminPassword
-                , client.click 100 (Effect.Browser.Dom.id "host-admin-login-submit")
-                , client.checkView 300
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-wikis-list" ]
-                            |> Test.Html.Query.has []
-                    )
-                ]
-            )
-        , Effect.Test.connectFrontend
-            204
-            (Effect.Lamdera.sessionIdFromString "session-story47-host-wiki-detail-auth")
-            "/admin/wikis/elm-tips"
-            { width = 800, height = 600 }
-            (\client ->
-                [ client.update 100 (UrlChanged hostWikiElmTipsUrl)
-                , client.checkModel 500
-                    (\model ->
-                        case model.hostAdminWikiDetailDraft.load of
-                            RemoteData.NotAsked ->
-                                Err "detail load should not stay NotAsked after cold open (RequestHostWikiDetail must apply)"
+        }
+    , ProgramTest.Start.startWith
+        { name = "47 — host-authenticated cold open /admin/wikis/ElmTips loads detail (not NotAsked ellipsis)"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , steps =
+            [ ProgramTest.Start.connectFrontend
+                { sessionId = "session-story47-host-wiki-detail-auth"
+                , path = "/admin"
+                , connectClientMs = Just 203
+                , steps =
+                    \client ->
+                        [ client.input 100 (Effect.Browser.Dom.id "host-admin-login-password") Env.hostAdminPassword
+                        , client.click 100 (Effect.Browser.Dom.id "host-admin-login-submit")
+                        , client.checkView 300
+                            (ProgramTest.Query.withinId "host-admin-wikis-list"
+                                ProgramTest.Query.expectEmpty
+                            )
+                        ]
+                }
+            , ProgramTest.Start.connectFrontend
+                { sessionId = "session-story47-host-wiki-detail-auth"
+                , path = "/admin/wikis/ElmTips"
+                , connectClientMs = Just 204
+                , steps =
+                    \client ->
+                        [ client.checkModel 500
+                            (\model ->
+                                case model.hostAdminWikiDetailDraft.load of
+                                    RemoteData.NotAsked ->
+                                        Err "detail load should not stay NotAsked after cold open (RequestHostWikiDetail must apply)"
 
-                            _ ->
-                                Ok ()
-                    )
-                , client.checkView 400
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-wiki-detail-slug" ]
-                            |> Test.Html.Query.has
-                                [ Test.Html.Selector.attribute (Html.Attributes.value "elm-tips") ]
-                    )
-                ]
-            )
-        ]
+                                    _ ->
+                                        Ok ()
+                            )
+                        , client.checkView 400
+                            (ProgramTest.Query.withinId "host-admin-wiki-detail-slug"
+                                (ProgramTest.Query.expectHasInputValue "ElmTips")
+                            )
+                        ]
+                }
+            ]
+        }
     ]

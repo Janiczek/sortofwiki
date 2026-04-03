@@ -4,26 +4,36 @@ module WikiAuditLog exposing
     , AuditEventKindFilterTag(..)
     , AuditLogFilter
     , Error(..)
+    , HostAuditLogFilter
+    , ScopedAuditEvent
+    , allScopedEventsFromDict
     , append
     , auditLogFilterCacheKey
     , emptyAuditLogFilter
+    , emptyHostAuditLogFilter
     , errorToUserText
     , eventKindFilterTagOptions
     , eventKindFilterTagToString
     , eventKindUserText
     , eventMatchesFilter
+    , eventUtcTimestampString
+    , eventUtcTimestampStringScoped
     , filterEvents
+    , filterScopedEvents
     , formatEventRowText
+    , hostAuditLogFilterCacheKey
+    , scopedEventMatchesFilter
     )
 
 import Dict exposing (Dict)
+import Time
 import Wiki
 
 
 {-| Single append-only audit row for a wiki (story 25).
 -}
 type alias AuditEvent =
-    { atMillis : Int
+    { at : Time.Posix
     , actorUsername : String
     , kind : AuditEventKind
     }
@@ -264,6 +274,121 @@ filterEvents f =
     List.filter (eventMatchesFilter f)
 
 
+{-| Audit row with wiki scope for the platform host-admin log (full cross-wiki view).
+-}
+type alias ScopedAuditEvent =
+    { wikiSlug : Wiki.Slug
+    , at : Time.Posix
+    , actorUsername : String
+    , kind : AuditEventKind
+    }
+
+
+{-| Like [`AuditLogFilter`](#AuditLogFilter) plus optional wiki slug substring (case-insensitive).
+-}
+type alias HostAuditLogFilter =
+    { wikiSlugSubstring : String
+    , actorUsernameSubstring : String
+    , pageSlugSubstring : String
+    , eventKindTags : List AuditEventKindFilterTag
+    }
+
+
+emptyHostAuditLogFilter : HostAuditLogFilter
+emptyHostAuditLogFilter =
+    { wikiSlugSubstring = ""
+    , actorUsernameSubstring = ""
+    , pageSlugSubstring = ""
+    , eventKindTags = []
+    }
+
+
+hostAuditLogFilterCacheKey : HostAuditLogFilter -> String
+hostAuditLogFilterCacheKey f =
+    let
+        kindsPart : String
+        kindsPart =
+            f.eventKindTags
+                |> List.map eventKindFilterTagToString
+                |> List.sort
+                |> String.join ","
+    in
+    String.toLower (String.trim f.wikiSlugSubstring)
+        ++ "\u{001E}"
+        ++ String.toLower (String.trim f.actorUsernameSubstring)
+        ++ "\u{001E}"
+        ++ String.toLower (String.trim f.pageSlugSubstring)
+        ++ "\u{001E}"
+        ++ kindsPart
+
+
+scopedEventMatchesFilter : HostAuditLogFilter -> ScopedAuditEvent -> Bool
+scopedEventMatchesFilter f ev =
+    let
+        wikiOk : Bool
+        wikiOk =
+            if String.isEmpty (String.trim f.wikiSlugSubstring) then
+                True
+
+            else
+                String.contains
+                    (String.toLower (String.trim f.wikiSlugSubstring))
+                    (String.toLower ev.wikiSlug)
+
+        coreFilter : AuditLogFilter
+        coreFilter =
+            { actorUsernameSubstring = f.actorUsernameSubstring
+            , pageSlugSubstring = f.pageSlugSubstring
+            , eventKindTags = f.eventKindTags
+            }
+
+        coreEvent : AuditEvent
+        coreEvent =
+            { at = ev.at
+            , actorUsername = ev.actorUsername
+            , kind = ev.kind
+            }
+    in
+    wikiOk && eventMatchesFilter coreFilter coreEvent
+
+
+filterScopedEvents : HostAuditLogFilter -> List ScopedAuditEvent -> List ScopedAuditEvent
+filterScopedEvents f =
+    List.filter (scopedEventMatchesFilter f)
+
+
+{-| Flatten per-wiki audit lists into one stream ordered by time (oldest first).
+-}
+allScopedEventsFromDict : Dict Wiki.Slug (List AuditEvent) -> List ScopedAuditEvent
+allScopedEventsFromDict dict =
+    Dict.foldl
+        (\wikiSlug events acc ->
+            List.foldl
+                (\e inner ->
+                    { wikiSlug = wikiSlug
+                    , at = e.at
+                    , actorUsername = e.actorUsername
+                    , kind = e.kind
+                    }
+                        :: inner
+                )
+                acc
+                events
+        )
+        []
+        dict
+        |> List.sortBy (\e -> Time.posixToMillis e.at)
+
+
+eventUtcTimestampStringScoped : ScopedAuditEvent -> String
+eventUtcTimestampStringScoped e =
+    eventUtcTimestampString
+        { at = e.at
+        , actorUsername = e.actorUsername
+        , kind = e.kind
+        }
+
+
 type Error
     = WikiNotFound
     | WikiInactive
@@ -295,16 +420,16 @@ errorToUserText err =
 -}
 append :
     Wiki.Slug
-    -> Int
+    -> Time.Posix
     -> String
     -> AuditEventKind
     -> Dict Wiki.Slug (List AuditEvent)
     -> Dict Wiki.Slug (List AuditEvent)
-append wikiSlug atMillis actorUsername kind dict =
+append wikiSlug at actorUsername kind dict =
     let
         ev : AuditEvent
         ev =
-            { atMillis = atMillis
+            { at = at
             , actorUsername = actorUsername
             , kind = kind
             }
@@ -316,9 +441,91 @@ append wikiSlug atMillis actorUsername kind dict =
         dict
 
 
-millisToAuditTimeLabel : Int -> String
-millisToAuditTimeLabel m =
-    "t=" ++ String.fromInt m
+{-| UTC wall time as `YYYY-MM-DD HH:mm:ss.sss` (from [`elm/time`](https://package.elm-lang.org/packages/elm/time/latest/Time)).
+-}
+eventUtcTimestampString : AuditEvent -> String
+eventUtcTimestampString e =
+    posixUtcToYyyyMmDdHhMmSsSss e.at
+
+
+posixUtcToYyyyMmDdHhMmSsSss : Time.Posix -> String
+posixUtcToYyyyMmDdHhMmSsSss posix =
+    let
+        zone : Time.Zone
+        zone =
+            Time.utc
+
+        pad2 : Int -> String
+        pad2 n =
+            n
+                |> String.fromInt
+                |> String.padLeft 2 '0'
+
+        pad3 : Int -> String
+        pad3 n =
+            n
+                |> String.fromInt
+                |> String.padLeft 3 '0'
+
+        year : String
+        year =
+            Time.toYear zone posix
+                |> String.fromInt
+                |> String.padLeft 4 '0'
+    in
+    year
+        ++ "-"
+        ++ pad2 (monthToInt (Time.toMonth zone posix))
+        ++ "-"
+        ++ pad2 (Time.toDay zone posix)
+        ++ " "
+        ++ pad2 (Time.toHour zone posix)
+        ++ ":"
+        ++ pad2 (Time.toMinute zone posix)
+        ++ ":"
+        ++ pad2 (Time.toSecond zone posix)
+        ++ "."
+        ++ pad3 (Time.toMillis zone posix)
+
+
+monthToInt : Time.Month -> Int
+monthToInt month =
+    case month of
+        Time.Jan ->
+            1
+
+        Time.Feb ->
+            2
+
+        Time.Mar ->
+            3
+
+        Time.Apr ->
+            4
+
+        Time.May ->
+            5
+
+        Time.Jun ->
+            6
+
+        Time.Jul ->
+            7
+
+        Time.Aug ->
+            8
+
+        Time.Sep ->
+            9
+
+        Time.Oct ->
+            10
+
+        Time.Nov ->
+            11
+
+        Time.Dec ->
+            12
 
 
 eventKindUserText : AuditEventKind -> String
@@ -369,7 +576,7 @@ eventKindUserText kind =
 
 formatEventRowText : AuditEvent -> String
 formatEventRowText e =
-    millisToAuditTimeLabel e.atMillis
+    eventUtcTimestampString e
         ++ " · "
         ++ e.actorUsername
         ++ " — "

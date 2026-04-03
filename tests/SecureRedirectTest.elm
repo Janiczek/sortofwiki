@@ -11,31 +11,31 @@ suite =
         [ Test.describe "safeContributorReturnPath"
             [ Test.test "accepts wiki home" <|
                 \() ->
-                    SecureRedirect.safeContributorReturnPath "demo" "/w/demo"
-                        |> Expect.equal (Just "/w/demo")
+                    SecureRedirect.safeContributorReturnPath "Demo" "/w/Demo"
+                        |> Expect.equal (Just "/w/Demo")
             , Test.test "accepts same-wiki path" <|
                 \() ->
-                    SecureRedirect.safeContributorReturnPath "demo" "/w/demo/review"
-                        |> Expect.equal (Just "/w/demo/review")
+                    SecureRedirect.safeContributorReturnPath "Demo" "/w/Demo/review"
+                        |> Expect.equal (Just "/w/Demo/review")
             , Test.test "accepts root" <|
                 \() ->
-                    SecureRedirect.safeContributorReturnPath "demo" "/"
+                    SecureRedirect.safeContributorReturnPath "Demo" "/"
                         |> Expect.equal (Just "/")
             , Test.test "rejects other wiki after path normalization" <|
                 \() ->
-                    SecureRedirect.safeContributorReturnPath "demo" "/w/demo/../../w/other/review"
+                    SecureRedirect.safeContributorReturnPath "Demo" "/w/Demo/../../w/other/review"
                         |> Expect.equal Nothing
             , Test.test "normalizes harmless dot segments" <|
                 \() ->
-                    SecureRedirect.safeContributorReturnPath "demo" "/w/demo/submit/../review"
-                        |> Expect.equal (Just "/w/demo/review")
+                    SecureRedirect.safeContributorReturnPath "Demo" "/w/Demo/submit/../review"
+                        |> Expect.equal (Just "/w/Demo/review")
             , Test.test "preserves query on canonical path" <|
                 \() ->
-                    SecureRedirect.safeContributorReturnPath "demo" "/w/demo/review?sort=id"
-                        |> Expect.equal (Just "/w/demo/review?sort=id")
+                    SecureRedirect.safeContributorReturnPath "Demo" "/w/Demo/review?sort=id"
+                        |> Expect.equal (Just "/w/Demo/review?sort=id")
             , Test.test "rejects protocol-relative" <|
                 \() ->
-                    SecureRedirect.safeContributorReturnPath "demo" "//evil.example/w/demo/review"
+                    SecureRedirect.safeContributorReturnPath "Demo" "//evil.example/w/Demo/review"
                         |> Expect.equal Nothing
             ]
         , Test.describe "safeHostAdminReturnPath"
@@ -47,9 +47,13 @@ suite =
                 \() ->
                     SecureRedirect.safeHostAdminReturnPath "/admin/wikis"
                         |> Expect.equal (Just "/admin/wikis")
+            , Test.test "accepts /admin/backup" <|
+                \() ->
+                    SecureRedirect.safeHostAdminReturnPath "/admin/backup"
+                        |> Expect.equal (Just "/admin/backup")
             , Test.test "rejects path that normalizes outside /admin" <|
                 \() ->
-                    SecureRedirect.safeHostAdminReturnPath "/admin/../w/demo"
+                    SecureRedirect.safeHostAdminReturnPath "/admin/../w/Demo"
                         |> Expect.equal Nothing
             , Test.test "normalizes inside /admin" <|
                 \() ->
@@ -59,15 +63,15 @@ suite =
         , Test.describe "contributorRedirectFromQuery"
             [ Test.test "parses encoded redirect for same wiki" <|
                 \() ->
-                    SecureRedirect.contributorRedirectFromQuery "demo" (Just "redirect=%2Fw%2Fdemo%2Freview")
-                        |> Expect.equal (Just "/w/demo/review")
+                    SecureRedirect.contributorRedirectFromQuery "Demo" (Just "redirect=%2Fw%2FDemo%2Freview")
+                        |> Expect.equal (Just "/w/Demo/review")
             , Test.test "first redirect= wins" <|
                 \() ->
-                    SecureRedirect.contributorRedirectFromQuery "demo" (Just "redirect=%2Fw%2Fdemo&redirect=%2F")
-                        |> Expect.equal (Just "/w/demo")
+                    SecureRedirect.contributorRedirectFromQuery "Demo" (Just "redirect=%2Fw%2FDemo&redirect=%2F")
+                        |> Expect.equal (Just "/w/Demo")
             , Test.test "rejects traversal in decoded value" <|
                 \() ->
-                    SecureRedirect.contributorRedirectFromQuery "demo" (Just "redirect=%2Fw%2Fdemo%2F..%2F..%2Fw%2Fother")
+                    SecureRedirect.contributorRedirectFromQuery "Demo" (Just "redirect=%2Fw%2FDemo%2F..%2F..%2Fw%2Fother")
                         |> Expect.equal Nothing
             ]
         , Test.describe "hostAdminRedirectFromQuery"

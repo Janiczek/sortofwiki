@@ -7,5 +7,5 @@ import Test exposing (Test)
 
 suite : Test
 suite =
-    Test.describe "Story 48 — concurrent edit conflicts"
+    Test.describe "Story 48 — concurrent edits: approve one, resolve other, approve second"
         (List.map Effect.Test.toTest ProgramTest.Story48_ConcurrentEditConflicts.endToEndTests)

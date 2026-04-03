@@ -21,9 +21,9 @@ type alias Entry =
 
 {-| Extract TOC entries from published page markdown (empty if parse fails or no headings).
 -}
-entries : Wiki.Slug -> Page.FrontendDetails -> List Entry
-entries wikiSlug pageDetails =
-    WikiPageMarkdownParse.blocksWithHeadingSlugs wikiSlug pageDetails.markdownSource
+entries : Wiki.Slug -> (Page.Slug -> Bool) -> Page.FrontendDetails -> List Entry
+entries wikiSlug publishedSlugExists pageDetails =
+    WikiPageMarkdownParse.blocksWithHeadingSlugs wikiSlug publishedSlugExists pageDetails.markdownSource
         |> Result.map entriesFromBlocksWithSlugMeta
         |> Result.withDefault []
 

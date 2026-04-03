@@ -1,40 +1,13 @@
 module ProgramTest.Story09_NewPageSubmission exposing (endToEndTests)
 
-import Backend
 import Effect.Browser.Dom
-import Effect.Lamdera
-import Effect.Test
-import Effect.Time
 import Expect
-import Frontend
-import Html.Attributes
 import ProgramTest.Config
-import Test.Html.Query
-import Test.Html.Selector
-import Types exposing (FrontendMsg(..), ToBackend, ToFrontend)
+import ProgramTest.Query
+import ProgramTest.Start
+import Types exposing (FrontendMsg(..))
 import Url exposing (Protocol(..), Url)
-
-
-submitNewUrl : Url
-submitNewUrl =
-    { protocol = Http
-    , host = "localhost"
-    , port_ = Just 8000
-    , path = "/w/demo/submit/new"
-    , query = Nothing
-    , fragment = Nothing
-    }
-
-
-demoWikiHomeUrl : Url
-demoWikiHomeUrl =
-    { protocol = Http
-    , host = "localhost"
-    , port_ = Just 8000
-    , path = "/w/demo"
-    , query = Nothing
-    , fragment = Nothing
-    }
+import Wiki
 
 
 pendingPageUrl : Url
@@ -42,67 +15,69 @@ pendingPageUrl =
     { protocol = Http
     , host = "localhost"
     , port_ = Just 8000
-    , path = "/w/demo/p/Story09NewPage"
+    , path = "/w/Demo/p/Story09NewPage"
     , query = Nothing
     , fragment = Nothing
     }
 
 
-endToEndTests : List (Effect.Test.EndToEndTest ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model)
+submitNewPageUrl : Url
+submitNewPageUrl =
+    { protocol = Http
+    , host = "localhost"
+    , port_ = Just 8000
+    , path = "/w/Demo/submit/new"
+    , query = Just "page=Story09NewPage"
+    , fragment = Nothing
+    }
+
+
+endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ Effect.Test.start
-        "9 — submit new page draft stays off public index"
-        (Effect.Time.millisToPosix 0)
-        ProgramTest.Config.config
-        [ Effect.Test.connectFrontend
-            100
-            (Effect.Lamdera.sessionIdFromString "session-story09-submit")
-            "/w/demo/register"
-            { width = 800, height = 600 }
-            (\client ->
+    [ ProgramTest.Start.start
+        { name = "9 — submit new page draft stays off public index"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , sessionId = "session-story09-submit"
+        , path = "/w/Demo/register"
+        , connectClientMs = Nothing
+        , clientSteps =
+            \client ->
                 [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story09user"
                 , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
                 , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
                 , client.checkView 300
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-register-success" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Registration complete" ]
+                    (ProgramTest.Query.withinId "wiki-register-success"
+                        (ProgramTest.Query.expectHasText "Registration complete")
                     )
-                , client.update 100 (UrlChanged submitNewUrl)
+                , client.update 100 (UrlChanged submitNewPageUrl)
                 , client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submit-new-page" ]
-                            |> Test.Html.Query.has
-                                [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "demo") ]
+                    (ProgramTest.Query.withinId "wiki-submit-new-page"
+                        (ProgramTest.Query.expectHasDataAttributes
+                            [ ( "data-wiki-slug", "Demo" )
+                            , ( "data-page-slug", "Story09NewPage" )
+                            ]
+                        )
                     )
-                , client.input 100 (Effect.Browser.Dom.id "wiki-submit-new-slug") "Story09NewPage"
                 , client.input 100 (Effect.Browser.Dom.id "wiki-submit-new-markdown") "# Story 09 page"
                 , client.click 100 (Effect.Browser.Dom.id "wiki-submit-new-submit")
                 , client.checkView 300
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submit-new-success" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "sub_1" ]
+                    (ProgramTest.Query.withinId "wiki-submit-new-success"
+                        (ProgramTest.Query.expectHasSubmissionId "sub_1")
                     )
-                , client.update 100 (UrlChanged demoWikiHomeUrl)
+                , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
                 , client.checkView 200
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-home-page-slugs" ]
-                            |> Test.Html.Query.findAll
-                                [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-page-slug" "Story09NewPage") ]
-                            |> Test.Html.Query.count (Expect.equal 0)
+                    (ProgramTest.Query.withinId "wiki-home-page-slugs"
+                        (ProgramTest.Query.expectDataAttributeOccurrenceCount "data-page-slug" "Story09NewPage" (\c -> c |> Expect.equal 0))
                     )
                 , client.update 100 (UrlChanged pendingPageUrl)
                 , client.checkView 200
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-context" "layout-header") ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Page not found" ]
+                    (ProgramTest.Query.withinLayoutHeader
+                        (ProgramTest.Query.expectAll
+                            [ ProgramTest.Query.expectHasText ": Create?"
+                            , ProgramTest.Query.expectHasText "Story09NewPage"
+                            ]
+                        )
                     )
                 ]
-            )
-        ]
+        }
     ]

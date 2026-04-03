@@ -1,92 +1,64 @@
 module ProgramTest.Story06_OnlyPublished exposing (endToEndTests)
 
-import Backend
-import Effect.Lamdera
-import Effect.Test
-import Effect.Time
 import Expect
-import Frontend
-import Html.Attributes
 import ProgramTest.Config
-import Test.Html.Query
-import Test.Html.Selector
-import Types exposing (ToBackend, ToFrontend)
+import ProgramTest.Query
+import ProgramTest.Start
 
 
-endToEndTests : List (Effect.Test.EndToEndTest ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model)
+endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ Effect.Test.start
-        "6 — published body on /w/demo/p/Home, pending text absent"
-        (Effect.Time.millisToPosix 0)
-        ProgramTest.Config.config
-        [ Effect.Test.connectFrontend
-            100
-            (Effect.Lamdera.sessionIdFromString "session-story06-home")
-            "/w/demo/p/Home"
-            { width = 800, height = 600 }
-            (\client ->
+    [ ProgramTest.Start.start
+        { name = "6 — published body on /w/Demo/p/Home, pending text absent"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , sessionId = "session-story06-home"
+        , path = "/w/Demo/p/Home"
+        , connectClientMs = Nothing
+        , clientSteps =
+            \client ->
                 [ client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "page-markdown" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Welcome to the Demo Wiki" ]
-                    )
-                , client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.hasNot [ Test.Html.Selector.text "STORY06_PENDING_LEAK" ]
-                    )
-                , client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.hasNot [ Test.Html.Selector.text "STORY06_PENDING_ONLY" ]
+                    (ProgramTest.Query.expectAll
+                        [ ProgramTest.Query.withinId "page-markdown"
+                            (ProgramTest.Query.expectHasText "Welcome to the Demo Wiki")
+                        , ProgramTest.Query.expectHasNotText "STORY06_PENDING_LEAK"
+                        , ProgramTest.Query.expectHasNotText "STORY06_PENDING_ONLY"
+                        ]
                     )
                 ]
-            )
-        ]
-    , Effect.Test.start
-        "6 — pending-only slug 404 at /w/demo/p/OnlyPending"
-        (Effect.Time.millisToPosix 0)
-        ProgramTest.Config.config
-        [ Effect.Test.connectFrontend
-            100
-            (Effect.Lamdera.sessionIdFromString "session-story06-pending-only")
-            "/w/demo/p/OnlyPending"
-            { width = 800, height = 600 }
-            (\client ->
+        }
+    , ProgramTest.Start.start
+        { name = "6 — pending-only slug 404 at /w/Demo/p/OnlyPending"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , sessionId = "session-story06-pending-only"
+        , path = "/w/Demo/p/OnlyPending"
+        , connectClientMs = Nothing
+        , clientSteps =
+            \client ->
                 [ client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-context" "layout-header") ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Page not found" ]
-                    )
-                , client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.hasNot [ Test.Html.Selector.text "STORY06_PENDING_ONLY" ]
+                    (ProgramTest.Query.expectAll
+                        [ ProgramTest.Query.withinLayoutHeader
+                            (ProgramTest.Query.expectAll
+                                [ ProgramTest.Query.expectHasText ": Create?"
+                                , ProgramTest.Query.expectHasText "OnlyPending"
+                                ]
+                            )
+                        , ProgramTest.Query.expectHasNotText "STORY06_PENDING_ONLY"
+                        ]
                     )
                 ]
-            )
-        ]
-    , Effect.Test.start
-        "6 — wiki home table omits pending-only slug"
-        (Effect.Time.millisToPosix 0)
-        ProgramTest.Config.config
-        [ Effect.Test.connectFrontend
-            100
-            (Effect.Lamdera.sessionIdFromString "session-story06-pages-list")
-            "/w/demo"
-            { width = 800, height = 600 }
-            (\client ->
+        }
+    , ProgramTest.Start.start
+        { name = "6 — wiki home table omits pending-only slug"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , sessionId = "session-story06-pages-list"
+        , path = "/w/Demo"
+        , connectClientMs = Nothing
+        , clientSteps =
+            \client ->
                 [ client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-home-page-slugs" ]
-                            |> Test.Html.Query.findAll
-                                [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-page-slug" "OnlyPending") ]
-                            |> Test.Html.Query.count (Expect.equal 0)
+                    (ProgramTest.Query.withinId "wiki-home-page-slugs"
+                        (ProgramTest.Query.expectDataAttributeOccurrenceCount "data-page-slug" "OnlyPending" (\c -> c |> Expect.equal 0))
                     )
                 ]
-            )
-        ]
+        }
     ]

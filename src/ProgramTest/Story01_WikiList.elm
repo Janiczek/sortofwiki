@@ -1,54 +1,35 @@
 module ProgramTest.Story01_WikiList exposing (endToEndTests)
 
-import Backend
-import Effect.Lamdera
-import Effect.Test
-import Effect.Time
-import Frontend
-import Html.Attributes
 import ProgramTest.Config
-import Test.Html.Query
-import Test.Html.Selector
-import Types exposing (ToBackend, ToFrontend)
+import ProgramTest.Query
+import ProgramTest.Start
+import Wiki
 
 
-endToEndTests : List (Effect.Test.EndToEndTest ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model)
+endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ Effect.Test.start
-        "1 — catalog on /"
-        (Effect.Time.millisToPosix 0)
-        ProgramTest.Config.config
-        [ Effect.Test.connectFrontend
-            100
-            (Effect.Lamdera.sessionIdFromString "session-catalog")
-            "/"
-            { width = 800, height = 600 }
-            (\client ->
+    [ ProgramTest.Start.start
+        { name = "See list of wikis on /"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , sessionId = "session-anonymous-viewer"
+        , path = "/"
+        , connectClientMs = Nothing
+        , clientSteps =
+            \client ->
                 [ client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-context" "layout-header") ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "SortOfWiki" ]
-                    )
-                , client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "catalog-page" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.id "wiki-catalog" ]
-                    )
-                , client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "demo") ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Demo Wiki" ]
-                    )
-                , client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "elm-tips") ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Elm Tips" ]
+                    (ProgramTest.Query.expectAll
+                        [ ProgramTest.Query.headingIs "SortOfWiki"
+                        , ProgramTest.Query.subheadingIs "Wikis"
+                        , ProgramTest.Query.withinLayoutHeader
+                            (ProgramTest.Query.expectLink
+                                { href = Wiki.wikiListUrlPath
+                                , label = "SortOfWiki"
+                                }
+                            )
+                        , ProgramTest.Query.expectWikiCard { slug = "Demo", title = "Demo Wiki" }
+                        , ProgramTest.Query.expectWikiCard { slug = "ElmTips", title = "Elm Tips" }
+                        ]
                     )
                 ]
-            )
-        ]
+        }
     ]

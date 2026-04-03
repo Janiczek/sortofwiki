@@ -72,7 +72,7 @@ suite =
         , Test.describe "pendingNewPageSlugInUse"
             [ Test.test "false on empty dict" <|
                 \() ->
-                    Submission.pendingNewPageSlugInUse "demo" "x" Dict.empty
+                    Submission.pendingNewPageSlugInUse "Demo" "x" Dict.empty
                         |> Expect.equal False
             , Test.test "true when pending new page matches slug" <|
                 \() ->
@@ -80,8 +80,8 @@ suite =
                         sub : Submission.Submission
                         sub =
                             { id = Submission.idFromCounter 1
-                            , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "u"
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = "wanted"
@@ -91,7 +91,7 @@ suite =
                             , reviewerNote = Nothing
                             }
                     in
-                    Submission.pendingNewPageSlugInUse "demo" "wanted" (Dict.singleton "sub_1" sub)
+                    Submission.pendingNewPageSlugInUse "Demo" "wanted" (Dict.singleton "sub_1" sub)
                         |> Expect.equal True
             , Test.fuzz Fuzz.string "false when slug differs from pending new page" <|
                 \suffix ->
@@ -103,8 +103,8 @@ suite =
                         sub : Submission.Submission
                         sub =
                             { id = Submission.idFromCounter 1
-                            , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "u"
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = "aaa-fixed"
@@ -114,7 +114,7 @@ suite =
                             , reviewerNote = Nothing
                             }
                     in
-                    Submission.pendingNewPageSlugInUse "demo" candidate (Dict.singleton "sub_1" sub)
+                    Submission.pendingNewPageSlugInUse "Demo" candidate (Dict.singleton "sub_1" sub)
                         |> Expect.equal False
             , Test.test "false when pending submission is EditPage for same slug" <|
                 \() ->
@@ -122,8 +122,8 @@ suite =
                         sub : Submission.Submission
                         sub =
                             { id = Submission.idFromCounter 1
-                            , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "u"
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
                                 Submission.EditPage
                                     { pageSlug = "guides"
@@ -135,7 +135,7 @@ suite =
                             , reviewerNote = Nothing
                             }
                     in
-                    Submission.pendingNewPageSlugInUse "demo" "guides" (Dict.singleton "sub_1" sub)
+                    Submission.pendingNewPageSlugInUse "Demo" "guides" (Dict.singleton "sub_1" sub)
                         |> Expect.equal False
             , Test.test "false when pending submission is DeletePage for same slug" <|
                 \() ->
@@ -143,8 +143,8 @@ suite =
                         sub : Submission.Submission
                         sub =
                             { id = Submission.idFromCounter 1
-                            , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "u"
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
                                 Submission.DeletePage
                                     { pageSlug = "guides"
@@ -154,7 +154,7 @@ suite =
                             , reviewerNote = Nothing
                             }
                     in
-                    Submission.pendingNewPageSlugInUse "demo" "guides" (Dict.singleton "sub_1" sub)
+                    Submission.pendingNewPageSlugInUse "Demo" "guides" (Dict.singleton "sub_1" sub)
                         |> Expect.equal False
             , Test.test "false when same slug exists only on rejected new page submission" <|
                 \() ->
@@ -162,15 +162,15 @@ suite =
                         sub : Submission.Submission
                         sub =
                             { id = Submission.idFromCounter 1
-                            , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "u"
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
                                 Submission.NewPage { pageSlug = "wanted", markdown = "m" }
                             , status = Submission.Rejected
                             , reviewerNote = Nothing
                             }
                     in
-                    Submission.pendingNewPageSlugInUse "demo" "wanted" (Dict.singleton "sub_1" sub)
+                    Submission.pendingNewPageSlugInUse "Demo" "wanted" (Dict.singleton "sub_1" sub)
                         |> Expect.equal False
             ]
         , Test.describe "validateDeleteReason"
@@ -237,7 +237,7 @@ suite =
                     let
                         wiki : Wiki.Wiki
                         wiki =
-                            Wiki.wikiWithPages "demo"
+                            Wiki.wikiWithPages "Demo"
                                 "Demo"
                                 (Dict.singleton "home" (Page.withPublished "home" "# H"))
                     in
@@ -248,7 +248,7 @@ suite =
                     let
                         wiki : Wiki.Wiki
                         wiki =
-                            Wiki.wikiWithPages "demo"
+                            Wiki.wikiWithPages "Demo"
                                 "Demo"
                                 (Dict.singleton "draft" (Page.pendingOnly "draft" "secret"))
                     in
@@ -259,7 +259,7 @@ suite =
                     let
                         wiki : Wiki.Wiki
                         wiki =
-                            Wiki.wikiWithPages "demo" "Demo" Dict.empty
+                            Wiki.wikiWithPages "Demo" "Demo" Dict.empty
                     in
                     Submission.wikiHasPublishedPage "nope" wiki
                         |> Expect.equal False
@@ -268,7 +268,7 @@ suite =
                     let
                         wiki : Wiki.Wiki
                         wiki =
-                            Wiki.wikiWithPages "demo"
+                            Wiki.wikiWithPages "Demo"
                                 "Demo"
                                 (Dict.singleton "fixed" (Page.withPublished "fixed" "x"))
                     in
@@ -361,8 +361,8 @@ suite =
                         sub : Submission.Submission
                         sub =
                             { id = Submission.idFromCounter 1
-                            , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "u"
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
                                 Submission.NewPage { pageSlug = "x", markdown = "m" }
                             , status = Submission.Pending
@@ -383,8 +383,8 @@ suite =
                         sub : Submission.Submission
                         sub =
                             { id = Submission.idFromCounter 2
-                            , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "u"
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
                                 Submission.EditPage { pageSlug = "home", baseMarkdown = "old", baseRevision = 1, proposedMarkdown = "m" }
                             , status = Submission.Rejected
@@ -411,7 +411,7 @@ suite =
         , Test.describe "pendingSubmissionsForWiki"
             [ Test.test "empty dict yields empty list" <|
                 \() ->
-                    Submission.pendingSubmissionsForWiki "demo" Dict.empty
+                    Submission.pendingSubmissionsForWiki "Demo" Dict.empty
                         |> Expect.equal []
             , Test.test "filters wiki and pending, sorted by id string" <|
                 \() ->
@@ -419,8 +419,8 @@ suite =
                         pendingDemo1 : Submission.Submission
                         pendingDemo1 =
                             { id = Submission.idFromCounter 1
-                            , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "a"
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "a"
                             , kind =
                                 Submission.NewPage { pageSlug = "x", markdown = "m" }
                             , status = Submission.Pending
@@ -430,8 +430,8 @@ suite =
                         pendingDemo2 : Submission.Submission
                         pendingDemo2 =
                             { id = Submission.idFromCounter 2
-                            , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "b"
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "b"
                             , kind =
                                 Submission.EditPage { pageSlug = "home", baseMarkdown = "old", baseRevision = 1, proposedMarkdown = "m" }
                             , status = Submission.Pending
@@ -452,7 +452,7 @@ suite =
                     , ( "sub_o", otherWiki )
                     ]
                         |> Dict.fromList
-                        |> Submission.pendingSubmissionsForWiki "demo"
+                        |> Submission.pendingSubmissionsForWiki "Demo"
                         |> Expect.equal [ pendingDemo1, pendingDemo2 ]
             , Test.fuzz Fuzz.string "only returns pending for matching wiki" <|
                 \noise ->
@@ -485,18 +485,129 @@ suite =
                         |> Submission.pendingSubmissionsForWiki wikiSlug
                         |> Expect.equal [ pending ]
             ]
+        , Test.describe "mySubmissionsForAuthorOnWiki"
+            [ Test.test "filters wiki listed statuses and author, sorted by id string" <|
+                \() ->
+                    let
+                        author : ContributorAccount.Id
+                        author =
+                            ContributorAccount.newAccountId "Demo" "statusdemo"
+
+                        otherAuthor : ContributorAccount.Id
+                        otherAuthor =
+                            ContributorAccount.newAccountId "Demo" "other"
+
+                        mine1 : Submission.Submission
+                        mine1 =
+                            { id = Submission.idFromKey "sub_b"
+                            , wikiSlug = "Demo"
+                            , authorId = author
+                            , kind =
+                                Submission.NewPage { pageSlug = "B", markdown = "m" }
+                            , status = Submission.Pending
+                            , reviewerNote = Nothing
+                            }
+
+                        mine2 : Submission.Submission
+                        mine2 =
+                            { id = Submission.idFromKey "sub_a"
+                            , wikiSlug = "Demo"
+                            , authorId = author
+                            , kind =
+                                Submission.NewPage { pageSlug = "A", markdown = "m" }
+                            , status = Submission.Pending
+                            , reviewerNote = Nothing
+                            }
+
+                        notMine : Submission.Submission
+                        notMine =
+                            { mine1 | authorId = otherAuthor }
+
+                        approvedMine : Submission.Submission
+                        approvedMine =
+                            { mine1 | status = Submission.Approved }
+
+                        rejectedMine : Submission.Submission
+                        rejectedMine =
+                            { mine1 | id = Submission.idFromKey "sub_r", status = Submission.Rejected }
+                    in
+                    [ ( "sub_b", mine1 ), ( "sub_a", mine2 ), ( "o", notMine ), ( "ap", approvedMine ), ( "sub_r", rejectedMine ) ]
+                        |> Dict.fromList
+                        |> Submission.mySubmissionsForAuthorOnWiki "Demo" author
+                        |> Expect.equal [ mine2, mine1, rejectedMine ]
+            , Test.fuzz Fuzz.string "returns pending and needs-revision for matching wiki and author" <|
+                \noise ->
+                    let
+                        wikiSlug : Wiki.Slug
+                        wikiSlug =
+                            "w" ++ noise
+
+                        author : ContributorAccount.Id
+                        author =
+                            ContributorAccount.newAccountId wikiSlug "u"
+
+                        other : ContributorAccount.Id
+                        other =
+                            ContributorAccount.newAccountId wikiSlug "v"
+
+                        pendingMine : Submission.Submission
+                        pendingMine =
+                            { id = Submission.idFromCounter 1
+                            , wikiSlug = wikiSlug
+                            , authorId = author
+                            , kind =
+                                Submission.DeletePage { pageSlug = "p", reason = Nothing }
+                            , status = Submission.Pending
+                            , reviewerNote = Nothing
+                            }
+
+                        wrongAuthor : Submission.Submission
+                        wrongAuthor =
+                            { pendingMine | authorId = other }
+
+                        needsRevMine : Submission.Submission
+                        needsRevMine =
+                            { pendingMine | id = Submission.idFromCounter 2, status = Submission.NeedsRevision }
+                    in
+                    [ ( "a", pendingMine ), ( "b", wrongAuthor ), ( "c", needsRevMine ) ]
+                        |> Dict.fromList
+                        |> Submission.mySubmissionsForAuthorOnWiki wikiSlug author
+                        |> Expect.equal [ pendingMine, needsRevMine ]
+            ]
+        , Test.describe "myPendingSubmissionListItemFromSubmission"
+            [ Test.test "maps id kind and page slug" <|
+                \() ->
+                    let
+                        sub : Submission.Submission
+                        sub =
+                            { id = Submission.idFromCounter 5
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "u"
+                            , kind =
+                                Submission.NewPage { pageSlug = "MyPage", markdown = "m" }
+                            , status = Submission.Pending
+                            , reviewerNote = Nothing
+                            }
+                    in
+                    Submission.myPendingSubmissionListItemFromSubmission sub
+                        |> Expect.equal
+                            { id = Submission.idFromCounter 5
+                            , kindLabel = "New page: MyPage"
+                            , maybePageSlug = Just "MyPage"
+                            }
+            ]
         , Test.describe "pendingEditForAuthorOnPageInUse"
             [ Test.test "true only for pending edit by same author on same page" <|
                 \() ->
                     let
                         author : ContributorAccount.Id
                         author =
-                            ContributorAccount.newAccountId "demo" "a"
+                            ContributorAccount.newAccountId "Demo" "a"
 
                         sub : Submission.Submission
                         sub =
                             { id = Submission.idFromCounter 1
-                            , wikiSlug = "demo"
+                            , wikiSlug = "Demo"
                             , authorId = author
                             , kind =
                                 Submission.EditPage { pageSlug = "home", baseMarkdown = "old", baseRevision = 1, proposedMarkdown = "new" }
@@ -504,23 +615,23 @@ suite =
                             , reviewerNote = Nothing
                             }
                     in
-                    Submission.pendingEditForAuthorOnPageInUse "demo" author "home" (Dict.singleton "sub_1" sub)
+                    Submission.pendingEditForAuthorOnPageInUse "Demo" author "home" (Dict.singleton "sub_1" sub)
                         |> Expect.equal True
             , Test.fuzz Fuzz.string "non-pending edit does not count" <|
                 \suffix ->
                     let
                         author : ContributorAccount.Id
                         author =
-                            ContributorAccount.newAccountId "demo" "a"
+                            ContributorAccount.newAccountId "Demo" "a"
                     in
                     Submission.pendingEditForAuthorOnPageInUse
-                        "demo"
+                        "Demo"
                         author
                         ("home" ++ suffix)
                         (Dict.singleton
                             "sub_1"
                             { id = Submission.idFromCounter 1
-                            , wikiSlug = "demo"
+                            , wikiSlug = "Demo"
                             , authorId = author
                             , kind =
                                 Submission.EditPage { pageSlug = "home", baseMarkdown = "old", baseRevision = 1, proposedMarkdown = "new" }
@@ -536,8 +647,8 @@ suite =
                     Submission.isStalePendingEditSubmission
                         { pageSlug = "home", currentRevision = 2 }
                         { id = Submission.idFromCounter 1
-                        , wikiSlug = "demo"
-                        , authorId = ContributorAccount.newAccountId "demo" "u"
+                        , wikiSlug = "Demo"
+                        , authorId = ContributorAccount.newAccountId "Demo" "u"
                         , kind =
                             Submission.EditPage { pageSlug = "home", baseMarkdown = "old", baseRevision = 1, proposedMarkdown = "new" }
                         , status = Submission.Pending
@@ -549,8 +660,8 @@ suite =
                     Submission.isStalePendingEditSubmission
                         { pageSlug = "home", currentRevision = 1 }
                         { id = Submission.idFromCounter 1
-                        , wikiSlug = "demo"
-                        , authorId = ContributorAccount.newAccountId "demo" "u"
+                        , wikiSlug = "Demo"
+                        , authorId = ContributorAccount.newAccountId "Demo" "u"
                         , kind =
                             Submission.EditPage { pageSlug = "home", baseMarkdown = "old", baseRevision = 1, proposedMarkdown = "new" }
                         , status = Submission.Pending
@@ -565,8 +676,8 @@ suite =
                         sub : Submission.Submission
                         sub =
                             { id = Submission.idFromCounter 1
-                            , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "u"
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
                                 Submission.EditPage { pageSlug = "home", baseMarkdown = "old", baseRevision = 1, proposedMarkdown = "mine" }
                             , status = Submission.NeedsRevision
@@ -607,12 +718,12 @@ suite =
                     let
                         accountId : ContributorAccount.Id
                         accountId =
-                            ContributorAccount.newAccountId "demo" "alice"
+                            ContributorAccount.newAccountId "Demo" "alice"
 
                         sub : Submission.Submission
                         sub =
                             { id = Submission.idFromKey "sub_x"
-                            , wikiSlug = "demo"
+                            , wikiSlug = "Demo"
                             , authorId = accountId
                             , kind =
                                 Submission.NewPage { pageSlug = "pg", markdown = "m" }
@@ -640,12 +751,12 @@ suite =
                     let
                         accountId : ContributorAccount.Id
                         accountId =
-                            ContributorAccount.newAccountId "demo" "bob"
+                            ContributorAccount.newAccountId "Demo" "bob"
 
                         sub : Submission.Submission
                         sub =
                             { id = Submission.idFromCounter 1
-                            , wikiSlug = "demo"
+                            , wikiSlug = "Demo"
                             , authorId = accountId
                             , kind =
                                 Submission.EditPage { pageSlug = "h", baseMarkdown = "old", baseRevision = 1, proposedMarkdown = "m" }
@@ -667,16 +778,16 @@ suite =
                     let
                         wiki : Wiki.Wiki
                         wiki =
-                            Wiki.wikiWithPages "demo" "Demo" Dict.empty
+                            Wiki.wikiWithPages "Demo" "Demo" Dict.empty
 
                         sub : Submission.Submission
                         sub =
                             { id = Submission.idFromKey "sub_queue_demo"
-                            , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "u"
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
                                 Submission.NewPage
-                                    { pageSlug = "queue-demo-page"
+                                    { pageSlug = "QueueDemoPage"
                                     , markdown = "Body text"
                                     }
                             , status = Submission.Pending
@@ -688,7 +799,7 @@ suite =
                             (\r ->
                                 ( r.submission.status
                                 , r.submission.reviewerNote
-                                , Dict.member "queue-demo-page" r.wiki.pages
+                                , Dict.member "QueueDemoPage" r.wiki.pages
                                 )
                             )
                         |> Expect.equal (Ok ( Submission.Approved, Nothing, True ))
@@ -697,13 +808,13 @@ suite =
                     let
                         wiki : Wiki.Wiki
                         wiki =
-                            Wiki.wikiWithPages "demo" "Demo" Dict.empty
+                            Wiki.wikiWithPages "Demo" "Demo" Dict.empty
 
                         sub : Submission.Submission
                         sub =
                             { id = Submission.idFromKey "sub_1"
-                            , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "u"
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = "x", markdown = "m" }
@@ -718,18 +829,18 @@ suite =
                     let
                         wiki : Wiki.Wiki
                         wiki =
-                            Wiki.wikiWithPages "demo"
+                            Wiki.wikiWithPages "Demo"
                                 "Demo"
-                                (Dict.singleton "queue-demo-page" (Page.withPublished "queue-demo-page" "old"))
+                                (Dict.singleton "QueueDemoPage" (Page.withPublished "QueueDemoPage" "old"))
 
                         sub : Submission.Submission
                         sub =
                             { id = Submission.idFromKey "sub_1"
-                            , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "u"
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
                                 Submission.NewPage
-                                    { pageSlug = "queue-demo-page"
+                                    { pageSlug = "QueueDemoPage"
                                     , markdown = "new"
                                     }
                             , status = Submission.Pending
@@ -777,11 +888,11 @@ suite =
                         sub : Submission.Submission
                         sub =
                             { id = Submission.idFromKey "sub_queue_demo"
-                            , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "u"
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
                                 Submission.NewPage
-                                    { pageSlug = "queue-demo-page"
+                                    { pageSlug = "QueueDemoPage"
                                     , markdown = "Body text"
                                     }
                             , status = Submission.Pending
@@ -802,8 +913,8 @@ suite =
                         sub : Submission.Submission
                         sub =
                             { id = Submission.idFromKey "sub_1"
-                            , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "u"
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = "x", markdown = "m" }
@@ -821,8 +932,8 @@ suite =
                         sub : Submission.Submission
                         sub =
                             { id = Submission.idFromKey "sub_changes_demo"
-                            , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "u"
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = "x-page"
@@ -846,8 +957,8 @@ suite =
                         sub : Submission.Submission
                         sub =
                             { id = Submission.idFromKey "sub_1"
-                            , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "u"
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = "x", markdown = "m" }
@@ -863,8 +974,8 @@ suite =
                         sub : Submission.Submission
                         sub =
                             { id = Submission.idFromKey "sub_1"
-                            , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "u"
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = "x", markdown = "m" }

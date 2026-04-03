@@ -1,60 +1,48 @@
 module ProgramTest.Story02_WikiHome exposing (endToEndTests)
 
-import Backend
-import Effect.Lamdera
-import Effect.Test
-import Effect.Time
-import Frontend
-import Html.Attributes
 import ProgramTest.Config
-import Test.Html.Query
-import Test.Html.Selector
-import Types exposing (ToBackend, ToFrontend)
+import ProgramTest.Query
+import ProgramTest.Start
 
 
-endToEndTests : List (Effect.Test.EndToEndTest ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model)
+endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ Effect.Test.start
-        "2 — wiki home /w/demo"
-        (Effect.Time.millisToPosix 0)
-        ProgramTest.Config.config
-        [ Effect.Test.connectFrontend
-            100
-            (Effect.Lamdera.sessionIdFromString "session-wiki-demo")
-            "/w/demo"
-            { width = 800, height = 600 }
-            (\client ->
+    [ ProgramTest.Start.start
+        { name = "See wiki home on /w/:wiki"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , sessionId = "session-wiki-demo"
+        , path = "/w/Demo"
+        , connectClientMs = Nothing
+        , clientSteps =
+            \client ->
                 [ client.checkView 200
-                    (\root ->
-                        root
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Demo Wiki" ]
-                    )
+                    (ProgramTest.Query.expectHasText "Demo Wiki")
                 , client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-home-page" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Pages" ]
+                    (ProgramTest.Query.withinId "wiki-home-page"
+                        (ProgramTest.Query.expectHasText "Pages")
                     )
                 ]
-            )
-        ]
-    , Effect.Test.start
-        "2 — unknown wiki slug shows 404"
-        (Effect.Time.millisToPosix 0)
-        ProgramTest.Config.config
-        [ Effect.Test.connectFrontend
-            100
-            (Effect.Lamdera.sessionIdFromString "session-wiki-unknown")
-            "/w/unknown-slug"
-            { width = 800, height = 600 }
-            (\client ->
+        }
+    , ProgramTest.Start.start
+        { name = "See 'Wiki not found' on /w/unknown"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , sessionId = "session-wiki-unknown"
+        , path = "/w/unknown-slug"
+        , connectClientMs = Nothing
+        , clientSteps =
+            \client ->
                 [ client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-context" "layout-header") ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Page not found" ]
+                    (ProgramTest.Query.expectAll
+                        [ ProgramTest.Query.withinLayoutHeader (ProgramTest.Query.expectHasText "Wiki not found")
+                        , ProgramTest.Query.withinId "wiki-not-found-page"
+                            (ProgramTest.Query.expectHasTexts
+                                [ "The wiki "
+                                , "unknown-slug"
+                                , " doesn't exist."
+                                ]
+                            )
+                        ]
                     )
                 ]
-            )
-        ]
+        }
     ]

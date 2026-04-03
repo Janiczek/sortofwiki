@@ -13,7 +13,7 @@ suite =
         [ Test.describe "linkedPageSlugs"
             [ Test.test "parses absolute /w/wiki/p/slug markdown link" <|
                 \() ->
-                    PageLinkRefs.linkedPageSlugs "demo" "[t](/w/demo/p/guides)"
+                    PageLinkRefs.linkedPageSlugs "Demo" "[t](/w/Demo/p/guides)"
                         |> Expect.equal [ "guides" ]
             , Test.test "parses multiple absolute links and sorts uniquely" <|
                 \() ->
@@ -22,27 +22,27 @@ suite =
                         |> Expect.equal [ "a", "z" ]
             , Test.test "ignores links for a different wiki slug" <|
                 \() ->
-                    PageLinkRefs.linkedPageSlugs "demo" "[t](/w/other/p/secret)"
+                    PageLinkRefs.linkedPageSlugs "Demo" "[t](/w/other/p/secret)"
                         |> Expect.equal []
             , Test.test "parses same-wiki ](p/slug) link" <|
                 \() ->
-                    PageLinkRefs.linkedPageSlugs "demo" "See [x](p/about)."
+                    PageLinkRefs.linkedPageSlugs "Demo" "See [x](p/about)."
                         |> Expect.equal [ "about" ]
             , Test.test "parses same-wiki ](./p/slug) link" <|
                 \() ->
-                    PageLinkRefs.linkedPageSlugs "demo" "See [x](./p/about)."
+                    PageLinkRefs.linkedPageSlugs "Demo" "See [x](./p/about)."
                         |> Expect.equal [ "about" ]
             , Test.test "parses [[wiki]] link" <|
                 \() ->
-                    PageLinkRefs.linkedPageSlugs "demo" "See [[home]] here."
+                    PageLinkRefs.linkedPageSlugs "Demo" "See [[home]] here."
                         |> Expect.equal [ "home" ]
             , Test.test "parses [[slug|label]] link" <|
                 \() ->
-                    PageLinkRefs.linkedPageSlugs "demo" "[[guides|Help]]"
+                    PageLinkRefs.linkedPageSlugs "Demo" "[[guides|Help]]"
                         |> Expect.equal [ "guides" ]
             , Test.test "stops slug at URL fragment" <|
                 \() ->
-                    PageLinkRefs.linkedPageSlugs "demo" "[t](/w/demo/p/sec#x)"
+                    PageLinkRefs.linkedPageSlugs "Demo" "[t](/w/Demo/p/sec#x)"
                         |> Expect.equal [ "sec" ]
             , Test.fuzz Fuzzers.wikiSlug "absolute link target appears in result" <|
                 \wikiSlug ->

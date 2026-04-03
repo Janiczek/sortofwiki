@@ -1,5 +1,8 @@
 module UI exposing
-    ( appHeaderBarClass
+    ( TableCellVerticalAlign(..)
+    , TableHeaderCell
+    , TableWidth(..)
+    , appHeaderBarClass
     , appHeaderDividerClass
     , appHeaderH1Class
     , appHeaderPrimaryLinkClass
@@ -45,6 +48,7 @@ module UI exposing
     , markdownParagraphClass
     , markdownThematicBreakClass
     , markdownUnorderedListClass
+    , markdownWikiLinkMissingClass
     , publishedPageContributorActionsClass
     , sideNavListClass
     , sideNavNavClass
@@ -55,12 +59,12 @@ module UI exposing
     , sidebarHeading
     , sidebarLink
     , sidebarNavSectionBodyClass
-    , tableAutoClass
+    , table
     , tableCellClass
-    , tableFullWidthMax72Class
-    , tableHeaderCellClass
-    , tableStripedRowClass
+    , tableHeaderText
+    , tableTd
     , themeToggleButtonClass
+    , trStriped
     , wikiCatalogCardClass
     , wikiCatalogCardSlugEmClass
     , wikiCatalogCardSummaryClass
@@ -82,7 +86,7 @@ appMainScrollRegionId =
 
 appRootClass : String
 appRootClass =
-    "app-root flex flex-col h-dvh max-h-dvh min-h-0 overflow-hidden px-[0.5rem] pt-[0.25rem] pb-0 font-serif bg-[var(--bg)] text-[var(--fg)] leading-[1.35] [&_a]:text-[var(--link)] [&_a]:underline [&_a]:underline-offset-[2px] [&_a:hover]:text-[var(--link-hover)] [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-[var(--focus-ring)] [&_a:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-[var(--focus-ring)] [&_button:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-[var(--focus-ring)] [&_input:focus-visible]:outline-offset-2 [&_textarea:focus-visible]:outline-2 [&_textarea:focus-visible]:outline-[var(--focus-ring)] [&_textarea:focus-visible]:outline-offset-2 [&_select:focus-visible]:outline-2 [&_select:focus-visible]:outline-[var(--focus-ring)] [&_select:focus-visible]:outline-offset-2 [&_h1]:mt-[0.35rem] [&_h1]:mb-[0.2rem] [&_h1]:font-semibold [&_h1]:leading-[1.2] [&_h2]:mt-[0.35rem] [&_h2]:mb-[0.2rem] [&_h2]:font-semibold [&_h2]:leading-[1.2] [&_h2]:text-[1.1rem] [&_h3]:mt-[0.35rem] [&_h3]:mb-[0.2rem] [&_h3]:font-semibold [&_h3]:leading-[1.2] [&_h3]:text-[1rem] [&_p]:my-[0.25rem] [&_input]:font-inherit [&_input]:text-[1rem] [&_input]:px-[0.3rem] [&_input]:py-[0.15rem] [&_input]:mt-[0.1rem] [&_input]:mb-[0.2rem] [&_input]:border [&_input]:border-[var(--border)] [&_input]:bg-[var(--input-bg)] [&_input]:text-[var(--fg)] [&_input]:max-w-full [&_textarea]:font-inherit [&_textarea]:text-[1rem] [&_textarea]:px-[0.3rem] [&_textarea]:py-[0.15rem] [&_textarea]:mt-[0.1rem] [&_textarea]:mb-[0.2rem] [&_textarea]:border [&_textarea]:border-[var(--border)] [&_textarea]:bg-[var(--input-bg)] [&_textarea]:text-[var(--fg)] [&_textarea]:max-w-full [&_textarea]:min-h-[5rem] [&_textarea]:w-full [&_textarea]:max-w-[48rem] [&_select]:font-inherit [&_select]:text-[1rem] [&_select]:px-[0.3rem] [&_select]:py-[0.15rem] [&_select]:mt-[0.1rem] [&_select]:mb-[0.2rem] [&_select]:border [&_select]:border-[var(--border)] [&_select]:bg-[var(--input-bg)] [&_select]:text-[var(--fg)] [&_select]:max-w-full [&_label]:block [&_label]:mt-[0.25rem] [&_label]:text-[1rem] [&_label]:text-[var(--fg-muted)]"
+    "app-root flex flex-col h-dvh max-h-dvh min-h-0 overflow-hidden px-[0.5rem] pt-[0.25rem] pb-0 font-serif bg-[var(--bg)] text-[var(--fg)] leading-[1.35] [&_a]:text-[var(--link)] [&_a]:underline [&_a]:underline-offset-[2px] [&_a:hover]:text-[var(--link-hover)] [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-[var(--focus-ring)] [&_a:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-[var(--focus-ring)] [&_button:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-[var(--focus-ring)] [&_input:focus-visible]:outline-offset-2 [&_textarea:focus-visible]:outline-2 [&_textarea:focus-visible]:outline-[var(--focus-ring)] [&_textarea:focus-visible]:outline-offset-2 [&_select:focus-visible]:outline-2 [&_select:focus-visible]:outline-[var(--focus-ring)] [&_select:focus-visible]:outline-offset-2 [&_h1]:mt-[0.35rem] [&_h1]:mb-[0.2rem] [&_h1]:font-semibold [&_h1]:leading-[1.2] [&_h2]:mt-[0.35rem] [&_h2]:mb-[0.2rem] [&_h2]:font-semibold [&_h2]:leading-[1.2] [&_h2]:text-[1.1rem] [&_h3]:mt-[0.35rem] [&_h3]:mb-[0.2rem] [&_h3]:font-semibold [&_h3]:leading-[1.2] [&_h3]:text-[1rem] [&_p]:my-[0.25rem] [&_input]:font-inherit [&_input]:text-[1rem] [&_input]:px-[0.3rem] [&_input]:py-[0.15rem] [&_input]:mt-[0.1rem] [&_input]:mb-[0.2rem] [&_input]:border [&_input]:border-[var(--border)] [&_input]:bg-[var(--input-bg)] [&_input]:text-[var(--fg)] [&_input]:max-w-full [&_textarea:not([data-submission-conflict-box])]:font-inherit [&_textarea:not([data-submission-conflict-box])]:text-[1rem] [&_textarea:not([data-submission-conflict-box])]:px-[0.3rem] [&_textarea:not([data-submission-conflict-box])]:py-[0.15rem] [&_textarea:not([data-submission-conflict-box])]:mt-[0.1rem] [&_textarea:not([data-submission-conflict-box])]:mb-[0.2rem] [&_textarea:not([data-submission-conflict-box])]:border [&_textarea:not([data-submission-conflict-box])]:border-[var(--border)] [&_textarea:not([data-submission-conflict-box])]:bg-[var(--input-bg)] [&_textarea:not([data-submission-conflict-box])]:text-[var(--fg)] [&_textarea:not([data-submission-conflict-box])]:max-w-full [&_textarea:not([data-submission-conflict-box])]:min-h-[5rem] [&_textarea:not([data-submission-conflict-box])]:w-full [&_textarea:not([data-submission-conflict-box])]:max-w-[48rem] [&_select]:font-inherit [&_select]:text-[1rem] [&_select]:px-[0.3rem] [&_select]:py-[0.15rem] [&_select]:mt-[0.1rem] [&_select]:mb-[0.2rem] [&_select]:border [&_select]:border-[var(--border)] [&_select]:bg-[var(--input-bg)] [&_select]:text-[var(--fg)] [&_select]:max-w-full [&_label]:block [&_label]:mt-[0.25rem] [&_label]:text-[1rem] [&_label]:text-[var(--fg-muted)]"
 
 
 buttonClass : String
@@ -159,14 +163,135 @@ tableHeaderCellClass =
     "px-[0.35rem] py-[0.15rem] border border-[var(--border)] text-left align-top bg-[var(--chrome-bg)] font-semibold border-b border-[var(--border)]"
 
 
+{-| Same as `tableHeaderCellClass` but vertically centers content (e.g. rows with buttons). Use `tableHeaderCellClass` when cell text may wrap across lines.
+-}
+tableHeaderCellMiddleClass : String
+tableHeaderCellMiddleClass =
+    "px-[0.35rem] py-[0.15rem] border border-[var(--border)] text-left align-middle bg-[var(--chrome-bg)] font-semibold border-b border-[var(--border)]"
+
+
 tableCellClass : String
 tableCellClass =
     "px-[0.35rem] py-[0.15rem] border border-[var(--border)] text-left align-top"
 
 
+{-| Same as `tableCellClass` but vertically centers content. Use `tableCellClass` when multi-line cell text is expected.
+-}
+tableCellMiddleClass : String
+tableCellMiddleClass =
+    "px-[0.35rem] py-[0.15rem] border border-[var(--border)] text-left align-middle"
+
+
 tableStripedRowClass : String
 tableStripedRowClass =
     "even:bg-[var(--table-stripe)]"
+
+
+{-| Fixed layout presets for `table` (width / max-width on the `table` element).
+-}
+type TableWidth
+    = TableAuto
+    | TableFullMax72
+
+
+{-| Chooses top- vs middle-aligned table cell classes for `table` header cells and for `tableTd`.
+-}
+type TableCellVerticalAlign
+    = TableAlignTop
+    | TableAlignMiddle
+
+
+{-| One column heading: optional extra `th` attributes plus cell contents.
+-}
+type alias TableHeaderCell msg =
+    { extraAttrs : List (Attribute msg)
+    , children : List (Html msg)
+    }
+
+
+{-| Shorthand header cell with only a text label.
+-}
+tableHeaderText : String -> TableHeaderCell msg
+tableHeaderText label =
+    { extraAttrs = []
+    , children = [ Html.text label ]
+    }
+
+
+tableWidthClass : TableWidth -> String
+tableWidthClass width =
+    case width of
+        TableAuto ->
+            tableAutoClass
+
+        TableFullMax72 ->
+            tableFullWidthMax72Class
+
+
+headerClassForVerticalAlign : TableCellVerticalAlign -> String
+headerClassForVerticalAlign align =
+    case align of
+        TableAlignTop ->
+            tableHeaderCellClass
+
+        TableAlignMiddle ->
+            tableHeaderCellMiddleClass
+
+
+cellClassForVerticalAlign : TableCellVerticalAlign -> String
+cellClassForVerticalAlign align =
+    case align of
+        TableAlignTop ->
+            tableCellClass
+
+        TableAlignMiddle ->
+            tableCellMiddleClass
+
+
+{-| App themed `table` with a single header row and styled `th` cells. Pass body rows as `Html.tr` (see `trStriped` and `tableTd`).
+-}
+table :
+    TableWidth
+    -> List (Attribute msg)
+    ->
+        { theadAttrs : List (Attribute msg)
+        , headerRowAttrs : List (Attribute msg)
+        , headerAlign : TableCellVerticalAlign
+        , headers : List (TableHeaderCell msg)
+        , tbodyAttrs : List (Attribute msg)
+        , rows : List (Html msg)
+        }
+    -> Html msg
+table width tableExtraAttrs config =
+    Html.table
+        (TW.cls (tableWidthClass width) :: tableExtraAttrs)
+        [ Html.thead config.theadAttrs
+            [ Html.tr config.headerRowAttrs
+                (List.map
+                    (\h ->
+                        Html.th
+                            (TW.cls (headerClassForVerticalAlign config.headerAlign) :: h.extraAttrs)
+                            h.children
+                    )
+                    config.headers
+                )
+            ]
+        , Html.tbody config.tbodyAttrs config.rows
+        ]
+
+
+{-| Striped data row (`even:` background). Merge with your own `tr` attributes.
+-}
+trStriped : List (Attribute msg) -> List (Html msg) -> Html msg
+trStriped attrs children =
+    Html.tr (TW.cls tableStripedRowClass :: attrs) children
+
+
+{-| Styled `td` for use inside `table` body rows. Avoid a second `TW.cls` in `extraAttrs` (duplicate `class`); merge utilities into `tableCellClass` / `tableCellMiddleClass` on a raw `Html.td` instead.
+-}
+tableTd : TableCellVerticalAlign -> List (Attribute msg) -> List (Html msg) -> Html msg
+tableTd align extraAttrs children =
+    Html.td (TW.cls (cellClassForVerticalAlign align) :: extraAttrs) children
 
 
 appHeaderSecondaryMetaClass : String
@@ -334,32 +459,32 @@ markdownContainerClass =
 
 markdownHeading1Class : String
 markdownHeading1Class =
-    "mt-[0.5rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[1.3rem]"
+    "mt-[1rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[1.3rem]"
 
 
 markdownHeading2Class : String
 markdownHeading2Class =
-    "mt-[0.5rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[1.12rem]"
+    "mt-[1rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[1.12rem]"
 
 
 markdownHeading3Class : String
 markdownHeading3Class =
-    "mt-[0.5rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[1.02rem]"
+    "mt-[1rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[1.02rem]"
 
 
 markdownHeading4Class : String
 markdownHeading4Class =
-    "mt-[0.5rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[0.98rem]"
+    "mt-[1rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[0.98rem]"
 
 
 markdownHeading5Class : String
 markdownHeading5Class =
-    "mt-[0.5rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[0.98rem]"
+    "mt-[1rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[0.98rem]"
 
 
 markdownHeading6Class : String
 markdownHeading6Class =
-    "mt-[0.5rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[0.98rem]"
+    "mt-[1rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[0.98rem]"
 
 
 markdownParagraphClass : String
@@ -375,6 +500,11 @@ markdownBlockQuoteClass =
 markdownLinkClass : String
 markdownLinkClass =
     "text-[var(--link)] hover:text-[var(--link-hover)] underline underline-offset-[2px]"
+
+
+markdownWikiLinkMissingClass : String
+markdownWikiLinkMissingClass =
+    "text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 underline underline-offset-[2px]"
 
 
 markdownUnorderedListClass : String

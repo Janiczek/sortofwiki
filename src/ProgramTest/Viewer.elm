@@ -5,7 +5,6 @@ import Effect.Test
 import Frontend
 import ProgramTest.Story01_WikiList as Story01
 import ProgramTest.Story02_WikiHome as Story02
-import ProgramTest.Story03_PageIndex as Story03
 import ProgramTest.Story04_PublishedPage as Story04
 import ProgramTest.Story05_Backlinks as Story05
 import ProgramTest.Story06_OnlyPublished as Story06
@@ -40,6 +39,11 @@ import ProgramTest.Story34_ModerationAuditTrail as Story34
 import ProgramTest.Story35_NotFound as Story35
 import ProgramTest.Story46_WikiLinksInMarkdown as Story46
 import ProgramTest.Story47_FrontendRouteGuards as Story47
+import ProgramTest.Story48_ConcurrentEditConflicts as Story48
+import ProgramTest.Story49_MissingPageNavAndWikiLinks as Story49
+import ProgramTest.Story50_MySubmissionsList as Story50
+import ProgramTest.Story51_HostAdminAuditLog as Story51
+import ProgramTest.Story52_HostAdminWikiBackup as Story52
 import Types exposing (ToBackend, ToFrontend)
 
 
@@ -51,7 +55,6 @@ main :
 main =
     [ Story01.endToEndTests
     , Story02.endToEndTests
-    , Story03.endToEndTests
     , Story04.endToEndTests
     , Story05.endToEndTests
     , Story06.endToEndTests
@@ -86,6 +89,11 @@ main =
     , Story35.endToEndTests
     , Story46.endToEndTests
     , Story47.endToEndTests
+    , Story48.endToEndTests
+    , Story49.endToEndTests
+    , Story50.endToEndTests
+    , Story51.endToEndTests
+    , Story52.endToEndTests
     ]
         |> List.concat
         |> Effect.Test.viewer

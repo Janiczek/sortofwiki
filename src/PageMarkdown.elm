@@ -1,4 +1,4 @@
-module PageMarkdown exposing (view)
+module PageMarkdown exposing (view, viewPreview)
 
 import Html exposing (Html)
 import Html.Attributes as Attr
@@ -14,15 +14,16 @@ import WikiPageMarkdownParse
 {-| Render markdown source as HTML using [dillonkearns/elm-markdown](https://package.elm-lang.org/packages/dillonkearns/elm-markdown/latest/).
 Wiki links `[[page-slug]]` and `[[page-slug|label]]` in text become in-wiki links before HTML rendering.
 Headings receive GitHub-style `id` attributes so the table of contents can link to them.
+Use a distinct `containerId` when several previews appear on one page.
 -}
-view : Wiki.Slug -> Page.FrontendDetails -> Html msg
-view wikiSlug pageDetails =
+viewPreview : String -> Wiki.Slug -> (Page.Slug -> Bool) -> String -> Html msg
+viewPreview containerId wikiSlug publishedSlugExists markdownSource =
     Html.div
-        [ Attr.id "page-markdown"
+        [ Attr.id containerId
         , TW.cls UI.markdownContainerClass
         ]
         (case
-            WikiPageMarkdownParse.blocksWithHeadingSlugs wikiSlug pageDetails.markdownSource
+            WikiPageMarkdownParse.blocksWithHeadingSlugs wikiSlug publishedSlugExists markdownSource
                 |> Result.andThen (MarkdownRenderer.renderWithMeta htmlRendererWithHeadingIds)
          of
             Ok elements ->
@@ -31,6 +32,13 @@ view wikiSlug pageDetails =
             Err _ ->
                 [ Html.p [] [ Html.text "Could not render this page as Markdown." ] ]
         )
+
+
+{-| Same as `viewPreview` with id `page-markdown` (published page body).
+-}
+view : Wiki.Slug -> (Page.Slug -> Bool) -> Page.FrontendDetails -> Html msg
+view wikiSlug publishedSlugExists pageDetails =
+    viewPreview "page-markdown" wikiSlug publishedSlugExists pageDetails.markdownSource
 
 
 htmlRendererWithHeadingIds : Maybe String -> MarkdownRenderer.Renderer (Html msg)
@@ -86,11 +94,20 @@ htmlRendererWithHeadingIds maybeSlug =
                 Html.code [ TW.cls UI.markdownCodeSpanClass ] [ Html.text code ]
         , link =
             \{ title, destination } children ->
+                let
+                    ( linkClass, titleAttr ) =
+                        case title of
+                            Just "sortofwiki:missing" ->
+                                ( UI.markdownWikiLinkMissingClass, Nothing )
+
+                            _ ->
+                                ( UI.markdownLinkClass, title )
+                in
                 Html.a
-                    ([ TW.cls UI.markdownLinkClass
+                    ([ TW.cls linkClass
                      , Attr.href destination
                      ]
-                        ++ (title
+                        ++ (titleAttr
                                 |> Maybe.map Attr.title
                                 |> Maybe.map List.singleton
                                 |> Maybe.withDefault []

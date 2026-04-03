@@ -1,5 +1,6 @@
 module HostAdminTest exposing (suite)
 
+import ContributorAccount
 import Expect
 import Fuzz
 import HostAdmin
@@ -62,6 +63,11 @@ suite =
                     HostAdmin.CreateSlugInvalid Submission.SlugEmpty
                         |> HostAdmin.createHostedWikiErrorToUserText
                         |> Expect.equal "Enter a wiki slug."
+            , Test.test "CreateInitialAdminInvalid maps register errors" <|
+                \() ->
+                    HostAdmin.CreateInitialAdminInvalid ContributorAccount.RegisterUsernameEmpty
+                        |> HostAdmin.createHostedWikiErrorToUserText
+                        |> Expect.equal "Enter a username."
             ]
         , Test.describe "validateHostedWikiSummary"
             [ Test.test "trims" <|

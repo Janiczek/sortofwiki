@@ -15,6 +15,11 @@ wiki =
     "demo"
 
 
+allPagesExist : Page.Slug -> Bool
+allPagesExist _ =
+    True
+
+
 suite : Test
 suite =
     Test.describe "PageToc"
@@ -22,7 +27,7 @@ suite =
             [ Test.test "collects heading labels and slugs" <|
                 \() ->
                     Page.frontendDetails "## First\n\n### Second one\n" []
-                        |> PageToc.entries wiki
+                        |> PageToc.entries wiki allPagesExist
                         |> Expect.equal
                             [ { level = Block.H2, label = "First", slug = "first" }
                             , { level = Block.H3, label = "Second one", slug = "second-one" }
@@ -30,7 +35,7 @@ suite =
             , Test.test "empty for plain paragraph markdown" <|
                 \() ->
                     Page.frontendDetails "Just text." []
-                        |> PageToc.entries wiki
+                        |> PageToc.entries wiki allPagesExist
                         |> Expect.equal []
             ]
         , Test.describe "view"

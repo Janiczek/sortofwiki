@@ -1,48 +1,23 @@
 module ProgramTest.Story10_PageEditSubmission exposing (endToEndTests)
 
-import Backend
 import Effect.Browser.Dom
-import Effect.Lamdera
-import Effect.Test
-import Effect.Time
 import Expect
-import Frontend
-import Html.Attributes
 import ProgramTest.Config
-import Test.Html.Query
-import Test.Html.Selector
-import Types exposing (FrontendMsg(..), ToBackend, ToFrontend)
+import ProgramTest.LoginSteps
+import ProgramTest.Query
+import ProgramTest.Start
+import Route
+import Types exposing (FrontendMsg(..))
 import Url exposing (Protocol(..), Url)
+import Wiki
 
 
-guidesPageUrl : Url
-guidesPageUrl =
+story10SubmitEditUrl : Url
+story10SubmitEditUrl =
     { protocol = Http
     , host = "localhost"
     , port_ = Just 8000
-    , path = "/w/demo/p/Guides"
-    , query = Nothing
-    , fragment = Nothing
-    }
-
-
-submitEditGuidesUrl : Url
-submitEditGuidesUrl =
-    { protocol = Http
-    , host = "localhost"
-    , port_ = Just 8000
-    , path = "/w/demo/submit/edit/Guides"
-    , query = Nothing
-    , fragment = Nothing
-    }
-
-
-demoLoginUrl : Url
-demoLoginUrl =
-    { protocol = Http
-    , host = "localhost"
-    , port_ = Just 8000
-    , path = "/w/demo/login"
+    , path = "/w/Demo/edit/Guides"
     , query = Nothing
     , fragment = Nothing
     }
@@ -53,77 +28,80 @@ proposedEditMarker =
     "STORY10_PROPOSED_EDIT_BODY"
 
 
-endToEndTests : List (Effect.Test.EndToEndTest ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model)
+endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ Effect.Test.start
-        "10 — submit page edit proposal; published content unchanged"
-        (Effect.Time.millisToPosix 0)
-        ProgramTest.Config.config
-        [ Effect.Test.connectFrontend
-            100
-            (Effect.Lamdera.sessionIdFromString "session-story10-edit")
-            "/w/demo/register"
-            { width = 800, height = 600 }
-            (\client ->
-                [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story10user"
-                , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
-                , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
-                , client.checkView 300
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-register-success" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Registration complete" ]
-                    )
-                , client.update 100 (UrlChanged demoLoginUrl)
-                , client.input 100 (Effect.Browser.Dom.id "wiki-login-username") "story10user"
-                , client.input 100 (Effect.Browser.Dom.id "wiki-login-password") "password12"
-                , client.click 100 (Effect.Browser.Dom.id "wiki-login-submit")
-                , client.checkView 300
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-login-success" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "You are logged in" ]
-                    )
-                , client.update 100 (UrlChanged guidesPageUrl)
-                , client.checkView 200
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-page-propose-edit" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Propose edit" ]
-                    )
-                , client.update 100 (UrlChanged submitEditGuidesUrl)
-                , client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submit-edit-page" ]
-                            |> Test.Html.Query.has
-                                [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "demo")
-                                , Test.Html.Selector.attribute (Html.Attributes.attribute "data-page-slug" "Guides")
+    [ ProgramTest.Start.start
+        { name = "10 — submit page edit proposal; published content unchanged"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , sessionId = "session-story10-edit"
+        , path = "/w/Demo/register"
+        , connectClientMs = Nothing
+        , clientSteps =
+            \client ->
+                List.concat
+                    [ [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story10user"
+                      , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
+                      , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
+                      , client.checkView 300
+                            (ProgramTest.Query.withinId "wiki-register-success"
+                                (ProgramTest.Query.expectHasText "Registration complete")
+                            )
+                      , client.click 100 (Effect.Browser.Dom.id "wiki-logout-button")
+                      , client.clickLink 100 (Wiki.loginUrlPath "Demo")
+                      ]
+                    , ProgramTest.LoginSteps.submitWikiLoginForm
+                        { username = "story10user"
+                        , password = "password12"
+                        }
+                        client
+                    , [ client.checkView 300
+                            (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
+                      , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
+                      , client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
+                      , client.checkView 200
+                            (ProgramTest.Query.withinId "wiki-page-propose-edit"
+                                (ProgramTest.Query.expectHasText "Propose edit")
+                            )
+                      , client.update 100 (UrlChanged story10SubmitEditUrl)
+                      , client.checkModel 200
+                            (\model ->
+                                case model.route of
+                                    Route.WikiSubmitEdit "Demo" "Guides" ->
+                                        Ok ()
+
+                                    _ ->
+                                        Err "expected submit-edit route after navigation"
+                            )
+                      , client.checkModel 3000
+                            (\model ->
+                                if
+                                    String.contains "How to use this wiki" model.pageEditSubmitDraft.markdownBody
+                                        && String.contains "Backlinks" model.pageEditSubmitDraft.markdownBody
+                                then
+                                    Ok ()
+
+                                else
+                                    Err
+                                        ("expected Guides markdown in edit draft, got length "
+                                            ++ String.fromInt (String.length model.pageEditSubmitDraft.markdownBody)
+                                        )
+                            )
+                      , client.input 100 (Effect.Browser.Dom.id "wiki-submit-edit-markdown") ("# " ++ proposedEditMarker)
+                      , client.click 100 (Effect.Browser.Dom.id "wiki-submit-edit-submit")
+                      , client.checkView 300
+                            (ProgramTest.Query.withinId "wiki-submit-edit-success"
+                                (ProgramTest.Query.expectHasSubmissionId "sub_1")
+                            )
+                      , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
+                      , client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
+                      , client.checkView 200
+                            (ProgramTest.Query.expectAll
+                                [ ProgramTest.Query.withinPageMarkdownHeading "h2"
+                                    (ProgramTest.Query.expectHasText "How to use this wiki")
+                                , ProgramTest.Query.expectTextOccurrenceCount proposedEditMarker (\c -> c |> Expect.equal 0)
                                 ]
-                    )
-                , client.input 100 (Effect.Browser.Dom.id "wiki-submit-edit-markdown") ("# " ++ proposedEditMarker)
-                , client.click 100 (Effect.Browser.Dom.id "wiki-submit-edit-submit")
-                , client.checkView 300
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submit-edit-success" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "sub_1" ]
-                    )
-                , client.update 100 (UrlChanged guidesPageUrl)
-                , client.checkView 200
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "page-markdown" ]
-                            |> Test.Html.Query.find [ Test.Html.Selector.tag "h2" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "How to use this wiki" ]
-                    )
-                , client.checkView 200
-                    (\root ->
-                        root
-                            |> Test.Html.Query.findAll [ Test.Html.Selector.text proposedEditMarker ]
-                            |> Test.Html.Query.count (Expect.equal 0)
-                    )
-                ]
-            )
-        ]
+                            )
+                      ]
+                    ]
+        }
     ]

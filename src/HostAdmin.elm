@@ -1,6 +1,10 @@
 module HostAdmin exposing
     ( CreateHostedWikiError(..)
+    , DataExportError(..)
+    , DataImportError(..)
     , DeleteHostedWikiError(..)
+    , WikiDataExportError(..)
+    , WikiDataImportError(..)
     , HostWikiDetailError(..)
     , LoginError(..)
     , ProtectedError(..)
@@ -9,6 +13,10 @@ module HostAdmin exposing
     , WikiNameError(..)
     , WikiSummaryError(..)
     , createHostedWikiErrorToUserText
+    , dataExportErrorToUserText
+    , dataImportErrorToUserText
+    , wikiDataExportErrorToUserText
+    , wikiDataImportErrorToUserText
     , deleteHostedWikiConfirmationMatches
     , deleteHostedWikiErrorToUserText
     , hostWikiDetailErrorToUserText
@@ -23,6 +31,7 @@ module HostAdmin exposing
     , wikiSummaryMaxLength
     )
 
+import ContributorAccount
 import Submission
 import Wiki
 
@@ -37,6 +46,74 @@ type LoginError
 -}
 type ProtectedError
     = NotHostAuthenticated
+
+
+{-| Host-admin JSON export (full backup download).
+-}
+type DataExportError
+    = DataExportNotHostAuthenticated
+
+
+{-| Host-admin JSON import (full restore).
+-}
+type DataImportError
+    = DataImportNotHostAuthenticated
+    | DataImportInvalid String
+
+
+{-| Per-wiki JSON export from the host admin wiki list.
+-}
+type WikiDataExportError
+    = WikiDataExportNotHostAuthenticated
+    | WikiDataExportWikiNotFound
+
+
+{-| Per-wiki JSON import (replaces one wiki slice).
+-}
+type WikiDataImportError
+    = WikiDataImportNotHostAuthenticated
+    | WikiDataImportWikiNotFound
+    | WikiDataImportInvalid String
+
+
+dataExportErrorToUserText : DataExportError -> String
+dataExportErrorToUserText err =
+    case err of
+        DataExportNotHostAuthenticated ->
+            protectedErrorToUserText NotHostAuthenticated
+
+
+dataImportErrorToUserText : DataImportError -> String
+dataImportErrorToUserText err =
+    case err of
+        DataImportNotHostAuthenticated ->
+            protectedErrorToUserText NotHostAuthenticated
+
+        DataImportInvalid detail ->
+            detail
+
+
+wikiDataExportErrorToUserText : WikiDataExportError -> String
+wikiDataExportErrorToUserText err =
+    case err of
+        WikiDataExportNotHostAuthenticated ->
+            protectedErrorToUserText NotHostAuthenticated
+
+        WikiDataExportWikiNotFound ->
+            "That wiki was not found."
+
+
+wikiDataImportErrorToUserText : WikiDataImportError -> String
+wikiDataImportErrorToUserText err =
+    case err of
+        WikiDataImportNotHostAuthenticated ->
+            protectedErrorToUserText NotHostAuthenticated
+
+        WikiDataImportWikiNotFound ->
+            "That wiki was not found."
+
+        WikiDataImportInvalid detail ->
+            detail
 
 
 {-| Hosted wiki display name validation (story 29).
@@ -210,6 +287,7 @@ type CreateHostedWikiError
     | CreateSlugInvalid Submission.ValidationError
     | CreateWikiNameInvalid WikiNameError
     | CreateWikiSlugTaken
+    | CreateInitialAdminInvalid ContributorAccount.RegisterContributorError
 
 
 loginErrorToUserText : LoginError -> String
@@ -266,6 +344,9 @@ createHostedWikiErrorToUserText err =
 
         CreateWikiSlugTaken ->
             "A wiki with this slug already exists."
+
+        CreateInitialAdminInvalid e ->
+            ContributorAccount.registerErrorToUserText e
 
 
 {-| Trimmed non-empty name, at most `wikiNameMaxLength` characters.

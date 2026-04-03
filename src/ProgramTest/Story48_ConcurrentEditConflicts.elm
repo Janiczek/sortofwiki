@@ -1,47 +1,22 @@
 module ProgramTest.Story48_ConcurrentEditConflicts exposing (endToEndTests)
 
-import Backend
 import Effect.Browser.Dom
-import Effect.Lamdera
-import Effect.Test
-import Effect.Time
-import Frontend
 import ProgramTest.Config
+import ProgramTest.LoginSteps
+import ProgramTest.Query
+import ProgramTest.Start
 import Submission
-import Test.Html.Query
-import Test.Html.Selector
-import Types exposing (FrontendMsg(..), ToBackend, ToFrontend)
+import Types exposing (FrontendMsg(..))
 import Url exposing (Protocol(..), Url)
+import Wiki
 
 
-submitEditGuidesUrl : Url
-submitEditGuidesUrl =
+story48SubmitEditGuidesUrl : Url
+story48SubmitEditGuidesUrl =
     { protocol = Http
     , host = "localhost"
     , port_ = Just 8000
-    , path = "/w/demo/submit/edit/Guides"
-    , query = Nothing
-    , fragment = Nothing
-    }
-
-
-reviewSub1Url : Url
-reviewSub1Url =
-    { protocol = Http
-    , host = "localhost"
-    , port_ = Just 8000
-    , path = "/w/demo/review/sub_1"
-    , query = Nothing
-    , fragment = Nothing
-    }
-
-
-submission2Url : Url
-submission2Url =
-    { protocol = Http
-    , host = "localhost"
-    , port_ = Just 8000
-    , path = "/w/demo/submit/sub_2"
+    , path = "/w/Demo/edit/Guides"
     , query = Nothing
     , fragment = Nothing
     }
@@ -62,136 +37,171 @@ editBResolved =
     "# Story48 resolved edit B"
 
 
-endToEndTests : List (Effect.Test.EndToEndTest ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model)
+navigateToSubmitEditGuides client =
+    [ client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
+    , client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
+    , client.update 100 (UrlChanged story48SubmitEditGuidesUrl)
+    ]
+
+
+endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ Effect.Test.start
-        "48 — concurrent pending edits roll stale ones to needs-revision and support resubmit"
-        (Effect.Time.millisToPosix 0)
-        ProgramTest.Config.config
-        [ Effect.Test.connectFrontend
-            100
-            (Effect.Lamdera.sessionIdFromString "session-story48-user-a")
-            "/w/demo/register"
-            { width = 800, height = 600 }
-            (\client ->
-                [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story48a"
-                , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
-                , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
-                , client.update 100 (UrlChanged submitEditGuidesUrl)
-                , client.input 100 (Effect.Browser.Dom.id "wiki-submit-edit-markdown") editA
-                , client.click 100 (Effect.Browser.Dom.id "wiki-submit-edit-submit")
-                , client.checkView 300
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submit-edit-success" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "sub_1" ]
-                    )
-                ]
-            )
-        , Effect.Test.connectFrontend
-            100
-            (Effect.Lamdera.sessionIdFromString "session-story48-user-b")
-            "/w/demo/register"
-            { width = 800, height = 600 }
-            (\client ->
-                [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story48b"
-                , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
-                , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
-                , client.update 100 (UrlChanged submitEditGuidesUrl)
-                , client.input 100 (Effect.Browser.Dom.id "wiki-submit-edit-markdown") editB
-                , client.click 100 (Effect.Browser.Dom.id "wiki-submit-edit-submit")
-                , client.checkView 300
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submit-edit-success" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "sub_2" ]
-                    )
-                , client.update 100 (UrlChanged submitEditGuidesUrl)
-                , client.input 100 (Effect.Browser.Dom.id "wiki-submit-edit-markdown") "# duplicate pending attempt"
-                , client.click 100 (Effect.Browser.Dom.id "wiki-submit-edit-submit")
-                , client.checkView 300
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submit-edit-error-text" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "already have a pending edit for this page" ]
-                    )
-                ]
-            )
-        , Effect.Test.connectFrontend
-            100
-            (Effect.Lamdera.sessionIdFromString "session-story48-trusted")
-            "/w/demo/login"
-            { width = 800, height = 600 }
-            (\client ->
-                [ client.input 100 (Effect.Browser.Dom.id "wiki-login-username") "trustedpub"
-                , client.input 100 (Effect.Browser.Dom.id "wiki-login-password") "password12"
-                , client.click 100 (Effect.Browser.Dom.id "wiki-login-submit")
-                , client.update 100 (UrlChanged reviewSub1Url)
-                , client.click 100 (Effect.Browser.Dom.id "wiki-review-approve-submit")
-                , client.checkView 400
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-review-approve-success" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Submission approved and published." ]
-                    )
-                ]
-            )
-        , Effect.Test.connectFrontend
-            100
-            (Effect.Lamdera.sessionIdFromString "session-story48-user-b")
-            "/w/demo/login"
-            { width = 800, height = 600 }
-            (\client ->
-                [ client.input 100 (Effect.Browser.Dom.id "wiki-login-username") "story48b"
-                , client.input 100 (Effect.Browser.Dom.id "wiki-login-password") "password12"
-                , client.click 100 (Effect.Browser.Dom.id "wiki-login-submit")
-                , client.update 100 (UrlChanged submission2Url)
-                , client.checkView 500
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submission-detail-status" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Needs revision" ]
-                    )
-                , client.checkView 200
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submission-detail-reviewer-note" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Page changed after this edit was submitted" ]
-                    )
-                , client.checkView 200
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submission-detail-base-markdown" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "How to use this wiki" ]
-                    )
-                , client.checkView 200
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submission-detail-current-markdown" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text editA ]
-                    )
-                , client.input 100 (Effect.Browser.Dom.id "wiki-submission-detail-resubmit-markdown") "   "
-                , client.click 100 (Effect.Browser.Dom.id "wiki-submission-detail-resubmit-submit")
-                , client.checkView 200
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submission-detail-resubmit-error" ]
-                            |> Test.Html.Query.has
-                                [ Test.Html.Selector.text
+    [ ProgramTest.Start.startWith
+        { name = "48 — one concurrent edit approved; other needs revision, resubmit to pending, then approved"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , steps =
+            [ ProgramTest.Start.connectFrontend
+                { sessionId = "session-story48-user-a"
+                , path = "/w/Demo/register"
+                , connectClientMs = Nothing
+                , steps =
+                    \client ->
+                        List.concat
+                            [ [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story48a"
+                              , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
+                              , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
+                              ]
+                            , navigateToSubmitEditGuides client
+                            , [ client.input 100 (Effect.Browser.Dom.id "wiki-submit-edit-markdown") editA
+                              , client.click 100 (Effect.Browser.Dom.id "wiki-submit-edit-submit")
+                              , client.checkView 300
+                                    (ProgramTest.Query.withinId "wiki-submit-edit-success"
+                                        (ProgramTest.Query.expectHasSubmissionId "sub_1")
+                                    )
+                              ]
+                            ]
+                }
+            , ProgramTest.Start.connectFrontend
+                { sessionId = "session-story48-user-b"
+                , path = "/w/Demo/register"
+                , connectClientMs = Nothing
+                , steps =
+                    \client ->
+                        List.concat
+                            [ [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story48b"
+                              , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
+                              , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
+                              ]
+                            , navigateToSubmitEditGuides client
+                            , [ client.input 100 (Effect.Browser.Dom.id "wiki-submit-edit-markdown") editB
+                              , client.click 100 (Effect.Browser.Dom.id "wiki-submit-edit-submit")
+                              , client.checkView 300
+                                    (ProgramTest.Query.withinId "wiki-submit-edit-success"
+                                        (ProgramTest.Query.expectHasSubmissionId "sub_2")
+                                    )
+                              ]
+                            , navigateToSubmitEditGuides client
+                            , [ client.input 100 (Effect.Browser.Dom.id "wiki-submit-edit-markdown") "# duplicate pending attempt"
+                              , client.click 100 (Effect.Browser.Dom.id "wiki-submit-edit-submit")
+                              , client.checkView 300
+                                    (ProgramTest.Query.withinId "wiki-submit-edit-error-text"
+                                        (ProgramTest.Query.expectHasText "already have a pending edit for this page")
+                                    )
+                              ]
+                            ]
+                }
+            , ProgramTest.Start.connectFrontend
+                { sessionId = "session-story48-trusted"
+                , path = "/"
+                , connectClientMs = Nothing
+                , steps =
+                    \client ->
+                        List.concat
+                            [ ProgramTest.LoginSteps.loginToWiki
+                                { wikiSlug = "Demo"
+                                , username = "trustedpub"
+                                , password = "password12"
+                                }
+                                client
+                            , [ client.clickLink 100 (Wiki.reviewQueueUrlPath "Demo")
+                        , client.clickLink 100 (Wiki.reviewDetailUrlPath "Demo" "sub_1")
+                        , client.click 100 (Effect.Browser.Dom.id "wiki-review-decision-submit")
+                        , client.checkView 400
+                            (ProgramTest.Query.withinId "wiki-review-approve-success"
+                                (ProgramTest.Query.expectHasText "Submission approved and published.")
+                            )
+                              ]
+                            ]
+                }
+            , ProgramTest.Start.connectFrontend
+                { sessionId = "session-story48-user-b"
+                , path = "/"
+                , connectClientMs = Nothing
+                , steps =
+                    \client ->
+                        List.concat
+                            [ ProgramTest.LoginSteps.loginToWiki
+                                { wikiSlug = "Demo"
+                                , username = "story48b"
+                                , password = "password12"
+                                }
+                                client
+                            , [ client.clickLink 100 (Wiki.mySubmissionsUrlPath "Demo")
+                        , client.clickLink 100 (Wiki.submissionDetailUrlPath "Demo" "sub_2")
+                        , client.checkView 500
+                            (ProgramTest.Query.withinId "wiki-submission-detail-status"
+                                (ProgramTest.Query.expectHasText "Needs revision")
+                            )
+                        , client.checkView 200
+                            (ProgramTest.Query.withinId "wiki-submission-detail-reviewer-note"
+                                (ProgramTest.Query.expectHasText "Page changed after this edit was submitted")
+                            )
+                        , client.checkView 2500
+                            (ProgramTest.Query.withinId "wiki-submission-detail-base-markdown-preview"
+                                (ProgramTest.Query.expectHasText "How to use this wiki")
+                            )
+                        , client.checkView 200
+                            (ProgramTest.Query.withinId "wiki-submission-detail-current-markdown"
+                                (ProgramTest.Query.expectHasInputValue editA)
+                            )
+                        , client.input 100 (Effect.Browser.Dom.id "wiki-submission-detail-resubmit-markdown") "   "
+                        , client.click 100 (Effect.Browser.Dom.id "wiki-submission-detail-resubmit-submit")
+                        , client.checkView 200
+                            (ProgramTest.Query.withinId "wiki-submission-detail-resubmit-error"
+                                (ProgramTest.Query.expectHasText
                                     (Submission.resubmitPageEditErrorToUserText
                                         (Submission.ResubmitEditValidation Submission.BodyEmpty)
                                     )
-                                ]
-                    )
-                , client.input 100 (Effect.Browser.Dom.id "wiki-submission-detail-resubmit-markdown") editBResolved
-                , client.click 100 (Effect.Browser.Dom.id "wiki-submission-detail-resubmit-submit")
-                , client.checkView 400
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submission-detail-status" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Pending review" ]
-                    )
-                ]
-            )
-        ]
+                                )
+                            )
+                        , client.input 100 (Effect.Browser.Dom.id "wiki-submission-detail-resubmit-markdown") editBResolved
+                        , client.click 100 (Effect.Browser.Dom.id "wiki-submission-detail-resubmit-submit")
+                        , client.checkView 400
+                            (ProgramTest.Query.withinId "wiki-submission-detail-status"
+                                (ProgramTest.Query.expectHasText "Pending review")
+                            )
+                              ]
+                            ]
+                }
+            , ProgramTest.Start.connectFrontend
+                { sessionId = "session-story48-trusted-approve-2"
+                , path = "/"
+                , connectClientMs = Nothing
+                , steps =
+                    \client ->
+                        List.concat
+                            [ ProgramTest.LoginSteps.loginToWiki
+                                { wikiSlug = "Demo"
+                                , username = "trustedpub"
+                                , password = "password12"
+                                }
+                                client
+                            , [ client.clickLink 100 (Wiki.reviewQueueUrlPath "Demo")
+                        , client.clickLink 100 (Wiki.reviewDetailUrlPath "Demo" "sub_2")
+                        , client.click 100 (Effect.Browser.Dom.id "wiki-review-decision-submit")
+                        , client.checkView 400
+                            (ProgramTest.Query.withinId "wiki-review-approve-success"
+                                (ProgramTest.Query.expectHasText "Submission approved and published.")
+                            )
+                        , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
+                        , client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
+                        , client.checkView 400
+                            (ProgramTest.Query.withinPageMarkdownHeading "h1"
+                                (ProgramTest.Query.expectHasText "Story48 resolved edit B")
+                            )
+                              ]
+                            ]
+                }
+            ]
+        }
     ]

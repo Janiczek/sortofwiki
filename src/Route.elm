@@ -22,6 +22,8 @@ type Route
     | HostAdminWikis
     | HostAdminWikiNew
     | HostAdminWikiDetail Wiki.Slug
+    | HostAdminAudit
+    | HostAdminBackup
     | WikiHome Wiki.Slug
     | WikiPage Wiki.Slug Page.Slug
     | WikiLogin Wiki.Slug (Maybe String)
@@ -30,6 +32,7 @@ type Route
     | WikiSubmitEdit Wiki.Slug Page.Slug
     | WikiSubmitDelete Wiki.Slug Page.Slug
     | WikiSubmissionDetail Wiki.Slug String
+    | WikiMySubmissions Wiki.Slug
     | WikiReview Wiki.Slug
     | WikiReviewDetail Wiki.Slug String
     | WikiAdminUsers Wiki.Slug
@@ -73,6 +76,12 @@ fromUrl url =
                     else
                         HostAdminWikiDetail wikiSlug
 
+                [ "admin", "audit" ] ->
+                    HostAdminAudit
+
+                [ "admin", "backup" ] ->
+                    HostAdminBackup
+
                 [ "w", slug ] ->
                     if slug == "" then
                         NotFound url
@@ -86,6 +95,13 @@ fromUrl url =
 
                     else
                         WikiPage wikiSlug pageSlug
+
+                [ "w", wikiSlug, "edit", pageSlug ] ->
+                    if wikiSlug == "" || pageSlug == "" then
+                        NotFound url
+
+                    else
+                        WikiSubmitEdit wikiSlug pageSlug
 
                 [ "w", slug, "login" ] ->
                     if slug == "" then
@@ -129,20 +145,20 @@ fromUrl url =
                     else
                         WikiAdminAudit wikiSlug
 
-                -- /w/:wiki/submit/new (story 9); /w/:wiki/submit/edit/:page (story 10); /w/:wiki/submit/delete/:page (story 11); /w/:wiki/submit/:id (story 12)
+                [ "w", wikiSlug, "submissions" ] ->
+                    if wikiSlug == "" then
+                        NotFound url
+
+                    else
+                        WikiMySubmissions wikiSlug
+
+                -- /w/:wiki/edit/:page (story 10); /w/:wiki/submit/new (story 9); /w/:wiki/submit/delete/:page (story 11); /w/:wiki/submit/:id (story 12)
                 [ "w", wikiSlug, "submit", "new" ] ->
                     if wikiSlug == "" then
                         NotFound url
 
                     else
                         WikiSubmitNew wikiSlug
-
-                [ "w", wikiSlug, "submit", "edit", pageSlug ] ->
-                    if wikiSlug == "" || pageSlug == "" then
-                        NotFound url
-
-                    else
-                        WikiSubmitEdit wikiSlug pageSlug
 
                 [ "w", wikiSlug, "submit", "delete", pageSlug ] ->
                     if wikiSlug == "" || pageSlug == "" then
@@ -192,6 +208,12 @@ isWikiList route =
         HostAdminWikiDetail _ ->
             False
 
+        HostAdminAudit ->
+            False
+
+        HostAdminBackup ->
+            False
+
         WikiHome _ ->
             False
 
@@ -214,6 +236,9 @@ isWikiList route =
             False
 
         WikiSubmissionDetail _ _ ->
+            False
+
+        WikiMySubmissions _ ->
             False
 
         WikiReview _ ->
@@ -250,6 +275,12 @@ storeActions route =
         HostAdminWikiDetail _ ->
             []
 
+        HostAdminAudit ->
+            []
+
+        HostAdminBackup ->
+            []
+
         WikiHome slug ->
             [ AskForWikiCatalog, AskForWikiFrontendDetails slug ]
 
@@ -284,6 +315,12 @@ storeActions route =
             [ AskForWikiCatalog
             , AskForWikiFrontendDetails slug
             , AskForSubmissionDetails slug submissionId
+            ]
+
+        WikiMySubmissions slug ->
+            [ AskForWikiCatalog
+            , AskForWikiFrontendDetails slug
+            , AskForMyPendingSubmissions slug
             ]
 
         WikiReview slug ->

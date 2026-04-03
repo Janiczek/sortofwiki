@@ -1,120 +1,89 @@
 module ProgramTest.Story12_SubmissionStatus exposing (endToEndTests)
 
-import Backend
 import Effect.Browser.Dom
-import Effect.Lamdera
-import Effect.Test
-import Effect.Time
-import Frontend
 import ProgramTest.Config
-import Test.Html.Query
-import Test.Html.Selector
-import Types exposing (FrontendMsg(..), ToBackend, ToFrontend)
+import ProgramTest.LoginSteps
+import ProgramTest.Query
+import ProgramTest.Start
+import Types exposing (FrontendMsg(..))
 import Url exposing (Protocol(..), Url)
+import Wiki
 
 
-submitNewUrl : Url
-submitNewUrl =
+submitNewPageUrl : Url
+submitNewPageUrl =
     { protocol = Http
     , host = "localhost"
     , port_ = Just 8000
-    , path = "/w/demo/submit/new"
-    , query = Nothing
+    , path = "/w/Demo/submit/new"
+    , query = Just "page=Story12Page"
     , fragment = Nothing
     }
 
 
-submissionDetailUrl : String -> Url
-submissionDetailUrl submissionId =
-    { protocol = Http
-    , host = "localhost"
-    , port_ = Just 8000
-    , path = "/w/demo/submit/" ++ submissionId
-    , query = Nothing
-    , fragment = Nothing
-    }
-
-
-endToEndTests : List (Effect.Test.EndToEndTest ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model)
+endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ Effect.Test.start
-        "12 — contributor sees Pending on new submission detail"
-        (Effect.Time.millisToPosix 0)
-        ProgramTest.Config.config
-        [ Effect.Test.connectFrontend
-            100
-            (Effect.Lamdera.sessionIdFromString "session-story12-pending")
-            "/w/demo/register"
-            { width = 800, height = 600 }
-            (\client ->
+    [ ProgramTest.Start.start
+        { name = "12 — contributor sees Pending on new submission detail"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , sessionId = "session-story12-pending"
+        , path = "/w/Demo/register"
+        , connectClientMs = Nothing
+        , clientSteps =
+            \client ->
                 [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story12user"
                 , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
                 , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
                 , client.checkView 300
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-register-success" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Registration complete" ]
+                    (ProgramTest.Query.withinId "wiki-register-success"
+                        (ProgramTest.Query.expectHasText "Registration complete")
                     )
-                , client.update 100 (UrlChanged submitNewUrl)
-                , client.input 100 (Effect.Browser.Dom.id "wiki-submit-new-slug") "Story12Page"
+                , client.update 100 (UrlChanged submitNewPageUrl)
                 , client.input 100 (Effect.Browser.Dom.id "wiki-submit-new-markdown") "# Story 12"
                 , client.click 100 (Effect.Browser.Dom.id "wiki-submit-new-submit")
                 , client.checkView 300
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submit-new-success" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "sub_1" ]
+                    (ProgramTest.Query.withinId "wiki-submit-new-success"
+                        (ProgramTest.Query.expectHasSubmissionId "sub_1")
                     )
-                , client.update 100 (UrlChanged (submissionDetailUrl "sub_1"))
+                , client.clickLink 100 (Wiki.submissionDetailUrlPath "Demo" "sub_1")
                 , client.checkView 400
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submission-detail-status" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Pending review" ]
+                    (ProgramTest.Query.withinId "wiki-submission-detail-status"
+                        (ProgramTest.Query.expectHasText "Pending review")
                     )
                 , client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submission-detail-kind-summary" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "New page: Story12Page" ]
+                    (ProgramTest.Query.withinId "wiki-submission-detail-kind-summary"
+                        (ProgramTest.Query.expectHasText "New page: Story12Page")
                     )
                 ]
-            )
-        ]
-    , Effect.Test.start
-        "12 — seeded demo user sees Rejected on sub_rejected_demo (log in as statusdemo / password12)"
-        (Effect.Time.millisToPosix 0)
-        ProgramTest.Config.config
-        [ Effect.Test.connectFrontend
-            100
-            (Effect.Lamdera.sessionIdFromString "session-story12-seed-rejected")
-            "/w/demo/login"
-            { width = 800, height = 600 }
-            (\client ->
-                [ client.input 100 (Effect.Browser.Dom.id "wiki-login-username") "statusdemo"
-                , client.input 100 (Effect.Browser.Dom.id "wiki-login-password") "password12"
-                , client.click 100 (Effect.Browser.Dom.id "wiki-login-submit")
-                , client.checkView 300
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-login-success" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "You are logged in" ]
-                    )
-                , client.update 100 (UrlChanged (submissionDetailUrl "sub_rejected_demo"))
-                , client.checkView 400
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submission-detail-status" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Rejected" ]
-                    )
-                , client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submission-detail-kind-summary" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "New page: seed-rejected" ]
-                    )
-                ]
-            )
-        ]
+        }
+    , ProgramTest.Start.start
+        { name = "12 — seeded demo user sees Rejected on sub_3 (log in as statusdemo / password12)"
+        , config = ProgramTest.Config.demoWikiWithModerationSeeds
+        , sessionId = "session-story12-seed-rejected"
+        , path = "/"
+        , connectClientMs = Nothing
+        , clientSteps =
+            \client ->
+                List.concat
+                    [ ProgramTest.LoginSteps.loginToWiki
+                        { wikiSlug = "Demo"
+                        , username = "statusdemo"
+                        , password = "password12"
+                        }
+                        client
+                    , [ client.checkView 300
+                            (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
+                      , client.clickLink 100 (Wiki.mySubmissionsUrlPath "Demo")
+                      , client.clickLink 100 (Wiki.submissionDetailUrlPath "Demo" "sub_3")
+                      , client.checkView 400
+                            (ProgramTest.Query.withinId "wiki-submission-detail-status"
+                                (ProgramTest.Query.expectHasText "Rejected")
+                            )
+                      , client.checkView 100
+                            (ProgramTest.Query.withinId "wiki-submission-detail-kind-summary"
+                                (ProgramTest.Query.expectHasText "New page: SeedRejected")
+                            )
+                      ]
+                    ]
+        }
     ]

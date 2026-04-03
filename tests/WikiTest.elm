@@ -108,8 +108,8 @@ suite =
         , Test.describe "loginUrlPath"
             [ Test.test "demo wiki login" <|
                 \() ->
-                    Wiki.loginUrlPath "demo"
-                        |> Expect.equal "/w/demo/login"
+                    Wiki.loginUrlPath "Demo"
+                        |> Expect.equal "/w/Demo/login"
             , Test.fuzz Fuzzers.wikiSlug "ends with /login" <|
                 \slug ->
                     Wiki.loginUrlPath slug
@@ -119,14 +119,14 @@ suite =
         , Test.describe "publishedPageUrlPath"
             [ Test.test "joins wiki segment and page slug" <|
                 \() ->
-                    Wiki.publishedPageUrlPath "demo" "home"
-                        |> Expect.equal "/w/demo/p/home"
+                    Wiki.publishedPageUrlPath "Demo" "home"
+                        |> Expect.equal "/w/Demo/p/home"
             ]
         , Test.describe "submitNewPageUrlPath"
             [ Test.test "demo wiki new submission form" <|
                 \() ->
-                    Wiki.submitNewPageUrlPath "demo"
-                        |> Expect.equal "/w/demo/submit/new"
+                    Wiki.submitNewPageUrlPath "Demo"
+                        |> Expect.equal "/w/Demo/submit/new"
             , Test.fuzz Fuzzers.wikiSlug "contains /submit/new" <|
                 \slug ->
                     Wiki.submitNewPageUrlPath slug
@@ -136,8 +136,8 @@ suite =
         , Test.describe "submitDeleteUrlPath"
             [ Test.test "demo wiki delete request for guides" <|
                 \() ->
-                    Wiki.submitDeleteUrlPath "demo" "guides"
-                        |> Expect.equal "/w/demo/submit/delete/guides"
+                    Wiki.submitDeleteUrlPath "Demo" "guides"
+                        |> Expect.equal "/w/Demo/submit/delete/guides"
             , Test.fuzz Fuzzers.wikiSlug "contains /submit/delete/" <|
                 \slug ->
                     Wiki.submitDeleteUrlPath slug "home"
@@ -147,25 +147,31 @@ suite =
         , Test.describe "hostAdminWikiDetailUrlPath"
             [ Test.test "demo slug" <|
                 \() ->
-                    Wiki.hostAdminWikiDetailUrlPath "demo"
-                        |> Expect.equal "/admin/wikis/demo"
+                    Wiki.hostAdminWikiDetailUrlPath "Demo"
+                        |> Expect.equal "/admin/wikis/Demo"
             , Test.fuzz Fuzzers.wikiSlug "prefixes /admin/wikis/" <|
                 \slug ->
                     Wiki.hostAdminWikiDetailUrlPath slug
                         |> String.startsWith "/admin/wikis/"
                         |> Expect.equal True
             ]
+        , Test.describe "hostAdminBackupUrlPath"
+            [ Test.test "is /admin/backup" <|
+                \() ->
+                    Wiki.hostAdminBackupUrlPath
+                        |> Expect.equal "/admin/backup"
+            ]
         , Test.describe "submissionDetailUrlPath"
             [ Test.test "joins wiki and submission id" <|
                 \() ->
-                    Wiki.submissionDetailUrlPath "demo" "sub_1"
-                        |> Expect.equal "/w/demo/submit/sub_1"
+                    Wiki.submissionDetailUrlPath "Demo" "sub_1"
+                        |> Expect.equal "/w/Demo/submit/sub_1"
             ]
         , Test.describe "reviewQueueUrlPath"
             [ Test.test "demo wiki review queue" <|
                 \() ->
-                    Wiki.reviewQueueUrlPath "demo"
-                        |> Expect.equal "/w/demo/review"
+                    Wiki.reviewQueueUrlPath "Demo"
+                        |> Expect.equal "/w/Demo/review"
             , Test.fuzz Fuzzers.wikiSlug "ends with /review" <|
                 \slug ->
                     Wiki.reviewQueueUrlPath slug
@@ -175,14 +181,14 @@ suite =
         , Test.describe "reviewDetailUrlPath"
             [ Test.test "joins wiki and submission id" <|
                 \() ->
-                    Wiki.reviewDetailUrlPath "demo" "sub_queue_demo"
-                        |> Expect.equal "/w/demo/review/sub_queue_demo"
+                    Wiki.reviewDetailUrlPath "Demo" "sub_queue_demo"
+                        |> Expect.equal "/w/Demo/review/sub_queue_demo"
             ]
         , Test.describe "adminUsersUrlPath"
             [ Test.test "demo wiki admin users" <|
                 \() ->
-                    Wiki.adminUsersUrlPath "demo"
-                        |> Expect.equal "/w/demo/admin/users"
+                    Wiki.adminUsersUrlPath "Demo"
+                        |> Expect.equal "/w/Demo/admin/users"
             , Test.fuzz Fuzzers.wikiSlug "contains /admin/users" <|
                 \slug ->
                     Wiki.adminUsersUrlPath slug
@@ -195,7 +201,7 @@ suite =
                     let
                         w : Wiki.Wiki
                         w =
-                            Wiki.wikiWithPages "demo"
+                            Wiki.wikiWithPages "Demo"
                                 "Demo"
                                 (Dict.fromList
                                     [ ( "a", Page.withPublished "a" "x" )
@@ -240,7 +246,7 @@ suite =
                     let
                         w : Wiki.Wiki
                         w =
-                            Wiki.wikiWithPages "demo"
+                            Wiki.wikiWithPages "Demo"
                                 "Demo"
                                 (Dict.singleton "home" (Page.withPublished "home" "body"))
                     in
@@ -252,7 +258,7 @@ suite =
                     let
                         w : Wiki.Wiki
                         w =
-                            Wiki.wikiWithPages "demo" "Demo" Dict.empty
+                            Wiki.wikiWithPages "Demo" "Demo" Dict.empty
                     in
                     Wiki.publishedPageFrontendDetails "home" w
                         |> Expect.equal Nothing
@@ -261,7 +267,7 @@ suite =
                     let
                         w : Wiki.Wiki
                         w =
-                            Wiki.wikiWithPages "demo"
+                            Wiki.wikiWithPages "Demo"
                                 "Demo"
                                 (Dict.singleton "x" (Page.pendingOnly "x" "secret"))
                     in
@@ -281,7 +287,7 @@ suite =
                     let
                         w : Wiki.Wiki
                         w =
-                            Wiki.wikiWithPages "demo"
+                            Wiki.wikiWithPages "Demo"
                                 "Demo"
                                 (Dict.singleton "home"
                                     (Page.withPublishedAndPending "home" "published body" "pending body")
@@ -295,10 +301,10 @@ suite =
                     let
                         w : Wiki.Wiki
                         w =
-                            Wiki.wikiWithPages "demo"
+                            Wiki.wikiWithPages "Demo"
                                 "Demo"
                                 (Dict.fromList
-                                    [ ( "home", Page.withPublishedAndPending "home" "[g](/w/demo/p/guides)" "[[guides]]" )
+                                    [ ( "home", Page.withPublishedAndPending "home" "[g](/w/Demo/p/guides)" "[[guides]]" )
                                     , ( "guides", Page.withPublished "guides" "No link to home." )
                                     ]
                                 )
