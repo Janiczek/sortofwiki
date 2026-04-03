@@ -5,7 +5,7 @@ import Dict
 import Effect.Test
 import HostAdmin
 import ProgramTest.Config
-import ProgramTest.LoginSteps
+import ProgramTest.Actions
 import ProgramTest.Query
 import ProgramTest.Start
 import RemoteData
@@ -53,7 +53,7 @@ endToEndTests =
                 , steps =
                     \client ->
                         List.concat
-                            [ ProgramTest.LoginSteps.loginToWiki
+                            [ ProgramTest.Actions.loginToWiki
                                 { wikiSlug = "Demo"
                                 , username = "statusdemo"
                                 , password = "password12"

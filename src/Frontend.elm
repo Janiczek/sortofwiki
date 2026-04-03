@@ -292,17 +292,19 @@ publishedSlugExistsFromWikiDetails details refSlug =
 
 submissionDetailMarkdownTextareaBaseClass : String
 submissionDetailMarkdownTextareaBaseClass =
-    "box-border m-0 min-h-[12rem] max-h-[24rem] w-full flex-1 overflow-auto rounded border border-[var(--border)] p-2 font-mono text-xs leading-normal whitespace-pre-wrap break-words text-[var(--fg)]"
+    UI.markdownTextareaClass
+        ++ " box-border m-0 min-h-[12rem] max-h-[24rem] w-full flex-1 overflow-auto rounded border border-[var(--border)] bg-[var(--input-bg)] p-2 whitespace-pre-wrap break-words"
 
 
 submissionDetailMarkdownTextareaReadonlyClass : String
 submissionDetailMarkdownTextareaReadonlyClass =
-    submissionDetailMarkdownTextareaBaseClass ++ " cursor-default resize-none bg-[var(--submission-conflict-readonly-bg)]"
+    submissionDetailMarkdownTextareaBaseClass
+        ++ " cursor-default resize-none text-[color:color-mix(in_srgb,var(--fg)_50%,transparent)]"
 
 
 submissionDetailMarkdownTextareaEditableClass : String
 submissionDetailMarkdownTextareaEditableClass =
-    submissionDetailMarkdownTextareaBaseClass ++ " resize-y bg-[var(--submission-conflict-editable-bg)]"
+    submissionDetailMarkdownTextareaBaseClass ++ " resize-y text-[var(--fg)]"
 
 
 submissionDetailMarkdownTextareaGridStretchClass : String
@@ -1076,6 +1078,42 @@ invalidateWikiPublishedCaches wikiSlug store =
             store.publishedPages
                 |> Dict.filter (\( w, _ ) _ -> w /= wikiSlug)
     }
+
+
+{-| Trusted immediate publish: clear this wiki's published page payloads (they are stale) but keep
+`wikiDetails` when already loaded and extend `pageSlugs` so we do not drop to Loading on
+`/submit/new` (which would flash until `WikiFrontendDetailsResponse`). Navigation to the new page
+uses `pushUrl` in the same update.
+-}
+afterTrustedNewPagePublishedImmediately : Wiki.Slug -> Page.Slug -> Store -> Store
+afterTrustedNewPagePublishedImmediately wikiSlug pageSlug store =
+    let
+        publishedPagesNext : Dict ( Wiki.Slug, Page.Slug ) (RemoteData () Page.FrontendDetails)
+        publishedPagesNext =
+            store.publishedPages
+                |> Dict.filter (\( w, _ ) _ -> w /= wikiSlug)
+
+        wikiDetailsNext : Dict Wiki.Slug (RemoteData () Wiki.FrontendDetails)
+        wikiDetailsNext =
+            case Dict.get wikiSlug store.wikiDetails of
+                Just (Success details) ->
+                    Dict.insert wikiSlug
+                        (Success
+                            { details
+                                | pageSlugs =
+                                    if List.member pageSlug details.pageSlugs then
+                                        details.pageSlugs
+
+                                    else
+                                        pageSlug :: details.pageSlugs |> List.sort
+                            }
+                        )
+                        store.wikiDetails
+
+                _ ->
+                    Dict.remove wikiSlug store.wikiDetails
+    in
+    { store | publishedPages = publishedPagesNext, wikiDetails = wikiDetailsNext }
 
 
 {-| After a successful approve (story 17), drop cached wiki/page/review data so the next fetch matches the server.
@@ -3760,16 +3798,40 @@ updateFromBackend msg model =
                     else
                         d
 
-                nextStore : Store
-                nextStore =
-                    let
-                        store0 : Store
-                        store0 =
-                            model.store
-                    in
+                store0 : Store
+                store0 =
+                    model.store
+
+                validatedNewPagePayload : Maybe { pageSlug : Page.Slug, markdown : String }
+                validatedNewPagePayload =
+                    Submission.validateNewPageFields d.pageSlug d.markdownBody
+                        |> Result.toMaybe
+
+                immediatePublishNavCmd : Command FrontendOnly ToBackend Msg
+                immediatePublishNavCmd =
                     case result of
                         Ok Submission.NewPagePublishedImmediately ->
-                            invalidateWikiPublishedCaches wikiSlug store0
+                            validatedNewPagePayload
+                                |> Maybe.map
+                                    (\payload ->
+                                        Effect.Browser.Navigation.pushUrl model.key
+                                            (Wiki.publishedPageUrlPath wikiSlug payload.pageSlug)
+                                    )
+                                |> Maybe.withDefault Command.none
+
+                        _ ->
+                            Command.none
+
+                nextStore : Store
+                nextStore =
+                    case result of
+                        Ok Submission.NewPagePublishedImmediately ->
+                            case validatedNewPagePayload of
+                                Just payload ->
+                                    afterTrustedNewPagePublishedImmediately wikiSlug payload.pageSlug store0
+
+                                Nothing ->
+                                    invalidateWikiPublishedCaches wikiSlug store0
 
                         Ok (Submission.NewPageSubmittedForReview _) ->
                             { store0
@@ -3780,7 +3842,7 @@ updateFromBackend msg model =
                         Err _ ->
                             store0
             in
-            ( { model | newPageSubmitDraft = nextDraft, store = nextStore }, Command.none )
+            ( { model | newPageSubmitDraft = nextDraft, store = nextStore }, immediatePublishNavCmd )
                 |> runRouteStoreActions
 
         SubmitPageEditResponse wikiSlug result ->
@@ -4717,7 +4779,11 @@ viewWikiListBody : Store -> Html Msg
 viewWikiListBody store =
     case store.wikiCatalog of
         RemoteData.Success catalog ->
-            viewWikiList catalog
+            if Dict.isEmpty catalog then
+                viewWikiListEmpty
+
+            else
+                viewWikiList catalog
 
         RemoteData.Failure _ ->
             Html.div
@@ -4730,6 +4796,19 @@ viewWikiListBody store =
 
         RemoteData.NotAsked ->
             viewWikiListLoading
+
+
+viewWikiListEmpty : Html Msg
+viewWikiListEmpty =
+    Html.div
+        [ Attr.id "catalog-page"
+        ]
+        [ Html.div
+            [ Attr.id "catalog-empty"
+            , Attr.attribute "role" "status"
+            ]
+            [ Html.p [] [ Html.text "There are no wikis yet." ] ]
+        ]
 
 
 viewWikiListLoading : Html Msg
@@ -5121,10 +5200,21 @@ appHeaderTitle ({ store, route } as model) =
                                     }
                                 )
 
-        Route.WikiSubmitEdit wikiSlug _ ->
+        Route.WikiSubmitEdit wikiSlug pageSlug ->
             wikiScopeHeaderTitle store wikiSlug <|
                 \summary ->
-                    wikiLoadedHeaderTitle summary (Just (AppHeaderSecondaryPlain "Propose edit"))
+                    wikiLoadedHeaderTitle summary <|
+                        Just
+                            (AppHeaderSecondaryPlainThenWikiLink
+                                { plainPrefix =
+                                    if wikiSessionTrustedOnWiki wikiSlug model then
+                                        "Edit "
+
+                                    else
+                                        "Propose edit "
+                                , wikiLabel = pageSlug
+                                }
+                            )
 
         Route.WikiSubmitDelete wikiSlug _ ->
             wikiScopeHeaderTitle store wikiSlug <|
@@ -5289,6 +5379,7 @@ viewHostAdminLogin model =
                     , Attr.value draft.password
                     , Events.onInput HostAdminLoginPasswordChanged
                     , Attr.disabled draft.inFlight
+                    , TW.cls UI.formTextInputClass
                     ]
                     []
                 ]
@@ -5426,8 +5517,10 @@ viewHostAdminWikiRow model summary =
     let
         wikiTableIoBusy : Bool
         wikiTableIoBusy =
-            model.hostAdminWikiExportInFlightSlug /= Nothing
-                || model.hostAdminWikiImportInFlightSlug /= Nothing
+            model.hostAdminWikiExportInFlightSlug
+                /= Nothing
+                || model.hostAdminWikiImportInFlightSlug
+                /= Nothing
 
         thisRowExporting : Bool
         thisRowExporting =
@@ -5603,6 +5696,7 @@ viewHostAdminAuditFilters model =
                     , Attr.type_ "text"
                     , Attr.value model.hostAdminAuditFilterWikiDraft
                     , Events.onInput HostAdminAuditFilterWikiChanged
+                    , TW.cls UI.formTextInputClass
                     ]
                     []
                 ]
@@ -5615,6 +5709,7 @@ viewHostAdminAuditFilters model =
                     , Attr.type_ "text"
                     , Attr.value model.hostAdminAuditFilterActorDraft
                     , Events.onInput HostAdminAuditFilterActorChanged
+                    , TW.cls UI.formTextInputClass
                     ]
                     []
                 ]
@@ -5627,6 +5722,7 @@ viewHostAdminAuditFilters model =
                     , Attr.type_ "text"
                     , Attr.value model.hostAdminAuditFilterPageDraft
                     , Events.onInput HostAdminAuditFilterPageChanged
+                    , TW.cls UI.formTextInputClass
                     ]
                     []
                 ]
@@ -5707,6 +5803,7 @@ viewHostAdminCreateWiki model =
                                     , Attr.value draft.slug
                                     , Events.onInput HostAdminCreateWikiSlugChanged
                                     , Attr.disabled draft.inFlight
+                                    , TW.cls UI.formTextInputClass
                                     ]
                                     []
                                 ]
@@ -5719,6 +5816,7 @@ viewHostAdminCreateWiki model =
                                     , Attr.value draft.name
                                     , Events.onInput HostAdminCreateWikiNameChanged
                                     , Attr.disabled draft.inFlight
+                                    , TW.cls UI.formTextInputClass
                                     ]
                                     []
                                 ]
@@ -5731,6 +5829,7 @@ viewHostAdminCreateWiki model =
                                     , Attr.value draft.initialAdminUsername
                                     , Events.onInput HostAdminCreateWikiInitialAdminUsernameChanged
                                     , Attr.disabled draft.inFlight
+                                    , TW.cls UI.formTextInputClass
                                     ]
                                     []
                                 ]
@@ -5743,6 +5842,7 @@ viewHostAdminCreateWiki model =
                                     , Attr.value draft.initialAdminPassword
                                     , Events.onInput HostAdminCreateWikiInitialAdminPasswordChanged
                                     , Attr.disabled draft.inFlight
+                                    , TW.cls UI.formTextInputClass
                                     ]
                                     []
                                 ]
@@ -5879,7 +5979,7 @@ viewHostAdminWikiDetail model =
                                             , Attr.disabled busy
                                             , Attr.spellcheck False
                                             , Attr.autocomplete False
-                                            , TW.cls (UI.hostAdminWikiSlugClass ++ " w-full max-w-full")
+                                            , TW.cls (UI.formTextInputClass ++ " " ++ UI.hostAdminWikiSlugClass ++ " w-full max-w-full")
                                             ]
                                             []
                                         ]
@@ -5892,6 +5992,7 @@ viewHostAdminWikiDetail model =
                                             , Attr.value d.nameDraft
                                             , Events.onInput HostAdminWikiDetailNameChanged
                                             , Attr.disabled busy
+                                            , TW.cls UI.formTextInputClass
                                             ]
                                             []
                                         ]
@@ -5903,6 +6004,7 @@ viewHostAdminWikiDetail model =
                                             , Attr.value d.summaryDraft
                                             , Events.onInput HostAdminWikiDetailSummaryChanged
                                             , Attr.disabled busy
+                                            , TW.cls UI.formTextareaClass
                                             ]
                                             []
                                         ]
@@ -5991,6 +6093,7 @@ viewHostAdminWikiDetail model =
                                             , Events.onInput HostAdminWikiDetailDeleteConfirmChanged
                                             , Attr.disabled busy
                                             , Attr.autocomplete False
+                                            , TW.cls UI.formTextInputClass
                                             ]
                                             []
                                         ]
@@ -6124,7 +6227,16 @@ documentTitle ({ store, route } as model) =
         Route.WikiSubmitEdit wikiSlug pageSlug ->
             case Store.get wikiSlug store.wikiCatalog of
                 RemoteData.Success summary ->
-                    "Propose edit — " ++ pageSlug ++ " — " ++ summary.name ++ " — SortOfWiki"
+                    let
+                        docPrefix : String
+                        docPrefix =
+                            if wikiSessionTrustedOnWiki wikiSlug model then
+                                "Edit "
+
+                            else
+                                "Propose edit "
+                    in
+                    docPrefix ++ "[[" ++ pageSlug ++ "]] — " ++ summary.name ++ " — SortOfWiki"
 
                 RemoteData.Failure _ ->
                     "404 — SortOfWiki"
@@ -6279,7 +6391,7 @@ viewRegisterFeedback : Maybe (Result ContributorAccount.RegisterContributorError
 viewRegisterFeedback maybeResult =
     case maybeResult of
         Nothing ->
-            Html.div [] []
+            Html.text ""
 
         Just (Ok ()) ->
             Html.div
@@ -6299,7 +6411,7 @@ viewLoginFeedback : Maybe (Result ContributorAccount.LoginContributorError ()) -
 viewLoginFeedback maybeResult =
     case maybeResult of
         Nothing ->
-            Html.div [] []
+            Html.text ""
 
         Just (Ok ()) ->
             Html.div
@@ -6334,6 +6446,7 @@ viewRegisterLoaded wikiSlug draft =
                     , Attr.value draft.username
                     , Events.onInput RegisterFormUsernameChanged
                     , Attr.disabled draft.inFlight
+                    , TW.cls UI.formTextInputClass
                     ]
                     []
                 ]
@@ -6346,6 +6459,7 @@ viewRegisterLoaded wikiSlug draft =
                     , Attr.value draft.password
                     , Events.onInput RegisterFormPasswordChanged
                     , Attr.disabled draft.inFlight
+                    , TW.cls UI.formTextInputClass
                     ]
                     []
                 ]
@@ -6415,6 +6529,7 @@ viewLoginLoaded wikiSlug draft =
                     , Attr.value draft.username
                     , Events.onInput LoginFormUsernameChanged
                     , Attr.disabled draft.inFlight
+                    , TW.cls UI.formTextInputClass
                     ]
                     []
                 ]
@@ -6427,6 +6542,7 @@ viewLoginLoaded wikiSlug draft =
                     , Attr.value draft.password
                     , Events.onInput LoginFormPasswordChanged
                     , Attr.disabled draft.inFlight
+                    , TW.cls UI.formTextInputClass
                     ]
                     []
                 ]
@@ -6489,21 +6605,12 @@ viewNewPageSubmitFeedback : Wiki.Slug -> NewPageSubmitDraft -> Html Msg
 viewNewPageSubmitFeedback wikiSlug draft =
     case draft.lastResult of
         Nothing ->
-            Html.div [] []
+            Html.text ""
 
         Just (Ok success) ->
             case success of
                 Submission.NewPagePublishedImmediately ->
-                    Html.div
-                        [ Attr.id "wiki-submit-new-success" ]
-                        [ Html.p []
-                            [ Html.text "Published. The page is live now. " ]
-                        , Html.a
-                            [ Attr.id "wiki-submit-new-success-published-link"
-                            , Attr.href (Wiki.publishedPageUrlPath wikiSlug draft.pageSlug)
-                            ]
-                            [ Html.text "Open page" ]
-                        ]
+                    Html.text ""
 
                 Submission.NewPageSubmittedForReview submissionId ->
                     let
@@ -6533,8 +6640,21 @@ viewNewPageSubmitFeedback wikiSlug draft =
                 ]
 
 
-viewSubmitNewLoaded : Wiki.Slug -> NewPageSubmitDraft -> Html Msg
-viewSubmitNewLoaded wikiSlug draft =
+viewSubmitNewLoaded : Wiki.Slug -> (Page.Slug -> Bool) -> NewPageSubmitDraft -> Html Msg
+viewSubmitNewLoaded wikiSlug publishedSlugExists draft =
+    let
+        newPageMarkdownHeadingClass : String
+        newPageMarkdownHeadingClass =
+            "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)]"
+
+        newPagePreviewHeadingClass : String
+        newPagePreviewHeadingClass =
+            "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg-muted)]"
+
+        newPageMarkdownPreviewCellClass : String
+        newPageMarkdownPreviewCellClass =
+            "flex min-h-0 min-w-0 flex-col gap-1 lg:h-full"
+    in
     Html.div
         [ Attr.id "wiki-submit-new-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
@@ -6545,13 +6665,14 @@ viewSubmitNewLoaded wikiSlug draft =
             , Events.onSubmit NewPageSubmitFormSubmitted
             ]
             [ Html.div []
-                [ Html.label [ Attr.for "wiki-submit-new-slug" ]
+                [ Html.label [ Attr.for "slug-input" ]
                     [ Html.text "Page slug" ]
                 , Html.input
-                    ([ Attr.id "wiki-submit-new-slug"
+                    ([ Attr.id "slug-input"
                      , Attr.type_ "text"
                      , Attr.value draft.pageSlug
                      , Attr.disabled draft.inFlight
+                     , TW.cls UI.formTextInputClass
                      ]
                         ++ (if draft.pageSlugLockedFromQuery then
                                 [ Attr.readonly True ]
@@ -6562,17 +6683,32 @@ viewSubmitNewLoaded wikiSlug draft =
                     )
                     []
                 ]
-            , Html.div []
-                [ Html.label [ Attr.for "wiki-submit-new-markdown" ]
-                    [ Html.text "Markdown body" ]
-                , Html.textarea
-                    [ Attr.id "wiki-submit-new-markdown"
-                    , Attr.value draft.markdownBody
-                    , Events.onInput NewPageSubmitMarkdownChanged
-                    , Attr.disabled draft.inFlight
-                    , Attr.rows 12
+            , Html.div
+                [ TW.cls "grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch" ]
+                [ Html.div
+                    [ TW.cls newPageMarkdownPreviewCellClass ]
+                    [ Html.h2
+                        [ TW.cls newPageMarkdownHeadingClass ]
+                        [ Html.text "Markdown body" ]
+                    , Html.textarea
+                        [ Attr.id "content-markdown-textarea"
+                        , Attr.value draft.markdownBody
+                        , Events.onInput NewPageSubmitMarkdownChanged
+                        , Attr.disabled draft.inFlight
+                        , Attr.rows 12
+                        , TW.cls (submissionDetailMarkdownTextareaEditableClass ++ submissionDetailMarkdownTextareaDiffCellClass)
+                        ]
+                        []
                     ]
-                    []
+                , Html.div
+                    [ TW.cls newPageMarkdownPreviewCellClass ]
+                    [ Html.h3
+                        [ TW.cls newPagePreviewHeadingClass ]
+                        [ Html.text "Preview" ]
+                    , Html.div
+                        [ TW.cls (markdownPreviewScrollClass ++ " min-h-0 flex-1") ]
+                        [ PageMarkdown.viewPreview "content-preview" wikiSlug publishedSlugExists draft.markdownBody ]
+                    ]
                 ]
             , UI.button
                 [ Attr.id "wiki-submit-new-submit"
@@ -6589,10 +6725,10 @@ viewSubmitNewLoaded wikiSlug draft =
 viewSubmitNewRoute : Model -> Wiki.Slug -> Html Msg
 viewSubmitNewRoute model wikiSlug =
     case Store.get_ wikiSlug model.store.wikiDetails of
-        RemoteData.Success _ ->
+        RemoteData.Success wikiDetails ->
             case Store.get wikiSlug model.store.wikiCatalog of
                 RemoteData.Success _ ->
-                    viewSubmitNewLoaded wikiSlug model.newPageSubmitDraft
+                    viewSubmitNewLoaded wikiSlug (publishedSlugExistsFromWikiDetails wikiDetails) model.newPageSubmitDraft
 
                 RemoteData.Failure _ ->
                     viewNotFound
@@ -6617,7 +6753,7 @@ viewPageEditSubmitFeedback : Wiki.Slug -> Page.Slug -> PageEditSubmitDraft -> Ht
 viewPageEditSubmitFeedback wikiSlug pageSlug draft =
     case draft.lastResult of
         Nothing ->
-            Html.div [] []
+            Html.text ""
 
         Just (Ok success) ->
             case success of
@@ -6661,41 +6797,124 @@ viewPageEditSubmitFeedback wikiSlug pageSlug draft =
                 ]
 
 
-viewSubmitEditLoaded : Wiki.Slug -> Page.Slug -> PageEditSubmitDraft -> Html Msg
-viewSubmitEditLoaded wikiSlug pageSlug draft =
+viewSubmitEditLoaded :
+    Wiki.Slug
+    -> Page.Slug
+    -> Bool
+    -> (Page.Slug -> Bool)
+    -> Page.FrontendDetails
+    -> PageEditSubmitDraft
+    -> Html Msg
+viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publishedSlugExists pageDetails draft =
+    let
+        originalMarkdown : String
+        originalMarkdown =
+            pageDetails.markdownSource
+
+        submitEditDiffCellShellClass : String
+        submitEditDiffCellShellClass =
+            "flex min-h-0 min-w-0 flex-col gap-1 lg:h-full"
+
+        submitEditMarkdownHeadingClass : String
+        submitEditMarkdownHeadingClass =
+            "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)]"
+
+        submitEditPreviewHeadingClass : String
+        submitEditPreviewHeadingClass =
+            "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg-muted)]"
+
+        submitEditReadonlyTextarea : String -> String -> String -> Html Msg
+        submitEditReadonlyTextarea elementId markdown extraClass =
+            Html.textarea
+                [ Attr.id elementId
+                , Attr.readonly True
+                , Attr.rows 12
+                , Attr.value markdown
+                , TW.cls (submissionDetailMarkdownTextareaReadonlyClass ++ extraClass)
+                ]
+                []
+
+        submitEditPreviewInCell : String -> String -> Html Msg
+        submitEditPreviewInCell previewId markdown =
+            Html.div
+                [ TW.cls (markdownPreviewScrollClass ++ " min-h-0 flex-1") ]
+                [ PageMarkdown.viewPreview previewId wikiSlug publishedSlugExists markdown ]
+    in
     Html.div
         [ Attr.id "wiki-submit-edit-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
         , Attr.attribute "data-page-slug" pageSlug
         ]
-        [ Html.p []
-            [ Html.text "Published content stays unchanged until a reviewer approves this proposal." ]
-        , Html.form
-            [ Attr.id "wiki-submit-edit-form"
-            , Events.onSubmit PageEditSubmitFormSubmitted
-            ]
-            [ Html.div []
-                [ Html.label [ Attr.for "wiki-submit-edit-markdown" ]
-                    [ Html.text "Proposed markdown" ]
-                , Html.textarea
-                    [ Attr.id "wiki-submit-edit-markdown"
-                    , Attr.value draft.markdownBody
-                    , Events.onInput PageEditSubmitMarkdownChanged
-                    , Attr.disabled draft.inFlight
-                    , Attr.rows 12
+        (List.concat
+            [ if showUntrustedContributorDisclaimer then
+                [ Html.p []
+                    [ Html.text "Published content stays unchanged until a reviewer approves this proposal." ]
+                ]
+
+              else
+                []
+            , [ Html.form
+                    [ Attr.id "wiki-submit-edit-form"
+                    , Events.onSubmit PageEditSubmitFormSubmitted
                     ]
-                    []
-                ]
-            , UI.button
-                [ Attr.id "wiki-submit-edit-submit"
-                , Attr.type_ "button"
-                , Events.onClick PageEditSubmitFormSubmitted
-                , Attr.disabled draft.inFlight
-                ]
-                [ Html.text "Submit edit proposal" ]
+                    [ Html.div
+                        [ TW.cls "grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2 lg:grid-rows-2 lg:items-stretch" ]
+                        [ Html.div
+                            [ TW.cls submitEditDiffCellShellClass ]
+                            [ Html.h2
+                                [ TW.cls submitEditMarkdownHeadingClass ]
+                                [ Html.text "Published" ]
+                            , submitEditReadonlyTextarea "wiki-submit-edit-original-markdown" originalMarkdown submissionDetailMarkdownTextareaDiffCellClass
+                            ]
+                        , Html.div
+                            [ TW.cls submitEditDiffCellShellClass ]
+                            [ Html.h2
+                                [ TW.cls submitEditMarkdownHeadingClass ]
+                                [ Html.text "Your edit" ]
+                            , Html.textarea
+                                [ Attr.id "wiki-submit-edit-markdown"
+                                , Attr.value draft.markdownBody
+                                , Events.onInput PageEditSubmitMarkdownChanged
+                                , Attr.disabled draft.inFlight
+                                , Attr.rows 12
+                                , TW.cls (submissionDetailMarkdownTextareaEditableClass ++ submissionDetailMarkdownTextareaDiffCellClass)
+                                ]
+                                []
+                            ]
+                        , Html.div
+                            [ TW.cls submitEditDiffCellShellClass ]
+                            [ Html.h3
+                                [ TW.cls submitEditPreviewHeadingClass ]
+                                [ Html.text "Preview" ]
+                            , submitEditPreviewInCell "wiki-submit-edit-original-preview" originalMarkdown
+                            ]
+                        , Html.div
+                            [ TW.cls submitEditDiffCellShellClass ]
+                            [ Html.h3
+                                [ TW.cls submitEditPreviewHeadingClass ]
+                                [ Html.text "Preview" ]
+                            , submitEditPreviewInCell "wiki-submit-edit-new-preview" draft.markdownBody
+                            ]
+                        ]
+                    , UI.button
+                        [ Attr.id "wiki-submit-edit-submit"
+                        , Attr.type_ "button"
+                        , Events.onClick PageEditSubmitFormSubmitted
+                        , Attr.disabled draft.inFlight
+                        ]
+                        [ Html.text
+                            (if showUntrustedContributorDisclaimer then
+                                "Submit edit proposal"
+
+                             else
+                                "Save"
+                            )
+                        ]
+                    ]
+              , viewPageEditSubmitFeedback wikiSlug pageSlug draft
+              ]
             ]
-        , viewPageEditSubmitFeedback wikiSlug pageSlug draft
-        ]
+        )
 
 
 viewSubmitEditRoute : Model -> Wiki.Slug -> Page.Slug -> Html Msg
@@ -6710,7 +6929,7 @@ viewSubmitEditRoute model wikiSlug pageSlug =
         RemoteData.Failure _ ->
             viewNotFound
 
-        RemoteData.Success _ ->
+        RemoteData.Success wikiDetails ->
             case Store.get wikiSlug model.store.wikiCatalog of
                 RemoteData.NotAsked ->
                     viewWikiSubmitNewLoading
@@ -6732,15 +6951,20 @@ viewSubmitEditRoute model wikiSlug pageSlug =
                         RemoteData.Failure _ ->
                             viewNotFound
 
-                        RemoteData.Success _ ->
-                            viewSubmitEditLoaded wikiSlug pageSlug model.pageEditSubmitDraft
+                        RemoteData.Success pageDetails ->
+                            viewSubmitEditLoaded wikiSlug
+                                pageSlug
+                                (model.contributorWikiSession == Just wikiSlug && not (wikiSessionTrustedOnWiki wikiSlug model))
+                                (publishedSlugExistsFromWikiDetails wikiDetails)
+                                pageDetails
+                                model.pageEditSubmitDraft
 
 
 viewPageDeleteSubmitFeedback : Wiki.Slug -> Page.Slug -> PageDeleteSubmitDraft -> Html Msg
 viewPageDeleteSubmitFeedback wikiSlug pageSlug draft =
     case draft.lastResult of
         Nothing ->
-            Html.div [] []
+            Html.text ""
 
         Just (Ok success) ->
             case success of
@@ -6801,6 +7025,7 @@ viewSubmitDeleteLoaded wikiSlug pageSlug draft =
                     , Events.onInput PageDeleteSubmitReasonChanged
                     , Attr.disabled draft.inFlight
                     , Attr.rows 4
+                    , TW.cls UI.formTextareaClass
                     ]
                     []
                 ]
@@ -7646,6 +7871,7 @@ viewWikiAdminAuditFilters model =
                     , Attr.type_ "text"
                     , Attr.value model.wikiAdminAuditFilterActorDraft
                     , Events.onInput WikiAdminAuditFilterActorChanged
+                    , TW.cls UI.formTextInputClass
                     ]
                     []
                 ]
@@ -7658,6 +7884,7 @@ viewWikiAdminAuditFilters model =
                     , Attr.type_ "text"
                     , Attr.value model.wikiAdminAuditFilterPageDraft
                     , Events.onInput WikiAdminAuditFilterPageChanged
+                    , TW.cls UI.formTextInputClass
                     ]
                     []
                 ]
@@ -7952,7 +8179,7 @@ viewReviewDecisionForm model wikiSlug submissionId =
                             , Attr.disabled (busy || not requestSelected)
                             , Attr.value requestDraft.guidanceText
                             , Attr.placeholder "Guidance for the contributor (required for this action)"
-                            , TW.cls "w-full min-h-0"
+                            , TW.cls UI.formTextareaCompactClass
                             ]
                             []
                         ]
@@ -7969,7 +8196,7 @@ viewReviewDecisionForm model wikiSlug submissionId =
                             , Attr.disabled (busy || not rejectSelected)
                             , Attr.value rejectDraft.reasonText
                             , Attr.placeholder "Rejection reason (required for this action)"
-                            , TW.cls "w-full min-h-0"
+                            , TW.cls UI.formTextareaCompactClass
                             ]
                             []
                         ]
@@ -8181,37 +8408,14 @@ viewMissingPublishedPage wikiSlug pageSlug maybeContributorWiki =
         ]
 
 
-viewPublishedPage : Wiki.Slug -> Page.Slug -> Page.FrontendDetails -> (Page.Slug -> Bool) -> Maybe Wiki.Slug -> Html Msg
-viewPublishedPage wikiSlug pageSlug pageDetails publishedSlugExists maybeContributorWikiForThisWiki =
+viewPublishedPage : Wiki.Slug -> Page.Slug -> Page.FrontendDetails -> (Page.Slug -> Bool) -> Html Msg
+viewPublishedPage wikiSlug pageSlug pageDetails publishedSlugExists =
     Html.div
         [ Attr.id "page-published-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
         , Attr.attribute "data-page-slug" pageSlug
         ]
         [ PageMarkdown.view wikiSlug publishedSlugExists pageDetails
-        , case maybeContributorWikiForThisWiki of
-            Just sessionWiki ->
-                if sessionWiki /= wikiSlug then
-                    Html.text ""
-
-                else
-                    Html.div
-                        [ TW.cls UI.publishedPageContributorActionsClass ]
-                        [ Html.a
-                            [ Attr.id "wiki-page-propose-edit"
-                            , Attr.href (Wiki.submitEditUrlPath wikiSlug pageSlug)
-                            ]
-                            [ Html.text "Propose edit" ]
-                        , Html.text " · "
-                        , Html.a
-                            [ Attr.id "wiki-page-request-deletion"
-                            , Attr.href (Wiki.submitDeleteUrlPath wikiSlug pageSlug)
-                            ]
-                            [ Html.text "Request deletion" ]
-                        ]
-
-            Nothing ->
-                Html.text ""
         ]
 
 
@@ -8250,7 +8454,7 @@ viewPublishedPageRoute model wikiSlug pageSlug =
                             viewMissingPublishedPage wikiSlug pageSlug model.contributorWikiSession
 
                         RemoteData.Success pageDetails ->
-                            viewPublishedPage wikiSlug pageSlug pageDetails (publishedSlugExistsFromWikiDetails wikiDetails) model.contributorWikiSession
+                            viewPublishedPage wikiSlug pageSlug pageDetails (publishedSlugExistsFromWikiDetails wikiDetails)
 
 
 viewBody : Model -> Html Msg
@@ -8374,6 +8578,33 @@ publishedPageEditLink model =
                         [ Html.text label ]
                     ]
                 ]
+
+        contributorPublishedPageActions : Wiki.Slug -> Page.Slug -> Html Msg
+        contributorPublishedPageActions wikiSlug pageSlug =
+            let
+                proposeOrEditLabel : String
+                proposeOrEditLabel =
+                    if wikiSessionTrustedOnWiki wikiSlug model then
+                        "Edit"
+
+                    else
+                        "Propose edit"
+            in
+            Html.div
+                [ TW.cls UI.sidebarNavSectionBodyClass
+                , TW.cls "flex flex-col gap-[0.25rem]"
+                ]
+                [ UI.sidebarLink
+                    [ Attr.href (Wiki.submitEditUrlPath wikiSlug pageSlug)
+                    , Attr.id "wiki-page-propose-edit"
+                    ]
+                    [ Html.text proposeOrEditLabel ]
+                , UI.sidebarLink
+                    [ Attr.href (Wiki.submitDeleteUrlPath wikiSlug pageSlug)
+                    , Attr.id "wiki-page-request-deletion"
+                    ]
+                    [ Html.text "Request deletion" ]
+                ]
     in
     case model.route of
         Route.WikiPage wikiSlug pageSlug ->
@@ -8384,12 +8615,16 @@ publishedPageEditLink model =
                 )
             of
                 ( Success _, Success _, Success _ ) ->
-                    Just
-                        (sidebarPageActionLink
-                            "Edit page"
-                            (Wiki.submitEditUrlPath wikiSlug pageSlug)
-                            "page-edit-link"
-                        )
+                    if model.contributorWikiSession == Just wikiSlug then
+                        Just (contributorPublishedPageActions wikiSlug pageSlug)
+
+                    else
+                        Just
+                            (sidebarPageActionLink
+                                "Edit page"
+                                (Wiki.submitEditUrlPath wikiSlug pageSlug)
+                                "page-edit-link"
+                            )
 
                 ( Success _, Success _, Failure _ ) ->
                     Just

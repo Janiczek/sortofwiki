@@ -2,10 +2,12 @@ module ProgramTest.Story29_CreateHostedWiki exposing (endToEndTests)
 
 import Effect.Browser.Dom
 import Env
+import HostAdmin
 import ProgramTest.Config
-import ProgramTest.LoginSteps
+import ProgramTest.Actions
 import ProgramTest.Query
 import ProgramTest.Start
+import Submission
 import Types exposing (FrontendMsg(..))
 import Url exposing (Protocol(..), Url)
 import Wiki
@@ -20,6 +22,12 @@ story29WikiLoginUrl =
     , query = Nothing
     , fragment = Nothing
     }
+
+
+invalidWikiSlugUserMessage : String
+invalidWikiSlugUserMessage =
+    HostAdmin.CreateSlugInvalid Submission.SlugInvalidChars
+        |> HostAdmin.createHostedWikiErrorToUserText
 
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
@@ -57,7 +65,7 @@ endToEndTests =
                       , client.checkView 300
                             (ProgramTest.Query.expectWikiLoginPageShowsSlug "Story29Wiki")
                       ]
-                    , ProgramTest.LoginSteps.submitWikiLoginForm
+                    , ProgramTest.Actions.submitWikiLoginForm
                         { username = "story29admin"
                         , password = "password12"
                         }
@@ -66,5 +74,35 @@ endToEndTests =
                             (ProgramTest.Query.expectPageShowsWikiSlug "wiki-home-page" "Story29Wiki")
                       ]
                     ]
+        }
+    , ProgramTest.Start.start
+        { name = "29 — create hosted wiki rejects non-PascalCase slug"
+        , config = ProgramTest.Config.emptyConfig
+        , sessionId = "session-story29-create-wiki-invalid-slug"
+        , path = "/admin"
+        , connectClientMs = Just 200
+        , clientSteps =
+            \client ->
+                [ client.input 100 (Effect.Browser.Dom.id "host-admin-login-password") Env.hostAdminPassword
+                , client.click 100 (Effect.Browser.Dom.id "host-admin-login-submit")
+                , client.checkView 300
+                    (ProgramTest.Query.withinId "host-admin-wikis-list"
+                        ProgramTest.Query.expectEmpty
+                    )
+                , client.clickLink 100 Wiki.hostAdminNewWikiUrlPath
+                , client.checkView 200
+                    (ProgramTest.Query.withinId "host-admin-create-wiki-page"
+                        ProgramTest.Query.expectEmpty
+                    )
+                , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-slug") "notPascalCase"
+                , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-name") "Story 29 Invalid Slug"
+                , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-initial-admin-username") "story29badslug"
+                , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-initial-admin-password") "password12"
+                , client.click 100 (Effect.Browser.Dom.id "host-admin-create-wiki-submit")
+                , client.checkView 200
+                    (ProgramTest.Query.withinId "host-admin-create-wiki-error"
+                        (ProgramTest.Query.expectHasText invalidWikiSlugUserMessage)
+                    )
+                ]
         }
     ]

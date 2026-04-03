@@ -3,7 +3,7 @@ module ProgramTest.Story14_TrustedDirectPublish exposing (endToEndTests)
 import Effect.Browser.Dom
 import Expect
 import ProgramTest.Config
-import ProgramTest.LoginSteps
+import ProgramTest.Actions
 import ProgramTest.Query
 import ProgramTest.Start
 import Types exposing (FrontendMsg(..))
@@ -33,7 +33,7 @@ endToEndTests =
         , clientSteps =
             \client ->
                 List.concat
-                    [ ProgramTest.LoginSteps.loginToWiki
+                    [ ProgramTest.Actions.loginToWiki
                         { wikiSlug = "Demo"
                         , username = "trustedpub"
                         , password = "password12"
@@ -42,11 +42,11 @@ endToEndTests =
                     , [ client.checkView 300
                             (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
                       , client.update 100 (UrlChanged submitNewPageUrl)
-                      , client.input 100 (Effect.Browser.Dom.id "wiki-submit-new-markdown") "# Story 14 trusted publish"
+                      , client.input 100 (Effect.Browser.Dom.id "content-markdown-textarea") "# Story 14 trusted publish"
                       , client.click 100 (Effect.Browser.Dom.id "wiki-submit-new-submit")
                       , client.checkView 300
-                            (ProgramTest.Query.withinId "wiki-submit-new-success"
-                                (ProgramTest.Query.expectHasText "Published")
+                            (ProgramTest.Query.withinPageMarkdownHeading "h1"
+                                (ProgramTest.Query.expectHasText "Story 14 trusted publish")
                             )
                       , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
                       , client.checkView 200

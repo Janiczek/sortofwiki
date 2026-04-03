@@ -2,7 +2,7 @@ module ProgramTest.Story08_Login exposing (endToEndTests)
 
 import Effect.Browser.Dom
 import ProgramTest.Config
-import ProgramTest.LoginSteps
+import ProgramTest.Actions
 import ProgramTest.Query
 import ProgramTest.Start
 import Route
@@ -51,7 +51,7 @@ endToEndTests =
                       , client.checkView 100
                             (ProgramTest.Query.expectWikiLoginPageShowsSlug "Demo")
                       ]
-                    , ProgramTest.LoginSteps.submitWikiLoginForm
+                    , ProgramTest.Actions.submitWikiLoginForm
                         { username = "story08user"
                         , password = "password12"
                         }
@@ -70,7 +70,7 @@ endToEndTests =
         , clientSteps =
             \client ->
                 List.concat
-                    [ ProgramTest.LoginSteps.submitWikiLoginForm
+                    [ ProgramTest.Actions.submitWikiLoginForm
                         { username = "trustedpub"
                         , password = "password12"
                         }
@@ -101,7 +101,7 @@ endToEndTests =
         , clientSteps =
             \client ->
                 List.concat
-                    [ ProgramTest.LoginSteps.loginToWiki
+                    [ ProgramTest.Actions.loginToWiki
                         { wikiSlug = "Demo"
                         , username = "trustedpub"
                         , password = "password12"

@@ -2,6 +2,7 @@ module ProgramTest.Config exposing
     ( ConfigBuilder
     , CreateWikiArgs
     , InitStep
+    , demoWikiCatalogOnly
     , demoWikiModerationSteps
     , demoWikiPagesOnly
     , demoWikiPagesPlusTwoPendingSubmissionsSteps
@@ -110,6 +111,63 @@ finish (ConfigBuilder steps) =
     }
 
 
+{-| Demo + ElmTips hosted wikis only (initial wiki admins exist); no contributor registrations or pages.
+-}
+demoWikiCatalogOnly : Effect.Test.Config ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model
+demoWikiCatalogOnly =
+    finish <| ConfigBuilder demoWikiCatalogOnlySteps
+
+
+{-| Host-admin creation of Demo and ElmTips (same slugs and wiki admins as the full program-test seed).
+-}
+demoWikiCatalogOnlySteps : List InitStep
+demoWikiCatalogOnlySteps =
+    List.concat
+        [ hostAdminCreateWikiSteps
+            { slug = "Demo"
+            , name = "Demo Wiki"
+            , wikiAdminUsername = "wikidemo"
+            , wikiAdminPassword = "password12"
+            }
+        , hostAdminCreateWikiSteps
+            { slug = "ElmTips"
+            , name = "Elm Tips"
+            , wikiAdminUsername = "elmtipsadmin"
+            , wikiAdminPassword = "password12"
+            }
+        ]
+
+
+{-| Register contributors, publish Demo + ElmTips pages (appends to `demoWikiCatalogOnlySteps`).
+-}
+demoWikiPagesSeedSteps : List InitStep
+demoWikiPagesSeedSteps =
+    [ initStep "pt-init-reg-statusdemo" "pt-c1" (RegisterContributor "Demo" { username = "statusdemo", password = "password12" })
+    , initStep "pt-init-reg-trustedpub" "pt-c2" (RegisterContributor "Demo" { username = "trustedpub", password = "password12" })
+    , initStep "pt-init-reg-grantadmin" "pt-c3" (RegisterContributor "Demo" { username = "grantadmin_trusted", password = "password12" })
+    , initStep "pt-init-wikidemo-login" "pt-c4" (LoginContributor "Demo" { username = "wikidemo", password = "password12" })
+    , initStep "pt-init-wikidemo-login" "pt-c4" (PromoteContributorToTrusted "Demo" "trustedpub")
+    , initStep "pt-init-wikidemo-login" "pt-c4" (PromoteContributorToTrusted "Demo" "grantadmin_trusted")
+    , initStep "pt-init-trustedpub-pub" "pt-c5" (LoginContributor "Demo" { username = "trustedpub", password = "password12" })
+    , initStep "pt-init-trustedpub-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "Home", rawMarkdown = Fixtures.demoHomePublished })
+    , initStep "pt-init-trustedpub-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "Guides", rawMarkdown = Fixtures.demoGuidesPublished })
+    , initStep "pt-init-trustedpub-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "About", rawMarkdown = Fixtures.demoAboutPublished })
+    , initStep "pt-init-trustedpub-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "MarkdownPlayground", rawMarkdown = Fixtures.demoMarkdownPlaygroundPublished })
+    , initStep "pt-init-elmtips-admin" "pt-c6" (LoginContributor "ElmTips" { username = "elmtipsadmin", password = "password12" })
+    , initStep "pt-init-elmtips-admin" "pt-c6" (SubmitNewPage "ElmTips" { rawPageSlug = "Home", rawMarkdown = "Tips and notes about Elm." })
+    ]
+
+
+{-| `demoWikiCatalogOnlySteps` followed by `demoWikiPagesSeedSteps`.
+-}
+demoWikiPagesSteps : List InitStep
+demoWikiPagesSteps =
+    List.concat
+        [ demoWikiCatalogOnlySteps
+        , demoWikiPagesSeedSteps
+        ]
+
+
 {-| Program-test catalog: demo + elm-tips wikis, contributors, published pages; `nextSubmissionCounter` still 1.
 -}
 demoWikiPagesOnly : Effect.Test.Config ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model
@@ -129,38 +187,6 @@ demoWikiWithModerationSeeds =
 emptyConfig : Effect.Test.Config ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model
 emptyConfig =
     finish <| ConfigBuilder []
-
-
-demoWikiPagesSteps : List InitStep
-demoWikiPagesSteps =
-    List.concat
-        [ hostAdminCreateWikiSteps
-            { slug = "Demo"
-            , name = "Demo Wiki"
-            , wikiAdminUsername = "wikidemo"
-            , wikiAdminPassword = "password12"
-            }
-        , hostAdminCreateWikiSteps
-            { slug = "ElmTips"
-            , name = "Elm Tips"
-            , wikiAdminUsername = "elmtipsadmin"
-            , wikiAdminPassword = "password12"
-            }
-        , [ initStep "pt-init-reg-statusdemo" "pt-c1" (RegisterContributor "Demo" { username = "statusdemo", password = "password12" })
-          , initStep "pt-init-reg-trustedpub" "pt-c2" (RegisterContributor "Demo" { username = "trustedpub", password = "password12" })
-          , initStep "pt-init-reg-grantadmin" "pt-c3" (RegisterContributor "Demo" { username = "grantadmin_trusted", password = "password12" })
-          , initStep "pt-init-wikidemo-login" "pt-c4" (LoginContributor "Demo" { username = "wikidemo", password = "password12" })
-          , initStep "pt-init-wikidemo-login" "pt-c4" (PromoteContributorToTrusted "Demo" "trustedpub")
-          , initStep "pt-init-wikidemo-login" "pt-c4" (PromoteContributorToTrusted "Demo" "grantadmin_trusted")
-          , initStep "pt-init-trustedpub-pub" "pt-c5" (LoginContributor "Demo" { username = "trustedpub", password = "password12" })
-          , initStep "pt-init-trustedpub-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "Home", rawMarkdown = Fixtures.demoHomePublished })
-          , initStep "pt-init-trustedpub-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "Guides", rawMarkdown = Fixtures.demoGuidesPublished })
-          , initStep "pt-init-trustedpub-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "About", rawMarkdown = Fixtures.demoAboutPublished })
-          , initStep "pt-init-trustedpub-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "MarkdownPlayground", rawMarkdown = Fixtures.demoMarkdownPlaygroundPublished })
-          , initStep "pt-init-elmtips-admin" "pt-c6" (LoginContributor "ElmTips" { username = "elmtipsadmin", password = "password12" })
-          , initStep "pt-init-elmtips-admin" "pt-c6" (SubmitNewPage "ElmTips" { rawPageSlug = "Home", rawMarkdown = "Tips and notes about Elm." })
-          ]
-        ]
 
 
 story13RejectReason : String

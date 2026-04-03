@@ -2,7 +2,7 @@ module ProgramTest.Story21_PromoteTrusted exposing (endToEndTests)
 
 import Effect.Browser.Dom
 import ProgramTest.Config
-import ProgramTest.LoginSteps
+import ProgramTest.Actions
 import ProgramTest.Query
 import ProgramTest.Start
 import Wiki
@@ -21,7 +21,7 @@ endToEndTests =
                 , steps =
                     \client ->
                         List.concat
-                            [ ProgramTest.LoginSteps.loginToWiki
+                            [ ProgramTest.Actions.loginToWiki
                                 { wikiSlug = "Demo"
                                 , username = "wikidemo"
                                 , password = "password12"
@@ -55,7 +55,7 @@ endToEndTests =
                 , steps =
                     \client ->
                         List.concat
-                            [ ProgramTest.LoginSteps.loginToWiki
+                            [ ProgramTest.Actions.loginToWiki
                                 { wikiSlug = "Demo"
                                 , username = "statusdemo"
                                 , password = "password12"

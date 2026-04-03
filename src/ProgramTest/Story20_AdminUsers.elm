@@ -1,7 +1,7 @@
 module ProgramTest.Story20_AdminUsers exposing (endToEndTests)
 
 import ProgramTest.Config
-import ProgramTest.LoginSteps
+import ProgramTest.Actions
 import ProgramTest.Query
 import ProgramTest.Start
 import Wiki
@@ -18,7 +18,7 @@ endToEndTests =
         , clientSteps =
             \client ->
                 List.concat
-                    [ ProgramTest.LoginSteps.loginToWiki
+                    [ ProgramTest.Actions.loginToWiki
                         { wikiSlug = "Demo"
                         , username = "wikidemo"
                         , password = "password12"

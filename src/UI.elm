@@ -18,6 +18,9 @@ module UI exposing
     , backlinksSectionClass
     , button
     , dangerButton
+    , formTextInputClass
+    , formTextareaClass
+    , formTextareaCompactClass
     , hostAdminWikiDetailCardClass
     , hostAdminWikiDetailDangerCardClass
     , hostAdminWikiDetailGridClass
@@ -46,10 +49,10 @@ module UI exposing
     , markdownListItemClass
     , markdownOrderedListClass
     , markdownParagraphClass
+    , markdownTextareaClass
     , markdownThematicBreakClass
     , markdownUnorderedListClass
     , markdownWikiLinkMissingClass
-    , publishedPageContributorActionsClass
     , sideNavListClass
     , sideNavNavClass
     , sideNavPublicAdminLinkClass
@@ -86,7 +89,42 @@ appMainScrollRegionId =
 
 appRootClass : String
 appRootClass =
-    "app-root flex flex-col h-dvh max-h-dvh min-h-0 overflow-hidden px-[0.5rem] pt-[0.25rem] pb-0 font-serif bg-[var(--bg)] text-[var(--fg)] leading-[1.35] [&_a]:text-[var(--link)] [&_a]:underline [&_a]:underline-offset-[2px] [&_a:hover]:text-[var(--link-hover)] [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-[var(--focus-ring)] [&_a:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-[var(--focus-ring)] [&_button:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-[var(--focus-ring)] [&_input:focus-visible]:outline-offset-2 [&_textarea:focus-visible]:outline-2 [&_textarea:focus-visible]:outline-[var(--focus-ring)] [&_textarea:focus-visible]:outline-offset-2 [&_select:focus-visible]:outline-2 [&_select:focus-visible]:outline-[var(--focus-ring)] [&_select:focus-visible]:outline-offset-2 [&_h1]:mt-[0.35rem] [&_h1]:mb-[0.2rem] [&_h1]:font-semibold [&_h1]:leading-[1.2] [&_h2]:mt-[0.35rem] [&_h2]:mb-[0.2rem] [&_h2]:font-semibold [&_h2]:leading-[1.2] [&_h2]:text-[1.1rem] [&_h3]:mt-[0.35rem] [&_h3]:mb-[0.2rem] [&_h3]:font-semibold [&_h3]:leading-[1.2] [&_h3]:text-[1rem] [&_p]:my-[0.25rem] [&_input]:font-inherit [&_input]:text-[1rem] [&_input]:px-[0.3rem] [&_input]:py-[0.15rem] [&_input]:mt-[0.1rem] [&_input]:mb-[0.2rem] [&_input]:border [&_input]:border-[var(--border)] [&_input]:bg-[var(--input-bg)] [&_input]:text-[var(--fg)] [&_input]:max-w-full [&_textarea:not([data-submission-conflict-box])]:font-inherit [&_textarea:not([data-submission-conflict-box])]:text-[1rem] [&_textarea:not([data-submission-conflict-box])]:px-[0.3rem] [&_textarea:not([data-submission-conflict-box])]:py-[0.15rem] [&_textarea:not([data-submission-conflict-box])]:mt-[0.1rem] [&_textarea:not([data-submission-conflict-box])]:mb-[0.2rem] [&_textarea:not([data-submission-conflict-box])]:border [&_textarea:not([data-submission-conflict-box])]:border-[var(--border)] [&_textarea:not([data-submission-conflict-box])]:bg-[var(--input-bg)] [&_textarea:not([data-submission-conflict-box])]:text-[var(--fg)] [&_textarea:not([data-submission-conflict-box])]:max-w-full [&_textarea:not([data-submission-conflict-box])]:min-h-[5rem] [&_textarea:not([data-submission-conflict-box])]:w-full [&_textarea:not([data-submission-conflict-box])]:max-w-[48rem] [&_select]:font-inherit [&_select]:text-[1rem] [&_select]:px-[0.3rem] [&_select]:py-[0.15rem] [&_select]:mt-[0.1rem] [&_select]:mb-[0.2rem] [&_select]:border [&_select]:border-[var(--border)] [&_select]:bg-[var(--input-bg)] [&_select]:text-[var(--fg)] [&_select]:max-w-full [&_label]:block [&_label]:mt-[0.25rem] [&_label]:text-[1rem] [&_label]:text-[var(--fg-muted)]"
+    "app-root flex flex-col h-dvh max-h-dvh min-h-0 overflow-hidden px-[0.5rem] pt-[0.25rem] pb-0 font-serif bg-[var(--bg)] text-[var(--fg)] leading-[1.35] [&_a]:text-[var(--link)] [&_a]:underline [&_a]:underline-offset-[2px] [&_a:hover]:text-[var(--link-hover)] [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-[var(--focus-ring)] [&_a:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-[var(--focus-ring)] [&_button:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-[var(--focus-ring)] [&_input:focus-visible]:outline-offset-2 [&_textarea:focus-visible]:outline-2 [&_textarea:focus-visible]:outline-[var(--focus-ring)] [&_textarea:focus-visible]:outline-offset-2 [&_h1]:mt-[0.35rem] [&_h1]:mb-[0.2rem] [&_h1]:font-semibold [&_h1]:leading-[1.2] [&_h2]:mt-[0.35rem] [&_h2]:mb-[0.2rem] [&_h2]:font-semibold [&_h2]:leading-[1.2] [&_h2]:text-[1.1rem] [&_h3]:mt-[0.35rem] [&_h3]:mb-[0.2rem] [&_h3]:font-semibold [&_h3]:leading-[1.2] [&_h3]:text-[1rem] [&_p]:my-[0.25rem] [&_label]:block [&_label]:mt-[0.25rem] [&_label]:text-[1rem] [&_label]:text-[var(--fg-muted)]"
+
+
+{-| Single-line controls (`type=text`, `password`, …). Omit on `checkbox` / `radio`.
+-}
+formTextInputClass : String
+formTextInputClass =
+    "font-inherit text-[1rem] px-[0.3rem] py-[0.15rem] mt-[0.1rem] mb-[0.2rem] border border-[var(--border)] bg-[var(--input-bg)] text-[var(--fg)] max-w-full box-border"
+
+
+{-| Border, spacing, and width shared by `formTextareaClass` and `markdownBodyTextareaClass`.
+-}
+formTextareaChromeClass : String
+formTextareaChromeClass =
+    "box-border px-[0.3rem] py-[0.15rem] mt-[0.1rem] mb-[0.2rem] border border-[var(--border)] bg-[var(--input-bg)] text-[var(--fg)] max-w-full w-full max-w-[48rem]"
+
+
+{-| Serif body typography plus `formTextareaChromeClass`.
+-}
+formTextareaShellClass : String
+formTextareaShellClass =
+    "font-inherit text-[1rem] " ++ formTextareaChromeClass
+
+
+{-| Default tall multi-line control.
+-}
+formTextareaClass : String
+formTextareaClass =
+    formTextareaShellClass ++ " min-h-[5rem]"
+
+
+{-| Short textarea inside flex layouts (e.g. review decision notes).
+-}
+formTextareaCompactClass : String
+formTextareaCompactClass =
+    formTextareaShellClass ++ " min-h-0"
 
 
 buttonClass : String
@@ -537,6 +575,13 @@ markdownCodeBlockCodeClass =
     "[font-family:var(--font-mono)] border-0 p-0 bg-transparent"
 
 
+{-| Markdown source `textarea` typography: matches fenced code blocks (`markdownCodeBlockPreClass`).
+-}
+markdownTextareaClass : String
+markdownTextareaClass =
+    "[font-family:var(--font-mono)] text-[0.85rem] leading-[1.4]"
+
+
 markdownThematicBreakClass : String
 markdownThematicBreakClass =
     "my-[0.35rem] border-0 border-t border-[var(--border)]"
@@ -550,11 +595,6 @@ backlinksSectionClass =
 backlinksListClass : String
 backlinksListClass =
     "list-none m-0 p-0 flex flex-col gap-[0.25rem]"
-
-
-publishedPageContributorActionsClass : String
-publishedPageContributorActionsClass =
-    "my-[0.25rem] mt-[0.15rem] text-[1rem]"
 
 
 sidebarDesktopOnlyClass : String

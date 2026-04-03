@@ -2,7 +2,7 @@ module ProgramTest.Story48_ConcurrentEditConflicts exposing (endToEndTests)
 
 import Effect.Browser.Dom
 import ProgramTest.Config
-import ProgramTest.LoginSteps
+import ProgramTest.Actions
 import ProgramTest.Query
 import ProgramTest.Start
 import Submission
@@ -107,7 +107,7 @@ endToEndTests =
                 , steps =
                     \client ->
                         List.concat
-                            [ ProgramTest.LoginSteps.loginToWiki
+                            [ ProgramTest.Actions.loginToWiki
                                 { wikiSlug = "Demo"
                                 , username = "trustedpub"
                                 , password = "password12"
@@ -130,7 +130,7 @@ endToEndTests =
                 , steps =
                     \client ->
                         List.concat
-                            [ ProgramTest.LoginSteps.loginToWiki
+                            [ ProgramTest.Actions.loginToWiki
                                 { wikiSlug = "Demo"
                                 , username = "story48b"
                                 , password = "password12"
@@ -180,7 +180,7 @@ endToEndTests =
                 , steps =
                     \client ->
                         List.concat
-                            [ ProgramTest.LoginSteps.loginToWiki
+                            [ ProgramTest.Actions.loginToWiki
                                 { wikiSlug = "Demo"
                                 , username = "trustedpub"
                                 , password = "password12"

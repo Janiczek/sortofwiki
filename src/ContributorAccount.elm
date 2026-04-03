@@ -142,7 +142,7 @@ type RegisterContributorError
     | RegisterUsernameTooShort
     | RegisterUsernameTooLong
     | RegisterUsernameInvalidChars
-    | RegisterPasswordTooShort
+    | RegisterPasswordEmpty
 
 
 registerErrorToUserText : RegisterContributorError -> String
@@ -169,8 +169,8 @@ registerErrorToUserText err =
         RegisterUsernameInvalidChars ->
             "Username may only use letters, digits, underscores, and hyphens."
 
-        RegisterPasswordTooShort ->
-            "Password must be at least 8 characters."
+        RegisterPasswordEmpty ->
+            "Enter a password."
 
 
 usernameRestCharOk : Char -> Bool
@@ -220,11 +220,17 @@ validateRegistrationFields rawUsername password =
     else if not (usernameCharsOk normalized) then
         Err RegisterUsernameInvalidChars
 
-    else if String.length password < 8 then
-        Err RegisterPasswordTooShort
-
     else
-        Ok { normalizedUsername = normalized, password = password }
+        let
+            trimmedPassword : String
+            trimmedPassword =
+                String.trim password
+        in
+        if String.isEmpty trimmedPassword then
+            Err RegisterPasswordEmpty
+
+        else
+            Ok { normalizedUsername = normalized, password = trimmedPassword }
 
 
 {-| Minimal checks before a login request (MVP).
@@ -239,8 +245,14 @@ validateLoginFields rawUsername password =
     if String.isEmpty normalized then
         Err LoginUsernameEmpty
 
-    else if String.isEmpty password then
-        Err LoginPasswordEmpty
-
     else
-        Ok { normalizedUsername = normalized, password = password }
+        let
+            trimmedPassword : String
+            trimmedPassword =
+                String.trim password
+        in
+        if String.isEmpty trimmedPassword then
+            Err LoginPasswordEmpty
+
+        else
+            Ok { normalizedUsername = normalized, password = trimmedPassword }

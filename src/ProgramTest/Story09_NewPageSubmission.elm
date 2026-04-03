@@ -58,7 +58,7 @@ endToEndTests =
                             ]
                         )
                     )
-                , client.input 100 (Effect.Browser.Dom.id "wiki-submit-new-markdown") "# Story 09 page"
+                , client.input 100 (Effect.Browser.Dom.id "content-markdown-textarea") "# Story 09 page"
                 , client.click 100 (Effect.Browser.Dom.id "wiki-submit-new-submit")
                 , client.checkView 300
                     (ProgramTest.Query.withinId "wiki-submit-new-success"

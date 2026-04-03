@@ -4,7 +4,7 @@ import Dict
 import Effect.Browser.Dom
 import Env
 import ProgramTest.Config
-import ProgramTest.LoginSteps
+import ProgramTest.Actions
 import ProgramTest.Query
 import ProgramTest.Start
 import RemoteData
@@ -50,7 +50,7 @@ endToEndTests =
         , clientSteps =
             \client ->
                 List.concat
-                    [ ProgramTest.LoginSteps.submitWikiLoginForm
+                    [ ProgramTest.Actions.submitWikiLoginForm
                         { username = "trustedpub"
                         , password = "password12"
                         }

@@ -3,7 +3,7 @@ module ProgramTest.Story10_PageEditSubmission exposing (endToEndTests)
 import Effect.Browser.Dom
 import Expect
 import ProgramTest.Config
-import ProgramTest.LoginSteps
+import ProgramTest.Actions
 import ProgramTest.Query
 import ProgramTest.Start
 import Route
@@ -49,7 +49,7 @@ endToEndTests =
                       , client.click 100 (Effect.Browser.Dom.id "wiki-logout-button")
                       , client.clickLink 100 (Wiki.loginUrlPath "Demo")
                       ]
-                    , ProgramTest.LoginSteps.submitWikiLoginForm
+                    , ProgramTest.Actions.submitWikiLoginForm
                         { username = "story10user"
                         , password = "password12"
                         }

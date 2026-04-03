@@ -2,7 +2,7 @@ module ProgramTest.Story11_PageDeleteSubmission exposing (endToEndTests)
 
 import Effect.Browser.Dom
 import ProgramTest.Config
-import ProgramTest.LoginSteps
+import ProgramTest.Actions
 import ProgramTest.Query
 import ProgramTest.Start
 import Wiki
@@ -34,7 +34,7 @@ endToEndTests =
                       , client.click 100 (Effect.Browser.Dom.id "wiki-logout-button")
                       , client.clickLink 100 (Wiki.loginUrlPath "Demo")
                       ]
-                    , ProgramTest.LoginSteps.submitWikiLoginForm
+                    , ProgramTest.Actions.submitWikiLoginForm
                         { username = "story11user"
                         , password = "password12"
                         }

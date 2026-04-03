@@ -2,7 +2,7 @@ module ProgramTest.Story12_SubmissionStatus exposing (endToEndTests)
 
 import Effect.Browser.Dom
 import ProgramTest.Config
-import ProgramTest.LoginSteps
+import ProgramTest.Actions
 import ProgramTest.Query
 import ProgramTest.Start
 import Types exposing (FrontendMsg(..))
@@ -39,7 +39,7 @@ endToEndTests =
                         (ProgramTest.Query.expectHasText "Registration complete")
                     )
                 , client.update 100 (UrlChanged submitNewPageUrl)
-                , client.input 100 (Effect.Browser.Dom.id "wiki-submit-new-markdown") "# Story 12"
+                , client.input 100 (Effect.Browser.Dom.id "content-markdown-textarea") "# Story 12"
                 , client.click 100 (Effect.Browser.Dom.id "wiki-submit-new-submit")
                 , client.checkView 300
                     (ProgramTest.Query.withinId "wiki-submit-new-success"
@@ -65,7 +65,7 @@ endToEndTests =
         , clientSteps =
             \client ->
                 List.concat
-                    [ ProgramTest.LoginSteps.loginToWiki
+                    [ ProgramTest.Actions.loginToWiki
                         { wikiSlug = "Demo"
                         , username = "statusdemo"
                         , password = "password12"

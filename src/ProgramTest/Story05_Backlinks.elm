@@ -1,60 +1,109 @@
 module ProgramTest.Story05_Backlinks exposing (endToEndTests)
 
+import Page
+import ProgramTest.Actions
 import ProgramTest.Config
 import ProgramTest.Query
 import ProgramTest.Start
+import Route
+import Types exposing (FrontendMsg(..))
+import Url exposing (Protocol(..), Url)
+import Wiki
+
+
+wikiSlug : Wiki.Slug
+wikiSlug =
+    "Demo"
+
+
+targetPageSlug : Page.Slug
+targetPageSlug =
+    "Target"
+
+
+linkerPageSlug : Page.Slug
+linkerPageSlug =
+    "Linker"
+
+
+publishedTargetUrl : Url
+publishedTargetUrl =
+    { protocol = Http
+    , host = "localhost"
+    , port_ = Just 8000
+    , path = Wiki.publishedPageUrlPath wikiSlug targetPageSlug
+    , query = Nothing
+    , fragment = Nothing
+    }
+
+
+publishedLinkerUrl : Url
+publishedLinkerUrl =
+    { protocol = Http
+    , host = "localhost"
+    , port_ = Just 8000
+    , path = Wiki.publishedPageUrlPath wikiSlug linkerPageSlug
+    , query = Nothing
+    , fragment = Nothing
+    }
 
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
     [ ProgramTest.Start.start
-        { name = "5 — backlinks on published page /w/Demo/p/Guides"
-        , config = ProgramTest.Config.demoWikiPagesOnly
-        , sessionId = "session-backlinks-guides"
-        , path = "/w/Demo/p/Guides"
+        { name = "Backlinks: create, check existence, remove, check absence"
+        , config = ProgramTest.Config.demoWikiCatalogOnly
+        , sessionId = "session-story05-backlinks"
+        , path = "/"
         , connectClientMs = Nothing
         , clientSteps =
             \client ->
-                [ client.checkView 100
-                    (ProgramTest.Query.expectAll
-                        [ ProgramTest.Query.withinId "page-backlinks"
-                            (ProgramTest.Query.expectHasText "Backlinks")
-                        , ProgramTest.Query.withinId "page-backlinks-list"
-                            (ProgramTest.Query.withinHref "/w/Demo/p/Home"
-                                (ProgramTest.Query.expectHasDataAttributes [ ( "data-backlink-page-slug", "Home" ) ])
+                List.concat
+                    [ ProgramTest.Actions.loginToWiki
+                        { wikiSlug = wikiSlug
+                        , username = "wikidemo"
+                        , password = "password12"
+                        }
+                        client
+                    , [ client.checkView 400 (ProgramTest.Query.expectWikiHomePageShowsSlug wikiSlug)
+                      ]
+                    , ProgramTest.Actions.createPage wikiSlug targetPageSlug "# Target\n\nStandalone page." client
+                    , ProgramTest.Actions.createPage wikiSlug linkerPageSlug "# Linker\n\nSee [[Target]] for more." client
+                    , [ client.update 100 (UrlChanged publishedTargetUrl)
+                      , client.checkView 300 (ProgramTest.Query.expectBacklinks wikiSlug [ linkerPageSlug ])
+                      , client.update 100 (UrlChanged publishedLinkerUrl)
+                      , client.checkView 300 ProgramTest.Query.expectNoBacklinks
+                      ]
+                    , ProgramTest.Actions.navigateToWikiSubmitEdit wikiSlug linkerPageSlug client
+                    , [ client.checkModel 200
+                            (\model ->
+                                case model.route of
+                                    Route.WikiSubmitEdit w p ->
+                                        if w == wikiSlug && p == linkerPageSlug then
+                                            Ok ()
+
+                                        else
+                                            Err "wrong wiki or page on submit-edit route"
+
+                                    _ ->
+                                        Err "expected submit-edit route after navigation"
                             )
-                        ]
-                    )
-                ]
-        }
-    , ProgramTest.Start.start
-        { name = "5 — backlinks on home list pages that link here (about → home, not reciprocated)"
-        , config = ProgramTest.Config.demoWikiPagesOnly
-        , sessionId = "session-backlinks-home"
-        , path = "/w/Demo/p/Home"
-        , connectClientMs = Nothing
-        , clientSteps =
-            \client ->
-                [ client.checkView 100
-                    (ProgramTest.Query.withinId "page-backlinks-list"
-                        (ProgramTest.Query.withinHref "/w/Demo/p/About"
-                            (ProgramTest.Query.expectHasDataAttributes [ ( "data-backlink-page-slug", "About" ) ])
-                        )
-                    )
-                ]
-        }
-    , ProgramTest.Start.start
-        { name = "5 — backlinks empty state on single-page wiki /w/ElmTips/p/Home"
-        , config = ProgramTest.Config.demoWikiPagesOnly
-        , sessionId = "session-backlinks-elm-tips-home"
-        , path = "/w/ElmTips/p/Home"
-        , connectClientMs = Nothing
-        , clientSteps =
-            \client ->
-                [ client.checkView 100
-                    (ProgramTest.Query.withinId "page-backlinks"
-                        (ProgramTest.Query.expectHasText "No backlinks.")
-                    )
-                ]
+                      , client.checkModel 3000
+                            (\model ->
+                                if String.contains "[[Target]]" model.pageEditSubmitDraft.markdownBody then
+                                    Ok ()
+
+                                else
+                                    Err
+                                        ("expected Linker edit draft to contain [[Target]], got length "
+                                            ++ String.fromInt (String.length model.pageEditSubmitDraft.markdownBody)
+                                        )
+                            )
+                      ]
+                    , ProgramTest.Actions.submitWikiEditForm "# Linker\n\nNo wiki link here." client
+                    , [ client.update 100 (UrlChanged publishedTargetUrl)
+                      , client.checkView 300 ProgramTest.Query.expectNoBacklinks
+                      ]
+                    ]
         }
     ]

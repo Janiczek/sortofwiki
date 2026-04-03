@@ -65,7 +65,7 @@ endToEndTests =
                 , client.update 100 (UrlChanged prefillMissingPublishedPageUrl)
                 , client.clickLink 100 (Wiki.submitNewPageUrlPathWithSuggestedSlug "Demo" "Story49PrefillSlug")
                 , client.checkView 100
-                    (ProgramTest.Query.withinId "wiki-submit-new-slug"
+                    (ProgramTest.Query.withinId "slug-input"
                         (ProgramTest.Query.expectAll
                             [ ProgramTest.Query.expectHasInputValue "Story49PrefillSlug"
                             , ProgramTest.Query.expectHasReadonly
@@ -91,7 +91,7 @@ endToEndTests =
                     )
                 , client.update 100 (UrlChanged submitNewNoQueryUrl)
                 , client.checkView 100
-                    (ProgramTest.Query.withinId "wiki-submit-new-slug"
+                    (ProgramTest.Query.withinId "slug-input"
                         ProgramTest.Query.expectDoesNotHaveReadonly
                     )
                 ]

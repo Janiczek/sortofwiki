@@ -1,5 +1,6 @@
 module ProgramTest.Query exposing
     ( expectAll
+    , expectBacklinks
     , expectDataAttributeOccurrenceCount
     , expectDescendantMatchesEvery
     , expectDoesNotHaveAriaLabel
@@ -18,6 +19,7 @@ module ProgramTest.Query exposing
     , expectHasTexts
     , expectHasWikiSlug
     , expectLink
+    , expectNoBacklinks
     , expectPageShowsWikiSlug
     , expectTagOccurrenceCount
     , expectTextOccurrenceCount
@@ -47,6 +49,7 @@ import Expect exposing (Expectation)
 import Html.Attributes
 import Test.Html.Query
 import Test.Html.Selector
+import Wiki
 
 
 dataAttr : String -> String -> Test.Html.Selector.Selector
@@ -288,6 +291,29 @@ expectWikiHomePageShowsSlug =
 expectWikiLoginPageShowsSlug : String -> Test.Html.Query.Single msg -> Expectation
 expectWikiLoginPageShowsSlug =
     expectPageShowsWikiSlug "wiki-login-page"
+
+
+{-| Published page backlinks section: heading plus one entry per slug (`data-backlink-page-slug`, href).
+-}
+expectBacklinks : String -> List String -> Test.Html.Query.Single msg -> Expectation
+expectBacklinks wikiSlug backlinkPageSlugs root =
+    expectAll
+        (withinId "page-backlinks" (expectHasText "Backlinks")
+            :: List.map
+                (\slug ->
+                    withinId "page-backlinks-list"
+                        (withinHref (Wiki.publishedPageUrlPath wikiSlug slug)
+                            (expectHasDataAttributes [ ( "data-backlink-page-slug", slug ) ])
+                        )
+                )
+                backlinkPageSlugs
+        )
+        root
+
+
+expectNoBacklinks : Test.Html.Query.Single msg -> Expectation
+expectNoBacklinks root =
+    withinId "page-backlinks-empty" (expectHasText "No backlinks.") root
 
 
 expectAll : List (Test.Html.Query.Single msg -> Expectation) -> Test.Html.Query.Single msg -> Expectation

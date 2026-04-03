@@ -26,10 +26,18 @@ suite =
                 \() ->
                     ContributorAccount.validateRegistrationFields "_abc" "password12"
                         |> Expect.equal (Err ContributorAccount.RegisterUsernameInvalidChars)
-            , Test.test "rejects short password" <|
+            , Test.test "accepts short non-empty password" <|
                 \() ->
                     ContributorAccount.validateRegistrationFields "alice" "short"
-                        |> Expect.equal (Err ContributorAccount.RegisterPasswordTooShort)
+                        |> Expect.equal (Ok { normalizedUsername = "alice", password = "short" })
+            , Test.test "rejects whitespace-only password" <|
+                \() ->
+                    ContributorAccount.validateRegistrationFields "alice" "   "
+                        |> Expect.equal (Err ContributorAccount.RegisterPasswordEmpty)
+            , Test.test "trims password in registration result" <|
+                \() ->
+                    ContributorAccount.validateRegistrationFields "alice" "  x  "
+                        |> Expect.equal (Ok { normalizedUsername = "alice", password = "x" })
             , Test.fuzz (Fuzz.intRange 0 99999) "valid default-shaped usernames pass" <|
                 \n ->
                     let
@@ -37,7 +45,7 @@ suite =
                         u =
                             "usr" ++ String.fromInt n
                     in
-                    ContributorAccount.validateRegistrationFields u "abcdefgh"
+                    ContributorAccount.validateRegistrationFields u "p"
                         |> Result.map .normalizedUsername
                         |> Expect.equal (Ok (String.toLower u))
             ]
@@ -80,6 +88,14 @@ suite =
                 \() ->
                     ContributorAccount.validateLoginFields "alice" ""
                         |> Expect.equal (Err ContributorAccount.LoginPasswordEmpty)
+            , Test.test "rejects whitespace-only password" <|
+                \() ->
+                    ContributorAccount.validateLoginFields "alice" "   "
+                        |> Expect.equal (Err ContributorAccount.LoginPasswordEmpty)
+            , Test.test "trims password in login result" <|
+                \() ->
+                    ContributorAccount.validateLoginFields "alice" "  x  "
+                        |> Expect.equal (Ok { normalizedUsername = "alice", password = "x" })
             , Test.fuzz (Fuzz.intRange 0 99999) "accepts usrN-shaped usernames with any non-empty password" <|
                 \n ->
                     let
