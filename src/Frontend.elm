@@ -3618,6 +3618,9 @@ updateFromBackend msg model =
                         ( Route.WikiLogin _ (Just path), Ok _ ) ->
                             Effect.Browser.Navigation.pushUrl nextModel.key path
 
+                        ( Route.WikiRegister homeWikiSlug, Ok _ ) ->
+                            Effect.Browser.Navigation.pushUrl nextModel.key (Wiki.wikiHomeUrlPath homeWikiSlug)
+
                         _ ->
                             Command.none
             in

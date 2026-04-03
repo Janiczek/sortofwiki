@@ -4,12 +4,13 @@ import Expect
 import ProgramTest.Config
 import ProgramTest.Query
 import ProgramTest.Start
+import Wiki
 
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
     [ ProgramTest.Start.start
-        { name = "6 — published body on /w/Demo/p/Home, pending text absent"
+        { name = "Pending edit not shown on /w/Demo/p/Home"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story06-home"
         , path = "/w/Demo/p/Home"
@@ -27,7 +28,7 @@ endToEndTests =
                 ]
         }
     , ProgramTest.Start.start
-        { name = "6 — pending-only slug 404 at /w/Demo/p/OnlyPending"
+        { name = "Pending new page not in list, shows 404 at /w/Demo/p/OnlyPending"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story06-pending-only"
         , path = "/w/Demo/p/OnlyPending"
@@ -45,19 +46,13 @@ endToEndTests =
                         , ProgramTest.Query.expectHasNotText "STORY06_PENDING_ONLY"
                         ]
                     )
-                ]
-        }
-    , ProgramTest.Start.start
-        { name = "6 — wiki home table omits pending-only slug"
-        , config = ProgramTest.Config.demoWikiPagesOnly
-        , sessionId = "session-story06-pages-list"
-        , path = "/w/Demo"
-        , connectClientMs = Nothing
-        , clientSteps =
-            \client ->
-                [ client.checkView 100
+                , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
+                , client.checkView 100
                     (ProgramTest.Query.withinId "wiki-home-page-slugs"
-                        (ProgramTest.Query.expectDataAttributeOccurrenceCount "data-page-slug" "OnlyPending" (\c -> c |> Expect.equal 0))
+                        (ProgramTest.Query.expectDataAttributeOccurrenceCount "data-page-slug"
+                            "OnlyPending"
+                            (Expect.equal 0)
+                        )
                     )
                 ]
         }

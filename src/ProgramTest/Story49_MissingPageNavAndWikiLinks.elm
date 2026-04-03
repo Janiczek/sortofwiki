@@ -58,10 +58,8 @@ endToEndTests =
                 [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story49prefilluser"
                 , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
                 , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
-                , client.checkView 300
-                    (ProgramTest.Query.withinId "wiki-register-success"
-                        (ProgramTest.Query.expectHasText "Registration complete")
-                    )
+                , client.checkView 400
+                    (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
                 , client.update 100 (UrlChanged prefillMissingPublishedPageUrl)
                 , client.clickLink 100 (Wiki.submitNewPageUrlPathWithSuggestedSlug "Demo" "Story49PrefillSlug")
                 , client.checkView 100
@@ -85,10 +83,8 @@ endToEndTests =
                 [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story49editableslug"
                 , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
                 , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
-                , client.checkView 300
-                    (ProgramTest.Query.withinId "wiki-register-success"
-                        (ProgramTest.Query.expectHasText "Registration complete")
-                    )
+                , client.checkView 400
+                    (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
                 , client.update 100 (UrlChanged submitNewNoQueryUrl)
                 , client.checkView 100
                     (ProgramTest.Query.withinId "slug-input"

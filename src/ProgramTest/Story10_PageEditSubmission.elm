@@ -4,6 +4,7 @@ import Effect.Browser.Dom
 import Expect
 import ProgramTest.Config
 import ProgramTest.Actions
+import ProgramTest.Model
 import ProgramTest.Query
 import ProgramTest.Start
 import Route
@@ -42,10 +43,8 @@ endToEndTests =
                     [ [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story10user"
                       , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
                       , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
-                      , client.checkView 300
-                            (ProgramTest.Query.withinId "wiki-register-success"
-                                (ProgramTest.Query.expectHasText "Registration complete")
-                            )
+                      , client.checkView 400
+                            (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
                       , client.click 100 (Effect.Browser.Dom.id "wiki-logout-button")
                       , client.clickLink 100 (Wiki.loginUrlPath "Demo")
                       ]
@@ -64,13 +63,8 @@ endToEndTests =
                             )
                       , client.update 100 (UrlChanged story10SubmitEditUrl)
                       , client.checkModel 200
-                            (\model ->
-                                case model.route of
-                                    Route.WikiSubmitEdit "Demo" "Guides" ->
-                                        Ok ()
-
-                                    _ ->
-                                        Err "expected submit-edit route after navigation"
+                            (ProgramTest.Model.expectRoute (Route.WikiSubmitEdit "Demo" "Guides")
+                                "expected submit-edit route after navigation"
                             )
                       , client.checkModel 3000
                             (\model ->

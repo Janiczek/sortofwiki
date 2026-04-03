@@ -3,6 +3,7 @@ module ProgramTest.Story08_Login exposing (endToEndTests)
 import Effect.Browser.Dom
 import ProgramTest.Config
 import ProgramTest.Actions
+import ProgramTest.Model
 import ProgramTest.Query
 import ProgramTest.Start
 import Route
@@ -25,7 +26,7 @@ demoLoginPathUrl =
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
     [ ProgramTest.Start.start
-        { name = "8 — login contributor /w/Demo/login"
+        { name = "Login on a wiki"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story08-login"
         , path = "/w/Demo/register"
@@ -33,36 +34,32 @@ endToEndTests =
         , clientSteps =
             \client ->
                 List.concat
-                    [ [ client.checkView 100
-                            (ProgramTest.Query.expectPageShowsWikiSlug "wiki-register-page" "Demo")
+                    [ [ client.checkView 100 (ProgramTest.Query.expectPageShowsWikiSlug "wiki-register-page" "Demo")
                       , client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story08user"
                       , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
                       , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
-                      , client.checkView 300
+                      , client.checkView 400
                             (ProgramTest.Query.expectAll
-                                [ ProgramTest.Query.withinId "wiki-register-success"
-                                    (ProgramTest.Query.expectHasText "Registration complete")
+                                [ ProgramTest.Query.expectWikiHomePageShowsSlug "Demo"
                                 , ProgramTest.Query.withinId "wiki-logout-button"
                                     (ProgramTest.Query.expectHasText "Log out")
                                 ]
                             )
                       , client.click 100 (Effect.Browser.Dom.id "wiki-logout-button")
                       , client.clickLink 100 (Wiki.loginUrlPath "Demo")
-                      , client.checkView 100
-                            (ProgramTest.Query.expectWikiLoginPageShowsSlug "Demo")
+                      , client.checkView 100 (ProgramTest.Query.expectWikiLoginPageShowsSlug "Demo")
                       ]
                     , ProgramTest.Actions.submitWikiLoginForm
                         { username = "story08user"
                         , password = "password12"
                         }
                         client
-                    , [ client.checkView 400
-                            (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
+                    , [ client.checkView 400 (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
                       ]
                     ]
         }
     , ProgramTest.Start.start
-        { name = "8 — logged-in user visiting /w/Demo/login is redirected to wiki home"
+        { name = "Logged in user can't see login form"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story08-login-redirect-away"
         , path = "/w/Demo/login"
@@ -81,19 +78,14 @@ endToEndTests =
                       , client.checkView 400
                             (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
                       , client.checkModel 100
-                            (\model ->
-                                case model.route of
-                                    Route.WikiHome "Demo" ->
-                                        Ok ()
-
-                                    _ ->
-                                        Err "expected WikiHome demo after login guard on /login"
+                            (ProgramTest.Model.expectRoute (Route.WikiHome "Demo")
+                                "expected WikiHome demo after login guard on /login"
                             )
                       ]
                     ]
         }
     , ProgramTest.Start.start
-        { name = "8 — contributor can log out from wiki nav"
+        { name = "Logged in user can log out"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story08-logout"
         , path = "/"

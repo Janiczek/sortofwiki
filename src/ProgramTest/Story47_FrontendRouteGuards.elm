@@ -5,6 +5,7 @@ import Effect.Browser.Dom
 import Env
 import ProgramTest.Config
 import ProgramTest.Actions
+import ProgramTest.Model
 import ProgramTest.Query
 import ProgramTest.Start
 import RemoteData
@@ -24,17 +25,18 @@ endToEndTests =
             \client ->
                 [ client.checkModel 400
                     (\model ->
-                        case model.route of
-                            Route.WikiLogin "Demo" (Just "/w/Demo/review") ->
-                                case Dict.get "Demo" model.store.reviewQueues of
-                                    Nothing ->
-                                        Ok ()
+                        ProgramTest.Model.expectRoute (Route.WikiLogin "Demo" (Just "/w/Demo/review"))
+                            "expected gated login route with redirect back to review"
+                            model
+                            |> Result.andThen
+                                (\_ ->
+                                    case Dict.get "Demo" model.store.reviewQueues of
+                                        Nothing ->
+                                            Ok ()
 
-                                    Just _ ->
-                                        Err "review queue should not be requested before login"
-
-                            _ ->
-                                Err "expected gated login route with redirect back to review"
+                                        Just _ ->
+                                            Err "review queue should not be requested before login"
+                                )
                     )
                 , client.checkView 100
                     (ProgramTest.Query.expectWikiLoginPageShowsSlug "Demo")
@@ -69,13 +71,8 @@ endToEndTests =
         , clientSteps =
             \client ->
                 [ client.checkModel 500
-                    (\model ->
-                        case model.route of
-                            Route.HostAdmin (Just "/admin/wikis/new") ->
-                                Ok ()
-
-                            _ ->
-                                Err "expected host admin login route preserving return path"
+                    (ProgramTest.Model.expectRoute (Route.HostAdmin (Just "/admin/wikis/new"))
+                        "expected host admin login route preserving return path"
                     )
                 , client.checkView 100
                     (ProgramTest.Query.withinId "host-admin-login-password"
@@ -92,13 +89,8 @@ endToEndTests =
         , clientSteps =
             \client ->
                 [ client.checkModel 500
-                    (\model ->
-                        case model.route of
-                            Route.HostAdmin (Just "/admin/wikis/ElmTips") ->
-                                Ok ()
-
-                            _ ->
-                                Err "expected host admin login route preserving return path to wiki detail"
+                    (ProgramTest.Model.expectRoute (Route.HostAdmin (Just "/admin/wikis/ElmTips"))
+                        "expected host admin login route preserving return path to wiki detail"
                     )
                 , client.checkView 100
                     (ProgramTest.Query.withinId "host-admin-login-password"

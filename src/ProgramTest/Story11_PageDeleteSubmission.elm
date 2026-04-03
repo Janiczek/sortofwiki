@@ -27,10 +27,8 @@ endToEndTests =
                     [ [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story11user"
                       , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
                       , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
-                      , client.checkView 300
-                            (ProgramTest.Query.withinId "wiki-register-success"
-                                (ProgramTest.Query.expectHasText "Registration complete")
-                            )
+                      , client.checkView 400
+                            (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
                       , client.click 100 (Effect.Browser.Dom.id "wiki-logout-button")
                       , client.clickLink 100 (Wiki.loginUrlPath "Demo")
                       ]

@@ -3,6 +3,7 @@ module ProgramTest.Story05_Backlinks exposing (endToEndTests)
 import Page
 import ProgramTest.Actions
 import ProgramTest.Config
+import ProgramTest.Model
 import ProgramTest.Query
 import ProgramTest.Start
 import Route
@@ -76,17 +77,8 @@ endToEndTests =
                       ]
                     , ProgramTest.Actions.navigateToWikiSubmitEdit wikiSlug linkerPageSlug client
                     , [ client.checkModel 200
-                            (\model ->
-                                case model.route of
-                                    Route.WikiSubmitEdit w p ->
-                                        if w == wikiSlug && p == linkerPageSlug then
-                                            Ok ()
-
-                                        else
-                                            Err "wrong wiki or page on submit-edit route"
-
-                                    _ ->
-                                        Err "expected submit-edit route after navigation"
+                            (ProgramTest.Model.expectRoute (Route.WikiSubmitEdit wikiSlug linkerPageSlug)
+                                "expected submit-edit route for linker page after navigation"
                             )
                       , client.checkModel 3000
                             (\model ->
