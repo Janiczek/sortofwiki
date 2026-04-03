@@ -6,9 +6,11 @@ import Effect.Browser.Dom
 import Effect.Lamdera
 import Effect.Test
 import Effect.Time
+import Env
 import Frontend
 import Html.Attributes
 import ProgramTest.Config
+import RemoteData
 import Route
 import Test.Html.Query
 import Test.Html.Selector
@@ -44,6 +46,28 @@ hostNewWikiUrl =
     , host = "localhost"
     , port_ = Just 8000
     , path = "/admin/wikis/new"
+    , query = Nothing
+    , fragment = Nothing
+    }
+
+
+adminUrl : Url
+adminUrl =
+    { protocol = Http
+    , host = "localhost"
+    , port_ = Just 8000
+    , path = "/admin"
+    , query = Nothing
+    , fragment = Nothing
+    }
+
+
+hostWikiElmTipsUrl : Url
+hostWikiElmTipsUrl =
+    { protocol = Http
+    , host = "localhost"
+    , port_ = Just 8000
+    , path = "/admin/wikis/elm-tips"
     , query = Nothing
     , fragment = Nothing
     }
@@ -135,6 +159,82 @@ endToEndTests =
                         root
                             |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-login-password" ]
                             |> Test.Html.Query.has []
+                    )
+                ]
+            )
+        ]
+    , Effect.Test.start
+        "47 — anonymous /admin/wikis/elm-tips ends on host login with redirect"
+        (Effect.Time.millisToPosix 0)
+        ProgramTest.Config.config
+        [ Effect.Test.connectFrontend
+            202
+            (Effect.Lamdera.sessionIdFromString "session-story47-host-wiki-detail-anon")
+            "/admin/wikis/elm-tips"
+            { width = 800, height = 600 }
+            (\client ->
+                [ client.update 100 (UrlChanged hostWikiElmTipsUrl)
+                , client.checkModel 500
+                    (\model ->
+                        case model.route of
+                            Route.HostAdmin (Just "/admin/wikis/elm-tips") ->
+                                Ok ()
+
+                            _ ->
+                                Err "expected host admin login route preserving return path to wiki detail"
+                    )
+                , client.checkView 100
+                    (\root ->
+                        root
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-login-password" ]
+                            |> Test.Html.Query.has []
+                    )
+                ]
+            )
+        ]
+    , Effect.Test.start
+        "47 — host-authenticated cold open /admin/wikis/elm-tips loads detail (not NotAsked ellipsis)"
+        (Effect.Time.millisToPosix 0)
+        ProgramTest.Config.config
+        [ Effect.Test.connectFrontend
+            203
+            (Effect.Lamdera.sessionIdFromString "session-story47-host-wiki-detail-auth")
+            "/admin"
+            { width = 800, height = 600 }
+            (\client ->
+                [ client.update 100 (UrlChanged adminUrl)
+                , client.input 100 (Effect.Browser.Dom.id "host-admin-login-password") Env.hostAdminPassword
+                , client.click 100 (Effect.Browser.Dom.id "host-admin-login-submit")
+                , client.checkView 300
+                    (\root ->
+                        root
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-wikis-list" ]
+                            |> Test.Html.Query.has []
+                    )
+                ]
+            )
+        , Effect.Test.connectFrontend
+            204
+            (Effect.Lamdera.sessionIdFromString "session-story47-host-wiki-detail-auth")
+            "/admin/wikis/elm-tips"
+            { width = 800, height = 600 }
+            (\client ->
+                [ client.update 100 (UrlChanged hostWikiElmTipsUrl)
+                , client.checkModel 500
+                    (\model ->
+                        case model.hostAdminWikiDetailDraft.load of
+                            RemoteData.NotAsked ->
+                                Err "detail load should not stay NotAsked after cold open (RequestHostWikiDetail must apply)"
+
+                            _ ->
+                                Ok ()
+                    )
+                , client.checkView 400
+                    (\root ->
+                        root
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-wiki-detail-slug" ]
+                            |> Test.Html.Query.has
+                                [ Test.Html.Selector.attribute (Html.Attributes.value "elm-tips") ]
                     )
                 ]
             )

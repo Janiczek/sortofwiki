@@ -60,4 +60,23 @@ endToEndTests =
                 ]
             )
         ]
+    , Effect.Test.start
+        "5 — backlinks empty state on single-page wiki /w/elm-tips/p/Home"
+        (Effect.Time.millisToPosix 0)
+        ProgramTest.Config.config
+        [ Effect.Test.connectFrontend
+            100
+            (Effect.Lamdera.sessionIdFromString "session-backlinks-elm-tips-home")
+            "/w/elm-tips/p/Home"
+            { width = 800, height = 600 }
+            (\client ->
+                [ client.checkView 100
+                    (\root ->
+                        root
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "page-backlinks" ]
+                            |> Test.Html.Query.has [ Test.Html.Selector.text "No backlinks." ]
+                    )
+                ]
+            )
+        ]
     ]

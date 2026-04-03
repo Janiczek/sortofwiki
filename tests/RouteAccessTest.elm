@@ -18,14 +18,14 @@ anon =
 contribDemo : RouteAccess.ContributorSession
 contribDemo =
     { contributorWikiSession = Just "demo"
-    , contributorWikiRole = Just WikiRole.Contributor
+    , contributorWikiRole = Just WikiRole.UntrustedContributor
     }
 
 
 trustedDemo : RouteAccess.ContributorSession
 trustedDemo =
     { contributorWikiSession = Just "demo"
-    , contributorWikiRole = Just WikiRole.Trusted
+    , contributorWikiRole = Just WikiRole.TrustedContributor
     }
 
 

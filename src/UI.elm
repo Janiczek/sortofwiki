@@ -1,0 +1,455 @@
+module UI exposing
+    ( appHeaderBarClass
+    , appHeaderDividerClass
+    , appHeaderH1Class
+    , appHeaderPrimaryLinkClass
+    , appHeaderPrimaryPlainClass
+    , appHeaderSecondaryBracketClass
+    , appHeaderSecondaryMetaClass
+    , appHeaderSecondaryWikiLabelEmClass
+    , appHeaderSecondaryWikiWrapClass
+    , appHeaderTitleRowClass
+    , appMainScrollRegionId
+    , appRootClass
+    , backlinksListClass
+    , backlinksSectionClass
+    , button
+    , dangerButton
+    , hostAdminWikiDetailCardClass
+    , hostAdminWikiDetailDangerCardClass
+    , hostAdminWikiDetailGridClass
+    , hostAdminWikiDetailMainStackClass
+    , hostAdminWikiDetailPageTitleClass
+    , hostAdminWikiDetailShellClass
+    , hostAdminWikiDetailSideStackClass
+    , hostAdminWikiSlugClass
+    , hostAdminWikiStatusBadgeActiveClass
+    , hostAdminWikiStatusBadgeInactiveClass
+    , layoutHolyGrailClass
+    , layoutLeftNavAsideClass
+    , layoutMainColumnClass
+    , markdownBlockQuoteClass
+    , markdownCodeBlockCodeClass
+    , markdownCodeBlockPreClass
+    , markdownCodeSpanClass
+    , markdownContainerClass
+    , markdownHeading1Class
+    , markdownHeading2Class
+    , markdownHeading3Class
+    , markdownHeading4Class
+    , markdownHeading5Class
+    , markdownHeading6Class
+    , markdownLinkClass
+    , markdownListItemClass
+    , markdownOrderedListClass
+    , markdownParagraphClass
+    , markdownThematicBreakClass
+    , markdownUnorderedListClass
+    , publishedPageContributorActionsClass
+    , sideNavListClass
+    , sideNavNavClass
+    , sideNavPublicAdminLinkClass
+    , sideNavStackClass
+    , sidebarContainerClass
+    , sidebarDesktopOnlyClass
+    , sidebarHeading
+    , sidebarLink
+    , sidebarNavSectionBodyClass
+    , tableAutoClass
+    , tableCellClass
+    , tableFullWidthMax72Class
+    , tableHeaderCellClass
+    , tableStripedRowClass
+    , themeToggleButtonClass
+    , wikiCatalogCardClass
+    , wikiCatalogCardSlugEmClass
+    , wikiCatalogCardSummaryClass
+    , wikiCatalogCardTitleClass
+    , wikiCatalogCardTitleLinkClass
+    , wikiCatalogGridClass
+    )
+
+import Html exposing (Attribute, Html)
+import TW
+
+
+{-| `Html.main_` in the app shell: overflow-y scroll region for article content. Used for in-page fragment scrolling (window scroll is not used; see `Frontend` Dom tasks).
+-}
+appMainScrollRegionId : String
+appMainScrollRegionId =
+    "app-main-scroll"
+
+
+appRootClass : String
+appRootClass =
+    "app-root flex flex-col h-dvh max-h-dvh min-h-0 overflow-hidden px-[0.5rem] pt-[0.25rem] pb-0 font-serif bg-[var(--bg)] text-[var(--fg)] leading-[1.35] [&_a]:text-[var(--link)] [&_a]:underline [&_a]:underline-offset-[2px] [&_a:hover]:text-[var(--link-hover)] [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-[var(--focus-ring)] [&_a:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-[var(--focus-ring)] [&_button:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-[var(--focus-ring)] [&_input:focus-visible]:outline-offset-2 [&_textarea:focus-visible]:outline-2 [&_textarea:focus-visible]:outline-[var(--focus-ring)] [&_textarea:focus-visible]:outline-offset-2 [&_select:focus-visible]:outline-2 [&_select:focus-visible]:outline-[var(--focus-ring)] [&_select:focus-visible]:outline-offset-2 [&_h1]:mt-[0.35rem] [&_h1]:mb-[0.2rem] [&_h1]:font-semibold [&_h1]:leading-[1.2] [&_h2]:mt-[0.35rem] [&_h2]:mb-[0.2rem] [&_h2]:font-semibold [&_h2]:leading-[1.2] [&_h2]:text-[1.1rem] [&_h3]:mt-[0.35rem] [&_h3]:mb-[0.2rem] [&_h3]:font-semibold [&_h3]:leading-[1.2] [&_h3]:text-[1rem] [&_p]:my-[0.25rem] [&_input]:font-inherit [&_input]:text-[1rem] [&_input]:px-[0.3rem] [&_input]:py-[0.15rem] [&_input]:mt-[0.1rem] [&_input]:mb-[0.2rem] [&_input]:border [&_input]:border-[var(--border)] [&_input]:bg-[var(--input-bg)] [&_input]:text-[var(--fg)] [&_input]:max-w-full [&_textarea]:font-inherit [&_textarea]:text-[1rem] [&_textarea]:px-[0.3rem] [&_textarea]:py-[0.15rem] [&_textarea]:mt-[0.1rem] [&_textarea]:mb-[0.2rem] [&_textarea]:border [&_textarea]:border-[var(--border)] [&_textarea]:bg-[var(--input-bg)] [&_textarea]:text-[var(--fg)] [&_textarea]:max-w-full [&_textarea]:min-h-[5rem] [&_textarea]:w-full [&_textarea]:max-w-[48rem] [&_select]:font-inherit [&_select]:text-[1rem] [&_select]:px-[0.3rem] [&_select]:py-[0.15rem] [&_select]:mt-[0.1rem] [&_select]:mb-[0.2rem] [&_select]:border [&_select]:border-[var(--border)] [&_select]:bg-[var(--input-bg)] [&_select]:text-[var(--fg)] [&_select]:max-w-full [&_label]:block [&_label]:mt-[0.25rem] [&_label]:text-[1rem] [&_label]:text-[var(--fg-muted)]"
+
+
+buttonClass : String
+buttonClass =
+    "[font-family:inherit] text-[1rem] px-[0.45rem] py-[0.2rem] mt-[0.1rem] mr-[0.15rem] mb-[0.1rem] ml-0 bg-[var(--btn-bg)] text-[var(--btn-fg)] border border-[var(--btn-border)] rounded-[3px] cursor-pointer hover:brightness-[1.08] dark:hover:brightness-[1.12] dark:hover:border-[var(--border-dash)] disabled:opacity-[0.55] disabled:cursor-not-allowed"
+
+
+{-| Filled destructive control. Uses `--danger-btn-bg` / `--danger-btn-fg` (not `--danger`) so class-based `.dark` matches CSS variables; see `head.html`.
+-}
+buttonDangerClass : String
+buttonDangerClass =
+    "[font-family:inherit] text-[1rem] px-[0.45rem] py-[0.2rem] mt-[0.1rem] mr-[0.15rem] mb-[0.1rem] ml-0 bg-[var(--danger-btn-bg)] text-[var(--danger-btn-fg)] border border-[var(--danger-btn-bg)] rounded-[3px] cursor-pointer hover:brightness-[1.12] disabled:opacity-[0.55] disabled:cursor-not-allowed"
+
+
+button : List (Attribute msg) -> List (Html msg) -> Html msg
+button attrs children =
+    Html.button (TW.cls buttonClass :: attrs) children
+
+
+dangerButton : List (Attribute msg) -> List (Html msg) -> Html msg
+dangerButton attrs children =
+    Html.button (TW.cls buttonDangerClass :: attrs) children
+
+
+sidebarContainerClass : String
+sidebarContainerClass =
+    "min-h-0 self-stretch overflow-y-auto overscroll-contain flex flex-col gap-y-[0.9rem] leading-[1.35] text-[var(--fg-muted)] bg-transparent border-0 text-[1rem] py-[0.85rem] pl-[0.85rem] pr-0 font-serif max-[56rem]:px-0"
+
+
+sidebarHeadingClass : String
+sidebarHeadingClass =
+    "m-0 mb-[0.35rem] text-[0.82rem] font-semibold tracking-[0.04em] text-[var(--fg-muted)]"
+
+
+sidebarHeading : String -> Html msg
+sidebarHeading label =
+    Html.h2 [ TW.cls sidebarHeadingClass ] [ Html.text label ]
+
+
+{-| Indents block content under `sidebarHeading` (same inset as the first ToC heading tier in `PageToc`).
+-}
+sidebarNavSectionBodyClass : String
+sidebarNavSectionBodyClass =
+    "pl-[0.35rem]"
+
+
+sidebarLinkClass : String
+sidebarLinkClass =
+    "text-[var(--link)] hover:text-[var(--link-hover)] underline underline-offset-[2px]"
+
+
+sidebarLink : List (Attribute msg) -> List (Html msg) -> Html msg
+sidebarLink attrs children =
+    Html.a (TW.cls sidebarLinkClass :: attrs) children
+
+
+tableBaseClass : String
+tableBaseClass =
+    "border-collapse text-[1rem] border border-[var(--border)]"
+
+
+tableAutoClass : String
+tableAutoClass =
+    "w-auto " ++ tableBaseClass
+
+
+tableFullWidthMax72Class : String
+tableFullWidthMax72Class =
+    "w-full max-w-[72rem] " ++ tableBaseClass
+
+
+tableHeaderCellClass : String
+tableHeaderCellClass =
+    "px-[0.35rem] py-[0.15rem] border border-[var(--border)] text-left align-top bg-[var(--chrome-bg)] font-semibold border-b border-[var(--border)]"
+
+
+tableCellClass : String
+tableCellClass =
+    "px-[0.35rem] py-[0.15rem] border border-[var(--border)] text-left align-top"
+
+
+tableStripedRowClass : String
+tableStripedRowClass =
+    "even:bg-[var(--table-stripe)]"
+
+
+appHeaderSecondaryMetaClass : String
+appHeaderSecondaryMetaClass =
+    "text-[var(--fg-muted)] font-normal max-w-full"
+
+
+appHeaderSecondaryBracketClass : String
+appHeaderSecondaryBracketClass =
+    "italic text-[var(--fg-muted)] opacity-[0.55] font-normal"
+
+
+appHeaderSecondaryWikiWrapClass : String
+appHeaderSecondaryWikiWrapClass =
+    appHeaderSecondaryMetaClass
+        ++ " inline-flex items-baseline flex-wrap gap-x-[0.15rem] gap-y-[0.05rem]"
+
+
+appHeaderSecondaryWikiLabelEmClass : String
+appHeaderSecondaryWikiLabelEmClass =
+    "text-[var(--fg-muted)] font-normal"
+
+
+appHeaderPrimaryLinkClass : String
+appHeaderPrimaryLinkClass =
+    "font-semibold text-[var(--fg)] no-underline"
+
+
+appHeaderPrimaryPlainClass : String
+appHeaderPrimaryPlainClass =
+    "font-semibold"
+
+
+appHeaderTitleRowClass : String
+appHeaderTitleRowClass =
+    "inline-flex items-center flex-wrap gap-x-[0.65rem] gap-y-[0.35rem] max-w-full"
+
+
+appHeaderDividerClass : String
+appHeaderDividerClass =
+    "self-stretch w-0 my-0 border-l-2 border-[var(--border)] min-h-[1.15em]"
+
+
+appHeaderBarClass : String
+appHeaderBarClass =
+    "shrink-0 flex flex-row flex-wrap items-center justify-between gap-y-[0.5rem] gap-x-[0.75rem] -mx-[0.5rem] px-[0.5rem] pt-[0.2rem] pb-[0.5rem] border-b border-dashed border-[var(--border-dash)]"
+
+
+appHeaderH1Class : String
+appHeaderH1Class =
+    "m-0 text-[1.35rem] font-semibold leading-[1.2] text-[var(--fg)] flex-1 min-w-0 font-serif"
+
+
+themeToggleButtonClass : String
+themeToggleButtonClass =
+    "shrink-0 inline-flex items-center justify-center w-[2.35rem] h-[2.35rem] p-0 m-0 border-0 rounded-none bg-transparent text-[var(--fg)] cursor-pointer hover:bg-[var(--chrome-bg)]"
+
+
+sideNavNavClass : String
+sideNavNavClass =
+    "w-full"
+
+
+sideNavStackClass : String
+sideNavStackClass =
+    "flex flex-col gap-y-[0.9rem] w-full text-[var(--fg-muted)] text-[1rem] font-serif leading-[1.35]"
+
+
+sideNavListClass : String
+sideNavListClass =
+    "list-none m-0 p-0 flex flex-col gap-[0.35rem] items-start"
+
+
+{-| Overrides app-root link color for the public `/admin` entry (host login), so it reads as secondary nav.
+-}
+sideNavPublicAdminLinkClass : String
+sideNavPublicAdminLinkClass =
+    "!text-[var(--fg-muted)] hover:!text-[var(--link)]"
+
+
+wikiCatalogGridClass : String
+wikiCatalogGridClass =
+    "grid w-full max-w-[72rem] grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+
+
+hostAdminWikiDetailShellClass : String
+hostAdminWikiDetailShellClass =
+    "w-full min-w-0"
+
+
+hostAdminWikiDetailGridClass : String
+hostAdminWikiDetailGridClass =
+    "grid grid-cols-1 gap-3.5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-5 lg:items-start"
+
+
+hostAdminWikiDetailMainStackClass : String
+hostAdminWikiDetailMainStackClass =
+    "flex flex-col gap-3 min-w-0"
+
+
+hostAdminWikiDetailSideStackClass : String
+hostAdminWikiDetailSideStackClass =
+    "flex flex-col gap-3 min-w-0"
+
+
+hostAdminWikiDetailCardClass : String
+hostAdminWikiDetailCardClass =
+    "rounded border border-[var(--border)] bg-[var(--chrome-bg)] p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+
+
+hostAdminWikiDetailDangerCardClass : String
+hostAdminWikiDetailDangerCardClass =
+    "rounded border border-[var(--danger)] bg-[var(--danger-bg)] p-3 shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+
+
+hostAdminWikiDetailPageTitleClass : String
+hostAdminWikiDetailPageTitleClass =
+    "m-0 text-[1.35rem] font-semibold leading-[1.2] text-[var(--fg)]"
+
+
+hostAdminWikiSlugClass : String
+hostAdminWikiSlugClass =
+    "[font-family:var(--font-mono)] text-[0.95rem] text-[var(--fg-muted)] break-all"
+
+
+hostAdminWikiStatusBadgeActiveClass : String
+hostAdminWikiStatusBadgeActiveClass =
+    "inline-block text-[0.82rem] font-semibold tracking-wide uppercase px-[0.4rem] py-[0.12rem] rounded border border-[var(--border)] bg-[var(--input-bg)] text-[var(--fg)]"
+
+
+hostAdminWikiStatusBadgeInactiveClass : String
+hostAdminWikiStatusBadgeInactiveClass =
+    "inline-block text-[0.82rem] font-semibold tracking-wide uppercase px-[0.4rem] py-[0.12rem] rounded border border-[var(--border-dash)] bg-[var(--bg)] text-[var(--fg-muted)]"
+
+
+wikiCatalogCardClass : String
+wikiCatalogCardClass =
+    "rounded border border-[var(--border)] bg-[var(--chrome-bg)] p-3 font-serif"
+
+
+wikiCatalogCardTitleClass : String
+wikiCatalogCardTitleClass =
+    "m-0 text-[1.1rem] font-semibold"
+
+
+wikiCatalogCardTitleLinkClass : String
+wikiCatalogCardTitleLinkClass =
+    "no-underline hover:underline underline-offset-[0.2em]"
+
+
+wikiCatalogCardSlugEmClass : String
+wikiCatalogCardSlugEmClass =
+    "text-[0.9rem] font-normal opacity-80"
+
+
+wikiCatalogCardSummaryClass : String
+wikiCatalogCardSummaryClass =
+    "m-0 mt-2 min-h-[1.25rem]"
+
+
+markdownContainerClass : String
+markdownContainerClass =
+    "max-w-[52rem] text-[0.95rem] font-serif"
+
+
+markdownHeading1Class : String
+markdownHeading1Class =
+    "mt-[0.5rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[1.3rem]"
+
+
+markdownHeading2Class : String
+markdownHeading2Class =
+    "mt-[0.5rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[1.12rem]"
+
+
+markdownHeading3Class : String
+markdownHeading3Class =
+    "mt-[0.5rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[1.02rem]"
+
+
+markdownHeading4Class : String
+markdownHeading4Class =
+    "mt-[0.5rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[0.98rem]"
+
+
+markdownHeading5Class : String
+markdownHeading5Class =
+    "mt-[0.5rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[0.98rem]"
+
+
+markdownHeading6Class : String
+markdownHeading6Class =
+    "mt-[0.5rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[0.98rem]"
+
+
+markdownParagraphClass : String
+markdownParagraphClass =
+    "my-[0.35rem]"
+
+
+markdownBlockQuoteClass : String
+markdownBlockQuoteClass =
+    "my-[0.35rem] px-[0.5rem] py-[0.2rem] border-l-[3px] border-l-[var(--border)] text-[var(--fg-muted)]"
+
+
+markdownLinkClass : String
+markdownLinkClass =
+    "text-[var(--link)] hover:text-[var(--link-hover)] underline underline-offset-[2px]"
+
+
+markdownUnorderedListClass : String
+markdownUnorderedListClass =
+    "my-[0.25rem] pl-[1.35rem] list-disc"
+
+
+markdownOrderedListClass : String
+markdownOrderedListClass =
+    "my-[0.25rem] pl-[1.35rem] list-decimal"
+
+
+markdownListItemClass : String
+markdownListItemClass =
+    "my-[0.1rem]"
+
+
+markdownCodeSpanClass : String
+markdownCodeSpanClass =
+    "[font-family:var(--font-mono)] text-[0.88em] bg-[var(--code-bg)] px-[0.2rem] py-[0.05rem]"
+
+
+markdownCodeBlockPreClass : String
+markdownCodeBlockPreClass =
+    "[font-family:var(--font-mono)] my-[0.35rem] px-[0.45rem] py-[0.35rem] overflow-x-auto bg-[var(--code-bg)] border border-[var(--border)] text-[0.85rem] leading-[1.4]"
+
+
+markdownCodeBlockCodeClass : String
+markdownCodeBlockCodeClass =
+    "[font-family:var(--font-mono)] border-0 p-0 bg-transparent"
+
+
+markdownThematicBreakClass : String
+markdownThematicBreakClass =
+    "my-[0.35rem] border-0 border-t border-[var(--border)]"
+
+
+backlinksSectionClass : String
+backlinksSectionClass =
+    "max-w-[52rem]"
+
+
+backlinksListClass : String
+backlinksListClass =
+    "list-none m-0 p-0 flex flex-col gap-[0.25rem]"
+
+
+publishedPageContributorActionsClass : String
+publishedPageContributorActionsClass =
+    "my-[0.25rem] mt-[0.15rem] text-[1rem]"
+
+
+sidebarDesktopOnlyClass : String
+sidebarDesktopOnlyClass =
+    "max-[56rem]:hidden"
+
+
+layoutLeftNavAsideClass : String
+layoutLeftNavAsideClass =
+    "self-stretch min-h-0 overflow-y-auto overscroll-contain leading-[1.35] text-[var(--fg)] text-[1rem] border-r border-dashed border-[var(--border-dash)] py-[0.85rem] pr-[0.85rem] pl-0 max-[56rem]:border-r-0 max-[56rem]:px-0"
+
+
+layoutHolyGrailClass : Bool -> String
+layoutHolyGrailClass hasRightColumn =
+    if hasRightColumn then
+        "grid min-h-0 min-w-0 h-full w-full flex-1 overflow-hidden items-stretch gap-y-[0.65rem] px-[0.5rem] -mx-[0.5rem] max-w-none grid-rows-[minmax(0,1fr)] auto-rows-[minmax(0,1fr)] grid-cols-[minmax(11rem,16rem)_minmax(0,1fr)_minmax(10rem,14rem)] max-[56rem]:grid-cols-1"
+
+    else
+        "grid min-h-0 min-w-0 h-full w-full flex-1 overflow-hidden items-stretch gap-y-[0.65rem] px-[0.5rem] -mx-[0.5rem] max-w-none grid-rows-[minmax(0,1fr)] auto-rows-[minmax(0,1fr)] grid-cols-[minmax(11rem,16rem)_minmax(0,1fr)] max-[56rem]:grid-cols-1"
+
+
+layoutMainColumnClass : Bool -> String
+layoutMainColumnClass hasRightColumn =
+    if hasRightColumn then
+        "min-h-0 min-w-0 overflow-y-auto overscroll-contain px-[0.85rem] py-[0.85rem] border-r border-dashed border-[var(--border-dash)] max-[56rem]:border-r-0 max-[56rem]:px-0"
+
+    else
+        "min-h-0 min-w-0 overflow-y-auto overscroll-contain py-[0.85rem] pl-[0.85rem] pr-0 border-r-0 max-[56rem]:px-0"

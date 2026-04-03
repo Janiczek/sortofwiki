@@ -1,12 +1,21 @@
-module WikiRole exposing (WikiRole(..), canAccessWikiAdminUsers, demoteTrustedToContributor, grantTrustedToAdmin, isTrustedModerator, label, promoteContributorToTrusted, revokeAdminToTrusted)
+module WikiRole exposing
+    ( WikiRole(..)
+    , canAccessWikiAdminUsers
+    , demoteTrustedToContributor
+    , grantTrustedToAdmin
+    , isTrustedModerator
+    , label
+    , promoteContributorToTrusted
+    , revokeAdminToTrusted
+    )
 
 {-| Per-wiki contributor capability tier (stories 14, 20).
 -}
 
 
 type WikiRole
-    = Contributor
-    | Trusted
+    = UntrustedContributor
+    | TrustedContributor
     | Admin
 
 
@@ -15,10 +24,10 @@ type WikiRole
 canAccessWikiAdminUsers : WikiRole -> Bool
 canAccessWikiAdminUsers role =
     case role of
-        Contributor ->
+        UntrustedContributor ->
             False
 
-        Trusted ->
+        TrustedContributor ->
             False
 
         Admin ->
@@ -30,10 +39,10 @@ canAccessWikiAdminUsers role =
 isTrustedModerator : WikiRole -> Bool
 isTrustedModerator role =
     case role of
-        Contributor ->
+        UntrustedContributor ->
             False
 
-        Trusted ->
+        TrustedContributor ->
             True
 
         Admin ->
@@ -45,10 +54,10 @@ isTrustedModerator role =
 promoteContributorToTrusted : WikiRole -> Maybe WikiRole
 promoteContributorToTrusted role =
     case role of
-        Contributor ->
-            Just Trusted
+        UntrustedContributor ->
+            Just TrustedContributor
 
-        Trusted ->
+        TrustedContributor ->
             Nothing
 
         Admin ->
@@ -60,11 +69,11 @@ promoteContributorToTrusted role =
 demoteTrustedToContributor : WikiRole -> Maybe WikiRole
 demoteTrustedToContributor role =
     case role of
-        Contributor ->
+        UntrustedContributor ->
             Nothing
 
-        Trusted ->
-            Just Contributor
+        TrustedContributor ->
+            Just UntrustedContributor
 
         Admin ->
             Nothing
@@ -75,10 +84,10 @@ demoteTrustedToContributor role =
 grantTrustedToAdmin : WikiRole -> Maybe WikiRole
 grantTrustedToAdmin role =
     case role of
-        Contributor ->
+        UntrustedContributor ->
             Nothing
 
-        Trusted ->
+        TrustedContributor ->
             Just Admin
 
         Admin ->
@@ -90,23 +99,23 @@ grantTrustedToAdmin role =
 revokeAdminToTrusted : WikiRole -> Maybe WikiRole
 revokeAdminToTrusted role =
     case role of
-        Contributor ->
+        UntrustedContributor ->
             Nothing
 
-        Trusted ->
+        TrustedContributor ->
             Nothing
 
         Admin ->
-            Just Trusted
+            Just TrustedContributor
 
 
 label : WikiRole -> String
 label role =
     case role of
-        Contributor ->
+        UntrustedContributor ->
             "Contributor"
 
-        Trusted ->
+        TrustedContributor ->
             "Trusted"
 
         Admin ->

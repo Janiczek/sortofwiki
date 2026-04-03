@@ -16,9 +16,19 @@ demoWiki =
     Wiki.wikiWithPages "demo" "Demo" Dict.empty
 
 
+demoWikiInactive : Wiki.Wiki
+demoWikiInactive =
+    { demoWiki | active = False }
+
+
 wikis : Dict.Dict Wiki.Slug Wiki.Wiki
 wikis =
     Dict.singleton "demo" demoWiki
+
+
+wikisInactive : Dict.Dict Wiki.Slug Wiki.Wiki
+wikisInactive =
+    Dict.singleton "demo" demoWikiInactive
 
 
 suite : Test
@@ -34,6 +44,10 @@ suite =
                 \() ->
                     WikiContributors.attemptRegister "missing" "alice" "password12" wikis WikiContributors.emptyRegistry
                         |> Expect.equal (Err ContributorAccount.RegisterWikiNotFound)
+            , Test.test "rejects inactive wiki" <|
+                \() ->
+                    WikiContributors.attemptRegister "demo" "alice" "password12" wikisInactive WikiContributors.emptyRegistry
+                        |> Expect.equal (Err ContributorAccount.RegisterWikiInactive)
             , Test.test "rejects duplicate username" <|
                 \() ->
                     case WikiContributors.attemptRegister "demo" "alice" "password12" wikis WikiContributors.emptyRegistry of
@@ -58,6 +72,10 @@ suite =
                 \() ->
                     WikiContributors.attemptLogin "missing" "alice" "password12" wikis WikiContributors.emptyRegistry
                         |> Expect.equal (Err ContributorAccount.LoginWikiNotFound)
+            , Test.test "rejects inactive wiki" <|
+                \() ->
+                    WikiContributors.attemptLogin "demo" "alice" "password12" wikisInactive WikiContributors.emptyRegistry
+                        |> Expect.equal (Err ContributorAccount.LoginWikiInactive)
             , Test.test "rejects unknown username" <|
                 \() ->
                     WikiContributors.attemptLogin "demo" "nobody" "password12" wikis WikiContributors.emptyRegistry
@@ -105,7 +123,7 @@ suite =
                     case WikiContributors.attemptRegister "demo" "alice" "password12" wikis WikiContributors.emptyRegistry of
                         Ok ( reg, accountId ) ->
                             WikiContributors.roleForAccount "demo" accountId reg
-                                |> Expect.equal (Just WikiRole.Contributor)
+                                |> Expect.equal (Just WikiRole.UntrustedContributor)
 
                         Err _ ->
                             Expect.fail "expected register to succeed"
@@ -114,7 +132,7 @@ suite =
                     case WikiContributors.seedTrustedContributorAtWiki "demo" "trusty" "password12" wikis WikiContributors.emptyRegistry of
                         Ok reg ->
                             WikiContributors.roleForAccount "demo" (ContributorAccount.newAccountId "demo" "trusty") reg
-                                |> Expect.equal (Just WikiRole.Trusted)
+                                |> Expect.equal (Just WikiRole.TrustedContributor)
 
                         Err _ ->
                             Expect.fail "expected trusted seed to succeed"
@@ -535,5 +553,49 @@ suite =
 
                         Err _ ->
                             Expect.fail "expected first admin seed to succeed"
+            ]
+        , Test.describe "renameWikiSlug"
+            [ Test.test "moves bucket and remaps ids" <|
+                \() ->
+                    case WikiContributors.attemptRegister "demo" "alice" "password12" wikis WikiContributors.emptyRegistry of
+                        Ok ( reg, _ ) ->
+                            let
+                                next : WikiContributors.Registry
+                                next =
+                                    WikiContributors.renameWikiSlug "demo" "Renamed" reg
+
+                                renamedWiki : Wiki.Wiki
+                                renamedWiki =
+                                    { demoWiki | slug = "Renamed" }
+
+                                wikisAfterRename : Dict.Dict Wiki.Slug Wiki.Wiki
+                                wikisAfterRename =
+                                    wikis
+                                        |> Dict.remove "demo"
+                                        |> Dict.insert "Renamed" renamedWiki
+
+                                newId : ContributorAccount.Id
+                                newId =
+                                    ContributorAccount.newAccountId "Renamed" "alice"
+                            in
+                            Expect.all
+                                [ \() ->
+                                    Dict.get "demo" next
+                                        |> Expect.equal Nothing
+                                , \() ->
+                                    WikiContributors.roleForAccount "Renamed" newId next
+                                        |> Expect.equal (Just WikiRole.UntrustedContributor)
+                                , \() ->
+                                    WikiContributors.attemptLogin "Renamed" "alice" "password12" wikisAfterRename next
+                                        |> Expect.equal (Ok newId)
+                                ]
+                                ()
+
+                        Err _ ->
+                            Expect.fail "expected register to succeed"
+            , Test.test "no-op when old slug missing" <|
+                \() ->
+                    WikiContributors.renameWikiSlug "missing" "X" WikiContributors.emptyRegistry
+                        |> Expect.equal WikiContributors.emptyRegistry
             ]
         ]

@@ -49,5 +49,12 @@ suite =
                             , Test.Html.Selector.attribute (Html.Attributes.href "#intro")
                             ]
                         |> Test.Html.Query.has [ Test.Html.Selector.text "Intro" ]
+            , Test.test "shallowest ToC tier has no extra li padding (matches other sidebar links)" <|
+                \() ->
+                    [ { level = Block.H2, label = "Intro", slug = "intro" } ]
+                        |> PageToc.view
+                        |> Test.Html.Query.fromHtml
+                        |> Test.Html.Query.find [ Test.Html.Selector.tag "li" ]
+                        |> Test.Html.Query.has [ Test.Html.Selector.classes [ "m-0", "pl-0" ] ]
             ]
         ]

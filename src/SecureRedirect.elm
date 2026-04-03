@@ -2,6 +2,7 @@ module SecureRedirect exposing
     ( contributorRedirectFromQuery
     , hostAdminRedirectFromQuery
     , pathAndQuery
+    , safeContributorReturnPath
     , safeHostAdminReturnPath
     )
 
@@ -56,25 +57,144 @@ splitOnceEq pair =
                 )
 
 
-{-| Allowed return paths after wiki contributor login: `/`, wiki home, or same-wiki paths.
-Rejects protocol-relative and other wikis' paths.
+{-| Split `path?query` after the first `?`; `queryWithMaybeFragment` includes `?` prefix when present.
 -}
-safeContributorReturnPath : Wiki.Slug -> String -> Maybe String
-safeContributorReturnPath wikiSlug path =
+splitPathAndQuery : String -> ( String, String )
+splitPathAndQuery s =
+    case String.indexes "?" s |> List.head of
+        Nothing ->
+            ( s, "" )
+
+        Just i ->
+            ( String.left i s
+            , String.dropLeft i s
+            )
+
+
+{-| Strip `#fragment` from a path-only segment (fragment is not part of the path for normalization).
+-}
+pathWithoutFragment : String -> String
+pathWithoutFragment s =
+    case String.indexes "#" s |> List.head of
+        Nothing ->
+            s
+
+        Just i ->
+            String.left i s
+
+
+{-| Non-empty path segments between slashes (leading `/` dropped before splitting).
+-}
+absolutePathSegments : String -> List String
+absolutePathSegments path =
     if not (String.startsWith "/" path) || String.startsWith "//" path then
-        Nothing
-
-    else if path == "/" then
-        Just path
-
-    else if path == "/w/" ++ wikiSlug then
-        Just path
-
-    else if String.startsWith ("/w/" ++ wikiSlug ++ "/") path then
-        Just path
+        []
 
     else
+        path
+            |> String.dropLeft 1
+            |> String.split "/"
+            |> List.filter (\seg -> seg /= "")
+
+
+{-| Resolve `.` / `..` in an absolute path; `Nothing` when `..` escapes above root.
+-}
+normalizeAbsolutePathSegments : List String -> Maybe (List String)
+normalizeAbsolutePathSegments segments =
+    List.foldl
+        (\seg acc ->
+            case acc of
+                Nothing ->
+                    Nothing
+
+                Just stack ->
+                    if seg == "." || seg == "" then
+                        Just stack
+
+                    else if seg == ".." then
+                        case stack of
+                            [] ->
+                                Nothing
+
+                            _ :: tail ->
+                                Just tail
+
+                    else
+                        Just (seg :: stack)
+        )
+        (Just [])
+        segments
+        |> Maybe.map List.reverse
+
+
+{-| Canonical absolute path: same logical location as `rawPath` without `.` / `..` segments.
+-}
+canonicalAbsolutePath : String -> Maybe String
+canonicalAbsolutePath rawPath =
+    let
+        pathOnly : String
+        pathOnly =
+            rawPath |> pathWithoutFragment
+    in
+    if not (String.startsWith "/" pathOnly) || String.startsWith "//" pathOnly then
         Nothing
+
+    else
+        case normalizeAbsolutePathSegments (absolutePathSegments pathOnly) of
+            Nothing ->
+                Nothing
+
+            Just [] ->
+                Just "/"
+
+            Just segs ->
+                Just ("/" ++ String.join "/" segs)
+
+
+{-| Rebuild redirect target: canonical path + original `?query#frag` suffix (query split preserved).
+-}
+canonicalRedirectTarget : String -> Maybe String
+canonicalRedirectTarget raw =
+    let
+        ( pathRaw, querySuffix ) =
+            splitPathAndQuery raw
+
+        pathForCanon : String
+        pathForCanon =
+            pathWithoutFragment pathRaw
+    in
+    canonicalAbsolutePath pathForCanon
+        |> Maybe.map (\c -> c ++ querySuffix)
+
+
+{-| Allowed return paths after wiki contributor login: `/`, wiki home, or same-wiki paths.
+Rejects protocol-relative, `..` escapes, and other wikis' paths (after canonicalization).
+-}
+safeContributorReturnPath : Wiki.Slug -> String -> Maybe String
+safeContributorReturnPath wikiSlug raw =
+    canonicalRedirectTarget raw
+        |> Maybe.andThen
+            (\canonFull ->
+                let
+                    ( pathOnly, _ ) =
+                        splitPathAndQuery canonFull
+
+                    pathCanon : String
+                    pathCanon =
+                        pathWithoutFragment pathOnly
+                in
+                if pathCanon == "/" then
+                    Just canonFull
+
+                else if pathCanon == "/w/" ++ wikiSlug then
+                    Just canonFull
+
+                else if String.startsWith ("/w/" ++ wikiSlug ++ "/") pathCanon then
+                    Just canonFull
+
+                else
+                    Nothing
+            )
 
 
 contributorRedirectFromQuery : Wiki.Slug -> Maybe String -> Maybe String
@@ -83,18 +203,27 @@ contributorRedirectFromQuery wikiSlug maybeQuery =
         |> Maybe.andThen (safeContributorReturnPath wikiSlug)
 
 
-{-| Allowed return paths after host admin login: must start with `/admin`.
+{-| Allowed return paths after host admin login: canonical path must start with `/admin`.
 -}
 safeHostAdminReturnPath : String -> Maybe String
-safeHostAdminReturnPath path =
-    if not (String.startsWith "/" path) || String.startsWith "//" path then
-        Nothing
+safeHostAdminReturnPath raw =
+    canonicalRedirectTarget raw
+        |> Maybe.andThen
+            (\canonFull ->
+                let
+                    ( pathOnly, _ ) =
+                        splitPathAndQuery canonFull
 
-    else if String.startsWith "/admin" path then
-        Just path
+                    pathCanon : String
+                    pathCanon =
+                        pathWithoutFragment pathOnly
+                in
+                if String.startsWith "/admin" pathCanon then
+                    Just canonFull
 
-    else
-        Nothing
+                else
+                    Nothing
+            )
 
 
 hostAdminRedirectFromQuery : Maybe String -> Maybe String

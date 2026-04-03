@@ -3,6 +3,7 @@ module WikiMarkdownTest exposing (suite)
 import Expect
 import Markdown.Block as Block
 import Markdown.Parser as MarkdownParser
+import MarkdownHeadingSlugs
 import Test exposing (Test)
 import WikiMarkdown
 
@@ -28,5 +29,20 @@ suite =
                         |> Result.map (WikiMarkdown.postProcessBlocksWithWikiLinks "demo")
                         |> Expect.equal
                             (Ok [ Block.Paragraph [ Block.CodeSpan "[[x]]" ] ])
+            , Test.test "does not duplicate blockquote paragraphs after heading-slug pass" <|
+                \() ->
+                    MarkdownParser.parse "> line one\n>\n> line two"
+                        |> Result.map (WikiMarkdown.postProcessBlocksWithWikiLinks "demo")
+                        |> Result.map MarkdownHeadingSlugs.gatherHeadingOccurrences
+                        |> Expect.equal
+                            (Ok
+                                [ ( Block.BlockQuote
+                                        [ Block.Paragraph [ Block.Text "line one" ]
+                                        , Block.Paragraph [ Block.Text "line two" ]
+                                        ]
+                                  , Nothing
+                                  )
+                                ]
+                            )
             ]
         ]

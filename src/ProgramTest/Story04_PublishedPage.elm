@@ -53,6 +53,15 @@ endToEndTests =
                 , client.checkView 100
                     (\root ->
                         root
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "page-edit-link" ]
+                            |> Test.Html.Query.has
+                                [ Test.Html.Selector.text "Edit page"
+                                , Test.Html.Selector.attribute (Html.Attributes.href "/w/demo/submit/edit/Guides")
+                                ]
+                    )
+                , client.checkView 100
+                    (\root ->
+                        root
                             |> Test.Html.Query.find [ Test.Html.Selector.id "page-markdown" ]
                             |> Test.Html.Query.find [ Test.Html.Selector.tag "strong" ]
                             |> Test.Html.Query.has [ Test.Html.Selector.text "manual" ]

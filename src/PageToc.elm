@@ -5,6 +5,7 @@ import Html.Attributes as Attr
 import Markdown.Block as Block
 import Page
 import TW
+import UI
 import Wiki
 import WikiPageMarkdownParse
 
@@ -52,45 +53,87 @@ view tocEntries =
         Html.text ""
 
     else
+        let
+            minHeadingInt : Int
+            minHeadingInt =
+                tocEntries
+                    |> List.map (.level >> headingLevelToInt)
+                    |> List.minimum
+                    |> Maybe.withDefault 1
+        in
         Html.nav
             [ TW.cls "font-serif"
             , Attr.id "page-article-toc"
             , Attr.attribute "aria-label" "On this page"
             ]
-            [ Html.h2 [ TW.cls "m-0 mb-[0.35rem] text-[0.82rem] font-semibold uppercase tracking-[0.04em] text-[var(--fg-muted)]" ]
-                [ Html.text "On this page" ]
-            , Html.ul [ TW.cls "list-none m-0 p-0 flex flex-col gap-[0.25rem]" ]
-                (tocEntries
-                    |> List.map
-                        (\e ->
-                            Html.li
-                                [ TW.cls ("m-0 leading-[1.3] " ++ headingLevelClass e.level) ]
-                                [ Html.a
-                                    [ Attr.href ("#" ++ e.slug) ]
-                                    [ Html.text e.label ]
-                                ]
-                        )
-                )
+            [ UI.sidebarHeading "On this page"
+            , Html.div [ TW.cls UI.sidebarNavSectionBodyClass ]
+                [ Html.ul [ TW.cls (UI.sideNavListClass ++ " leading-[1.3]") ]
+                    (tocEntries
+                        |> List.map
+                            (\e ->
+                                Html.li
+                                    [ TW.cls ("m-0 " ++ entryIndentClass minHeadingInt e.level) ]
+                                    [ UI.sidebarLink
+                                        [ Attr.href ("#" ++ e.slug) ]
+                                        [ Html.text e.label ]
+                                    ]
+                            )
+                    )
+                ]
             ]
 
 
-headingLevelClass : Block.HeadingLevel -> String
-headingLevelClass level =
+headingLevelToInt : Block.HeadingLevel -> Int
+headingLevelToInt level =
     case level of
         Block.H1 ->
-            "pl-0"
+            1
 
         Block.H2 ->
-            "pl-[0.35rem]"
+            2
 
         Block.H3 ->
-            "pl-[0.65rem]"
+            3
 
         Block.H4 ->
-            "pl-[0.95rem]"
+            4
 
         Block.H5 ->
-            "pl-[1.25rem]"
+            5
 
         Block.H6 ->
+            6
+
+
+{-| Indent nested headings relative to the shallowest heading in this page’s ToC so the top tier lines up with other sidebar nav links (body already applies `sidebarNavSectionBodyClass`).
+-}
+entryIndentClass : Int -> Block.HeadingLevel -> String
+entryIndentClass minHeadingInt level =
+    relativeIndentStepClass
+        (Basics.clamp 0 5 (headingLevelToInt level - minHeadingInt))
+
+
+relativeIndentStepClass : Int -> String
+relativeIndentStepClass step =
+    case step of
+        0 ->
+            "pl-0"
+
+        1 ->
+            "pl-[0.35rem]"
+
+        2 ->
+            "pl-[0.65rem]"
+
+        3 ->
+            "pl-[0.95rem]"
+
+        4 ->
+            "pl-[1.25rem]"
+
+        5 ->
+            "pl-[1.55rem]"
+
+        _ ->
             "pl-[1.55rem]"

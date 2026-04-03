@@ -102,8 +102,9 @@ endToEndTests =
                         root
                             |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.attribute "aria-label" "Site") ]
                             |> Test.Html.Query.has
-                                [ Test.Html.Selector.text "Hosted wikis"
-                                , Test.Html.Selector.text "Create hosted wiki"
+                                [ Test.Html.Selector.text "Host admin"
+                                , Test.Html.Selector.text "Hosted wikis"
+                                , Test.Html.Selector.text "Add wiki"
                                 ]
                     )
                 ]

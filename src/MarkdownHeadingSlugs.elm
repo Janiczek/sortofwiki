@@ -11,8 +11,8 @@ import Regex
 gatherHeadingOccurrences : List Block -> List ( Block, Maybe String )
 gatherHeadingOccurrences blocks =
     blocks
-        |> Block.mapAndAccumulate
-            (\soFar block ->
+        |> List.foldl
+            (\block ( soFar, acc ) ->
                 case block of
                     Block.Heading level inlines ->
                         let
@@ -25,14 +25,15 @@ gatherHeadingOccurrences blocks =
                                 trackOccurence rawSlug soFar
                         in
                         ( updatedOccurences
-                        , ( Block.Heading level inlines, Just finalSlug )
+                        , ( Block.Heading level inlines, Just finalSlug ) :: acc
                         )
 
                     _ ->
-                        ( soFar, ( block, Nothing ) )
+                        ( soFar, ( block, Nothing ) :: acc )
             )
-            Dict.empty
+            ( Dict.empty, [] )
         |> Tuple.second
+        |> List.reverse
 
 
 specials : Regex.Regex

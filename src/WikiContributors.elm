@@ -10,6 +10,7 @@ module WikiContributors exposing
     , isAdminForWiki
     , isTrustedForWiki
     , promoteContributorToTrustedAtWiki
+    , renameWikiSlug
     , revokeAdminToTrustedAtWiki
     , roleForAccount
     , seedAdminContributorAtWiki
@@ -55,45 +56,49 @@ attemptRegister wikiSlug rawUsername plainPassword wikis registry =
         Nothing ->
             Err ContributorAccount.RegisterWikiNotFound
 
-        Just _ ->
-            case ContributorAccount.validateRegistrationFields rawUsername plainPassword of
-                Err e ->
-                    Err e
+        Just w ->
+            if not w.active then
+                Err ContributorAccount.RegisterWikiInactive
 
-                Ok { normalizedUsername, password } ->
-                    let
-                        byWiki : Dict String StoredContributor
-                        byWiki =
-                            registry
-                                |> Dict.get wikiSlug
-                                |> Maybe.withDefault Dict.empty
-                    in
-                    case Dict.get normalizedUsername byWiki of
-                        Just _ ->
-                            Err ContributorAccount.RegisterUsernameTaken
+            else
+                case ContributorAccount.validateRegistrationFields rawUsername plainPassword of
+                    Err e ->
+                        Err e
 
-                        Nothing ->
-                            let
-                                id : ContributorAccount.Id
-                                id =
-                                    ContributorAccount.newAccountId wikiSlug normalizedUsername
+                    Ok { normalizedUsername, password } ->
+                        let
+                            byWiki : Dict String StoredContributor
+                            byWiki =
+                                registry
+                                    |> Dict.get wikiSlug
+                                    |> Maybe.withDefault Dict.empty
+                        in
+                        case Dict.get normalizedUsername byWiki of
+                            Just _ ->
+                                Err ContributorAccount.RegisterUsernameTaken
 
-                                stored : StoredContributor
-                                stored =
-                                    { id = id
-                                    , passwordVerifier = ContributorAccount.verifierFromPassword password
-                                    , role = WikiRole.Contributor
-                                    }
+                            Nothing ->
+                                let
+                                    id : ContributorAccount.Id
+                                    id =
+                                        ContributorAccount.newAccountId wikiSlug normalizedUsername
 
-                                nextByWiki : Dict String StoredContributor
-                                nextByWiki =
-                                    Dict.insert normalizedUsername stored byWiki
+                                    stored : StoredContributor
+                                    stored =
+                                        { id = id
+                                        , passwordVerifier = ContributorAccount.verifierFromPassword password
+                                        , role = WikiRole.UntrustedContributor
+                                        }
 
-                                nextRegistry : Registry
-                                nextRegistry =
-                                    Dict.insert wikiSlug nextByWiki registry
-                            in
-                            Ok ( nextRegistry, id )
+                                    nextByWiki : Dict String StoredContributor
+                                    nextByWiki =
+                                        Dict.insert normalizedUsername stored byWiki
+
+                                    nextRegistry : Registry
+                                    nextRegistry =
+                                        Dict.insert wikiSlug nextByWiki registry
+                                in
+                                Ok ( nextRegistry, id )
 
 
 {-| Normalized username for an account on this wiki, if registered.
@@ -182,29 +187,33 @@ attemptLogin wikiSlug rawUsername plainPassword wikis registry =
         Nothing ->
             Err ContributorAccount.LoginWikiNotFound
 
-        Just _ ->
-            case ContributorAccount.validateLoginFields rawUsername plainPassword of
-                Err e ->
-                    Err e
+        Just w ->
+            if not w.active then
+                Err ContributorAccount.LoginWikiInactive
 
-                Ok { normalizedUsername, password } ->
-                    let
-                        byWiki : Dict String StoredContributor
-                        byWiki =
-                            registry
-                                |> Dict.get wikiSlug
-                                |> Maybe.withDefault Dict.empty
-                    in
-                    case Dict.get normalizedUsername byWiki of
-                        Nothing ->
-                            Err ContributorAccount.LoginInvalidCredentials
+            else
+                case ContributorAccount.validateLoginFields rawUsername plainPassword of
+                    Err e ->
+                        Err e
 
-                        Just stored ->
-                            if ContributorAccount.verifierMatchesPassword password stored.passwordVerifier then
-                                Ok stored.id
-
-                            else
+                    Ok { normalizedUsername, password } ->
+                        let
+                            byWiki : Dict String StoredContributor
+                            byWiki =
+                                registry
+                                    |> Dict.get wikiSlug
+                                    |> Maybe.withDefault Dict.empty
+                        in
+                        case Dict.get normalizedUsername byWiki of
+                            Nothing ->
                                 Err ContributorAccount.LoginInvalidCredentials
+
+                            Just stored ->
+                                if ContributorAccount.verifierMatchesPassword password stored.passwordVerifier then
+                                    Ok stored.id
+
+                                else
+                                    Err ContributorAccount.LoginInvalidCredentials
 
 
 {-| Insert a contributor for backend seed data (same rules as registration). Contributor role.
@@ -217,7 +226,7 @@ seedContributorAtWiki :
     -> Registry
     -> Result ContributorAccount.RegisterContributorError Registry
 seedContributorAtWiki wikiSlug rawUsername plainPassword wikis registry =
-    seedContributorAtWikiWithRole WikiRole.Contributor wikiSlug rawUsername plainPassword wikis registry
+    seedContributorAtWikiWithRole WikiRole.UntrustedContributor wikiSlug rawUsername plainPassword wikis registry
 
 
 {-| Seed a trusted contributor (demo / tests; story 14).
@@ -230,7 +239,7 @@ seedTrustedContributorAtWiki :
     -> Registry
     -> Result ContributorAccount.RegisterContributorError Registry
 seedTrustedContributorAtWiki wikiSlug rawUsername plainPassword wikis registry =
-    seedContributorAtWikiWithRole WikiRole.Trusted wikiSlug rawUsername plainPassword wikis registry
+    seedContributorAtWikiWithRole WikiRole.TrustedContributor wikiSlug rawUsername plainPassword wikis registry
 
 
 {-| Seed a wiki admin (story 20).
@@ -451,3 +460,28 @@ demoteTrustedToContributorAtWiki wikiSlug normalizedUsername registry =
                             Dict.insert normalizedUsername nextStored byWiki
                     in
                     Ok (Dict.insert wikiSlug nextByWiki registry)
+
+
+{-| Move the per-wiki contributor map to a new slug and re-mint account ids (hosted wiki slug rename).
+-}
+renameWikiSlug : Wiki.Slug -> Wiki.Slug -> Registry -> Registry
+renameWikiSlug oldSlug newSlug registry =
+    case Dict.get oldSlug registry of
+        Nothing ->
+            registry
+
+        Just byWiki ->
+            let
+                remapped : Dict String StoredContributor
+                remapped =
+                    Dict.map
+                        (\username stored ->
+                            { stored
+                                | id = ContributorAccount.newAccountId newSlug username
+                            }
+                        )
+                        byWiki
+            in
+            registry
+                |> Dict.remove oldSlug
+                |> Dict.insert newSlug remapped

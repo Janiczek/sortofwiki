@@ -8,6 +8,7 @@ module ContributorAccount exposing
     , newAccountId
     , normalizeUsername
     , registerErrorToUserText
+    , remapIdForWikiSlug
     , validateLoginFields
     , validateRegistrationFields
     , verifierFromPassword
@@ -34,6 +35,26 @@ newAccountId wikiSlug normalizedUsername =
     Id ("acc:" ++ wikiSlug ++ ":" ++ normalizedUsername)
 
 
+{-| Contributor ids embed the wiki slug; after a hosted wiki slug rename, remap ids that belonged to `oldSlug`.
+-}
+remapIdForWikiSlug : Wiki.Slug -> Wiki.Slug -> Id -> Id
+remapIdForWikiSlug oldSlug newSlug id =
+    let
+        s : String
+        s =
+            idToString id
+
+        prefix : String
+        prefix =
+            "acc:" ++ oldSlug ++ ":"
+    in
+    if String.startsWith prefix s then
+        newAccountId newSlug (String.dropLeft (String.length prefix) s)
+
+    else
+        id
+
+
 type Verifier
     = Verifier String
 
@@ -55,6 +76,7 @@ verifierMatchesPassword password (Verifier storedHex) =
 
 type LoginContributorError
     = LoginWikiNotFound
+    | LoginWikiInactive
     | LoginInvalidCredentials
     | LoginUsernameEmpty
     | LoginPasswordEmpty
@@ -65,6 +87,9 @@ loginErrorToUserText err =
     case err of
         LoginWikiNotFound ->
             "This wiki does not exist."
+
+        LoginWikiInactive ->
+            "This wiki is currently paused."
 
         LoginInvalidCredentials ->
             "Invalid username or password."
@@ -78,6 +103,7 @@ loginErrorToUserText err =
 
 type RegisterContributorError
     = RegisterWikiNotFound
+    | RegisterWikiInactive
     | RegisterUsernameTaken
     | RegisterUsernameEmpty
     | RegisterUsernameTooShort
@@ -91,6 +117,9 @@ registerErrorToUserText err =
     case err of
         RegisterWikiNotFound ->
             "This wiki does not exist."
+
+        RegisterWikiInactive ->
+            "This wiki is currently paused."
 
         RegisterUsernameTaken ->
             "That username is already taken."

@@ -5,6 +5,7 @@ module WikiUser exposing
     , contributorIdForWiki
     , dropBindingsForWiki
     , emptySessions
+    , remapSessionsForWikiSlugRename
     )
 
 import ContributorAccount
@@ -55,5 +56,22 @@ dropBindingsForWiki wikiSlug sessions =
             case binding of
                 Binding slug _ ->
                     slug /= wikiSlug
+        )
+        sessions
+
+
+{-| Contributor sessions and account ids reference the wiki slug; keep them consistent after a rename.
+-}
+remapSessionsForWikiSlugRename : Wiki.Slug -> Wiki.Slug -> SessionTable -> SessionTable
+remapSessionsForWikiSlugRename oldSlug newSlug sessions =
+    Dict.map
+        (\_ binding ->
+            case binding of
+                Binding slug accId ->
+                    if slug == oldSlug then
+                        Binding newSlug (ContributorAccount.remapIdForWikiSlug oldSlug newSlug accId)
+
+                    else
+                        binding
         )
         sessions

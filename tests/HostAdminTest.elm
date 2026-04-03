@@ -77,6 +77,20 @@ suite =
                     HostAdmin.validateHostedWikiSummary (String.repeat (HostAdmin.wikiSummaryMaxLength + 1) "x")
                         |> Expect.equal (Err HostAdmin.WikiSummaryTooLong)
             ]
+        , Test.describe "validateHostedWikiMetadataSlug"
+            [ Test.test "allows legacy slug when unchanged" <|
+                \() ->
+                    HostAdmin.validateHostedWikiMetadataSlug "demo" "  demo  "
+                        |> Expect.equal (Ok "demo")
+            , Test.test "validates new slug with page slug rules" <|
+                \() ->
+                    HostAdmin.validateHostedWikiMetadataSlug "demo" "  MyWiki  "
+                        |> Expect.equal (Ok "MyWiki")
+            , Test.test "rejects invalid new slug" <|
+                \() ->
+                    HostAdmin.validateHostedWikiMetadataSlug "demo" "bad slug"
+                        |> Expect.equal (Err (HostAdmin.UpdateMetadataWikiSlugInvalid Submission.SlugInvalidChars))
+            ]
         , Test.describe "updateHostedWikiMetadataErrorToUserText"
             [ Test.test "UpdateMetadataWikiSummaryInvalid" <|
                 \() ->
@@ -84,6 +98,10 @@ suite =
                         (HostAdmin.UpdateMetadataWikiSummaryInvalid HostAdmin.WikiSummaryTooLong)
                         |> String.contains (String.fromInt HostAdmin.wikiSummaryMaxLength)
                         |> Expect.equal True
+            , Test.test "UpdateMetadataWikiSlugTaken" <|
+                \() ->
+                    HostAdmin.updateHostedWikiMetadataErrorToUserText HostAdmin.UpdateMetadataWikiSlugTaken
+                        |> Expect.equal "A wiki with this slug already exists."
             ]
         , Test.describe "wikiLifecycleErrorToUserText"
             [ Test.test "WikiLifecycleWikiNotFound" <|
@@ -106,10 +124,10 @@ suite =
                 \() ->
                     HostAdmin.deleteHostedWikiConfirmationMatches "acme" "  acme  "
                         |> Expect.equal True
-            , Test.test "accepts DELETE" <|
+            , Test.test "rejects DELETE literal" <|
                 \() ->
                     HostAdmin.deleteHostedWikiConfirmationMatches "acme" "DELETE"
-                        |> Expect.equal True
+                        |> Expect.equal False
             , Test.test "rejects wrong phrase" <|
                 \() ->
                     HostAdmin.deleteHostedWikiConfirmationMatches "acme" "acm"
@@ -120,7 +138,7 @@ suite =
                 \() ->
                     HostAdmin.DeleteHostedWikiConfirmationMismatch
                         |> HostAdmin.deleteHostedWikiErrorToUserText
-                        |> Expect.equal "Confirmation must match the wiki slug or the word DELETE."
+                        |> Expect.equal "Type the wiki slug exactly to confirm deletion."
             , Test.test "DeleteHostedWikiNotHostAuthenticated matches protected" <|
                 \() ->
                     HostAdmin.DeleteHostedWikiNotHostAuthenticated

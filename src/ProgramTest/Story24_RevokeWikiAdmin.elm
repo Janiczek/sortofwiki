@@ -30,10 +30,10 @@ expectGrantadminTrustedOnDemo backendModel =
 
                 Just stored ->
                     case stored.role of
-                        WikiRole.Trusted ->
+                        WikiRole.TrustedContributor ->
                             Ok ()
 
-                        WikiRole.Contributor ->
+                        WikiRole.UntrustedContributor ->
                             Err "grantadmin_trusted should be Trusted after revoke"
 
                         WikiRole.Admin ->

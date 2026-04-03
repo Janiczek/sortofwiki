@@ -109,7 +109,7 @@ endToEndTests =
                         root
                             |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-delete-wiki-error" ]
                             |> Test.Html.Query.has
-                                [ Test.Html.Selector.text "Confirmation must match the wiki slug or the word DELETE." ]
+                                [ Test.Html.Selector.text "Type the wiki slug exactly to confirm deletion." ]
                     )
                 , client.input 100 (Effect.Browser.Dom.id "host-admin-delete-wiki-confirm") "Story32Wiki"
                 , client.click 100 (Effect.Browser.Dom.id "host-admin-delete-wiki-submit")

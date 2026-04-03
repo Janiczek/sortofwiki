@@ -15,6 +15,7 @@ module HostAdmin exposing
     , loginErrorToUserText
     , protectedErrorToUserText
     , updateHostedWikiMetadataErrorToUserText
+    , validateHostedWikiMetadataSlug
     , validateHostedWikiName
     , validateHostedWikiSummary
     , wikiLifecycleErrorToUserText
@@ -23,6 +24,7 @@ module HostAdmin exposing
     )
 
 import Submission
+import Wiki
 
 
 {-| Wrong password for host-admin login (story 27).
@@ -86,19 +88,14 @@ deleteHostedWikiErrorToUserText err =
             "That wiki was not found."
 
         DeleteHostedWikiConfirmationMismatch ->
-            "Confirmation must match the wiki slug or the word DELETE."
+            "Type the wiki slug exactly to confirm deletion."
 
 
-{-| After `String.trim`, the phrase must equal the wiki slug or exactly `DELETE`.
+{-| After `String.trim`, the phrase must equal the wiki slug.
 -}
 deleteHostedWikiConfirmationMatches : String -> String -> Bool
 deleteHostedWikiConfirmationMatches wikiSlug raw =
-    let
-        trimmed : String
-        trimmed =
-            String.trim raw
-    in
-    trimmed == wikiSlug || trimmed == "DELETE"
+    String.trim raw == wikiSlug
 
 
 wikiLifecycleErrorToUserText : WikiLifecycleError -> String
@@ -118,6 +115,8 @@ type UpdateHostedWikiMetadataError
     | UpdateMetadataWikiNotFound
     | UpdateMetadataWikiNameInvalid WikiNameError
     | UpdateMetadataWikiSummaryInvalid WikiSummaryError
+    | UpdateMetadataWikiSlugInvalid Submission.ValidationError
+    | UpdateMetadataWikiSlugTaken
 
 
 {-| Public wiki blurb length (story 30).
@@ -151,6 +150,12 @@ updateHostedWikiMetadataErrorToUserText err =
         UpdateMetadataWikiSummaryInvalid e ->
             wikiSummaryErrorToUserText e
 
+        UpdateMetadataWikiSlugInvalid e ->
+            hostedWikiSlugErrorToUserText e
+
+        UpdateMetadataWikiSlugTaken ->
+            "A wiki with this slug already exists."
+
 
 wikiSummaryErrorToUserText : WikiSummaryError -> String
 wikiSummaryErrorToUserText err =
@@ -159,6 +164,27 @@ wikiSummaryErrorToUserText err =
             "Summary must be at most "
                 ++ String.fromInt wikiSummaryMaxLength
                 ++ " characters."
+
+
+{-| Slug field on host wiki detail: unchanged value keeps legacy slugs; a new value uses the same rules as create (story 29).
+-}
+validateHostedWikiMetadataSlug : Wiki.Slug -> String -> Result UpdateHostedWikiMetadataError String
+validateHostedWikiMetadataSlug currentSlug raw =
+    let
+        trimmed : String
+        trimmed =
+            String.trim raw
+    in
+    if trimmed == currentSlug then
+        Ok trimmed
+
+    else
+        case Submission.validatePageSlug trimmed of
+            Err e ->
+                Err (UpdateMetadataWikiSlugInvalid e)
+
+            Ok s ->
+                Ok s
 
 
 {-| Trims; empty summary is allowed; length cap only.

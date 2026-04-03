@@ -13,7 +13,7 @@ import Set
 import Submission
 import SubmissionReviewDetail
 import Types exposing (BackendModel, BackendMsg(..), ToBackend(..), ToFrontend(..))
-import Wiki exposing (Slug, Wiki)
+import Wiki exposing (Wiki)
 import WikiAdminUsers
 import WikiAuditLog
 import WikiContributors
@@ -29,10 +29,38 @@ type alias Msg =
     BackendMsg
 
 
+{-| Point wiki data, contributors, sessions, submissions, and audit log at `newSlug` (hosted wiki slug rename).
+-}
+applyHostedWikiSlugRename : Wiki.Slug -> Wiki.Slug -> Wiki -> Model -> Model
+applyHostedWikiSlugRename oldSlug newSlug nextWiki model =
+    let
+        nextAudit : Dict Wiki.Slug (List WikiAuditLog.AuditEvent)
+        nextAudit =
+            case Dict.get oldSlug model.wikiAuditEvents of
+                Nothing ->
+                    Dict.remove oldSlug model.wikiAuditEvents
+
+                Just events ->
+                    model.wikiAuditEvents
+                        |> Dict.remove oldSlug
+                        |> Dict.insert newSlug events
+    in
+    { model
+        | wikis =
+            model.wikis
+                |> Dict.remove oldSlug
+                |> Dict.insert newSlug nextWiki
+        , contributors = WikiContributors.renameWikiSlug oldSlug newSlug model.contributors
+        , contributorSessions = WikiUser.remapSessionsForWikiSlugRename oldSlug newSlug model.contributorSessions
+        , submissions = Submission.remapWikiSlugInSubmissions oldSlug newSlug model.submissions
+        , wikiAuditEvents = nextAudit
+    }
+
+
 {-| Append one audit row and advance the monotonic server clock (stories 25, 34).
 Uses the acting account id (moderator / admin), not submission authors.
 -}
-recordAudit : Slug -> ContributorAccount.Id -> WikiAuditLog.AuditEventKind -> Model -> Model
+recordAudit : Wiki.Slug -> ContributorAccount.Id -> WikiAuditLog.AuditEventKind -> Model -> Model
 recordAudit wikiSlug actorId kind model =
     let
         actor : String
@@ -47,7 +75,7 @@ recordAudit wikiSlug actorId kind model =
     }
 
 
-seedWikis : Dict Slug Wiki
+seedWikis : Dict Wiki.Slug Wiki
 seedWikis =
     [ { slug = "demo"
       , name = "Demo Wiki"
@@ -55,16 +83,69 @@ seedWikis =
       , active = True
       , pages =
             [ Page.withPublishedAndPending "Home"
-                "Welcome to the Demo Wiki. See [Guides](/w/demo/p/Guides) and [MarkdownPlayground](/w/demo/p/MarkdownPlayground)."
-                "### STORY06_PENDING_LEAK\n\nUnpublished draft only. [[OnlyPending]]"
+                """Welcome to the Demo Wiki. See [Guides](/w/demo/p/Guides) and [MarkdownPlayground](/w/demo/p/MarkdownPlayground)."""
+                """### STORY06_PENDING_LEAK
+
+Unpublished draft only. [[OnlyPending]]"""
             , Page.withPublished "Guides"
-                "## How to use this wiki\n\nRead the **manual**.\n\nThe home page links here, so it shows under *Backlinks* below. That list is inbound links only—this page does not link back to home.\n"
+                """## How to use this wiki
+
+Read the **manual**.
+
+The home page links here, so it shows under *Backlinks* below. That list is inbound links only—this page does not link back to home.
+"""
             , Page.withPublished "About"
-                "This page links only to [[Home]]. The home page does not link here; *Backlinks* on home still lists this page because other pages pointing **to** the current page are what backlinks mean.\n"
+                """This page links only to [[Home]]. The home page does not link here; *Backlinks* on home still lists this page because other pages pointing **to** the current page are what backlinks mean.
+"""
             , Page.withPublished "MarkdownPlayground"
-                "# Markdown Playground\n\nThis page demonstrates seeded Markdown support.\n\n## Inline formatting\n\nThis paragraph includes **bold**, *italic*, `inline code`, and ~~strikethrough~~.\n\n## Links\n\n- External link: [Lamdera](https://lamdera.com)\n- In-wiki link by slug: [[Guides]]\n- In-wiki link with label: [[About|About this wiki]]\n- Raw URL autolink: <https://example.com>\n\n## Lists\n\n- Unordered item one\n- Unordered item two\n  - Nested unordered item\n\n1. Ordered item one\n2. Ordered item two\n\n## Blockquote\n\n> This is a blockquote.\n>\n> It spans multiple lines.\n\n## Code block\n\n```elm\nviewGreeting : String -> String\nviewGreeting name =\n    \"Hello, \" ++ name\n```\n\n## Horizontal rule\n\n---\n\n## Escaping and entities\n\nUse \\*asterisks\\* literally and show an ampersand entity: &amp;.\n"
+                """# Markdown Playground
+
+This page demonstrates seeded Markdown support.
+
+## Inline formatting
+
+This paragraph includes **bold**, *italic*, `inline code`, and ~~strikethrough~~.
+
+## Links
+
+- External link: [Lamdera](https://lamdera.com)
+- In-wiki link by slug: [[Guides]]
+- In-wiki link with label: [[About|About this wiki]]
+- Raw URL autolink: <https://example.com>
+
+## Lists
+
+- Unordered item one
+- Unordered item two
+  - Nested unordered item
+
+1. Ordered item one
+2. Ordered item two
+
+## Blockquote
+
+> This is a blockquote.
+>
+> It spans multiple lines.
+
+## Code block
+
+```elm
+viewGreeting : String -> String
+viewGreeting name =
+    "Hello, " ++ name
+```
+
+## Horizontal rule
+
+---
+
+## Escaping and entities
+
+Use \\*asterisks\\* literally and show an ampersand entity: &amp;.
+"""
             , Page.pendingOnly "OnlyPending"
-                "STORY06_PENDING_ONLY visible if leaked."
+                """STORY06_PENDING_ONLY visible if leaked."""
             ]
                 |> slugDict
       }
@@ -73,7 +154,7 @@ seedWikis =
       , summary = ""
       , active = True
       , pages =
-            [ Page.withPublished "Home" "Tips and notes about Elm." ]
+            [ Page.withPublished "Home" """Tips and notes about Elm.""" ]
                 |> slugDict
       }
     ]
@@ -172,7 +253,7 @@ demoStatusSeededSubmissions authorId =
 init : ( Model, Command BackendOnly ToFrontend Msg )
 init =
     let
-        wikis : Dict Slug Wiki
+        wikis : Dict Wiki.Slug Wiki
         wikis =
             seedWikis
 
@@ -293,10 +374,6 @@ updateFromFrontend sessionId clientId msg model =
 
         RequestReviewQueue wikiSlug ->
             let
-                sessionKey : String
-                sessionKey =
-                    Effect.Lamdera.sessionIdToString sessionId
-
                 respond : Result Submission.ReviewQueueError (List Submission.ReviewQueueItem) -> ( Model, Command BackendOnly ToFrontend Msg )
                 respond res =
                     ( model
@@ -307,24 +384,39 @@ updateFromFrontend sessionId clientId msg model =
                 lookupAuthor : ContributorAccount.Id -> Maybe String
                 lookupAuthor accountId =
                     WikiContributors.displayUsernameForAccount wikiSlug accountId model.contributors
+
+                wikiPaused : Bool
+                wikiPaused =
+                    Dict.get wikiSlug model.wikis
+                        |> Maybe.map (not << .active)
+                        |> Maybe.withDefault False
             in
-            case Dict.get sessionKey model.contributorSessions of
-                Nothing ->
-                    respond (Err Submission.ReviewQueueNotLoggedIn)
+            if wikiPaused then
+                respond (Err Submission.ReviewQueueWikiInactive)
 
-                Just (WikiUser.Binding boundWiki accountId) ->
-                    if boundWiki /= wikiSlug then
-                        respond (Err Submission.ReviewQueueWrongWikiSession)
+            else
+                let
+                    sessionKey : String
+                    sessionKey =
+                        Effect.Lamdera.sessionIdToString sessionId
+                in
+                case Dict.get sessionKey model.contributorSessions of
+                    Nothing ->
+                        respond (Err Submission.ReviewQueueNotLoggedIn)
 
-                    else if not (WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors) then
-                        respond (Err Submission.ReviewQueueForbidden)
+                    Just (WikiUser.Binding boundWiki accountId) ->
+                        if boundWiki /= wikiSlug then
+                            respond (Err Submission.ReviewQueueWrongWikiSession)
 
-                    else
-                        model.submissions
-                            |> Submission.pendingSubmissionsForWiki wikiSlug
-                            |> List.map (Submission.reviewQueueItemFromSubmission lookupAuthor)
-                            |> Ok
-                            |> respond
+                        else if not (WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors) then
+                            respond (Err Submission.ReviewQueueForbidden)
+
+                        else
+                            model.submissions
+                                |> Submission.pendingSubmissionsForWiki wikiSlug
+                                |> List.map (Submission.reviewQueueItemFromSubmission lookupAuthor)
+                                |> Ok
+                                |> respond
 
         RequestWikiUsers wikiSlug ->
             let
@@ -339,27 +431,31 @@ updateFromFrontend sessionId clientId msg model =
                 Nothing ->
                     respond (Err WikiAdminUsers.WikiNotFound)
 
-                Just _ ->
-                    let
-                        sessionKey : String
-                        sessionKey =
-                            Effect.Lamdera.sessionIdToString sessionId
-                    in
-                    case Dict.get sessionKey model.contributorSessions of
-                        Nothing ->
-                            respond (Err WikiAdminUsers.NotLoggedIn)
+                Just w ->
+                    if not w.active then
+                        respond (Err WikiAdminUsers.WikiInactive)
 
-                        Just (WikiUser.Binding boundWiki accountId) ->
-                            if boundWiki /= wikiSlug then
-                                respond (Err WikiAdminUsers.WrongWikiSession)
+                    else
+                        let
+                            sessionKey : String
+                            sessionKey =
+                                Effect.Lamdera.sessionIdToString sessionId
+                        in
+                        case Dict.get sessionKey model.contributorSessions of
+                            Nothing ->
+                                respond (Err WikiAdminUsers.NotLoggedIn)
 
-                            else if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
-                                respond (Err WikiAdminUsers.Forbidden)
+                            Just (WikiUser.Binding boundWiki accountId) ->
+                                if boundWiki /= wikiSlug then
+                                    respond (Err WikiAdminUsers.WrongWikiSession)
 
-                            else
-                                WikiContributors.usersForWikiListing wikiSlug model.contributors
-                                    |> Ok
-                                    |> respond
+                                else if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
+                                    respond (Err WikiAdminUsers.Forbidden)
+
+                                else
+                                    WikiContributors.usersForWikiListing wikiSlug model.contributors
+                                        |> Ok
+                                        |> respond
 
         RequestWikiAuditLog wikiSlug filter ->
             let
@@ -374,30 +470,34 @@ updateFromFrontend sessionId clientId msg model =
                 Nothing ->
                     respond (Err WikiAuditLog.WikiNotFound)
 
-                Just _ ->
-                    let
-                        sessionKey : String
-                        sessionKey =
-                            Effect.Lamdera.sessionIdToString sessionId
-                    in
-                    case Dict.get sessionKey model.contributorSessions of
-                        Nothing ->
-                            respond (Err WikiAuditLog.NotLoggedIn)
+                Just w ->
+                    if not w.active then
+                        respond (Err WikiAuditLog.WikiInactive)
 
-                        Just (WikiUser.Binding boundWiki accountId) ->
-                            if boundWiki /= wikiSlug then
-                                respond (Err WikiAuditLog.WrongWikiSession)
+                    else
+                        let
+                            sessionKey : String
+                            sessionKey =
+                                Effect.Lamdera.sessionIdToString sessionId
+                        in
+                        case Dict.get sessionKey model.contributorSessions of
+                            Nothing ->
+                                respond (Err WikiAuditLog.NotLoggedIn)
 
-                            else if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
-                                respond (Err WikiAuditLog.Forbidden)
+                            Just (WikiUser.Binding boundWiki accountId) ->
+                                if boundWiki /= wikiSlug then
+                                    respond (Err WikiAuditLog.WrongWikiSession)
 
-                            else
-                                model.wikiAuditEvents
-                                    |> Dict.get wikiSlug
-                                    |> Maybe.withDefault []
-                                    |> WikiAuditLog.filterEvents filter
-                                    |> Ok
-                                    |> respond
+                                else if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
+                                    respond (Err WikiAuditLog.Forbidden)
+
+                                else
+                                    model.wikiAuditEvents
+                                        |> Dict.get wikiSlug
+                                        |> Maybe.withDefault []
+                                        |> WikiAuditLog.filterEvents filter
+                                        |> Ok
+                                        |> respond
 
         PromoteContributorToTrusted wikiSlug rawTargetUsername ->
             let
@@ -414,50 +514,54 @@ updateFromFrontend sessionId clientId msg model =
                 Nothing ->
                     respond (Err WikiAdminUsers.PromoteWikiNotFound)
 
-                Just _ ->
-                    let
-                        sessionKey : String
-                        sessionKey =
-                            Effect.Lamdera.sessionIdToString sessionId
-                    in
-                    case Dict.get sessionKey model.contributorSessions of
-                        Nothing ->
-                            respond (Err WikiAdminUsers.PromoteNotLoggedIn)
+                Just w ->
+                    if not w.active then
+                        respond (Err WikiAdminUsers.PromoteWikiInactive)
 
-                        Just (WikiUser.Binding boundWiki accountId) ->
-                            if boundWiki /= wikiSlug then
-                                respond (Err WikiAdminUsers.PromoteWrongWikiSession)
+                    else
+                        let
+                            sessionKey : String
+                            sessionKey =
+                                Effect.Lamdera.sessionIdToString sessionId
+                        in
+                        case Dict.get sessionKey model.contributorSessions of
+                            Nothing ->
+                                respond (Err WikiAdminUsers.PromoteNotLoggedIn)
 
-                            else if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
-                                respond (Err WikiAdminUsers.PromoteForbidden)
+                            Just (WikiUser.Binding boundWiki accountId) ->
+                                if boundWiki /= wikiSlug then
+                                    respond (Err WikiAdminUsers.PromoteWrongWikiSession)
 
-                            else
-                                let
-                                    normalizedTarget : String
-                                    normalizedTarget =
-                                        ContributorAccount.normalizeUsername rawTargetUsername
-                                in
-                                if String.isEmpty normalizedTarget then
-                                    respond (Err WikiAdminUsers.PromoteTargetNotFound)
+                                else if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
+                                    respond (Err WikiAdminUsers.PromoteForbidden)
 
                                 else
-                                    case WikiContributors.promoteContributorToTrustedAtWiki wikiSlug normalizedTarget model.contributors of
-                                        Err e ->
-                                            respond (Err e)
+                                    let
+                                        normalizedTarget : String
+                                        normalizedTarget =
+                                            ContributorAccount.normalizeUsername rawTargetUsername
+                                    in
+                                    if String.isEmpty normalizedTarget then
+                                        respond (Err WikiAdminUsers.PromoteTargetNotFound)
 
-                                        Ok nextContributors ->
-                                            let
-                                                nextModel0 : Model
-                                                nextModel0 =
-                                                    { model | contributors = nextContributors }
-                                            in
-                                            ( recordAudit wikiSlug
-                                                accountId
-                                                (WikiAuditLog.PromotedContributorToTrusted { targetUsername = normalizedTarget })
-                                                nextModel0
-                                            , Effect.Lamdera.sendToFrontend clientId
-                                                (PromoteContributorToTrustedResponse wikiSlug (Ok ()))
-                                            )
+                                    else
+                                        case WikiContributors.promoteContributorToTrustedAtWiki wikiSlug normalizedTarget model.contributors of
+                                            Err e ->
+                                                respond (Err e)
+
+                                            Ok nextContributors ->
+                                                let
+                                                    nextModel0 : Model
+                                                    nextModel0 =
+                                                        { model | contributors = nextContributors }
+                                                in
+                                                ( recordAudit wikiSlug
+                                                    accountId
+                                                    (WikiAuditLog.PromotedContributorToTrusted { targetUsername = normalizedTarget })
+                                                    nextModel0
+                                                , Effect.Lamdera.sendToFrontend clientId
+                                                    (PromoteContributorToTrustedResponse wikiSlug (Ok ()))
+                                                )
 
         DemoteTrustedToContributor wikiSlug rawTargetUsername ->
             let
@@ -474,50 +578,54 @@ updateFromFrontend sessionId clientId msg model =
                 Nothing ->
                     respond (Err WikiAdminUsers.DemoteWikiNotFound)
 
-                Just _ ->
-                    let
-                        sessionKey : String
-                        sessionKey =
-                            Effect.Lamdera.sessionIdToString sessionId
-                    in
-                    case Dict.get sessionKey model.contributorSessions of
-                        Nothing ->
-                            respond (Err WikiAdminUsers.DemoteNotLoggedIn)
+                Just w ->
+                    if not w.active then
+                        respond (Err WikiAdminUsers.DemoteWikiInactive)
 
-                        Just (WikiUser.Binding boundWiki accountId) ->
-                            if boundWiki /= wikiSlug then
-                                respond (Err WikiAdminUsers.DemoteWrongWikiSession)
+                    else
+                        let
+                            sessionKey : String
+                            sessionKey =
+                                Effect.Lamdera.sessionIdToString sessionId
+                        in
+                        case Dict.get sessionKey model.contributorSessions of
+                            Nothing ->
+                                respond (Err WikiAdminUsers.DemoteNotLoggedIn)
 
-                            else if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
-                                respond (Err WikiAdminUsers.DemoteForbidden)
+                            Just (WikiUser.Binding boundWiki accountId) ->
+                                if boundWiki /= wikiSlug then
+                                    respond (Err WikiAdminUsers.DemoteWrongWikiSession)
 
-                            else
-                                let
-                                    normalizedTarget : String
-                                    normalizedTarget =
-                                        ContributorAccount.normalizeUsername rawTargetUsername
-                                in
-                                if String.isEmpty normalizedTarget then
-                                    respond (Err WikiAdminUsers.DemoteTargetNotFound)
+                                else if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
+                                    respond (Err WikiAdminUsers.DemoteForbidden)
 
                                 else
-                                    case WikiContributors.demoteTrustedToContributorAtWiki wikiSlug normalizedTarget model.contributors of
-                                        Err e ->
-                                            respond (Err e)
+                                    let
+                                        normalizedTarget : String
+                                        normalizedTarget =
+                                            ContributorAccount.normalizeUsername rawTargetUsername
+                                    in
+                                    if String.isEmpty normalizedTarget then
+                                        respond (Err WikiAdminUsers.DemoteTargetNotFound)
 
-                                        Ok nextContributors ->
-                                            let
-                                                nextModel0 : Model
-                                                nextModel0 =
-                                                    { model | contributors = nextContributors }
-                                            in
-                                            ( recordAudit wikiSlug
-                                                accountId
-                                                (WikiAuditLog.DemotedTrustedToContributor { targetUsername = normalizedTarget })
-                                                nextModel0
-                                            , Effect.Lamdera.sendToFrontend clientId
-                                                (DemoteTrustedToContributorResponse wikiSlug (Ok ()))
-                                            )
+                                    else
+                                        case WikiContributors.demoteTrustedToContributorAtWiki wikiSlug normalizedTarget model.contributors of
+                                            Err e ->
+                                                respond (Err e)
+
+                                            Ok nextContributors ->
+                                                let
+                                                    nextModel0 : Model
+                                                    nextModel0 =
+                                                        { model | contributors = nextContributors }
+                                                in
+                                                ( recordAudit wikiSlug
+                                                    accountId
+                                                    (WikiAuditLog.DemotedTrustedToContributor { targetUsername = normalizedTarget })
+                                                    nextModel0
+                                                , Effect.Lamdera.sendToFrontend clientId
+                                                    (DemoteTrustedToContributorResponse wikiSlug (Ok ()))
+                                                )
 
         GrantWikiAdmin wikiSlug rawTargetUsername ->
             let
@@ -534,50 +642,54 @@ updateFromFrontend sessionId clientId msg model =
                 Nothing ->
                     respond (Err WikiAdminUsers.GrantTrustedWikiNotFound)
 
-                Just _ ->
-                    let
-                        sessionKey : String
-                        sessionKey =
-                            Effect.Lamdera.sessionIdToString sessionId
-                    in
-                    case Dict.get sessionKey model.contributorSessions of
-                        Nothing ->
-                            respond (Err WikiAdminUsers.GrantTrustedNotLoggedIn)
+                Just w ->
+                    if not w.active then
+                        respond (Err WikiAdminUsers.GrantTrustedWikiInactive)
 
-                        Just (WikiUser.Binding boundWiki accountId) ->
-                            if boundWiki /= wikiSlug then
-                                respond (Err WikiAdminUsers.GrantTrustedWrongWikiSession)
+                    else
+                        let
+                            sessionKey : String
+                            sessionKey =
+                                Effect.Lamdera.sessionIdToString sessionId
+                        in
+                        case Dict.get sessionKey model.contributorSessions of
+                            Nothing ->
+                                respond (Err WikiAdminUsers.GrantTrustedNotLoggedIn)
 
-                            else if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
-                                respond (Err WikiAdminUsers.GrantTrustedForbidden)
+                            Just (WikiUser.Binding boundWiki accountId) ->
+                                if boundWiki /= wikiSlug then
+                                    respond (Err WikiAdminUsers.GrantTrustedWrongWikiSession)
 
-                            else
-                                let
-                                    normalizedTarget : String
-                                    normalizedTarget =
-                                        ContributorAccount.normalizeUsername rawTargetUsername
-                                in
-                                if String.isEmpty normalizedTarget then
-                                    respond (Err WikiAdminUsers.GrantTrustedTargetNotFound)
+                                else if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
+                                    respond (Err WikiAdminUsers.GrantTrustedForbidden)
 
                                 else
-                                    case WikiContributors.grantTrustedToAdminAtWiki wikiSlug normalizedTarget model.contributors of
-                                        Err e ->
-                                            respond (Err e)
+                                    let
+                                        normalizedTarget : String
+                                        normalizedTarget =
+                                            ContributorAccount.normalizeUsername rawTargetUsername
+                                    in
+                                    if String.isEmpty normalizedTarget then
+                                        respond (Err WikiAdminUsers.GrantTrustedTargetNotFound)
 
-                                        Ok nextContributors ->
-                                            let
-                                                nextModel0 : Model
-                                                nextModel0 =
-                                                    { model | contributors = nextContributors }
-                                            in
-                                            ( recordAudit wikiSlug
-                                                accountId
-                                                (WikiAuditLog.GrantedWikiAdmin { targetUsername = normalizedTarget })
-                                                nextModel0
-                                            , Effect.Lamdera.sendToFrontend clientId
-                                                (GrantWikiAdminResponse wikiSlug (Ok ()))
-                                            )
+                                    else
+                                        case WikiContributors.grantTrustedToAdminAtWiki wikiSlug normalizedTarget model.contributors of
+                                            Err e ->
+                                                respond (Err e)
+
+                                            Ok nextContributors ->
+                                                let
+                                                    nextModel0 : Model
+                                                    nextModel0 =
+                                                        { model | contributors = nextContributors }
+                                                in
+                                                ( recordAudit wikiSlug
+                                                    accountId
+                                                    (WikiAuditLog.GrantedWikiAdmin { targetUsername = normalizedTarget })
+                                                    nextModel0
+                                                , Effect.Lamdera.sendToFrontend clientId
+                                                    (GrantWikiAdminResponse wikiSlug (Ok ()))
+                                                )
 
         RevokeWikiAdmin wikiSlug rawTargetUsername ->
             let
@@ -594,50 +706,54 @@ updateFromFrontend sessionId clientId msg model =
                 Nothing ->
                     respond (Err WikiAdminUsers.RevokeAdminWikiNotFound)
 
-                Just _ ->
-                    let
-                        sessionKey : String
-                        sessionKey =
-                            Effect.Lamdera.sessionIdToString sessionId
-                    in
-                    case Dict.get sessionKey model.contributorSessions of
-                        Nothing ->
-                            respond (Err WikiAdminUsers.RevokeAdminNotLoggedIn)
+                Just w ->
+                    if not w.active then
+                        respond (Err WikiAdminUsers.RevokeAdminWikiInactive)
 
-                        Just (WikiUser.Binding boundWiki accountId) ->
-                            if boundWiki /= wikiSlug then
-                                respond (Err WikiAdminUsers.RevokeAdminWrongWikiSession)
+                    else
+                        let
+                            sessionKey : String
+                            sessionKey =
+                                Effect.Lamdera.sessionIdToString sessionId
+                        in
+                        case Dict.get sessionKey model.contributorSessions of
+                            Nothing ->
+                                respond (Err WikiAdminUsers.RevokeAdminNotLoggedIn)
 
-                            else if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
-                                respond (Err WikiAdminUsers.RevokeAdminForbidden)
+                            Just (WikiUser.Binding boundWiki accountId) ->
+                                if boundWiki /= wikiSlug then
+                                    respond (Err WikiAdminUsers.RevokeAdminWrongWikiSession)
 
-                            else
-                                let
-                                    normalizedTarget : String
-                                    normalizedTarget =
-                                        ContributorAccount.normalizeUsername rawTargetUsername
-                                in
-                                if String.isEmpty normalizedTarget then
-                                    respond (Err WikiAdminUsers.RevokeAdminTargetNotFound)
+                                else if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
+                                    respond (Err WikiAdminUsers.RevokeAdminForbidden)
 
                                 else
-                                    case WikiContributors.revokeAdminToTrustedAtWiki wikiSlug accountId normalizedTarget model.contributors of
-                                        Err e ->
-                                            respond (Err e)
+                                    let
+                                        normalizedTarget : String
+                                        normalizedTarget =
+                                            ContributorAccount.normalizeUsername rawTargetUsername
+                                    in
+                                    if String.isEmpty normalizedTarget then
+                                        respond (Err WikiAdminUsers.RevokeAdminTargetNotFound)
 
-                                        Ok nextContributors ->
-                                            let
-                                                nextModel0 : Model
-                                                nextModel0 =
-                                                    { model | contributors = nextContributors }
-                                            in
-                                            ( recordAudit wikiSlug
-                                                accountId
-                                                (WikiAuditLog.RevokedWikiAdmin { targetUsername = normalizedTarget })
-                                                nextModel0
-                                            , Effect.Lamdera.sendToFrontend clientId
-                                                (RevokeWikiAdminResponse wikiSlug (Ok ()))
-                                            )
+                                    else
+                                        case WikiContributors.revokeAdminToTrustedAtWiki wikiSlug accountId normalizedTarget model.contributors of
+                                            Err e ->
+                                                respond (Err e)
+
+                                            Ok nextContributors ->
+                                                let
+                                                    nextModel0 : Model
+                                                    nextModel0 =
+                                                        { model | contributors = nextContributors }
+                                                in
+                                                ( recordAudit wikiSlug
+                                                    accountId
+                                                    (WikiAuditLog.RevokedWikiAdmin { targetUsername = normalizedTarget })
+                                                    nextModel0
+                                                , Effect.Lamdera.sendToFrontend clientId
+                                                    (RevokeWikiAdminResponse wikiSlug (Ok ()))
+                                                )
 
         RequestReviewSubmissionDetail wikiSlug submissionId ->
             let
@@ -671,17 +787,21 @@ updateFromFrontend sessionId clientId msg model =
                                 respond (Err SubmissionReviewDetail.ReviewSubmissionDetailNotFound)
 
                             Just wiki ->
-                                case Dict.get submissionId model.submissions of
-                                    Nothing ->
-                                        respond (Err SubmissionReviewDetail.ReviewSubmissionDetailNotFound)
+                                if not wiki.active then
+                                    respond (Err SubmissionReviewDetail.ReviewSubmissionDetailWikiInactive)
 
-                                    Just sub ->
-                                        if sub.wikiSlug /= wikiSlug then
+                                else
+                                    case Dict.get submissionId model.submissions of
+                                        Nothing ->
                                             respond (Err SubmissionReviewDetail.ReviewSubmissionDetailNotFound)
 
-                                        else
-                                            respond
-                                                (Ok (SubmissionReviewDetail.reviewDetailFromWikiAndSubmission wiki sub))
+                                        Just sub ->
+                                            if sub.wikiSlug /= wikiSlug then
+                                                respond (Err SubmissionReviewDetail.ReviewSubmissionDetailNotFound)
+
+                                            else
+                                                respond
+                                                    (Ok (SubmissionReviewDetail.reviewDetailFromWikiAndSubmission wiki sub))
 
         RequestSubmissionDetails wikiSlug submissionId ->
             let
@@ -705,19 +825,33 @@ updateFromFrontend sessionId clientId msg model =
                         respond (Err Submission.DetailsWrongWikiSession)
 
                     else
-                        case Dict.get submissionId model.submissions of
-                            Nothing ->
-                                respond (Err Submission.DetailsNotFound)
+                        let
+                            submissionBranch : ( Model, Command BackendOnly ToFrontend Msg )
+                            submissionBranch =
+                                case Dict.get submissionId model.submissions of
+                                    Nothing ->
+                                        respond (Err Submission.DetailsNotFound)
 
-                            Just sub ->
-                                if sub.wikiSlug /= wikiSlug then
-                                    respond (Err Submission.DetailsNotFound)
+                                    Just sub ->
+                                        if sub.wikiSlug /= wikiSlug then
+                                            respond (Err Submission.DetailsNotFound)
 
-                                else if sub.authorId /= accountId then
-                                    respond (Err Submission.DetailsForbidden)
+                                        else if sub.authorId /= accountId then
+                                            respond (Err Submission.DetailsForbidden)
+
+                                        else
+                                            respond (Ok (Submission.contributorViewFromSubmission (Dict.get wikiSlug model.wikis) sub))
+                        in
+                        case Dict.get wikiSlug model.wikis of
+                            Just w ->
+                                if not w.active then
+                                    respond (Err Submission.DetailsWikiInactive)
 
                                 else
-                                    respond (Ok (Submission.contributorViewFromSubmission (Dict.get wikiSlug model.wikis) sub))
+                                    submissionBranch
+
+                            Nothing ->
+                                submissionBranch
 
         RegisterContributor wikiSlug username password ->
             case WikiContributors.attemptRegister wikiSlug username password model.wikis model.contributors of
@@ -742,7 +876,7 @@ updateFromFrontend sessionId clientId msg model =
                         , contributorSessions = nextSessions
                       }
                     , Effect.Lamdera.sendToFrontend clientId
-                        (RegisterContributorResponse wikiSlug (Ok WikiRole.Contributor))
+                        (RegisterContributorResponse wikiSlug (Ok WikiRole.UntrustedContributor))
                     )
 
         LoginContributor wikiSlug username password ->
@@ -766,7 +900,7 @@ updateFromFrontend sessionId clientId msg model =
                         role : WikiRole.WikiRole
                         role =
                             WikiContributors.roleForAccount wikiSlug accountId model.contributors
-                                |> Maybe.withDefault WikiRole.Contributor
+                                |> Maybe.withDefault WikiRole.UntrustedContributor
                     in
                     ( { model | contributorSessions = nextSessions }
                     , Effect.Lamdera.sendToFrontend clientId
@@ -800,73 +934,77 @@ updateFromFrontend sessionId clientId msg model =
                                 respondErr Submission.WikiNotFound
 
                             Just wiki ->
-                                case Submission.validateNewPageFields rawSlug rawMarkdown of
-                                    Err ve ->
-                                        respondErr (Submission.Validation ve)
+                                if not wiki.active then
+                                    respondErr Submission.WikiInactive
 
-                                    Ok payload ->
-                                        if Dict.member payload.pageSlug wiki.pages then
-                                            respondErr Submission.SlugAlreadyInUse
+                                else
+                                    case Submission.validateNewPageFields rawSlug rawMarkdown of
+                                        Err ve ->
+                                            respondErr (Submission.Validation ve)
 
-                                        else if Submission.pendingNewPageSlugInUse wikiSlug payload.pageSlug model.submissions then
-                                            respondErr Submission.SlugAlreadyInUse
+                                        Ok payload ->
+                                            if Dict.member payload.pageSlug wiki.pages then
+                                                respondErr Submission.SlugAlreadyInUse
 
-                                        else if WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors then
-                                            let
-                                                nextWiki : Wiki
-                                                nextWiki =
-                                                    Wiki.publishNewPageOnWiki payload wiki
+                                            else if Submission.pendingNewPageSlugInUse wikiSlug payload.pageSlug model.submissions then
+                                                respondErr Submission.SlugAlreadyInUse
 
-                                                nextModel0 : Model
-                                                nextModel0 =
-                                                    { model
-                                                        | wikis = Dict.insert wikiSlug nextWiki model.wikis
-                                                    }
+                                            else if WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors then
+                                                let
+                                                    nextWiki : Wiki
+                                                    nextWiki =
+                                                        Wiki.publishNewPageOnWiki payload wiki
 
-                                                nextModel : Model
-                                                nextModel =
-                                                    recordAudit wikiSlug
-                                                        accountId
-                                                        (WikiAuditLog.TrustedPublishedNewPage { pageSlug = payload.pageSlug })
-                                                        nextModel0
-                                            in
-                                            ( nextModel
-                                            , Effect.Lamdera.sendToFrontend clientId
-                                                (SubmitNewPageResponse wikiSlug (Ok Submission.NewPagePublishedImmediately))
-                                            )
+                                                    nextModel0 : Model
+                                                    nextModel0 =
+                                                        { model
+                                                            | wikis = Dict.insert wikiSlug nextWiki model.wikis
+                                                        }
 
-                                        else
-                                            let
-                                                submissionId : Submission.Id
-                                                submissionId =
-                                                    Submission.idFromCounter model.nextSubmissionCounter
+                                                    nextModel : Model
+                                                    nextModel =
+                                                        recordAudit wikiSlug
+                                                            accountId
+                                                            (WikiAuditLog.TrustedPublishedNewPage { pageSlug = payload.pageSlug })
+                                                            nextModel0
+                                                in
+                                                ( nextModel
+                                                , Effect.Lamdera.sendToFrontend clientId
+                                                    (SubmitNewPageResponse wikiSlug (Ok Submission.NewPagePublishedImmediately))
+                                                )
 
-                                                sub : Submission.Submission
-                                                sub =
-                                                    { id = submissionId
-                                                    , wikiSlug = wikiSlug
-                                                    , authorId = accountId
-                                                    , kind =
-                                                        Submission.NewPage
-                                                            { pageSlug = payload.pageSlug
-                                                            , markdown = payload.markdown
-                                                            }
-                                                    , status = Submission.Pending
-                                                    , reviewerNote = Nothing
-                                                    }
+                                            else
+                                                let
+                                                    submissionId : Submission.Id
+                                                    submissionId =
+                                                        Submission.idFromCounter model.nextSubmissionCounter
 
-                                                nextModel : Model
-                                                nextModel =
-                                                    { model
-                                                        | submissions =
-                                                            Dict.insert (Submission.idToString submissionId) sub model.submissions
-                                                        , nextSubmissionCounter = model.nextSubmissionCounter + 1
-                                                    }
-                                            in
-                                            ( nextModel
-                                            , Effect.Lamdera.sendToFrontend clientId
-                                                (SubmitNewPageResponse wikiSlug (Ok (Submission.NewPageSubmittedForReview submissionId)))
-                                            )
+                                                    sub : Submission.Submission
+                                                    sub =
+                                                        { id = submissionId
+                                                        , wikiSlug = wikiSlug
+                                                        , authorId = accountId
+                                                        , kind =
+                                                            Submission.NewPage
+                                                                { pageSlug = payload.pageSlug
+                                                                , markdown = payload.markdown
+                                                                }
+                                                        , status = Submission.Pending
+                                                        , reviewerNote = Nothing
+                                                        }
+
+                                                    nextModel : Model
+                                                    nextModel =
+                                                        { model
+                                                            | submissions =
+                                                                Dict.insert (Submission.idToString submissionId) sub model.submissions
+                                                            , nextSubmissionCounter = model.nextSubmissionCounter + 1
+                                                        }
+                                                in
+                                                ( nextModel
+                                                , Effect.Lamdera.sendToFrontend clientId
+                                                    (SubmitNewPageResponse wikiSlug (Ok (Submission.NewPageSubmittedForReview submissionId)))
+                                                )
 
         SubmitPageEdit wikiSlug pageSlug rawMarkdown ->
             let
@@ -895,84 +1033,88 @@ updateFromFrontend sessionId clientId msg model =
                                 respondErr Submission.EditWikiNotFound
 
                             Just wiki ->
-                                case Submission.validateEditMarkdown rawMarkdown of
-                                    Err ve ->
-                                        respondErr (Submission.EditValidation ve)
+                                if not wiki.active then
+                                    respondErr Submission.EditWikiInactive
 
-                                    Ok markdown ->
-                                        if not (Submission.wikiHasPublishedPage pageSlug wiki) then
-                                            respondErr Submission.EditTargetPageNotPublished
+                                else
+                                    case Submission.validateEditMarkdown rawMarkdown of
+                                        Err ve ->
+                                            respondErr (Submission.EditValidation ve)
 
-                                        else if Submission.pendingEditForAuthorOnPageInUse wikiSlug accountId pageSlug model.submissions then
-                                            respondErr Submission.EditAlreadyPendingForAuthor
+                                        Ok markdown ->
+                                            if not (Submission.wikiHasPublishedPage pageSlug wiki) then
+                                                respondErr Submission.EditTargetPageNotPublished
 
-                                        else if WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors then
-                                            let
-                                                nextWiki : Wiki
-                                                nextWiki =
-                                                    Wiki.applyPublishedMarkdownEdit pageSlug markdown wiki
+                                            else if Submission.pendingEditForAuthorOnPageInUse wikiSlug accountId pageSlug model.submissions then
+                                                respondErr Submission.EditAlreadyPendingForAuthor
 
-                                                nextModel0 : Model
-                                                nextModel0 =
-                                                    { model
-                                                        | wikis = Dict.insert wikiSlug nextWiki model.wikis
-                                                    }
+                                            else if WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors then
+                                                let
+                                                    nextWiki : Wiki
+                                                    nextWiki =
+                                                        Wiki.applyPublishedMarkdownEdit pageSlug markdown wiki
 
-                                                nextModel : Model
-                                                nextModel =
-                                                    recordAudit wikiSlug
-                                                        accountId
-                                                        (WikiAuditLog.TrustedPublishedPageEdit { pageSlug = pageSlug })
-                                                        nextModel0
-                                            in
-                                            ( nextModel
-                                            , Effect.Lamdera.sendToFrontend clientId
-                                                (SubmitPageEditResponse wikiSlug (Ok Submission.EditPublishedImmediately))
-                                            )
+                                                    nextModel0 : Model
+                                                    nextModel0 =
+                                                        { model
+                                                            | wikis = Dict.insert wikiSlug nextWiki model.wikis
+                                                        }
 
-                                        else
-                                            let
-                                                baseMarkdown : String
-                                                baseMarkdown =
-                                                    SubmissionReviewDetail.publishedMarkdownForSlug wiki pageSlug
+                                                    nextModel : Model
+                                                    nextModel =
+                                                        recordAudit wikiSlug
+                                                            accountId
+                                                            (WikiAuditLog.TrustedPublishedPageEdit { pageSlug = pageSlug })
+                                                            nextModel0
+                                                in
+                                                ( nextModel
+                                                , Effect.Lamdera.sendToFrontend clientId
+                                                    (SubmitPageEditResponse wikiSlug (Ok Submission.EditPublishedImmediately))
+                                                )
 
-                                                baseRevision : Int
-                                                baseRevision =
-                                                    Submission.currentPublishedRevision wiki pageSlug
-                                                        |> Maybe.withDefault 0
+                                            else
+                                                let
+                                                    baseMarkdown : String
+                                                    baseMarkdown =
+                                                        SubmissionReviewDetail.publishedMarkdownForSlug wiki pageSlug
 
-                                                submissionId : Submission.Id
-                                                submissionId =
-                                                    Submission.idFromCounter model.nextSubmissionCounter
+                                                    baseRevision : Int
+                                                    baseRevision =
+                                                        Submission.currentPublishedRevision wiki pageSlug
+                                                            |> Maybe.withDefault 0
 
-                                                sub : Submission.Submission
-                                                sub =
-                                                    { id = submissionId
-                                                    , wikiSlug = wikiSlug
-                                                    , authorId = accountId
-                                                    , kind =
-                                                        Submission.EditPage
-                                                            { pageSlug = pageSlug
-                                                            , baseMarkdown = baseMarkdown
-                                                            , baseRevision = baseRevision
-                                                            , proposedMarkdown = markdown
-                                                            }
-                                                    , status = Submission.Pending
-                                                    , reviewerNote = Nothing
-                                                    }
+                                                    submissionId : Submission.Id
+                                                    submissionId =
+                                                        Submission.idFromCounter model.nextSubmissionCounter
 
-                                                nextModel : Model
-                                                nextModel =
-                                                    { model
-                                                        | submissions =
-                                                            Dict.insert (Submission.idToString submissionId) sub model.submissions
-                                                        , nextSubmissionCounter = model.nextSubmissionCounter + 1
-                                                    }
-                                            in
-                                            ( nextModel
-                                            , Effect.Lamdera.sendToFrontend clientId
-                                                (SubmitPageEditResponse wikiSlug (Ok (Submission.EditSubmittedForReview submissionId)))
-                                            )
+                                                    sub : Submission.Submission
+                                                    sub =
+                                                        { id = submissionId
+                                                        , wikiSlug = wikiSlug
+                                                        , authorId = accountId
+                                                        , kind =
+                                                            Submission.EditPage
+                                                                { pageSlug = pageSlug
+                                                                , baseMarkdown = baseMarkdown
+                                                                , baseRevision = baseRevision
+                                                                , proposedMarkdown = markdown
+                                                                }
+                                                        , status = Submission.Pending
+                                                        , reviewerNote = Nothing
+                                                        }
+
+                                                    nextModel : Model
+                                                    nextModel =
+                                                        { model
+                                                            | submissions =
+                                                                Dict.insert (Submission.idToString submissionId) sub model.submissions
+                                                            , nextSubmissionCounter = model.nextSubmissionCounter + 1
+                                                        }
+                                                in
+                                                ( nextModel
+                                                , Effect.Lamdera.sendToFrontend clientId
+                                                    (SubmitPageEditResponse wikiSlug (Ok (Submission.EditSubmittedForReview submissionId)))
+                                                )
 
         SubmitPageDelete wikiSlug pageSlug rawReason ->
             let
@@ -1001,70 +1143,74 @@ updateFromFrontend sessionId clientId msg model =
                                 respondErr Submission.DeleteWikiNotFound
 
                             Just wiki ->
-                                case Submission.validateDeleteReason rawReason of
-                                    Err ve ->
-                                        respondErr (Submission.DeleteValidation ve)
+                                if not wiki.active then
+                                    respondErr Submission.DeleteWikiInactive
 
-                                    Ok maybeReason ->
-                                        if not (Submission.wikiHasPublishedPage pageSlug wiki) then
-                                            respondErr Submission.DeleteTargetPageNotPublished
+                                else
+                                    case Submission.validateDeleteReason rawReason of
+                                        Err ve ->
+                                            respondErr (Submission.DeleteValidation ve)
 
-                                        else if WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors then
-                                            let
-                                                nextWiki : Wiki
-                                                nextWiki =
-                                                    Wiki.removePublishedPage pageSlug wiki
+                                        Ok maybeReason ->
+                                            if not (Submission.wikiHasPublishedPage pageSlug wiki) then
+                                                respondErr Submission.DeleteTargetPageNotPublished
 
-                                                nextModel0 : Model
-                                                nextModel0 =
-                                                    { model
-                                                        | wikis = Dict.insert wikiSlug nextWiki model.wikis
-                                                    }
+                                            else if WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors then
+                                                let
+                                                    nextWiki : Wiki
+                                                    nextWiki =
+                                                        Wiki.removePublishedPage pageSlug wiki
 
-                                                nextModel : Model
-                                                nextModel =
-                                                    recordAudit wikiSlug
-                                                        accountId
-                                                        (WikiAuditLog.TrustedPublishedPageDelete { pageSlug = pageSlug })
-                                                        nextModel0
-                                            in
-                                            ( nextModel
-                                            , Effect.Lamdera.sendToFrontend clientId
-                                                (SubmitPageDeleteResponse wikiSlug (Ok Submission.DeletePublishedImmediately))
-                                            )
+                                                    nextModel0 : Model
+                                                    nextModel0 =
+                                                        { model
+                                                            | wikis = Dict.insert wikiSlug nextWiki model.wikis
+                                                        }
 
-                                        else
-                                            let
-                                                submissionId : Submission.Id
-                                                submissionId =
-                                                    Submission.idFromCounter model.nextSubmissionCounter
+                                                    nextModel : Model
+                                                    nextModel =
+                                                        recordAudit wikiSlug
+                                                            accountId
+                                                            (WikiAuditLog.TrustedPublishedPageDelete { pageSlug = pageSlug })
+                                                            nextModel0
+                                                in
+                                                ( nextModel
+                                                , Effect.Lamdera.sendToFrontend clientId
+                                                    (SubmitPageDeleteResponse wikiSlug (Ok Submission.DeletePublishedImmediately))
+                                                )
 
-                                                sub : Submission.Submission
-                                                sub =
-                                                    { id = submissionId
-                                                    , wikiSlug = wikiSlug
-                                                    , authorId = accountId
-                                                    , kind =
-                                                        Submission.DeletePage
-                                                            { pageSlug = pageSlug
-                                                            , reason = maybeReason
-                                                            }
-                                                    , status = Submission.Pending
-                                                    , reviewerNote = Nothing
-                                                    }
+                                            else
+                                                let
+                                                    submissionId : Submission.Id
+                                                    submissionId =
+                                                        Submission.idFromCounter model.nextSubmissionCounter
 
-                                                nextModel : Model
-                                                nextModel =
-                                                    { model
-                                                        | submissions =
-                                                            Dict.insert (Submission.idToString submissionId) sub model.submissions
-                                                        , nextSubmissionCounter = model.nextSubmissionCounter + 1
-                                                    }
-                                            in
-                                            ( nextModel
-                                            , Effect.Lamdera.sendToFrontend clientId
-                                                (SubmitPageDeleteResponse wikiSlug (Ok (Submission.DeleteSubmittedForReview submissionId)))
-                                            )
+                                                    sub : Submission.Submission
+                                                    sub =
+                                                        { id = submissionId
+                                                        , wikiSlug = wikiSlug
+                                                        , authorId = accountId
+                                                        , kind =
+                                                            Submission.DeletePage
+                                                                { pageSlug = pageSlug
+                                                                , reason = maybeReason
+                                                                }
+                                                        , status = Submission.Pending
+                                                        , reviewerNote = Nothing
+                                                        }
+
+                                                    nextModel : Model
+                                                    nextModel =
+                                                        { model
+                                                            | submissions =
+                                                                Dict.insert (Submission.idToString submissionId) sub model.submissions
+                                                            , nextSubmissionCounter = model.nextSubmissionCounter + 1
+                                                        }
+                                                in
+                                                ( nextModel
+                                                , Effect.Lamdera.sendToFrontend clientId
+                                                    (SubmitPageDeleteResponse wikiSlug (Ok (Submission.DeleteSubmittedForReview submissionId)))
+                                                )
 
         ResubmitPageEdit wikiSlug submissionId rawMarkdown ->
             let
@@ -1093,59 +1239,63 @@ updateFromFrontend sessionId clientId msg model =
                                 respondErr Submission.ResubmitEditWikiNotFound
 
                             Just wiki ->
-                                case Dict.get submissionId model.submissions of
-                                    Nothing ->
-                                        respondErr Submission.ResubmitEditSubmissionNotFound
+                                if not wiki.active then
+                                    respondErr Submission.ResubmitEditWikiInactive
 
-                                    Just sub ->
-                                        if sub.wikiSlug /= wikiSlug then
+                                else
+                                    case Dict.get submissionId model.submissions of
+                                        Nothing ->
                                             respondErr Submission.ResubmitEditSubmissionNotFound
 
-                                        else if sub.authorId /= accountId then
-                                            respondErr Submission.ResubmitEditForbidden
+                                        Just sub ->
+                                            if sub.wikiSlug /= wikiSlug then
+                                                respondErr Submission.ResubmitEditSubmissionNotFound
 
-                                        else
-                                            case sub.kind of
-                                                Submission.EditPage body ->
-                                                    if not (Submission.wikiHasPublishedPage body.pageSlug wiki) then
-                                                        respondErr Submission.ResubmitEditTargetPageNotPublished
+                                            else if sub.authorId /= accountId then
+                                                respondErr Submission.ResubmitEditForbidden
 
-                                                    else
-                                                        let
-                                                            currentMarkdown : String
-                                                            currentMarkdown =
-                                                                SubmissionReviewDetail.publishedMarkdownForSlug wiki body.pageSlug
+                                            else
+                                                case sub.kind of
+                                                    Submission.EditPage body ->
+                                                        if not (Submission.wikiHasPublishedPage body.pageSlug wiki) then
+                                                            respondErr Submission.ResubmitEditTargetPageNotPublished
 
-                                                            currentRevision : Int
-                                                            currentRevision =
-                                                                Submission.currentPublishedRevision wiki body.pageSlug
-                                                                    |> Maybe.withDefault 0
-                                                        in
-                                                        case
-                                                            Submission.resubmitNeedsRevisionEdit
-                                                                { markdown = rawMarkdown
-                                                                , currentMarkdown = currentMarkdown
-                                                                , currentRevision = currentRevision
-                                                                }
-                                                                sub
-                                                        of
-                                                            Err err ->
-                                                                respondErr err
+                                                        else
+                                                            let
+                                                                currentMarkdown : String
+                                                                currentMarkdown =
+                                                                    SubmissionReviewDetail.publishedMarkdownForSlug wiki body.pageSlug
 
-                                                            Ok nextSub ->
-                                                                ( { model
-                                                                    | submissions =
-                                                                        Dict.insert submissionId nextSub model.submissions
-                                                                  }
-                                                                , Effect.Lamdera.sendToFrontend clientId
-                                                                    (ResubmitPageEditResponse wikiSlug submissionId (Ok ()))
-                                                                )
+                                                                currentRevision : Int
+                                                                currentRevision =
+                                                                    Submission.currentPublishedRevision wiki body.pageSlug
+                                                                        |> Maybe.withDefault 0
+                                                            in
+                                                            case
+                                                                Submission.resubmitNeedsRevisionEdit
+                                                                    { markdown = rawMarkdown
+                                                                    , currentMarkdown = currentMarkdown
+                                                                    , currentRevision = currentRevision
+                                                                    }
+                                                                    sub
+                                                            of
+                                                                Err err ->
+                                                                    respondErr err
 
-                                                Submission.NewPage _ ->
-                                                    respondErr Submission.ResubmitEditNotEditKind
+                                                                Ok nextSub ->
+                                                                    ( { model
+                                                                        | submissions =
+                                                                            Dict.insert submissionId nextSub model.submissions
+                                                                      }
+                                                                    , Effect.Lamdera.sendToFrontend clientId
+                                                                        (ResubmitPageEditResponse wikiSlug submissionId (Ok ()))
+                                                                    )
 
-                                                Submission.DeletePage _ ->
-                                                    respondErr Submission.ResubmitEditNotEditKind
+                                                    Submission.NewPage _ ->
+                                                        respondErr Submission.ResubmitEditNotEditKind
+
+                                                    Submission.DeletePage _ ->
+                                                        respondErr Submission.ResubmitEditNotEditKind
 
         ApproveSubmission wikiSlug submissionId ->
             let
@@ -1177,87 +1327,91 @@ updateFromFrontend sessionId clientId msg model =
                                 respondErr Submission.ApproveWikiNotFound
 
                             Just wiki ->
-                                case Dict.get submissionId model.submissions of
-                                    Nothing ->
-                                        respondErr Submission.ApproveSubmissionNotFound
+                                if not wiki.active then
+                                    respondErr Submission.ApproveWikiInactive
 
-                                    Just sub ->
-                                        if sub.wikiSlug /= wikiSlug then
+                                else
+                                    case Dict.get submissionId model.submissions of
+                                        Nothing ->
                                             respondErr Submission.ApproveSubmissionNotFound
 
-                                        else
-                                            case Submission.applyApprovedSubmission wiki sub of
-                                                Err e ->
-                                                    respondErr e
+                                        Just sub ->
+                                            if sub.wikiSlug /= wikiSlug then
+                                                respondErr Submission.ApproveSubmissionNotFound
 
-                                                Ok approved ->
-                                                    let
-                                                        pageSlug : String
-                                                        pageSlug =
-                                                            Submission.pageSlugFromKind sub.kind
-                                                                |> Maybe.withDefault ""
+                                            else
+                                                case Submission.applyApprovedSubmission wiki sub of
+                                                    Err e ->
+                                                        respondErr e
 
-                                                        submissionsAfterApproval : Dict String Submission.Submission
-                                                        submissionsAfterApproval =
-                                                            case sub.kind of
-                                                                Submission.EditPage editBody ->
-                                                                    let
-                                                                        maybeCurrentRevision : Maybe Int
-                                                                        maybeCurrentRevision =
-                                                                            Submission.currentPublishedRevision approved.wiki editBody.pageSlug
-                                                                    in
-                                                                    case maybeCurrentRevision of
-                                                                        Nothing ->
-                                                                            Dict.insert submissionId approved.submission model.submissions
+                                                    Ok approved ->
+                                                        let
+                                                            pageSlug : String
+                                                            pageSlug =
+                                                                Submission.pageSlugFromKind sub.kind
+                                                                    |> Maybe.withDefault ""
 
-                                                                        Just currentRevision ->
-                                                                            let
-                                                                                staleNote : String
-                                                                                staleNote =
-                                                                                    "Page changed after this edit was submitted. Resolve conflicts against the latest page and resubmit."
-                                                                            in
-                                                                            model.submissions
-                                                                                |> Dict.insert submissionId approved.submission
-                                                                                |> Dict.map
-                                                                                    (\subId candidate ->
-                                                                                        if subId == submissionId || candidate.wikiSlug /= wikiSlug then
-                                                                                            candidate
+                                                            submissionsAfterApproval : Dict String Submission.Submission
+                                                            submissionsAfterApproval =
+                                                                case sub.kind of
+                                                                    Submission.EditPage editBody ->
+                                                                        let
+                                                                            maybeCurrentRevision : Maybe Int
+                                                                            maybeCurrentRevision =
+                                                                                Submission.currentPublishedRevision approved.wiki editBody.pageSlug
+                                                                        in
+                                                                        case maybeCurrentRevision of
+                                                                            Nothing ->
+                                                                                Dict.insert submissionId approved.submission model.submissions
 
-                                                                                        else if Submission.isStalePendingEditSubmission { pageSlug = editBody.pageSlug, currentRevision = currentRevision } candidate then
-                                                                                            Submission.markStalePendingEditNeedsRevision staleNote candidate
+                                                                            Just currentRevision ->
+                                                                                let
+                                                                                    staleNote : String
+                                                                                    staleNote =
+                                                                                        "Page changed after this edit was submitted. Resolve conflicts against the latest page and resubmit."
+                                                                                in
+                                                                                model.submissions
+                                                                                    |> Dict.insert submissionId approved.submission
+                                                                                    |> Dict.map
+                                                                                        (\subId candidate ->
+                                                                                            if subId == submissionId || candidate.wikiSlug /= wikiSlug then
+                                                                                                candidate
 
-                                                                                        else
-                                                                                            candidate
-                                                                                    )
+                                                                                            else if Submission.isStalePendingEditSubmission { pageSlug = editBody.pageSlug, currentRevision = currentRevision } candidate then
+                                                                                                Submission.markStalePendingEditNeedsRevision staleNote candidate
 
-                                                                Submission.NewPage _ ->
-                                                                    Dict.insert submissionId approved.submission model.submissions
+                                                                                            else
+                                                                                                candidate
+                                                                                        )
 
-                                                                Submission.DeletePage _ ->
-                                                                    Dict.insert submissionId approved.submission model.submissions
+                                                                    Submission.NewPage _ ->
+                                                                        Dict.insert submissionId approved.submission model.submissions
 
-                                                        nextModel0 : Model
-                                                        nextModel0 =
-                                                            { model
-                                                                | wikis = Dict.insert wikiSlug approved.wiki model.wikis
-                                                                , submissions = submissionsAfterApproval
-                                                            }
+                                                                    Submission.DeletePage _ ->
+                                                                        Dict.insert submissionId approved.submission model.submissions
 
-                                                        nextModel : Model
-                                                        nextModel =
-                                                            recordAudit wikiSlug
-                                                                accountId
-                                                                (WikiAuditLog.ApprovedSubmission
-                                                                    { submissionId = submissionId
-                                                                    , pageSlug = pageSlug
-                                                                    }
-                                                                )
-                                                                nextModel0
-                                                    in
-                                                    ( nextModel
-                                                    , Effect.Lamdera.sendToFrontend clientId
-                                                        (ApproveSubmissionResponse wikiSlug submissionId (Ok ()))
-                                                    )
+                                                            nextModel0 : Model
+                                                            nextModel0 =
+                                                                { model
+                                                                    | wikis = Dict.insert wikiSlug approved.wiki model.wikis
+                                                                    , submissions = submissionsAfterApproval
+                                                                }
+
+                                                            nextModel : Model
+                                                            nextModel =
+                                                                recordAudit wikiSlug
+                                                                    accountId
+                                                                    (WikiAuditLog.ApprovedSubmission
+                                                                        { submissionId = submissionId
+                                                                        , pageSlug = pageSlug
+                                                                        }
+                                                                    )
+                                                                    nextModel0
+                                                        in
+                                                        ( nextModel
+                                                        , Effect.Lamdera.sendToFrontend clientId
+                                                            (ApproveSubmissionResponse wikiSlug submissionId (Ok ()))
+                                                        )
 
         RejectSubmission wikiSlug submissionId rawReason ->
             let
@@ -1288,49 +1442,53 @@ updateFromFrontend sessionId clientId msg model =
                             Nothing ->
                                 respondErr Submission.RejectWikiNotFound
 
-                            Just _ ->
-                                case Dict.get submissionId model.submissions of
-                                    Nothing ->
-                                        respondErr Submission.RejectSubmissionNotFound
+                            Just w ->
+                                if not w.active then
+                                    respondErr Submission.RejectWikiInactive
 
-                                    Just sub ->
-                                        if sub.wikiSlug /= wikiSlug then
+                                else
+                                    case Dict.get submissionId model.submissions of
+                                        Nothing ->
                                             respondErr Submission.RejectSubmissionNotFound
 
-                                        else
-                                            case Submission.rejectPendingSubmission rawReason sub of
-                                                Err e ->
-                                                    respondErr e
+                                        Just sub ->
+                                            if sub.wikiSlug /= wikiSlug then
+                                                respondErr Submission.RejectSubmissionNotFound
 
-                                                Ok rejected ->
-                                                    let
-                                                        pageSlug : String
-                                                        pageSlug =
-                                                            Submission.pageSlugFromKind sub.kind
-                                                                |> Maybe.withDefault ""
+                                            else
+                                                case Submission.rejectPendingSubmission rawReason sub of
+                                                    Err e ->
+                                                        respondErr e
 
-                                                        nextModel0 : Model
-                                                        nextModel0 =
-                                                            { model
-                                                                | submissions =
-                                                                    Dict.insert submissionId rejected model.submissions
-                                                            }
+                                                    Ok rejected ->
+                                                        let
+                                                            pageSlug : String
+                                                            pageSlug =
+                                                                Submission.pageSlugFromKind sub.kind
+                                                                    |> Maybe.withDefault ""
 
-                                                        nextModel : Model
-                                                        nextModel =
-                                                            recordAudit wikiSlug
-                                                                accountId
-                                                                (WikiAuditLog.RejectedSubmission
-                                                                    { submissionId = submissionId
-                                                                    , pageSlug = pageSlug
-                                                                    }
-                                                                )
-                                                                nextModel0
-                                                    in
-                                                    ( nextModel
-                                                    , Effect.Lamdera.sendToFrontend clientId
-                                                        (RejectSubmissionResponse wikiSlug submissionId (Ok ()))
-                                                    )
+                                                            nextModel0 : Model
+                                                            nextModel0 =
+                                                                { model
+                                                                    | submissions =
+                                                                        Dict.insert submissionId rejected model.submissions
+                                                                }
+
+                                                            nextModel : Model
+                                                            nextModel =
+                                                                recordAudit wikiSlug
+                                                                    accountId
+                                                                    (WikiAuditLog.RejectedSubmission
+                                                                        { submissionId = submissionId
+                                                                        , pageSlug = pageSlug
+                                                                        }
+                                                                    )
+                                                                    nextModel0
+                                                        in
+                                                        ( nextModel
+                                                        , Effect.Lamdera.sendToFrontend clientId
+                                                            (RejectSubmissionResponse wikiSlug submissionId (Ok ()))
+                                                        )
 
         RequestSubmissionChanges wikiSlug submissionId rawGuidance ->
             let
@@ -1361,49 +1519,53 @@ updateFromFrontend sessionId clientId msg model =
                             Nothing ->
                                 respondErr Submission.RequestChangesWikiNotFound
 
-                            Just _ ->
-                                case Dict.get submissionId model.submissions of
-                                    Nothing ->
-                                        respondErr Submission.RequestChangesSubmissionNotFound
+                            Just w ->
+                                if not w.active then
+                                    respondErr Submission.RequestChangesWikiInactive
 
-                                    Just sub ->
-                                        if sub.wikiSlug /= wikiSlug then
+                                else
+                                    case Dict.get submissionId model.submissions of
+                                        Nothing ->
                                             respondErr Submission.RequestChangesSubmissionNotFound
 
-                                        else
-                                            case Submission.requestPendingSubmissionChanges rawGuidance sub of
-                                                Err e ->
-                                                    respondErr e
+                                        Just sub ->
+                                            if sub.wikiSlug /= wikiSlug then
+                                                respondErr Submission.RequestChangesSubmissionNotFound
 
-                                                Ok needsRevision ->
-                                                    let
-                                                        pageSlug : String
-                                                        pageSlug =
-                                                            Submission.pageSlugFromKind sub.kind
-                                                                |> Maybe.withDefault ""
+                                            else
+                                                case Submission.requestPendingSubmissionChanges rawGuidance sub of
+                                                    Err e ->
+                                                        respondErr e
 
-                                                        nextModel0 : Model
-                                                        nextModel0 =
-                                                            { model
-                                                                | submissions =
-                                                                    Dict.insert submissionId needsRevision model.submissions
-                                                            }
+                                                    Ok needsRevision ->
+                                                        let
+                                                            pageSlug : String
+                                                            pageSlug =
+                                                                Submission.pageSlugFromKind sub.kind
+                                                                    |> Maybe.withDefault ""
 
-                                                        nextModel : Model
-                                                        nextModel =
-                                                            recordAudit wikiSlug
-                                                                accountId
-                                                                (WikiAuditLog.RequestedSubmissionChanges
-                                                                    { submissionId = submissionId
-                                                                    , pageSlug = pageSlug
-                                                                    }
-                                                                )
-                                                                nextModel0
-                                                    in
-                                                    ( nextModel
-                                                    , Effect.Lamdera.sendToFrontend clientId
-                                                        (RequestSubmissionChangesResponse wikiSlug submissionId (Ok ()))
-                                                    )
+                                                            nextModel0 : Model
+                                                            nextModel0 =
+                                                                { model
+                                                                    | submissions =
+                                                                        Dict.insert submissionId needsRevision model.submissions
+                                                                }
+
+                                                            nextModel : Model
+                                                            nextModel =
+                                                                recordAudit wikiSlug
+                                                                    accountId
+                                                                    (WikiAuditLog.RequestedSubmissionChanges
+                                                                        { submissionId = submissionId
+                                                                        , pageSlug = pageSlug
+                                                                        }
+                                                                    )
+                                                                    nextModel0
+                                                        in
+                                                        ( nextModel
+                                                        , Effect.Lamdera.sendToFrontend clientId
+                                                            (RequestSubmissionChangesResponse wikiSlug submissionId (Ok ()))
+                                                        )
 
         HostAdminLogin password ->
             if password == Env.hostAdminPassword then
@@ -1522,7 +1684,7 @@ updateFromFrontend sessionId clientId msg model =
                             (HostWikiDetailResponse wikiSlug (Ok (Wiki.catalogEntry wiki)))
                         )
 
-        UpdateHostedWikiMetadata wikiSlug rawName rawSummary ->
+        UpdateHostedWikiMetadata wikiSlug rawName rawSummary rawSlugDraft ->
             let
                 sessionKey : String
                 sessionKey =
@@ -1554,22 +1716,47 @@ updateFromFrontend sessionId clientId msg model =
                                         respondErr (HostAdmin.UpdateMetadataWikiSummaryInvalid se)
 
                                     Ok summaryText ->
-                                        let
-                                            nextWiki : Wiki
-                                            nextWiki =
-                                                { wiki
-                                                    | name = name
-                                                    , summary = summaryText
-                                                }
+                                        case HostAdmin.validateHostedWikiMetadataSlug wiki.slug rawSlugDraft of
+                                            Err slugErr ->
+                                                respondErr slugErr
 
-                                            nextModel : Model
-                                            nextModel =
-                                                { model | wikis = Dict.insert wikiSlug nextWiki model.wikis }
-                                        in
-                                        ( nextModel
-                                        , Effect.Lamdera.sendToFrontend clientId
-                                            (UpdateHostedWikiMetadataResponse wikiSlug (Ok (Wiki.catalogEntry nextWiki)))
-                                        )
+                                            Ok newSlug ->
+                                                let
+                                                    nextWikiBase : Wiki
+                                                    nextWikiBase =
+                                                        { wiki
+                                                            | name = name
+                                                            , summary = summaryText
+                                                        }
+
+                                                    nextWiki : Wiki
+                                                    nextWiki =
+                                                        { nextWikiBase | slug = newSlug }
+                                                in
+                                                if newSlug == wikiSlug then
+                                                    let
+                                                        nextModel : Model
+                                                        nextModel =
+                                                            { model | wikis = Dict.insert wikiSlug nextWiki model.wikis }
+                                                    in
+                                                    ( nextModel
+                                                    , Effect.Lamdera.sendToFrontend clientId
+                                                        (UpdateHostedWikiMetadataResponse wikiSlug (Ok (Wiki.catalogEntry nextWiki)))
+                                                    )
+
+                                                else if Dict.member newSlug model.wikis then
+                                                    respondErr HostAdmin.UpdateMetadataWikiSlugTaken
+
+                                                else
+                                                    let
+                                                        nextModel : Model
+                                                        nextModel =
+                                                            applyHostedWikiSlugRename wikiSlug newSlug nextWiki model
+                                                    in
+                                                    ( nextModel
+                                                    , Effect.Lamdera.sendToFrontend clientId
+                                                        (UpdateHostedWikiMetadataResponse wikiSlug (Ok (Wiki.catalogEntry nextWiki)))
+                                                    )
 
         DeactivateHostedWiki wikiSlug ->
             let

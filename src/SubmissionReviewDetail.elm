@@ -37,6 +37,7 @@ type ReviewSubmissionDetailError
     = ReviewSubmissionDetailNotLoggedIn
     | ReviewSubmissionDetailWrongWikiSession
     | ReviewSubmissionDetailForbidden
+    | ReviewSubmissionDetailWikiInactive
     | ReviewSubmissionDetailNotFound
 
 
@@ -51,6 +52,9 @@ reviewSubmissionDetailErrorToUserText err =
 
         ReviewSubmissionDetailForbidden ->
             "You do not have permission to inspect this submission."
+
+        ReviewSubmissionDetailWikiInactive ->
+            "This wiki is currently paused."
 
         ReviewSubmissionDetailNotFound ->
             "That submission was not found."

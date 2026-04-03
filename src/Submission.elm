@@ -42,6 +42,7 @@ module Submission exposing
     , rejectPendingSubmission
     , rejectReasonMaxLength
     , rejectSubmissionErrorToUserText
+    , remapWikiSlugInSubmissions
     , requestChangesSubmissionErrorToUserText
     , requestPendingSubmissionChanges
     , resubmitNeedsRevisionEdit
@@ -131,6 +132,7 @@ kindSummaryUserText kind =
 type DetailsError
     = DetailsNotLoggedIn
     | DetailsWrongWikiSession
+    | DetailsWikiInactive
     | DetailsNotFound
     | DetailsForbidden
 
@@ -143,6 +145,9 @@ detailsErrorToUserText err =
 
         DetailsWrongWikiSession ->
             "Your session is for a different wiki. Log in again on this wiki."
+
+        DetailsWikiInactive ->
+            "This wiki is currently paused."
 
         DetailsNotFound ->
             "That submission was not found."
@@ -232,6 +237,7 @@ type ReviewQueueError
     = ReviewQueueNotLoggedIn
     | ReviewQueueWrongWikiSession
     | ReviewQueueForbidden
+    | ReviewQueueWikiInactive
 
 
 reviewQueueErrorToUserText : ReviewQueueError -> String
@@ -245,6 +251,9 @@ reviewQueueErrorToUserText err =
 
         ReviewQueueForbidden ->
             "You do not have access to the review queue."
+
+        ReviewQueueWikiInactive ->
+            "This wiki is currently paused."
 
 
 {-| Summary row for moderators (story 15).
@@ -283,6 +292,24 @@ pendingSubmissionsForWiki wikiSlug submissions =
         |> List.sortBy (\sub -> idToString sub.id)
 
 
+{-| After a hosted wiki slug rename: point submissions and embedded author ids at the new slug.
+-}
+remapWikiSlugInSubmissions : Wiki.Slug -> Wiki.Slug -> Dict String Submission -> Dict String Submission
+remapWikiSlugInSubmissions oldSlug newSlug submissions =
+    Dict.map
+        (\_ sub ->
+            if sub.wikiSlug == oldSlug then
+                { sub
+                    | wikiSlug = newSlug
+                    , authorId = ContributorAccount.remapIdForWikiSlug oldSlug newSlug sub.authorId
+                }
+
+            else
+                sub
+        )
+        submissions
+
+
 authorDisplayForReviewQueue : (ContributorAccount.Id -> Maybe String) -> ContributorAccount.Id -> String
 authorDisplayForReviewQueue lookupUsername accountId =
     lookupUsername accountId
@@ -305,6 +332,7 @@ type ApproveSubmissionError
     | ApproveWrongWikiSession
     | ApproveForbidden
     | ApproveWikiNotFound
+    | ApproveWikiInactive
     | ApproveSubmissionNotFound
     | ApproveNotPending
     | ApproveNewPageSlugTaken
@@ -358,6 +386,7 @@ type RejectSubmissionError
     | RejectWrongWikiSession
     | RejectForbidden
     | RejectWikiNotFound
+    | RejectWikiInactive
     | RejectSubmissionNotFound
     | RejectNotPending
     | RejectReasonInvalid RejectReasonError
@@ -377,6 +406,9 @@ rejectSubmissionErrorToUserText err =
 
         RejectWikiNotFound ->
             "This wiki does not exist."
+
+        RejectWikiInactive ->
+            "This wiki is currently paused."
 
         RejectSubmissionNotFound ->
             "That submission was not found."
@@ -415,6 +447,7 @@ type RequestChangesSubmissionError
     | RequestChangesWrongWikiSession
     | RequestChangesForbidden
     | RequestChangesWikiNotFound
+    | RequestChangesWikiInactive
     | RequestChangesSubmissionNotFound
     | RequestChangesNotPending
     | RequestChangesGuidanceInvalid RejectReasonError
@@ -434,6 +467,9 @@ requestChangesSubmissionErrorToUserText err =
 
         RequestChangesWikiNotFound ->
             "This wiki does not exist."
+
+        RequestChangesWikiInactive ->
+            "This wiki is currently paused."
 
         RequestChangesSubmissionNotFound ->
             "That submission was not found."
@@ -484,6 +520,9 @@ approveSubmissionErrorToUserText err =
 
         ApproveWikiNotFound ->
             "This wiki does not exist."
+
+        ApproveWikiInactive ->
+            "This wiki is currently paused."
 
         ApproveSubmissionNotFound ->
             "That submission was not found."
@@ -616,6 +655,7 @@ type SubmitNewPageError
     = NotLoggedIn
     | WrongWikiSession
     | WikiNotFound
+    | WikiInactive
     | Validation ValidationError
     | SlugAlreadyInUse
 
@@ -639,6 +679,9 @@ submitNewPageErrorToUserText err =
         WikiNotFound ->
             "This wiki does not exist."
 
+        WikiInactive ->
+            "This wiki is currently paused."
+
         Validation e ->
             validationErrorToUserText e
 
@@ -650,6 +693,7 @@ type SubmitPageEditError
     = EditNotLoggedIn
     | EditWrongWikiSession
     | EditWikiNotFound
+    | EditWikiInactive
     | EditValidation ValidationError
     | EditTargetPageNotPublished
     | EditAlreadyPendingForAuthor
@@ -671,6 +715,9 @@ submitPageEditErrorToUserText err =
 
         EditWikiNotFound ->
             "This wiki does not exist."
+
+        EditWikiInactive ->
+            "This wiki is currently paused."
 
         EditValidation e ->
             validationErrorToUserText e
@@ -721,6 +768,7 @@ type SubmitPageDeleteError
     = DeleteNotLoggedIn
     | DeleteWrongWikiSession
     | DeleteWikiNotFound
+    | DeleteWikiInactive
     | DeleteValidation DeleteReasonError
     | DeleteTargetPageNotPublished
 
@@ -741,6 +789,9 @@ submitPageDeleteErrorToUserText err =
 
         DeleteWikiNotFound ->
             "This wiki does not exist."
+
+        DeleteWikiInactive ->
+            "This wiki is currently paused."
 
         DeleteValidation e ->
             deleteReasonErrorToUserText e
@@ -915,6 +966,7 @@ type ResubmitPageEditError
     = ResubmitEditNotLoggedIn
     | ResubmitEditWrongWikiSession
     | ResubmitEditWikiNotFound
+    | ResubmitEditWikiInactive
     | ResubmitEditSubmissionNotFound
     | ResubmitEditForbidden
     | ResubmitEditTargetPageNotPublished
@@ -934,6 +986,9 @@ resubmitPageEditErrorToUserText err =
 
         ResubmitEditWikiNotFound ->
             "This wiki does not exist."
+
+        ResubmitEditWikiInactive ->
+            "This wiki is currently paused."
 
         ResubmitEditSubmissionNotFound ->
             "This submission was not found."

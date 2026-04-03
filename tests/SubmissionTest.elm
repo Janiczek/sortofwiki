@@ -288,6 +288,10 @@ suite =
                 \() ->
                     Submission.detailsErrorToUserText Submission.DetailsWrongWikiSession
                         |> Expect.equal "Your session is for a different wiki. Log in again on this wiki."
+            , Test.test "DetailsWikiInactive" <|
+                \() ->
+                    Submission.detailsErrorToUserText Submission.DetailsWikiInactive
+                        |> Expect.equal "This wiki is currently paused."
             , Test.test "DetailsNotFound" <|
                 \() ->
                     Submission.detailsErrorToUserText Submission.DetailsNotFound

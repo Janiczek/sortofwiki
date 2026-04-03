@@ -1,4 +1,16 @@
-module WikiAdminUsers exposing (DemoteTrustedError(..), Error(..), GrantTrustedToAdminError(..), ListedUser, PromoteContributorError(..), RevokeAdminError(..), demoteErrorToUserText, errorToUserText, grantTrustedToAdminErrorToUserText, promoteErrorToUserText, revokeAdminErrorToUserText)
+module WikiAdminUsers exposing
+    ( DemoteTrustedError(..)
+    , Error(..)
+    , GrantTrustedToAdminError(..)
+    , ListedUser
+    , PromoteContributorError(..)
+    , RevokeAdminError(..)
+    , demoteErrorToUserText
+    , errorToUserText
+    , grantTrustedToAdminErrorToUserText
+    , promoteErrorToUserText
+    , revokeAdminErrorToUserText
+    )
 
 import WikiRole
 
@@ -8,6 +20,7 @@ type Error
     | WrongWikiSession
     | Forbidden
     | WikiNotFound
+    | WikiInactive
 
 
 {-| Promote-to-trusted failures (story 21).
@@ -17,6 +30,7 @@ type PromoteContributorError
     | PromoteWrongWikiSession
     | PromoteForbidden
     | PromoteWikiNotFound
+    | PromoteWikiInactive
     | PromoteTargetNotFound
     | PromoteTargetNotContributor
 
@@ -28,6 +42,7 @@ type DemoteTrustedError
     | DemoteWrongWikiSession
     | DemoteForbidden
     | DemoteWikiNotFound
+    | DemoteWikiInactive
     | DemoteTargetNotFound
     | DemoteTargetNotTrusted
 
@@ -39,6 +54,7 @@ type GrantTrustedToAdminError
     | GrantTrustedWrongWikiSession
     | GrantTrustedForbidden
     | GrantTrustedWikiNotFound
+    | GrantTrustedWikiInactive
     | GrantTrustedTargetNotFound
     | GrantTrustedTargetNotTrusted
 
@@ -50,6 +66,7 @@ type RevokeAdminError
     | RevokeAdminWrongWikiSession
     | RevokeAdminForbidden
     | RevokeAdminWikiNotFound
+    | RevokeAdminWikiInactive
     | RevokeAdminTargetNotFound
     | RevokeAdminTargetNotAdmin
     | RevokeAdminCannotRevokeSelf
@@ -76,6 +93,9 @@ errorToUserText err =
         WikiNotFound ->
             "This wiki was not found."
 
+        WikiInactive ->
+            "This wiki is currently paused."
+
 
 promoteErrorToUserText : PromoteContributorError -> String
 promoteErrorToUserText err =
@@ -91,6 +111,9 @@ promoteErrorToUserText err =
 
         PromoteWikiNotFound ->
             "This wiki was not found."
+
+        PromoteWikiInactive ->
+            "This wiki is currently paused."
 
         PromoteTargetNotFound ->
             "That user is not registered on this wiki."
@@ -114,6 +137,9 @@ demoteErrorToUserText err =
         DemoteWikiNotFound ->
             "This wiki was not found."
 
+        DemoteWikiInactive ->
+            "This wiki is currently paused."
+
         DemoteTargetNotFound ->
             "That user is not registered on this wiki."
 
@@ -136,6 +162,9 @@ grantTrustedToAdminErrorToUserText err =
         GrantTrustedWikiNotFound ->
             "This wiki was not found."
 
+        GrantTrustedWikiInactive ->
+            "This wiki is currently paused."
+
         GrantTrustedTargetNotFound ->
             "That user is not registered on this wiki."
 
@@ -157,6 +186,9 @@ revokeAdminErrorToUserText err =
 
         RevokeAdminWikiNotFound ->
             "This wiki was not found."
+
+        RevokeAdminWikiInactive ->
+            "This wiki is currently paused."
 
         RevokeAdminTargetNotFound ->
             "That user is not registered on this wiki."

@@ -17,7 +17,6 @@
 - `/w/:wikiSlug/admin` - wiki admin landing
 - `/w/:wikiSlug/admin/users` - role and trust management
 - `/w/:wikiSlug/admin/audit` - audit log
-- `/w/:wikiSlug/settings/profile` - user profile for this wiki
 - `/admin` - hidden platform host-admin entry point
 - `/admin/wikis` - host-admin wiki management list
 - `/admin/wikis/new` - create new hosted wiki
@@ -56,7 +55,7 @@
 29. [x]  Platform host admin can create a hosted wiki so that new communities can be launched.
 30. [x]  Platform host admin can edit hosted wiki metadata (name, summary, slug policy) so that discoverability stays accurate.
 31. [x]  Platform host admin can deactivate a hosted wiki so that unsafe or inactive tenants can be paused without data loss.
-32. [x]  Platform host admin can delete a hosted wiki through explicit confirmation so that irreversible operations are deliberate and auditable.
+32. [x]  Platform host admin can delete a hosted wiki by typing the exact wiki slug to confirm, so irreversible operations are deliberate and auditable.
 33. [x]  As any authenticated role, my authorization is checked server-side so that direct URL access cannot bypass permissions.
 34. [x]  As an admin or trusted contributor, all moderation decisions are logged with actor and timestamp so that governance is accountable.
 35. [x] Viewer can open an unknown URL and see a 404 page so that broken or mistyped links are clearly not valid content.

@@ -48,6 +48,18 @@ trustedpubOnDemo =
         initialModel
 
 
+{-| Demo wiki `active = False` (hosted wiki deactivated); contributor sessions unchanged.
+-}
+withDemoWikiInactive : Backend.Model -> Backend.Model
+withDemoWikiInactive model =
+    case Dict.get "demo" model.wikis of
+        Nothing ->
+            model
+
+        Just w ->
+            { model | wikis = Dict.insert "demo" { w | active = False } model.wikis }
+
+
 expectUnchanged : Backend.Model -> ToBackend -> Expect.Expectation
 expectUnchanged before msg =
     let
@@ -93,7 +105,7 @@ suite =
                     , ( "RequestHostWikiDetail", RequestHostWikiDetail "demo" )
                     , ( "CreateHostedWiki", CreateHostedWiki "newwiki" "Name" )
                     , ( "UpdateHostedWikiMetadata"
-                      , UpdateHostedWikiMetadata "demo" "N" "S"
+                      , UpdateHostedWikiMetadata "demo" "N" "S" "demo"
                       )
                     , ( "DeactivateHostedWiki", DeactivateHostedWiki "demo" )
                     , ( "ReactivateHostedWiki", ReactivateHostedWiki "demo" )
@@ -138,6 +150,23 @@ suite =
                 , Test.test "RequestReviewQueue for other wiki returns wrong session without changing model" <|
                     \() ->
                         expectUnchanged statusdemoOnDemo (RequestReviewQueue "elm-tips")
+                ]
+            , Test.describe "inactive demo wiki (deactivated tenant)"
+                [ Test.test "trusted RequestReviewQueue leaves model unchanged" <|
+                    \() ->
+                        trustedpubOnDemo
+                            |> withDemoWikiInactive
+                            |> (\m -> expectUnchanged m (RequestReviewQueue "demo"))
+                , Test.test "contributor SubmitNewPage leaves model unchanged" <|
+                    \() ->
+                        statusdemoOnDemo
+                            |> withDemoWikiInactive
+                            |> (\m -> expectUnchanged m (SubmitNewPage "demo" "NewPage" "## Body"))
+                , Test.test "trusted ApproveSubmission leaves model unchanged" <|
+                    \() ->
+                        trustedpubOnDemo
+                            |> withDemoWikiInactive
+                            |> (\m -> expectUnchanged m (ApproveSubmission "demo" "sub_queue_demo"))
                 ]
             ]
         ]

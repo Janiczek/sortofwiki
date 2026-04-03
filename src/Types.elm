@@ -18,12 +18,13 @@ module Types exposing
     , ToFrontend(..)
     )
 
-import ColorTheme exposing (ColorTheme)
+import ColorTheme exposing (ColorTheme, ColorThemePreference)
 import ContributorAccount
 import Dict exposing (Dict)
 import Effect.Browser
 import Effect.Browser.Navigation
 import HostAdmin
+import Json.Encode
 import Page
 import RemoteData exposing (RemoteData)
 import Route exposing (Route)
@@ -66,7 +67,7 @@ type ToBackend
     | RequestHostWikiList
     | RequestHostWikiDetail Wiki.Slug
     | CreateHostedWiki String String
-    | UpdateHostedWikiMetadata Wiki.Slug String String
+    | UpdateHostedWikiMetadata Wiki.Slug String String String
     | DeactivateHostedWiki Wiki.Slug
     | ReactivateHostedWiki Wiki.Slug
     | DeleteHostedWiki Wiki.Slug String
@@ -154,6 +155,7 @@ type alias HostAdminCreateWikiDraft =
 type alias HostAdminWikiDetailDraft =
     { wikiSlug : Wiki.Slug
     , load : RemoteData () (Result HostAdmin.HostWikiDetailError Wiki.CatalogEntry)
+    , slugDraft : String
     , nameDraft : String
     , summaryDraft : String
     , saveInFlight : Bool
@@ -211,8 +213,10 @@ type alias ReviewRequestChangesDraft =
 
 type alias FrontendModel =
     { key : Effect.Browser.Navigation.Key
-    , colorTheme : ColorTheme
+    , colorThemePreference : ColorThemePreference
+    , systemColorTheme : ColorTheme
     , route : Route
+    , navigationFragment : Maybe String
     , store : Store
     , contributorWikiSession : Maybe Wiki.Slug
     , contributorWikiRole : Maybe WikiRole.WikiRole
@@ -237,13 +241,16 @@ type alias FrontendModel =
     , hostAdminCreateWikiDraft : HostAdminCreateWikiDraft
     , hostAdminWikiDetailDraft : HostAdminWikiDetailDraft
     , hostAdminWikis : RemoteData () (Result HostAdmin.ProtectedError (List Wiki.CatalogEntry))
+    , hostAdminSessionAuthenticated : Bool
     }
 
 
 type FrontendMsg
     = UrlClicked Effect.Browser.UrlRequest
     | UrlChanged Url
+    | UrlFragmentScrollDone
     | ColorThemeToggled
+    | ColorThemeFromJs Json.Encode.Value
     | RegisterFormUsernameChanged String
     | RegisterFormPasswordChanged String
     | RegisterFormSubmitted
@@ -278,6 +285,7 @@ type FrontendMsg
     | HostAdminCreateWikiNameChanged String
     | HostAdminCreateWikiSubmitted
     | HostAdminWikiDetailNameChanged String
+    | HostAdminWikiDetailSlugChanged String
     | HostAdminWikiDetailSummaryChanged String
     | HostAdminWikiDetailSaveClicked
     | HostAdminWikiDetailDeactivateClicked

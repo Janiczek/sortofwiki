@@ -266,6 +266,7 @@ filterEvents f =
 
 type Error
     = WikiNotFound
+    | WikiInactive
     | NotLoggedIn
     | WrongWikiSession
     | Forbidden
@@ -276,6 +277,9 @@ errorToUserText err =
     case err of
         WikiNotFound ->
             "This wiki was not found."
+
+        WikiInactive ->
+            "This wiki is currently paused."
 
         NotLoggedIn ->
             "You must be logged in to view the audit log."

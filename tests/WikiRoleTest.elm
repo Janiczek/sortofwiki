@@ -12,11 +12,11 @@ suite =
         [ Test.describe "canAccessWikiAdminUsers"
             [ Test.test "false for Contributor" <|
                 \() ->
-                    WikiRole.canAccessWikiAdminUsers WikiRole.Contributor
+                    WikiRole.canAccessWikiAdminUsers WikiRole.UntrustedContributor
                         |> Expect.equal False
             , Test.test "false for Trusted" <|
                 \() ->
-                    WikiRole.canAccessWikiAdminUsers WikiRole.Trusted
+                    WikiRole.canAccessWikiAdminUsers WikiRole.TrustedContributor
                         |> Expect.equal False
             , Test.test "true for Admin" <|
                 \() ->
@@ -30,11 +30,11 @@ suite =
         , Test.describe "promoteContributorToTrusted"
             [ Test.test "Contributor becomes Trusted" <|
                 \() ->
-                    WikiRole.promoteContributorToTrusted WikiRole.Contributor
-                        |> Expect.equal (Just WikiRole.Trusted)
+                    WikiRole.promoteContributorToTrusted WikiRole.UntrustedContributor
+                        |> Expect.equal (Just WikiRole.TrustedContributor)
             , Test.test "Trusted unchanged" <|
                 \() ->
-                    WikiRole.promoteContributorToTrusted WikiRole.Trusted
+                    WikiRole.promoteContributorToTrusted WikiRole.TrustedContributor
                         |> Expect.equal Nothing
             , Test.test "Admin unchanged" <|
                 \() ->
@@ -44,8 +44,8 @@ suite =
                 \role ->
                     WikiRole.promoteContributorToTrusted role
                         |> Expect.equal
-                            (if role == WikiRole.Contributor then
-                                Just WikiRole.Trusted
+                            (if role == WikiRole.UntrustedContributor then
+                                Just WikiRole.TrustedContributor
 
                              else
                                 Nothing
@@ -54,11 +54,11 @@ suite =
         , Test.describe "demoteTrustedToContributor"
             [ Test.test "Trusted becomes Contributor" <|
                 \() ->
-                    WikiRole.demoteTrustedToContributor WikiRole.Trusted
-                        |> Expect.equal (Just WikiRole.Contributor)
+                    WikiRole.demoteTrustedToContributor WikiRole.TrustedContributor
+                        |> Expect.equal (Just WikiRole.UntrustedContributor)
             , Test.test "Contributor unchanged" <|
                 \() ->
-                    WikiRole.demoteTrustedToContributor WikiRole.Contributor
+                    WikiRole.demoteTrustedToContributor WikiRole.UntrustedContributor
                         |> Expect.equal Nothing
             , Test.test "Admin unchanged" <|
                 \() ->
@@ -68,8 +68,8 @@ suite =
                 \role ->
                     WikiRole.demoteTrustedToContributor role
                         |> Expect.equal
-                            (if role == WikiRole.Trusted then
-                                Just WikiRole.Contributor
+                            (if role == WikiRole.TrustedContributor then
+                                Just WikiRole.UntrustedContributor
 
                              else
                                 Nothing
@@ -78,11 +78,11 @@ suite =
         , Test.describe "grantTrustedToAdmin"
             [ Test.test "Trusted becomes Admin" <|
                 \() ->
-                    WikiRole.grantTrustedToAdmin WikiRole.Trusted
+                    WikiRole.grantTrustedToAdmin WikiRole.TrustedContributor
                         |> Expect.equal (Just WikiRole.Admin)
             , Test.test "Contributor unchanged" <|
                 \() ->
-                    WikiRole.grantTrustedToAdmin WikiRole.Contributor
+                    WikiRole.grantTrustedToAdmin WikiRole.UntrustedContributor
                         |> Expect.equal Nothing
             , Test.test "Admin unchanged" <|
                 \() ->
@@ -92,7 +92,7 @@ suite =
                 \role ->
                     WikiRole.grantTrustedToAdmin role
                         |> Expect.equal
-                            (if role == WikiRole.Trusted then
+                            (if role == WikiRole.TrustedContributor then
                                 Just WikiRole.Admin
 
                              else
@@ -103,21 +103,21 @@ suite =
             [ Test.test "Admin becomes Trusted" <|
                 \() ->
                     WikiRole.revokeAdminToTrusted WikiRole.Admin
-                        |> Expect.equal (Just WikiRole.Trusted)
+                        |> Expect.equal (Just WikiRole.TrustedContributor)
             , Test.test "Contributor unchanged" <|
                 \() ->
-                    WikiRole.revokeAdminToTrusted WikiRole.Contributor
+                    WikiRole.revokeAdminToTrusted WikiRole.UntrustedContributor
                         |> Expect.equal Nothing
             , Test.test "Trusted unchanged" <|
                 \() ->
-                    WikiRole.revokeAdminToTrusted WikiRole.Trusted
+                    WikiRole.revokeAdminToTrusted WikiRole.TrustedContributor
                         |> Expect.equal Nothing
             , Test.fuzz Fuzzers.wikiRole "only Admin revokes to Just Trusted" <|
                 \role ->
                     WikiRole.revokeAdminToTrusted role
                         |> Expect.equal
                             (if role == WikiRole.Admin then
-                                Just WikiRole.Trusted
+                                Just WikiRole.TrustedContributor
 
                              else
                                 Nothing

@@ -96,4 +96,26 @@ suite =
                     ContributorAccount.loginErrorToUserText ContributorAccount.LoginInvalidCredentials
                         |> Expect.equal "Invalid username or password."
             ]
+        , Test.describe "remapIdForWikiSlug"
+            [ Test.test "rewrites ids for the old wiki slug" <|
+                \() ->
+                    ContributorAccount.newAccountId "Old" "alice"
+                        |> ContributorAccount.remapIdForWikiSlug "Old" "New"
+                        |> Expect.equal (ContributorAccount.newAccountId "New" "alice")
+            , Test.test "leaves other ids unchanged" <|
+                \() ->
+                    ContributorAccount.newAccountId "Other" "alice"
+                        |> ContributorAccount.remapIdForWikiSlug "Old" "New"
+                        |> Expect.equal (ContributorAccount.newAccountId "Other" "alice")
+            , Test.fuzz (Fuzz.intRange 0 99999) "round username segment for matching prefix" <|
+                \n ->
+                    let
+                        u : String
+                        u =
+                            "usr" ++ String.fromInt n
+                    in
+                    ContributorAccount.newAccountId "W" u
+                        |> ContributorAccount.remapIdForWikiSlug "W" "Z"
+                        |> Expect.equal (ContributorAccount.newAccountId "Z" u)
+            ]
         ]
