@@ -40,6 +40,7 @@ suite =
               <|
                 \( variant, utilities ) ->
                     let
+                        expected : String
                         expected =
                             utilities
                                 |> String.words

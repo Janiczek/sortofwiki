@@ -5,7 +5,6 @@ import ContributorAccount
 import Dict
 import Effect.Lamdera
 import Expect
-import HostedWikiSlugPolicy
 import Test exposing (Test)
 import Types exposing (ToBackend(..))
 import WikiAuditLog
@@ -94,7 +93,7 @@ suite =
                     , ( "RequestHostWikiDetail", RequestHostWikiDetail "demo" )
                     , ( "CreateHostedWiki", CreateHostedWiki "newwiki" "Name" )
                     , ( "UpdateHostedWikiMetadata"
-                      , UpdateHostedWikiMetadata "demo" "N" "S" HostedWikiSlugPolicy.StrictSlugs
+                      , UpdateHostedWikiMetadata "demo" "N" "S"
                       )
                     , ( "DeactivateHostedWiki", DeactivateHostedWiki "demo" )
                     , ( "ReactivateHostedWiki", ReactivateHostedWiki "demo" )

@@ -53,18 +53,18 @@ view tocEntries =
 
     else
         Html.nav
-            [ TW.cls "article-toc"
+            [ TW.cls "font-serif"
             , Attr.id "page-article-toc"
             , Attr.attribute "aria-label" "On this page"
             ]
-            [ Html.h2 [ TW.cls "article-toc-title" ]
+            [ Html.h2 [ TW.cls "m-0 mb-[0.35rem] text-[0.82rem] font-semibold uppercase tracking-[0.04em] text-[var(--fg-muted)]" ]
                 [ Html.text "On this page" ]
-            , Html.ul [ TW.cls "article-toc-list" ]
+            , Html.ul [ TW.cls "list-none m-0 p-0 flex flex-col gap-[0.25rem]" ]
                 (tocEntries
                     |> List.map
                         (\e ->
                             Html.li
-                                [ TW.cls ("article-toc-item article-toc-level-" ++ headingLevelClass e.level) ]
+                                [ TW.cls ("m-0 leading-[1.3] " ++ headingLevelClass e.level) ]
                                 [ Html.a
                                     [ Attr.href ("#" ++ e.slug) ]
                                     [ Html.text e.label ]
@@ -78,19 +78,19 @@ headingLevelClass : Block.HeadingLevel -> String
 headingLevelClass level =
     case level of
         Block.H1 ->
-            "1"
+            "pl-0"
 
         Block.H2 ->
-            "2"
+            "pl-[0.35rem]"
 
         Block.H3 ->
-            "3"
+            "pl-[0.65rem]"
 
         Block.H4 ->
-            "4"
+            "pl-[0.95rem]"
 
         Block.H5 ->
-            "5"
+            "pl-[1.25rem]"
 
         Block.H6 ->
-            "6"
+            "pl-[1.55rem]"

@@ -5,6 +5,7 @@ import Effect.Lamdera
 import Effect.Test
 import Effect.Time
 import Frontend
+import Html.Attributes
 import ProgramTest.Config
 import Test.Html.Query
 import Test.Html.Selector
@@ -26,7 +27,7 @@ endToEndTests =
                 [ client.checkView 100
                     (\root ->
                         root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "not-found-page" ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-context" "layout-header") ]
                             |> Test.Html.Query.has [ Test.Html.Selector.text "Page not found" ]
                     )
                 ]

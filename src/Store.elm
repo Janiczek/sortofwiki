@@ -4,8 +4,8 @@ module Store exposing
     , Store
     , empty
     , get
-    , get_
     , getWikiAuditLog
+    , get_
     , perform
     )
 

@@ -130,9 +130,6 @@ contributorForcedRedirect sess url route =
         Route.WikiHome _ ->
             Nothing
 
-        Route.WikiPages _ ->
-            Nothing
-
         Route.WikiPage _ _ ->
             Nothing
 

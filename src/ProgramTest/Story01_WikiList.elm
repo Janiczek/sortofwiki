@@ -27,8 +27,14 @@ endToEndTests =
                 [ client.checkView 100
                     (\root ->
                         root
+                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-context" "layout-header") ]
+                            |> Test.Html.Query.has [ Test.Html.Selector.text "SortOfWiki" ]
+                    )
+                , client.checkView 100
+                    (\root ->
+                        root
                             |> Test.Html.Query.find [ Test.Html.Selector.id "catalog-page" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Hosted wikis" ]
+                            |> Test.Html.Query.has [ Test.Html.Selector.id "wiki-catalog" ]
                     )
                 , client.checkView 100
                     (\root ->

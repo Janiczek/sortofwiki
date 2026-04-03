@@ -24,17 +24,16 @@ endToEndTests =
             "/w/demo"
             { width = 800, height = 600 }
             (\client ->
-                [ client.checkView 100
+                [ client.checkView 200
                     (\root ->
                         root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-home-page" ]
                             |> Test.Html.Query.has [ Test.Html.Selector.text "Demo Wiki" ]
                     )
                 , client.checkView 100
                     (\root ->
                         root
-                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "demo") ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Demo Wiki" ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-home-page" ]
+                            |> Test.Html.Query.has [ Test.Html.Selector.text "Pages" ]
                     )
                 ]
             )
@@ -52,7 +51,7 @@ endToEndTests =
                 [ client.checkView 100
                     (\root ->
                         root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "not-found-page" ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-context" "layout-header") ]
                             |> Test.Html.Query.has [ Test.Html.Selector.text "Page not found" ]
                     )
                 ]

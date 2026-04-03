@@ -13,12 +13,6 @@ blocksWithHeadingSlugs : Wiki.Slug -> String -> Result String (List ( Block.Bloc
 blocksWithHeadingSlugs wikiSlug source =
     source
         |> MarkdownParser.parse
-        |> Result.mapError deadEndsToString
+        |> Result.mapError (List.map MarkdownParser.deadEndToString >> String.join "\n")
         |> Result.map (WikiMarkdown.postProcessBlocksWithWikiLinks wikiSlug)
         |> Result.map MarkdownHeadingSlugs.gatherHeadingOccurrences
-
-
-deadEndsToString deadEnds =
-    deadEnds
-        |> List.map MarkdownParser.deadEndToString
-        |> String.join "\n"

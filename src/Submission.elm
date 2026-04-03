@@ -5,6 +5,7 @@ module Submission exposing
     , DeleteReasonError(..)
     , DeleteSubmitSuccess(..)
     , DetailsError(..)
+    , EditConflictContext
     , EditPageBody
     , EditSubmitSuccess(..)
     , Id
@@ -14,6 +15,7 @@ module Submission exposing
     , RejectReasonError(..)
     , RejectSubmissionError(..)
     , RequestChangesSubmissionError(..)
+    , ResubmitPageEditError(..)
     , ReviewQueueError(..)
     , ReviewQueueItem
     , Status(..)
@@ -25,12 +27,16 @@ module Submission exposing
     , applyApprovedSubmission
     , approveSubmissionErrorToUserText
     , contributorViewFromSubmission
+    , currentPublishedRevision
     , detailsErrorToUserText
     , idFromCounter
     , idFromKey
     , idToString
+    , isStalePendingEditSubmission
     , kindSummaryUserText
+    , markStalePendingEditNeedsRevision
     , pageSlugFromKind
+    , pendingEditForAuthorOnPageInUse
     , pendingNewPageSlugInUse
     , pendingSubmissionsForWiki
     , rejectPendingSubmission
@@ -38,6 +44,8 @@ module Submission exposing
     , rejectSubmissionErrorToUserText
     , requestChangesSubmissionErrorToUserText
     , requestPendingSubmissionChanges
+    , resubmitNeedsRevisionEdit
+    , resubmitPageEditErrorToUserText
     , reviewQueueErrorToUserText
     , reviewQueueItemFromSubmission
     , reviewerNoteForDisplay
@@ -151,6 +159,17 @@ type alias ContributorView =
     , status : Status
     , kindSummary : String
     , reviewerNote : Maybe String
+    , conflictContext : Maybe EditConflictContext
+    }
+
+
+type alias EditConflictContext =
+    { pageSlug : Page.Slug
+    , baseMarkdown : String
+    , baseRevision : Int
+    , proposedMarkdown : String
+    , currentMarkdown : String
+    , currentRevision : Int
     }
 
 
@@ -175,12 +194,35 @@ reviewerNoteForDisplay maybeRaw =
                 Just trimmed
 
 
-contributorViewFromSubmission : Submission -> ContributorView
-contributorViewFromSubmission sub =
+contributorViewFromSubmission : Maybe Wiki.Wiki -> Submission -> ContributorView
+contributorViewFromSubmission maybeWiki sub =
     { id = sub.id
     , status = sub.status
     , kindSummary = kindSummaryUserText sub.kind
     , reviewerNote = reviewerNoteForDisplay sub.reviewerNote
+    , conflictContext =
+        case sub.kind of
+            NewPage _ ->
+                Nothing
+
+            EditPage body ->
+                Just
+                    { pageSlug = body.pageSlug
+                    , baseMarkdown = body.baseMarkdown
+                    , baseRevision = body.baseRevision
+                    , proposedMarkdown = body.proposedMarkdown
+                    , currentMarkdown =
+                        maybeWiki
+                            |> Maybe.map (\wiki -> currentPublishedMarkdown wiki body.pageSlug)
+                            |> Maybe.withDefault body.baseMarkdown
+                    , currentRevision =
+                        maybeWiki
+                            |> Maybe.andThen (\wiki -> currentPublishedRevision wiki body.pageSlug)
+                            |> Maybe.withDefault body.baseRevision
+                    }
+
+            DeletePage _ ->
+                Nothing
     }
 
 
@@ -488,7 +530,7 @@ applyApprovedSubmission wiki sub =
 
                 else
                     Ok
-                        { wiki = Wiki.applyPublishedMarkdownEdit body.pageSlug body.markdown wiki
+                        { wiki = Wiki.applyPublishedMarkdownEdit body.pageSlug body.proposedMarkdown wiki
                         , submission =
                             { sub
                                 | status = Approved
@@ -519,7 +561,9 @@ type alias NewPageBody =
 
 type alias EditPageBody =
     { pageSlug : Page.Slug
-    , markdown : String
+    , baseMarkdown : String
+    , baseRevision : Int
+    , proposedMarkdown : String
     }
 
 
@@ -562,7 +606,7 @@ validationErrorToUserText err =
             "Page slug must be at most 64 characters."
 
         SlugInvalidChars ->
-            "Page slug may only use letters, digits, underscores, and hyphens (start with a letter or digit)."
+            "Page slug must be PascalCase letters and digits only."
 
         BodyEmpty ->
             "Enter page content (markdown)."
@@ -608,6 +652,7 @@ type SubmitPageEditError
     | EditWikiNotFound
     | EditValidation ValidationError
     | EditTargetPageNotPublished
+    | EditAlreadyPendingForAuthor
 
 
 type EditSubmitSuccess
@@ -632,6 +677,9 @@ submitPageEditErrorToUserText err =
 
         EditTargetPageNotPublished ->
             "That page does not exist or has no published content yet."
+
+        EditAlreadyPendingForAuthor ->
+            "You already have a pending edit for this page."
 
 
 type DeleteReasonError
@@ -729,11 +777,6 @@ validateEditMarkdown rawMarkdown =
         Ok markdown
 
 
-slugRestCharOk : Char -> Bool
-slugRestCharOk c =
-    Char.isAlphaNum c || c == '_' || c == '-'
-
-
 slugCharsOk : String -> Bool
 slugCharsOk s =
     case String.uncons s of
@@ -741,19 +784,18 @@ slugCharsOk s =
             False
 
         Just ( first, rest ) ->
-            Char.isAlphaNum first && String.all slugRestCharOk rest
+            Char.isUpper first && String.all Char.isAlphaNum rest
 
 
-{-| Trim + lowercase slug (same normalization style as contributor usernames).
+{-| Trim slug before validating.
 -}
 normalizePageSlug : String -> String
 normalizePageSlug raw =
     raw
         |> String.trim
-        |> String.toLower
 
 
-{-| Page slug rules only (trim, lowercase, length, character class). Same rules as hosted wiki slugs (story 29).
+{-| Page slug rules only (trim, length, PascalCase character class). Same rules as hosted wiki slugs (story 29).
 -}
 validatePageSlug : String -> Result ValidationError Page.Slug
 validatePageSlug rawSlug =
@@ -825,3 +867,146 @@ pendingNewPageSlugInUse wikiSlug pageSlug submissions =
                         NeedsRevision ->
                             False
             )
+
+
+pendingEditForAuthorOnPageInUse : Wiki.Slug -> ContributorAccount.Id -> Page.Slug -> Dict String Submission -> Bool
+pendingEditForAuthorOnPageInUse wikiSlug authorId pageSlug submissions =
+    submissions
+        |> Dict.values
+        |> List.any
+            (\sub ->
+                if sub.wikiSlug /= wikiSlug || sub.authorId /= authorId || sub.status /= Pending then
+                    False
+
+                else
+                    case sub.kind of
+                        EditPage body ->
+                            body.pageSlug == pageSlug
+
+                        NewPage _ ->
+                            False
+
+                        DeletePage _ ->
+                            False
+            )
+
+
+currentPublishedRevision : Wiki.Wiki -> Page.Slug -> Maybe Int
+currentPublishedRevision wiki pageSlug =
+    Dict.get pageSlug wiki.pages
+        |> Maybe.andThen
+            (\page ->
+                if Page.hasPublished page then
+                    Just (Page.publishedRevision page)
+
+                else
+                    Nothing
+            )
+
+
+currentPublishedMarkdown : Wiki.Wiki -> Page.Slug -> String
+currentPublishedMarkdown wiki pageSlug =
+    Dict.get pageSlug wiki.pages
+        |> Maybe.map Page.publishedMarkdownForLinks
+        |> Maybe.withDefault ""
+
+
+type ResubmitPageEditError
+    = ResubmitEditNotLoggedIn
+    | ResubmitEditWrongWikiSession
+    | ResubmitEditWikiNotFound
+    | ResubmitEditSubmissionNotFound
+    | ResubmitEditForbidden
+    | ResubmitEditTargetPageNotPublished
+    | ResubmitEditNotNeedsRevision
+    | ResubmitEditNotEditKind
+    | ResubmitEditValidation ValidationError
+
+
+resubmitPageEditErrorToUserText : ResubmitPageEditError -> String
+resubmitPageEditErrorToUserText err =
+    case err of
+        ResubmitEditNotLoggedIn ->
+            "You must be logged in to resubmit this edit."
+
+        ResubmitEditWrongWikiSession ->
+            "Your session is for a different wiki. Log in again on this wiki."
+
+        ResubmitEditWikiNotFound ->
+            "This wiki does not exist."
+
+        ResubmitEditSubmissionNotFound ->
+            "This submission was not found."
+
+        ResubmitEditForbidden ->
+            "You can only resubmit your own submissions."
+
+        ResubmitEditTargetPageNotPublished ->
+            "That page does not exist or has no published content yet."
+
+        ResubmitEditNotNeedsRevision ->
+            "Only submissions in \"Needs revision\" can be resubmitted."
+
+        ResubmitEditNotEditKind ->
+            "Only page-edit submissions can be resubmitted from this form."
+
+        ResubmitEditValidation validationError ->
+            validationErrorToUserText validationError
+
+
+resubmitNeedsRevisionEdit : { markdown : String, currentMarkdown : String, currentRevision : Int } -> Submission -> Result ResubmitPageEditError Submission
+resubmitNeedsRevisionEdit payload sub =
+    if sub.status /= NeedsRevision then
+        Err ResubmitEditNotNeedsRevision
+
+    else
+        case sub.kind of
+            NewPage _ ->
+                Err ResubmitEditNotEditKind
+
+            EditPage body ->
+                case validateEditMarkdown payload.markdown of
+                    Err validationError ->
+                        Err (ResubmitEditValidation validationError)
+
+                    Ok proposedMarkdown ->
+                        Ok
+                            { sub
+                                | status = Pending
+                                , reviewerNote = Nothing
+                                , kind =
+                                    EditPage
+                                        { body
+                                            | baseMarkdown = payload.currentMarkdown
+                                            , baseRevision = payload.currentRevision
+                                            , proposedMarkdown = proposedMarkdown
+                                        }
+                            }
+
+            DeletePage _ ->
+                Err ResubmitEditNotEditKind
+
+
+isStalePendingEditSubmission : { pageSlug : Page.Slug, currentRevision : Int } -> Submission -> Bool
+isStalePendingEditSubmission payload sub =
+    if sub.status /= Pending then
+        False
+
+    else
+        case sub.kind of
+            NewPage _ ->
+                False
+
+            EditPage body ->
+                body.pageSlug == payload.pageSlug && body.baseRevision /= payload.currentRevision
+
+            DeletePage _ ->
+                False
+
+
+markStalePendingEditNeedsRevision : String -> Submission -> Submission
+markStalePendingEditNeedsRevision systemNote sub =
+    { sub
+        | status = NeedsRevision
+        , reviewerNote = Just systemNote
+    }

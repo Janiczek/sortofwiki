@@ -1,12 +1,12 @@
 module ProgramTest.Story31_DeactivateHostedWiki exposing (endToEndTests)
 
 import Backend
-import Expect
 import Effect.Browser.Dom
 import Effect.Lamdera
 import Effect.Test
 import Effect.Time
 import Env
+import Expect
 import Frontend
 import Html.Attributes
 import ProgramTest.Config
@@ -89,8 +89,8 @@ endToEndTests =
                 , client.checkView 300
                     (\root ->
                         root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-login-success" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Signed in as platform host admin." ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-wikis-list" ]
+                            |> Test.Html.Query.has []
                     )
                 , client.update 100 (UrlChanged adminWikiElmTipsUrl)
                 , client.checkView 400
@@ -124,7 +124,7 @@ endToEndTests =
                 , client.checkView 400
                     (\root ->
                         root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "not-found-page" ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-context" "layout-header") ]
                             |> Test.Html.Query.has [ Test.Html.Selector.text "Page not found" ]
                     )
                 , client.update 100 (UrlChanged adminWikisUrl)

@@ -17,9 +17,7 @@ suite =
         testCases =
             [ ( "https://example.com/w/demo", Route.WikiHome "demo" )
             , ( "https://example.com/w/elm-tips", Route.WikiHome "elm-tips" )
-            , ( "https://example.com/w/demo/pages", Route.WikiPages "demo" )
             , ( "https://example.com/w/demo/p/guides", Route.WikiPage "demo" "guides" )
-            , ( "https://example.com/w/demo/pages/", Route.WikiPages "demo" )
             , ( "https://example.com/w/demo/register", Route.WikiRegister "demo" )
             , ( "https://example.com/w/demo/login", Route.WikiLogin "demo" Nothing )
             , ( "https://example.com/w/demo/submit/new", Route.WikiSubmitNew "demo" )
@@ -46,101 +44,94 @@ suite =
                         |> Expect.equal (Just expectedRoute)
     in
     Test.describe "Route"
-        ( testCases
-            |> List.map toTest
-            |> (++)
-                [ Test.test "empty path is wiki list" <|
+        (List.concat
+            [ testCases |> List.map toTest
+            , [ Test.test "empty path is wiki list" <|
                     \_ ->
                         "https://example.com"
                             |> Url.fromString
                             |> Maybe.map (Route.fromUrl >> Route.isWikiList)
                             |> Expect.equal (Just True)
-               , Test.test "slash-only path is wiki list" <|
+              , Test.test "slash-only path is wiki list" <|
                     \_ ->
                         "https://example.com/"
                             |> Url.fromString
                             |> Maybe.map (Route.fromUrl >> Route.isWikiList)
                             |> Expect.equal (Just True)
-               , Test.test "wiki home path is not wiki list" <|
+              , Test.test "wiki home path is not wiki list" <|
                     \_ ->
                         "https://example.com/w/demo"
                             |> Url.fromString
                             |> Maybe.map (Route.fromUrl >> Route.isWikiList)
                             |> Expect.equal (Just False)
-               , Test.test "/w/demo/guides without /p/ is NotFound" <|
+              , Test.test "/w/demo/guides without /p/ is NotFound" <|
                     \_ ->
                         "https://example.com/w/demo/guides"
                             |> Url.fromString
                             |> Maybe.map Route.fromUrl
                             |> Maybe.andThen Route.notFoundPath
                             |> Expect.equal (Just "/w/demo/guides")
-               , Test.test "wiki pages path is not wiki list" <|
+              , Test.test "/w/demo/pages is NotFound" <|
                     \_ ->
                         "https://example.com/w/demo/pages"
                             |> Url.fromString
-                            |> Maybe.map (Route.fromUrl >> Route.isWikiList)
-                            |> Expect.equal (Just False)
-               , Test.test "/w is NotFound" <|
+                            |> Maybe.map Route.fromUrl
+                            |> Maybe.andThen Route.notFoundPath
+                            |> Expect.equal (Just "/w/demo/pages")
+              , Test.test "/w is NotFound" <|
                     \_ ->
                         "https://example.com/w"
                             |> Url.fromString
                             |> Maybe.map Route.fromUrl
                             |> Maybe.andThen Route.notFoundPath
                             |> Expect.equal (Just "/w")
-               , Test.test "/w/ is NotFound" <|
+              , Test.test "/w/ is NotFound" <|
                     \_ ->
                         "https://example.com/w/"
                             |> Url.fromString
                             |> Maybe.map Route.fromUrl
                             |> Maybe.andThen Route.notFoundPath
                             |> Expect.equal (Just "/w/")
-               , Test.test "/w/demo/extra is NotFound" <|
+              , Test.test "/w/demo/extra is NotFound" <|
                     \_ ->
                         "https://example.com/w/demo/extra"
                             |> Url.fromString
                             |> Maybe.map Route.fromUrl
                             |> Maybe.andThen Route.notFoundPath
                             |> Expect.equal (Just "/w/demo/extra")
-               , Test.test "storeActions WikiList asks for catalog" <|
+              , Test.test "storeActions WikiList asks for catalog" <|
                     \_ ->
                         Route.storeActions Route.WikiList
                             |> Expect.equal [ Store.AskForWikiCatalog ]
-               , Test.fuzz Fuzzers.wikiSlug "storeActions WikiHome asks catalog and details" <|
+              , Test.fuzz Fuzzers.wikiSlug "storeActions WikiHome asks catalog and details" <|
                     \slug ->
                         Route.storeActions (Route.WikiHome slug)
                             |> Expect.equal
                                 [ Store.AskForWikiCatalog
                                 , Store.AskForWikiFrontendDetails slug
                                 ]
-               , Test.fuzz Fuzzers.wikiSlug "storeActions WikiPages asks catalog and details" <|
-                    \slug ->
-                        Route.storeActions (Route.WikiPages slug)
-                            |> Expect.equal
-                                [ Store.AskForWikiCatalog
-                                , Store.AskForWikiFrontendDetails slug
-                                ]
-               , Test.fuzz Fuzzers.wikiSlug "storeActions WikiRegister asks catalog and details" <|
+              , Test.fuzz Fuzzers.wikiSlug "storeActions WikiRegister asks catalog and details" <|
                     \slug ->
                         Route.storeActions (Route.WikiRegister slug)
                             |> Expect.equal
                                 [ Store.AskForWikiCatalog
                                 , Store.AskForWikiFrontendDetails slug
                                 ]
-               , Test.fuzz Fuzzers.wikiSlug "storeActions WikiLogin asks catalog and details" <|
+              , Test.fuzz Fuzzers.wikiSlug "storeActions WikiLogin asks catalog and details" <|
                     \slug ->
                         Route.storeActions (Route.WikiLogin slug Nothing)
                             |> Expect.equal
                                 [ Store.AskForWikiCatalog
                                 , Store.AskForWikiFrontendDetails slug
                                 ]
-               , Test.fuzz Fuzzers.wikiSlug "storeActions WikiSubmitNew asks catalog and details" <|
+              , Test.fuzz Fuzzers.wikiSlug "storeActions WikiSubmitNew asks catalog and details" <|
                     \slug ->
                         Route.storeActions (Route.WikiSubmitNew slug)
                             |> Expect.equal
                                 [ Store.AskForWikiCatalog
                                 , Store.AskForWikiFrontendDetails slug
                                 ]
-               , Test.fuzz (Fuzz.map2 Tuple.pair Fuzzers.wikiSlug Fuzzers.pageSlug) "storeActions WikiSubmitEdit asks catalog, details, and published page" <|
+              , Test.fuzz (Fuzz.map2 Tuple.pair Fuzzers.wikiSlug Fuzzers.pageSlug) "storeActions WikiSubmitEdit asks catalog, details, and published page" <|
                     \( wikiSlug, pageSlug ) ->
                         Route.storeActions (Route.WikiSubmitEdit wikiSlug pageSlug)
                             |> Expect.equal
@@ -148,7 +139,7 @@ suite =
                                 , Store.AskForWikiFrontendDetails wikiSlug
                                 , Store.AskForPageFrontendDetails wikiSlug pageSlug
                                 ]
-               , Test.fuzz (Fuzz.map2 Tuple.pair Fuzzers.wikiSlug Fuzzers.pageSlug) "storeActions WikiSubmitDelete asks catalog, details, and published page" <|
+              , Test.fuzz (Fuzz.map2 Tuple.pair Fuzzers.wikiSlug Fuzzers.pageSlug) "storeActions WikiSubmitDelete asks catalog, details, and published page" <|
                     \( wikiSlug, pageSlug ) ->
                         Route.storeActions (Route.WikiSubmitDelete wikiSlug pageSlug)
                             |> Expect.equal
@@ -156,7 +147,7 @@ suite =
                                 , Store.AskForWikiFrontendDetails wikiSlug
                                 , Store.AskForPageFrontendDetails wikiSlug pageSlug
                                 ]
-               , Test.fuzz (Fuzz.map2 Tuple.pair Fuzzers.wikiSlug Fuzz.string) "storeActions WikiSubmissionDetail asks catalog, details, and submission" <|
+              , Test.fuzz (Fuzz.map2 Tuple.pair Fuzzers.wikiSlug Fuzz.string) "storeActions WikiSubmissionDetail asks catalog, details, and submission" <|
                     \( wikiSlug, subId ) ->
                         Route.storeActions (Route.WikiSubmissionDetail wikiSlug subId)
                             |> Expect.equal
@@ -164,7 +155,7 @@ suite =
                                 , Store.AskForWikiFrontendDetails wikiSlug
                                 , Store.AskForSubmissionDetails wikiSlug subId
                                 ]
-               , Test.fuzz Fuzzers.wikiSlug "storeActions WikiReview asks catalog, details, and review queue" <|
+              , Test.fuzz Fuzzers.wikiSlug "storeActions WikiReview asks catalog, details, and review queue" <|
                     \slug ->
                         Route.storeActions (Route.WikiReview slug)
                             |> Expect.equal
@@ -172,7 +163,7 @@ suite =
                                 , Store.AskForWikiFrontendDetails slug
                                 , Store.AskForReviewQueue slug
                                 ]
-               , Test.fuzz (Fuzz.map2 Tuple.pair Fuzzers.wikiSlug Fuzz.string) "storeActions WikiReviewDetail asks catalog, details, and review submission detail" <|
+              , Test.fuzz (Fuzz.map2 Tuple.pair Fuzzers.wikiSlug Fuzz.string) "storeActions WikiReviewDetail asks catalog, details, and review submission detail" <|
                     \( wikiSlug, subId ) ->
                         Route.storeActions (Route.WikiReviewDetail wikiSlug subId)
                             |> Expect.equal
@@ -180,7 +171,7 @@ suite =
                                 , Store.AskForWikiFrontendDetails wikiSlug
                                 , Store.AskForReviewSubmissionDetail wikiSlug subId
                                 ]
-               , Test.fuzz Fuzzers.wikiSlug "storeActions WikiAdminUsers asks catalog, details, and wiki users" <|
+              , Test.fuzz Fuzzers.wikiSlug "storeActions WikiAdminUsers asks catalog, details, and wiki users" <|
                     \slug ->
                         Route.storeActions (Route.WikiAdminUsers slug)
                             |> Expect.equal
@@ -188,7 +179,7 @@ suite =
                                 , Store.AskForWikiFrontendDetails slug
                                 , Store.AskForWikiUsers slug
                                 ]
-               , Test.fuzz Fuzzers.wikiSlug "storeActions WikiAdminAudit asks catalog, details, and audit log" <|
+              , Test.fuzz Fuzzers.wikiSlug "storeActions WikiAdminAudit asks catalog, details, and audit log" <|
                     \slug ->
                         Route.storeActions (Route.WikiAdminAudit slug)
                             |> Expect.equal
@@ -196,7 +187,7 @@ suite =
                                 , Store.AskForWikiFrontendDetails slug
                                 , Store.AskForWikiAuditLog slug WikiAuditLog.emptyAuditLogFilter
                                 ]
-               , Test.fuzz (Fuzz.map2 Tuple.pair Fuzzers.wikiSlug Fuzzers.pageSlug) "storeActions WikiPage asks catalog, details, and published page" <|
+              , Test.fuzz (Fuzz.map2 Tuple.pair Fuzzers.wikiSlug Fuzzers.pageSlug) "storeActions WikiPage asks catalog, details, and published page" <|
                     \( wikiSlug, pageSlug ) ->
                         Route.storeActions (Route.WikiPage wikiSlug pageSlug)
                             |> Expect.equal
@@ -204,28 +195,28 @@ suite =
                                 , Store.AskForWikiFrontendDetails wikiSlug
                                 , Store.AskForPageFrontendDetails wikiSlug pageSlug
                                 ]
-               , Test.test "storeActions HostAdmin asks nothing" <|
+              , Test.test "storeActions HostAdmin asks nothing" <|
                     \_ ->
                         Route.storeActions (Route.HostAdmin Nothing)
                             |> Expect.equal []
-               , Test.test "storeActions HostAdminWikis asks nothing" <|
+              , Test.test "storeActions HostAdminWikis asks nothing" <|
                     \_ ->
                         Route.storeActions Route.HostAdminWikis
                             |> Expect.equal []
-               , Test.test "storeActions HostAdminWikiNew asks nothing" <|
+              , Test.test "storeActions HostAdminWikiNew asks nothing" <|
                     \_ ->
                         Route.storeActions Route.HostAdminWikiNew
                             |> Expect.equal []
-               , Test.test "storeActions HostAdminWikiDetail asks nothing" <|
+              , Test.test "storeActions HostAdminWikiDetail asks nothing" <|
                     \_ ->
                         Route.storeActions (Route.HostAdminWikiDetail "demo")
                             |> Expect.equal []
-               , Test.test "storeActions NotFound asks nothing" <|
+              , Test.test "storeActions NotFound asks nothing" <|
                     \_ ->
                         Url.fromString "https://example.com/nope"
                             |> Maybe.map (Route.fromUrl >> Route.storeActions)
                             |> Expect.equal (Just [])
-               , Test.fuzz Fuzz.string "NotFound preserves url" <|
+              , Test.fuzz Fuzz.string "NotFound preserves url" <|
                     \str ->
                         let
                             path : String
@@ -248,9 +239,6 @@ suite =
                                             False
 
                                         Route.WikiHome _ ->
-                                            False
-
-                                        Route.WikiPages _ ->
                                             False
 
                                         Route.WikiPage _ _ ->
@@ -299,37 +287,38 @@ suite =
                                             False
                                 )
                             |> Expect.equal (Just True)
-               , Test.test "/w/demo/register/extra is NotFound" <|
+              , Test.test "/w/demo/register/extra is NotFound" <|
                     \_ ->
                         "https://example.com/w/demo/register/extra"
                             |> Url.fromString
                             |> Maybe.map Route.fromUrl
                             |> Maybe.andThen Route.notFoundPath
                             |> Expect.equal (Just "/w/demo/register/extra")
-               , Test.test "/w/demo/login/extra is NotFound" <|
+              , Test.test "/w/demo/login/extra is NotFound" <|
                     \_ ->
                         "https://example.com/w/demo/login/extra"
                             |> Url.fromString
                             |> Maybe.map Route.fromUrl
                             |> Maybe.andThen Route.notFoundPath
                             |> Expect.equal (Just "/w/demo/login/extra")
-               , Test.test "wiki login parses validated redirect query" <|
+              , Test.test "wiki login parses validated redirect query" <|
                     \_ ->
                         "https://example.com/w/demo/login?redirect=%2Fw%2Fdemo%2Freview"
                             |> Url.fromString
                             |> Maybe.map Route.fromUrl
                             |> Expect.equal (Just (Route.WikiLogin "demo" (Just "/w/demo/review")))
-               , Test.test "wiki login drops unsafe redirect query" <|
+              , Test.test "wiki login drops unsafe redirect query" <|
                     \_ ->
                         "https://example.com/w/demo/login?redirect=https%3A%2F%2Fevil.com"
                             |> Url.fromString
                             |> Maybe.map Route.fromUrl
                             |> Expect.equal (Just (Route.WikiLogin "demo" Nothing))
-               , Test.test "host admin login parses validated redirect query" <|
+              , Test.test "host admin login parses validated redirect query" <|
                     \_ ->
                         "https://example.com/admin?redirect=%2Fadmin%2Fwikis%2Fnew"
                             |> Url.fromString
                             |> Maybe.map Route.fromUrl
                             |> Expect.equal (Just (Route.HostAdmin (Just "/admin/wikis/new")))
-               ]
+              ]
+            ]
         )

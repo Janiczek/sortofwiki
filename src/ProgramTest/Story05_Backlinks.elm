@@ -15,13 +15,13 @@ import Types exposing (ToBackend, ToFrontend)
 endToEndTests : List (Effect.Test.EndToEndTest ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model)
 endToEndTests =
     [ Effect.Test.start
-        "5 — backlinks on published page /w/demo/p/guides"
+        "5 — backlinks on published page /w/demo/p/Guides"
         (Effect.Time.millisToPosix 0)
         ProgramTest.Config.config
         [ Effect.Test.connectFrontend
             100
             (Effect.Lamdera.sessionIdFromString "session-backlinks-guides")
-            "/w/demo/p/guides"
+            "/w/demo/p/Guides"
             { width = 800, height = 600 }
             (\client ->
                 [ client.checkView 100
@@ -34,8 +34,8 @@ endToEndTests =
                     (\root ->
                         root
                             |> Test.Html.Query.find [ Test.Html.Selector.id "page-backlinks-list" ]
-                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.href "/w/demo/p/home") ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-backlink-page-slug" "home") ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.href "/w/demo/p/Home") ]
+                            |> Test.Html.Query.has [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-backlink-page-slug" "Home") ]
                     )
                 ]
             )
@@ -47,15 +47,15 @@ endToEndTests =
         [ Effect.Test.connectFrontend
             100
             (Effect.Lamdera.sessionIdFromString "session-backlinks-home")
-            "/w/demo/p/home"
+            "/w/demo/p/Home"
             { width = 800, height = 600 }
             (\client ->
                 [ client.checkView 100
                     (\root ->
                         root
                             |> Test.Html.Query.find [ Test.Html.Selector.id "page-backlinks-list" ]
-                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.href "/w/demo/p/about") ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-backlink-page-slug" "about") ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.href "/w/demo/p/About") ]
+                            |> Test.Html.Query.has [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-backlink-page-slug" "About") ]
                     )
                 ]
             )

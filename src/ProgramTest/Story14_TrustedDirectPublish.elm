@@ -26,12 +26,12 @@ submitNewUrl =
     }
 
 
-demoPagesUrl : Url
-demoPagesUrl =
+demoWikiHomeUrl : Url
+demoWikiHomeUrl =
     { protocol = Http
     , host = "localhost"
     , port_ = Just 8000
-    , path = "/w/demo/pages"
+    , path = "/w/demo"
     , query = Nothing
     , fragment = Nothing
     }
@@ -42,7 +42,7 @@ publishedPageUrl =
     { protocol = Http
     , host = "localhost"
     , port_ = Just 8000
-    , path = "/w/demo/p/story14trustedpage"
+    , path = "/w/demo/p/Story14TrustedPage"
     , query = Nothing
     , fragment = Nothing
     }
@@ -70,7 +70,7 @@ endToEndTests =
                             |> Test.Html.Query.has [ Test.Html.Selector.text "You are logged in" ]
                     )
                 , client.update 100 (UrlChanged submitNewUrl)
-                , client.input 100 (Effect.Browser.Dom.id "wiki-submit-new-slug") "story14trustedpage"
+                , client.input 100 (Effect.Browser.Dom.id "wiki-submit-new-slug") "Story14TrustedPage"
                 , client.input 100 (Effect.Browser.Dom.id "wiki-submit-new-markdown") "# Story 14 trusted publish"
                 , client.click 100 (Effect.Browser.Dom.id "wiki-submit-new-submit")
                 , client.checkView 300
@@ -79,13 +79,13 @@ endToEndTests =
                             |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submit-new-success" ]
                             |> Test.Html.Query.has [ Test.Html.Selector.text "Published" ]
                     )
-                , client.update 100 (UrlChanged demoPagesUrl)
+                , client.update 100 (UrlChanged demoWikiHomeUrl)
                 , client.checkView 200
                     (\root ->
                         root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "pages-list-page-list" ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-home-page-slugs" ]
                             |> Test.Html.Query.findAll
-                                [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-page-slug" "story14trustedpage") ]
+                                [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-page-slug" "Story14TrustedPage") ]
                             |> Test.Html.Query.count (Expect.equal 1)
                     )
                 , client.update 100 (UrlChanged publishedPageUrl)

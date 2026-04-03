@@ -39,7 +39,7 @@ adminWikiDemoUrl =
 endToEndTests : List (Effect.Test.EndToEndTest ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model)
 endToEndTests =
     [ Effect.Test.start
-        "30 — host admin edit demo wiki summary and slug policy"
+        "30 — host admin edit demo wiki summary"
         (Effect.Time.millisToPosix 0)
         ProgramTest.Config.config
         [ Effect.Test.connectFrontend
@@ -54,8 +54,8 @@ endToEndTests =
                 , client.checkView 300
                     (\root ->
                         root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-login-success" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Signed in as platform host admin." ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-wikis-list" ]
+                            |> Test.Html.Query.has []
                     )
                 , client.update 100 (UrlChanged adminWikiDemoUrl)
                 , client.checkView 400
@@ -65,19 +65,12 @@ endToEndTests =
                             |> Test.Html.Query.has []
                     )
                 , client.input 100 (Effect.Browser.Dom.id "host-admin-wiki-detail-summary") "STORY30_UPDATED_SUMMARY"
-                , client.update 100 (HostAdminWikiDetailSlugPolicyFormChanged "AllowAny")
                 , client.click 100 (Effect.Browser.Dom.id "host-admin-wiki-detail-save")
                 , client.checkView 400
                     (\root ->
                         root
                             |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-wiki-detail-summary-display" ]
                             |> Test.Html.Query.has [ Test.Html.Selector.text "STORY30_UPDATED_SUMMARY" ]
-                    )
-                , client.checkView 100
-                    (\root ->
-                        root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-wiki-detail-policy-display" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Allow any slug characters (legacy)" ]
                     )
                 ]
             )

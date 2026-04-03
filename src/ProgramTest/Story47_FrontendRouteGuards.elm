@@ -22,17 +22,17 @@ loginWithRedirectUrl =
     , host = "localhost"
     , port_ = Just 8000
     , path = "/w/demo/login"
-    , query = Just "redirect=%2Fw%2Fdemo%2Fpages"
+    , query = Just "redirect=%2Fw%2Fdemo"
     , fragment = Nothing
     }
 
 
-pagesUrl : Url
-pagesUrl =
+wikiHomeUrl : Url
+wikiHomeUrl =
     { protocol = Http
     , host = "localhost"
     , port_ = Just 8000
-    , path = "/w/demo/pages"
+    , path = "/w/demo"
     , query = Nothing
     , fragment = Nothing
     }
@@ -99,11 +99,11 @@ endToEndTests =
                 , client.input 100 (Effect.Browser.Dom.id "wiki-login-username") "trustedpub"
                 , client.input 100 (Effect.Browser.Dom.id "wiki-login-password") "password12"
                 , client.click 100 (Effect.Browser.Dom.id "wiki-login-submit")
-                , client.update 100 (UrlChanged pagesUrl)
+                , client.update 100 (UrlChanged wikiHomeUrl)
                 , client.checkView 400
                     (\root ->
                         root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "pages-list-page" ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-home-page" ]
                             |> Test.Html.Query.has
                                 [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "demo") ]
                     )

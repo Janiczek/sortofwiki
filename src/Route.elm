@@ -23,7 +23,6 @@ type Route
     | HostAdminWikiNew
     | HostAdminWikiDetail Wiki.Slug
     | WikiHome Wiki.Slug
-    | WikiPages Wiki.Slug
     | WikiPage Wiki.Slug Page.Slug
     | WikiLogin Wiki.Slug (Maybe String)
     | WikiRegister Wiki.Slug
@@ -80,13 +79,6 @@ fromUrl url =
 
                     else
                         WikiHome slug
-
-                [ "w", slug, "pages" ] ->
-                    if slug == "" then
-                        NotFound url
-
-                    else
-                        WikiPages slug
 
                 [ "w", wikiSlug, "p", pageSlug ] ->
                     if wikiSlug == "" || pageSlug == "" then
@@ -203,9 +195,6 @@ isWikiList route =
         WikiHome _ ->
             False
 
-        WikiPages _ ->
-            False
-
         WikiPage _ _ ->
             False
 
@@ -262,9 +251,6 @@ storeActions route =
             []
 
         WikiHome slug ->
-            [ AskForWikiCatalog, AskForWikiFrontendDetails slug ]
-
-        WikiPages slug ->
             [ AskForWikiCatalog, AskForWikiFrontendDetails slug ]
 
         WikiPage wikiSlug pageSlug ->

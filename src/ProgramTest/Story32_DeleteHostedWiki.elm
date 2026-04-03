@@ -1,12 +1,12 @@
 module ProgramTest.Story32_DeleteHostedWiki exposing (endToEndTests)
 
 import Backend
-import Expect
 import Effect.Browser.Dom
 import Effect.Lamdera
 import Effect.Test
 import Effect.Time
 import Env
+import Expect
 import Frontend
 import Html.Attributes
 import ProgramTest.Config
@@ -54,7 +54,7 @@ story32WikiDetailUrl =
     { protocol = Http
     , host = "localhost"
     , port_ = Just 8000
-    , path = "/admin/wikis/story32wiki"
+    , path = "/admin/wikis/Story32Wiki"
     , query = Nothing
     , fragment = Nothing
     }
@@ -78,11 +78,11 @@ endToEndTests =
                 , client.checkView 300
                     (\root ->
                         root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-login-success" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Signed in as platform host admin." ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-wikis-list" ]
+                            |> Test.Html.Query.has []
                     )
                 , client.update 100 (UrlChanged adminWikisNewUrl)
-                , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-slug") "story32wiki"
+                , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-slug") "Story32Wiki"
                 , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-name") "Story 32 Wiki"
                 , client.click 100 (Effect.Browser.Dom.id "host-admin-create-wiki-submit")
                 , client.update 100 (UrlChanged adminWikisUrl)
@@ -91,7 +91,7 @@ endToEndTests =
                         root
                             |> Test.Html.Query.find
                                 [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-context" "host-admin-wiki-row")
-                                , Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "story32wiki")
+                                , Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "Story32Wiki")
                                 ]
                             |> Test.Html.Query.has [ Test.Html.Selector.text "Story 32 Wiki" ]
                     )
@@ -100,7 +100,7 @@ endToEndTests =
                     (\root ->
                         root
                             |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-wiki-detail-page" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "story32wiki") ]
+                            |> Test.Html.Query.has [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "Story32Wiki") ]
                     )
                 , client.input 100 (Effect.Browser.Dom.id "host-admin-delete-wiki-confirm") "not-the-slug"
                 , client.click 100 (Effect.Browser.Dom.id "host-admin-delete-wiki-submit")
@@ -111,14 +111,14 @@ endToEndTests =
                             |> Test.Html.Query.has
                                 [ Test.Html.Selector.text "Confirmation must match the wiki slug or the word DELETE." ]
                     )
-                , client.input 100 (Effect.Browser.Dom.id "host-admin-delete-wiki-confirm") "story32wiki"
+                , client.input 100 (Effect.Browser.Dom.id "host-admin-delete-wiki-confirm") "Story32Wiki"
                 , client.click 100 (Effect.Browser.Dom.id "host-admin-delete-wiki-submit")
                 , client.update 100 (UrlChanged adminWikisUrl)
                 , client.checkView 400
                     (\root ->
                         root
                             |> Test.Html.Query.findAll
-                                [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "story32wiki") ]
+                                [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "Story32Wiki") ]
                             |> Test.Html.Query.count (Expect.equal 0)
                     )
                 ]

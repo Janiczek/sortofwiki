@@ -18,7 +18,7 @@ view : Wiki.Slug -> Page.FrontendDetails -> Html msg
 view wikiSlug pageDetails =
     Html.div
         [ Attr.id "page-markdown"
-        , TW.cls "page-markdown-inner"
+        , TW.cls "max-w-[52rem] text-[0.95rem] font-serif"
         ]
         (case
             WikiPageMarkdownParse.blocksWithHeadingSlugs wikiSlug pageDetails.markdownSource
@@ -49,6 +49,7 @@ htmlRendererWithHeadingIds maybeSlug =
 headingHtml : Maybe String -> Block.HeadingLevel -> List (Html msg) -> Html msg
 headingHtml maybeSlug level children =
     let
+        attrs : List (Html.Attribute msg)
         attrs =
             maybeSlug
                 |> Maybe.map Attr.id

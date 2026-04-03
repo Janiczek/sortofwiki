@@ -6,7 +6,6 @@ import Fuzz
 import Fuzzers
 import Page
 import Test exposing (Test)
-import HostedWikiSlugPolicy
 import Wiki
 
 
@@ -22,7 +21,6 @@ suite =
                             { slug = "s"
                             , name = "N"
                             , summary = "Blurb"
-                            , slugPolicy = HostedWikiSlugPolicy.AllowAny
                             , active = True
                             , pages = Dict.empty
                             }
@@ -32,7 +30,6 @@ suite =
                             { slug = "s"
                             , name = "N"
                             , summary = "Blurb"
-                            , slugPolicy = HostedWikiSlugPolicy.AllowAny
                             , active = True
                             }
             ]
@@ -43,7 +40,6 @@ suite =
                         { slug = "abc"
                         , name = "Abc"
                         , summary = ""
-                        , slugPolicy = HostedWikiSlugPolicy.StrictSlugs
                         , active = True
                         }
                         |> Expect.equal "/w/abc"
@@ -62,7 +58,6 @@ suite =
                             { slug = "a"
                             , name = "A"
                             , summary = ""
-                            , slugPolicy = HostedWikiSlugPolicy.StrictSlugs
                             , active = True
                             , pages = Dict.empty
                             }
@@ -72,7 +67,6 @@ suite =
                             { slug = "b"
                             , name = "B"
                             , summary = ""
-                            , slugPolicy = HostedWikiSlugPolicy.StrictSlugs
                             , active = False
                             , pages = Dict.empty
                             }
@@ -93,7 +87,6 @@ suite =
                                 { slug = slugA
                                 , name = "NA"
                                 , summary = ""
-                                , slugPolicy = HostedWikiSlugPolicy.StrictSlugs
                                 , active = True
                                 , pages = Dict.empty
                                 }
@@ -103,7 +96,6 @@ suite =
                                 { slug = slugB
                                 , name = "NB"
                                 , summary = ""
-                                , slugPolicy = HostedWikiSlugPolicy.StrictSlugs
                                 , active = False
                                 , pages = Dict.empty
                                 }
@@ -112,17 +104,6 @@ suite =
                             |> Wiki.publicCatalogDict
                             |> Dict.keys
                             |> Expect.equal [ slugA ]
-            ]
-        , Test.describe "pageIndexUrlPath"
-            [ Test.test "demo wiki pages index" <|
-                \() ->
-                    Wiki.pageIndexUrlPath "demo"
-                        |> Expect.equal "/w/demo/pages"
-            , Test.fuzz Fuzzers.wikiSlug "ends with /pages" <|
-                \slug ->
-                    Wiki.pageIndexUrlPath slug
-                        |> String.endsWith "/pages"
-                        |> Expect.equal True
             ]
         , Test.describe "loginUrlPath"
             [ Test.test "demo wiki login" <|

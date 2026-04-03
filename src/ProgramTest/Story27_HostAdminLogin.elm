@@ -7,6 +7,7 @@ import Effect.Test
 import Effect.Time
 import Env
 import Frontend
+import Html.Attributes
 import ProgramTest.Config
 import Test.Html.Query
 import Test.Html.Selector
@@ -57,16 +58,22 @@ endToEndTests =
                 [ client.checkView 100
                     (\root ->
                         root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-login-page" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Platform host admin" ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-context" "layout-header") ]
+                            |> Test.Html.Query.has
+                                [ Test.Html.Selector.text "SortOfWiki"
+                                , Test.Html.Selector.text "Admin login"
+                                ]
                     )
                 , client.update 100 (UrlChanged adminWikisUrl)
                 , client.update 150 (UrlChanged adminLoginReturnToWikisUrl)
                 , client.checkView 200
                     (\root ->
                         root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-login-page" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Platform host admin" ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-context" "layout-header") ]
+                            |> Test.Html.Query.has
+                                [ Test.Html.Selector.text "SortOfWiki"
+                                , Test.Html.Selector.text "Admin login"
+                                ]
                     )
                 , client.update 100 (UrlChanged adminUrl)
                 , client.input 100 (Effect.Browser.Dom.id "host-admin-login-password") "wrong-password"
@@ -82,15 +89,22 @@ endToEndTests =
                 , client.checkView 300
                     (\root ->
                         root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-login-success" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Signed in as platform host admin." ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-wikis-list" ]
+                            |> Test.Html.Query.has []
                     )
-                , client.update 100 (UrlChanged adminWikisUrl)
                 , client.checkView 400
                     (\root ->
                         root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-wikis-list" ]
-                            |> Test.Html.Query.has []
+                            |> Test.Html.Query.hasNot [ Test.Html.Selector.id "host-admin-login-form" ]
+                    )
+                , client.checkView 100
+                    (\root ->
+                        root
+                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.attribute "aria-label" "Site") ]
+                            |> Test.Html.Query.has
+                                [ Test.Html.Selector.text "Hosted wikis"
+                                , Test.Html.Selector.text "Create hosted wiki"
+                                ]
                     )
                 ]
             )

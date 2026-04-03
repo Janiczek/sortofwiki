@@ -22,9 +22,8 @@ import ColorTheme exposing (ColorTheme)
 import ContributorAccount
 import Dict exposing (Dict)
 import Effect.Browser
-import HostAdmin
 import Effect.Browser.Navigation
-import HostedWikiSlugPolicy exposing (HostedWikiSlugPolicy)
+import HostAdmin
 import Page
 import RemoteData exposing (RemoteData)
 import Route exposing (Route)
@@ -59,6 +58,7 @@ type ToBackend
     | SubmitNewPage Wiki.Slug String String
     | SubmitPageEdit Wiki.Slug Page.Slug String
     | SubmitPageDelete Wiki.Slug Page.Slug String
+    | ResubmitPageEdit Wiki.Slug String String
     | ApproveSubmission Wiki.Slug String
     | RejectSubmission Wiki.Slug String String
     | RequestSubmissionChanges Wiki.Slug String String
@@ -66,7 +66,7 @@ type ToBackend
     | RequestHostWikiList
     | RequestHostWikiDetail Wiki.Slug
     | CreateHostedWiki String String
-    | UpdateHostedWikiMetadata Wiki.Slug String String HostedWikiSlugPolicy
+    | UpdateHostedWikiMetadata Wiki.Slug String String
     | DeactivateHostedWiki Wiki.Slug
     | ReactivateHostedWiki Wiki.Slug
     | DeleteHostedWiki Wiki.Slug String
@@ -80,16 +80,17 @@ type ToFrontend
     | ReviewSubmissionDetailResponse Wiki.Slug String (Result SubmissionReviewDetail.ReviewSubmissionDetailError SubmissionReviewDetail.SubmissionReviewDetail)
     | WikiUsersResponse Wiki.Slug (Result WikiAdminUsers.Error (List WikiAdminUsers.ListedUser))
     | WikiAuditLogResponse Wiki.Slug WikiAuditLog.AuditLogFilter (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent))
-    | PromoteContributorToTrustedResponse Wiki.Slug String (Result WikiAdminUsers.PromoteContributorError ())
-    | DemoteTrustedToContributorResponse Wiki.Slug String (Result WikiAdminUsers.DemoteTrustedError ())
-    | GrantWikiAdminResponse Wiki.Slug String (Result WikiAdminUsers.GrantTrustedToAdminError ())
-    | RevokeWikiAdminResponse Wiki.Slug String (Result WikiAdminUsers.RevokeAdminError ())
+    | PromoteContributorToTrustedResponse Wiki.Slug (Result WikiAdminUsers.PromoteContributorError ())
+    | DemoteTrustedToContributorResponse Wiki.Slug (Result WikiAdminUsers.DemoteTrustedError ())
+    | GrantWikiAdminResponse Wiki.Slug (Result WikiAdminUsers.GrantTrustedToAdminError ())
+    | RevokeWikiAdminResponse Wiki.Slug (Result WikiAdminUsers.RevokeAdminError ())
     | SubmissionDetailsResponse Wiki.Slug String (Result Submission.DetailsError Submission.ContributorView)
     | RegisterContributorResponse Wiki.Slug (Result ContributorAccount.RegisterContributorError WikiRole.WikiRole)
     | LoginContributorResponse Wiki.Slug (Result ContributorAccount.LoginContributorError WikiRole.WikiRole)
     | SubmitNewPageResponse Wiki.Slug (Result Submission.SubmitNewPageError Submission.NewPageSubmitSuccess)
     | SubmitPageEditResponse Wiki.Slug (Result Submission.SubmitPageEditError Submission.EditSubmitSuccess)
     | SubmitPageDeleteResponse Wiki.Slug (Result Submission.SubmitPageDeleteError Submission.DeleteSubmitSuccess)
+    | ResubmitPageEditResponse Wiki.Slug String (Result Submission.ResubmitPageEditError ())
     | ApproveSubmissionResponse Wiki.Slug String (Result Submission.ApproveSubmissionError ())
     | RejectSubmissionResponse Wiki.Slug String (Result Submission.RejectSubmissionError ())
     | RequestSubmissionChangesResponse Wiki.Slug String (Result Submission.RequestChangesSubmissionError ())
@@ -155,7 +156,6 @@ type alias HostAdminWikiDetailDraft =
     , load : RemoteData () (Result HostAdmin.HostWikiDetailError Wiki.CatalogEntry)
     , nameDraft : String
     , summaryDraft : String
-    , slugPolicyDraft : HostedWikiSlugPolicy
     , saveInFlight : Bool
     , lastSaveResult : Maybe (Result HostAdmin.UpdateHostedWikiMetadataError ())
     , lifecycleInFlight : Bool
@@ -178,6 +178,7 @@ type alias PageEditSubmitDraft =
     { markdownBody : String
     , inFlight : Bool
     , lastResult : Maybe (Result Submission.SubmitPageEditError Submission.EditSubmitSuccess)
+    , lastResubmitResult : Maybe (Result Submission.ResubmitPageEditError Submission.EditSubmitSuccess)
     }
 
 
@@ -256,6 +257,8 @@ type FrontendMsg
     | PageEditSubmitFormSubmitted
     | PageDeleteSubmitReasonChanged String
     | PageDeleteSubmitFormSubmitted
+    | SubmissionConflictResubmitMarkdownChanged String
+    | SubmissionConflictResubmitSubmitted
     | ReviewApproveSubmitted
     | ReviewRejectReasonChanged String
     | ReviewRejectSubmitted
@@ -276,7 +279,6 @@ type FrontendMsg
     | HostAdminCreateWikiSubmitted
     | HostAdminWikiDetailNameChanged String
     | HostAdminWikiDetailSummaryChanged String
-    | HostAdminWikiDetailSlugPolicyFormChanged String
     | HostAdminWikiDetailSaveClicked
     | HostAdminWikiDetailDeactivateClicked
     | HostAdminWikiDetailReactivateClicked

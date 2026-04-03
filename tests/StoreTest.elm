@@ -7,8 +7,6 @@ import Expect
 import Frontend
 import Fuzz
 import Fuzzers
-import HostedWikiSlugPolicy
-import Effect.Command as Command
 import Page
 import RemoteData
 import Store exposing (Store)
@@ -95,7 +93,6 @@ suite =
                                         { slug = "x"
                                         , name = "X"
                                         , summary = ""
-                                        , slugPolicy = HostedWikiSlugPolicy.StrictSlugs
                                         , active = True
                                         }
                                     )
@@ -150,15 +147,15 @@ suite =
                         store : Store
                         store =
                             { wikiCatalog = RemoteData.NotAsked
-                              , wikiDetails = Dict.empty
-                              , publishedPages = Dict.empty
-                              , reviewQueues = Dict.empty
-                              , submissionDetails =
+                            , wikiDetails = Dict.empty
+                            , publishedPages = Dict.empty
+                            , reviewQueues = Dict.empty
+                            , submissionDetails =
                                 Dict.singleton ( "demo", "sub_1" )
                                     (RemoteData.succeed (Err Submission.DetailsNotLoggedIn))
-                              , reviewSubmissionDetails = Dict.empty
-                              , wikiUsers = Dict.empty
-                              , wikiAuditLogs = Dict.empty
+                            , reviewSubmissionDetails = Dict.empty
+                            , wikiUsers = Dict.empty
+                            , wikiAuditLogs = Dict.empty
                             }
                     in
                     store
@@ -176,10 +173,10 @@ suite =
                         store : Store
                         store =
                             { wikiCatalog = RemoteData.NotAsked
-                              , wikiDetails = Dict.empty
-                              , publishedPages = Dict.empty
-                              , reviewQueues = Dict.empty
-                              , submissionDetails =
+                            , wikiDetails = Dict.empty
+                            , publishedPages = Dict.empty
+                            , reviewQueues = Dict.empty
+                            , submissionDetails =
                                 Dict.singleton ( "demo", "sub_1" )
                                     (RemoteData.succeed
                                         (Ok
@@ -187,12 +184,13 @@ suite =
                                             , status = Submission.Pending
                                             , kindSummary = "New page: x"
                                             , reviewerNote = Nothing
+                                            , conflictContext = Nothing
                                             }
                                         )
                                     )
-                              , reviewSubmissionDetails = Dict.empty
-                              , wikiUsers = Dict.empty
-                              , wikiAuditLogs = Dict.empty
+                            , reviewSubmissionDetails = Dict.empty
+                            , wikiUsers = Dict.empty
+                            , wikiAuditLogs = Dict.empty
                             }
                     in
                     store
@@ -323,15 +321,15 @@ suite =
                         store : Store
                         store =
                             { wikiCatalog = RemoteData.NotAsked
-                              , wikiDetails = Dict.empty
-                              , publishedPages = Dict.empty
-                              , reviewQueues = Dict.empty
-                              , submissionDetails = Dict.empty
-                              , reviewSubmissionDetails =
+                            , wikiDetails = Dict.empty
+                            , publishedPages = Dict.empty
+                            , reviewQueues = Dict.empty
+                            , submissionDetails = Dict.empty
+                            , reviewSubmissionDetails =
                                 Dict.singleton ( "demo", "sub_1" )
                                     (RemoteData.succeed (Err SubmissionReviewDetail.ReviewSubmissionDetailForbidden))
-                              , wikiUsers = Dict.empty
-                              , wikiAuditLogs = Dict.empty
+                            , wikiUsers = Dict.empty
+                            , wikiAuditLogs = Dict.empty
                             }
                     in
                     store
@@ -349,11 +347,11 @@ suite =
                         store : Store
                         store =
                             { wikiCatalog = RemoteData.NotAsked
-                              , wikiDetails = Dict.empty
-                              , publishedPages = Dict.empty
-                              , reviewQueues = Dict.empty
-                              , submissionDetails = Dict.empty
-                              , reviewSubmissionDetails =
+                            , wikiDetails = Dict.empty
+                            , publishedPages = Dict.empty
+                            , reviewQueues = Dict.empty
+                            , submissionDetails = Dict.empty
+                            , reviewSubmissionDetails =
                                 Dict.singleton ( "demo", "sub_1" )
                                     (RemoteData.succeed
                                         (Ok
@@ -364,8 +362,8 @@ suite =
                                             )
                                         )
                                     )
-                              , wikiUsers = Dict.empty
-                              , wikiAuditLogs = Dict.empty
+                            , wikiUsers = Dict.empty
+                            , wikiAuditLogs = Dict.empty
                             }
                     in
                     store

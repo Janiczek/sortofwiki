@@ -15,21 +15,21 @@ import Types exposing (ToBackend, ToFrontend)
 endToEndTests : List (Effect.Test.EndToEndTest ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model)
 endToEndTests =
     [ Effect.Test.start
-        "46 — [[home]] on published page renders as same-wiki link"
+        "46 — [[Home]] on published page renders as same-wiki link"
         (Effect.Time.millisToPosix 0)
         ProgramTest.Config.config
         [ Effect.Test.connectFrontend
             100
             (Effect.Lamdera.sessionIdFromString "session-wiki-links-about")
-            "/w/demo/p/about"
+            "/w/demo/p/About"
             { width = 800, height = 600 }
             (\client ->
                 [ client.checkView 100
                     (\root ->
                         root
                             |> Test.Html.Query.find [ Test.Html.Selector.id "page-markdown" ]
-                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.href "/w/demo/p/home") ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "home" ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.href "/w/demo/p/Home") ]
+                            |> Test.Html.Query.has [ Test.Html.Selector.text "Home" ]
                     )
                 ]
             )

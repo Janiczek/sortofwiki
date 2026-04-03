@@ -15,9 +15,9 @@ module HostAdmin exposing
     , loginErrorToUserText
     , protectedErrorToUserText
     , updateHostedWikiMetadataErrorToUserText
-    , wikiLifecycleErrorToUserText
     , validateHostedWikiName
     , validateHostedWikiSummary
+    , wikiLifecycleErrorToUserText
     , wikiNameMaxLength
     , wikiSummaryMaxLength
     )
@@ -220,7 +220,7 @@ hostedWikiSlugErrorToUserText slugErr =
             "Wiki slug must be at most 64 characters."
 
         Submission.SlugInvalidChars ->
-            "Wiki slug may only use letters, digits, underscores, and hyphens (start with a letter or digit)."
+            "Wiki slug must be PascalCase letters and digits only."
 
         Submission.BodyEmpty ->
             "Invalid wiki slug."

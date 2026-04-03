@@ -19,7 +19,7 @@ guidesPageUrl =
     { protocol = Http
     , host = "localhost"
     , port_ = Just 8000
-    , path = "/w/demo/p/guides"
+    , path = "/w/demo/p/Guides"
     , query = Nothing
     , fragment = Nothing
     }
@@ -30,7 +30,7 @@ submitDeleteGuidesUrl =
     { protocol = Http
     , host = "localhost"
     , port_ = Just 8000
-    , path = "/w/demo/submit/delete/guides"
+    , path = "/w/demo/submit/delete/Guides"
     , query = Nothing
     , fragment = Nothing
     }
@@ -97,7 +97,7 @@ endToEndTests =
                             |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submit-delete-page" ]
                             |> Test.Html.Query.has
                                 [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "demo")
-                                , Test.Html.Selector.attribute (Html.Attributes.attribute "data-page-slug" "guides")
+                                , Test.Html.Selector.attribute (Html.Attributes.attribute "data-page-slug" "Guides")
                                 ]
                     )
                 , client.input 100 (Effect.Browser.Dom.id "wiki-submit-delete-reason") deleteReasonMarker

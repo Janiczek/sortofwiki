@@ -3,15 +3,15 @@ module WikiContributors exposing
     , StoredContributor
     , attemptLogin
     , attemptRegister
+    , demoteTrustedToContributorAtWiki
     , displayUsernameForAccount
     , emptyRegistry
+    , grantTrustedToAdminAtWiki
     , isAdminForWiki
     , isTrustedForWiki
-    , roleForAccount
-    , demoteTrustedToContributorAtWiki
-    , grantTrustedToAdminAtWiki
     , promoteContributorToTrustedAtWiki
     , revokeAdminToTrustedAtWiki
+    , roleForAccount
     , seedAdminContributorAtWiki
     , seedContributorAtWiki
     , seedTrustedContributorAtWiki

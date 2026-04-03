@@ -66,8 +66,8 @@ endToEndTests =
                 , client.checkView 300
                     (\root ->
                         root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-login-success" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "Signed in as platform host admin." ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-wikis-list" ]
+                            |> Test.Html.Query.has []
                     )
                 , client.update 100 (UrlChanged adminWikisNewUrl)
                 , client.checkView 200
@@ -76,7 +76,7 @@ endToEndTests =
                             |> Test.Html.Query.find [ Test.Html.Selector.id "host-admin-create-wiki-page" ]
                             |> Test.Html.Query.has []
                     )
-                , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-slug") "story29wiki"
+                , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-slug") "Story29Wiki"
                 , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-name") "Story 29 Wiki"
                 , client.click 100 (Effect.Browser.Dom.id "host-admin-create-wiki-submit")
                 , client.update 100 (UrlChanged adminWikisUrl)
@@ -85,7 +85,7 @@ endToEndTests =
                         root
                             |> Test.Html.Query.find
                                 [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-context" "host-admin-wiki-row")
-                                , Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "story29wiki")
+                                , Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "Story29Wiki")
                                 ]
                             |> Test.Html.Query.has [ Test.Html.Selector.text "Story 29 Wiki" ]
                     )

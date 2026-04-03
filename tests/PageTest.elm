@@ -58,4 +58,32 @@ suite =
                         |> Page.publishedMarkdownForLinks
                         |> Expect.equal s
             ]
+        , Test.describe "titleHintFromMarkdown"
+            [ Test.test "reads first ATX H1" <|
+                \() ->
+                    Page.titleHintFromMarkdown "# Guides\n\nBody"
+                        |> Expect.equal (Just "Guides")
+            , Test.test "strips optional closing hashes" <|
+                \() ->
+                    Page.titleHintFromMarkdown "# Guides #\n"
+                        |> Expect.equal (Just "Guides")
+            , Test.test "Nothing when no leading H1" <|
+                \() ->
+                    Page.titleHintFromMarkdown "Intro\n\n# Later"
+                        |> Expect.equal Nothing
+            , Test.test "Nothing for empty H1" <|
+                \() ->
+                    Page.titleHintFromMarkdown "# \n"
+                        |> Expect.equal Nothing
+            ]
+        , Test.describe "publishedPageTitle"
+            [ Test.test "uses H1 over slug" <|
+                \() ->
+                    Page.publishedPageTitle "guides" (Page.frontendDetails "# How to\n" [])
+                        |> Expect.equal "How to"
+            , Test.test "falls back to slug" <|
+                \() ->
+                    Page.publishedPageTitle "guides" (Page.frontendDetails "No heading\n" [])
+                        |> Expect.equal "guides"
+            ]
         ]

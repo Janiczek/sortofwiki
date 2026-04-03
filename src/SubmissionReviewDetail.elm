@@ -82,8 +82,8 @@ reviewDetailFromWikiAndSubmission wiki sub =
         Submission.EditPage body ->
             EditPageDiff
                 { pageSlug = body.pageSlug
-                , beforeMarkdown = publishedMarkdownForSlug wiki body.pageSlug
-                , afterMarkdown = body.markdown
+                , beforeMarkdown = body.baseMarkdown
+                , afterMarkdown = body.proposedMarkdown
                 }
 
         Submission.DeletePage body ->

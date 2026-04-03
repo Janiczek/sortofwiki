@@ -57,7 +57,7 @@ endToEndTests =
                             |> Test.Html.Query.has [ Test.Html.Selector.text "Registration complete" ]
                     )
                 , client.update 100 (UrlChanged submitNewUrl)
-                , client.input 100 (Effect.Browser.Dom.id "wiki-submit-new-slug") "story12page"
+                , client.input 100 (Effect.Browser.Dom.id "wiki-submit-new-slug") "Story12Page"
                 , client.input 100 (Effect.Browser.Dom.id "wiki-submit-new-markdown") "# Story 12"
                 , client.click 100 (Effect.Browser.Dom.id "wiki-submit-new-submit")
                 , client.checkView 300
@@ -77,7 +77,7 @@ endToEndTests =
                     (\root ->
                         root
                             |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submission-detail-kind-summary" ]
-                            |> Test.Html.Query.has [ Test.Html.Selector.text "New page: story12page" ]
+                            |> Test.Html.Query.has [ Test.Html.Selector.text "New page: Story12Page" ]
                     )
                 ]
             )

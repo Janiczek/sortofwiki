@@ -45,6 +45,7 @@ suite =
             [ Test.test "verifier matches same password" <|
                 \() ->
                     let
+                        v : ContributorAccount.Verifier
                         v =
                             ContributorAccount.verifierFromPassword "secret123"
                     in
@@ -53,6 +54,7 @@ suite =
             , Test.test "verifier rejects different password" <|
                 \() ->
                     let
+                        v : ContributorAccount.Verifier
                         v =
                             ContributorAccount.verifierFromPassword "secret123"
                     in

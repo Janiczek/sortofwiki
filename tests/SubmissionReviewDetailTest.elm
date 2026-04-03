@@ -61,7 +61,9 @@ suite =
                             , kind =
                                 Submission.EditPage
                                     { pageSlug = "home"
-                                    , markdown = "## Proposed\n\nReplacement."
+                                    , baseMarkdown = "## Published\n\nOriginal."
+                                    , baseRevision = 1
+                                    , proposedMarkdown = "## Proposed\n\nReplacement."
                                     }
                             , status = Submission.Pending
                             , reviewerNote = Nothing

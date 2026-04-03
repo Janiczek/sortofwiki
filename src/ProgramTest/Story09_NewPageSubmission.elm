@@ -26,12 +26,12 @@ submitNewUrl =
     }
 
 
-demoPagesUrl : Url
-demoPagesUrl =
+demoWikiHomeUrl : Url
+demoWikiHomeUrl =
     { protocol = Http
     , host = "localhost"
     , port_ = Just 8000
-    , path = "/w/demo/pages"
+    , path = "/w/demo"
     , query = Nothing
     , fragment = Nothing
     }
@@ -42,7 +42,7 @@ pendingPageUrl =
     { protocol = Http
     , host = "localhost"
     , port_ = Just 8000
-    , path = "/w/demo/p/story09newpage"
+    , path = "/w/demo/p/Story09NewPage"
     , query = Nothing
     , fragment = Nothing
     }
@@ -77,7 +77,7 @@ endToEndTests =
                             |> Test.Html.Query.has
                                 [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-wiki-slug" "demo") ]
                     )
-                , client.input 100 (Effect.Browser.Dom.id "wiki-submit-new-slug") "story09newpage"
+                , client.input 100 (Effect.Browser.Dom.id "wiki-submit-new-slug") "Story09NewPage"
                 , client.input 100 (Effect.Browser.Dom.id "wiki-submit-new-markdown") "# Story 09 page"
                 , client.click 100 (Effect.Browser.Dom.id "wiki-submit-new-submit")
                 , client.checkView 300
@@ -86,20 +86,20 @@ endToEndTests =
                             |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-submit-new-success" ]
                             |> Test.Html.Query.has [ Test.Html.Selector.text "sub_1" ]
                     )
-                , client.update 100 (UrlChanged demoPagesUrl)
+                , client.update 100 (UrlChanged demoWikiHomeUrl)
                 , client.checkView 200
                     (\root ->
                         root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "pages-list-page-list" ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.id "wiki-home-page-slugs" ]
                             |> Test.Html.Query.findAll
-                                [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-page-slug" "story09newpage") ]
+                                [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-page-slug" "Story09NewPage") ]
                             |> Test.Html.Query.count (Expect.equal 0)
                     )
                 , client.update 100 (UrlChanged pendingPageUrl)
                 , client.checkView 200
                     (\root ->
                         root
-                            |> Test.Html.Query.find [ Test.Html.Selector.id "not-found-page" ]
+                            |> Test.Html.Query.find [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-context" "layout-header") ]
                             |> Test.Html.Query.has [ Test.Html.Selector.text "Page not found" ]
                     )
                 ]

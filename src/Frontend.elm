@@ -17,7 +17,6 @@ import Effect.Command as Command exposing (Command, FrontendOnly)
 import Effect.Lamdera
 import Effect.Subscription as Subscription exposing (Subscription)
 import HostAdmin
-import HostedWikiSlugPolicy
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events as Events
@@ -49,6 +48,17 @@ type alias Model =
 
 type alias Msg =
     FrontendMsg
+
+
+type AppHeaderSecondary
+    = AppHeaderSecondaryPlain String
+    | AppHeaderSecondaryWikiLink String
+
+
+type alias AppHeaderTitle =
+    { primary : String
+    , secondary : Maybe AppHeaderSecondary
+    }
 
 
 storeConfig : Store.Config ToBackend
@@ -105,7 +115,6 @@ emptyHostAdminWikiDetailDraft =
     , load = NotAsked
     , nameDraft = ""
     , summaryDraft = ""
-    , slugPolicyDraft = HostedWikiSlugPolicy.StrictSlugs
     , saveInFlight = False
     , lastSaveResult = Nothing
     , lifecycleInFlight = False
@@ -122,7 +131,6 @@ hostAdminWikiDetailDraftLoading slug =
     , load = Loading
     , nameDraft = ""
     , summaryDraft = ""
-    , slugPolicyDraft = HostedWikiSlugPolicy.StrictSlugs
     , saveInFlight = False
     , lastSaveResult = Nothing
     , lifecycleInFlight = False
@@ -147,6 +155,7 @@ emptyPageEditSubmitDraft =
     { markdownBody = ""
     , inFlight = False
     , lastResult = Nothing
+    , lastResubmitResult = Nothing
     }
 
 
@@ -262,9 +271,6 @@ runRouteStoreActions ( model, cmd ) =
                 Route.WikiHome _ ->
                     Command.none
 
-                Route.WikiPages _ ->
-                    Command.none
-
                 Route.WikiPage _ _ ->
                     Command.none
 
@@ -350,6 +356,71 @@ wikiSessionWikiAdminOnWiki wikiSlug model =
            )
 
 
+{-| True after a successful host-admin wiki list load (session cookie is present).
+-}
+hostAdminAuthenticated : Model -> Bool
+hostAdminAuthenticated model =
+    case model.hostAdminWikis of
+        RemoteData.Success (Ok _) ->
+            True
+
+        _ ->
+            False
+
+
+hostAdminSectionNavVisible : Model -> Bool
+hostAdminSectionNavVisible model =
+    case model.route of
+        Route.HostAdminWikis ->
+            True
+
+        Route.HostAdminWikiNew ->
+            True
+
+        Route.HostAdminWikiDetail _ ->
+            True
+
+        Route.HostAdmin _ ->
+            case model.hostAdminLoginDraft.lastResult of
+                Just (Ok ()) ->
+                    True
+
+                _ ->
+                    False
+
+        _ ->
+            False
+
+
+globalSideNavItems : Model -> List (Html Msg)
+globalSideNavItems model =
+    let
+        adminAppHref : String
+        adminAppHref =
+            if hostAdminAuthenticated model then
+                Wiki.hostAdminWikisUrlPath
+
+            else
+                "/admin"
+
+        adminSectionItems : List (Html Msg)
+        adminSectionItems =
+            if hostAdminSectionNavVisible model then
+                [ Html.li [] [ Html.a [ Attr.href Wiki.hostAdminWikisUrlPath ] [ Html.text "Hosted wikis" ] ]
+                , Html.li [] [ Html.a [ Attr.href Wiki.hostAdminNewWikiUrlPath ] [ Html.text "Create hosted wiki" ] ]
+                ]
+
+            else
+                []
+    in
+    List.concat
+        [ [ Html.li [] [ Html.a [ Attr.href "/" ] [ Html.text "All wikis" ] ]
+          , Html.li [] [ Html.a [ Attr.href adminAppHref ] [ Html.text "Admin (app)" ] ]
+          ]
+        , adminSectionItems
+        ]
+
+
 wikiNavReviewLis : Wiki.Slug -> Model -> List (Html Msg)
 wikiNavReviewLis wikiSlug model =
     if wikiSessionTrustedOnWiki wikiSlug model then
@@ -364,8 +435,26 @@ wikiNavReviewLis wikiSlug model =
 wikiNavWikiAdminLis : Wiki.Slug -> Model -> List (Html Msg)
 wikiNavWikiAdminLis wikiSlug model =
     if wikiSessionWikiAdminOnWiki wikiSlug model then
+        let
+            wikiLabel : String
+            wikiLabel =
+                case Store.get wikiSlug model.store.wikiCatalog of
+                    RemoteData.Success summary ->
+                        summary.name
+
+                    RemoteData.Failure _ ->
+                        wikiSlug
+
+                    RemoteData.Loading ->
+                        wikiSlug
+
+                    RemoteData.NotAsked ->
+                        wikiSlug
+        in
         [ Html.li []
-            [ Html.a [ Attr.href (Wiki.adminUsersUrlPath wikiSlug) ] [ Html.text "Admin users" ] ]
+            [ Html.a [ Attr.href (Wiki.adminUsersUrlPath wikiSlug) ]
+                [ Html.text ("Admin (wiki " ++ wikiLabel ++ ")") ]
+            ]
         , Html.li []
             [ Html.a [ Attr.href (Wiki.adminAuditUrlPath wikiSlug) ] [ Html.text "Audit log" ] ]
         ]
@@ -602,9 +691,6 @@ update msg model =
                                 Route.WikiHome _ ->
                                     RemoteData.NotAsked
 
-                                Route.WikiPages _ ->
-                                    RemoteData.NotAsked
-
                                 Route.WikiPage _ _ ->
                                     RemoteData.NotAsked
 
@@ -692,9 +778,6 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiHome _ ->
-                    ( model, Command.none )
-
-                Route.WikiPages _ ->
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
@@ -800,9 +883,6 @@ update msg model =
                 Route.WikiHome _ ->
                     ( model, Command.none )
 
-                Route.WikiPages _ ->
-                    ( model, Command.none )
-
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
@@ -906,9 +986,6 @@ update msg model =
                 Route.WikiHome _ ->
                     ( model, Command.none )
 
-                Route.WikiPages _ ->
-                    ( model, Command.none )
-
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
@@ -1002,9 +1079,6 @@ update msg model =
                 Route.WikiHome _ ->
                     ( model, Command.none )
 
-                Route.WikiPages _ ->
-                    ( model, Command.none )
-
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
@@ -1029,6 +1103,7 @@ update msg model =
                                 | pageEditSubmitDraft =
                                     { d
                                         | lastResult = Just (Err (Submission.EditValidation ve))
+                                        , lastResubmitResult = Nothing
                                         , inFlight = False
                                     }
                               }
@@ -1041,6 +1116,7 @@ update msg model =
                                     { d
                                         | inFlight = True
                                         , lastResult = Nothing
+                                        , lastResubmitResult = Nothing
                                     }
                               }
                             , Effect.Lamdera.sendToBackend
@@ -1096,9 +1172,6 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiHome _ ->
-                    ( model, Command.none )
-
-                Route.WikiPages _ ->
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
@@ -1176,6 +1249,51 @@ update msg model =
                 Route.NotFound _ ->
                     ( model, Command.none )
 
+        SubmissionConflictResubmitMarkdownChanged value ->
+            let
+                d : PageEditSubmitDraft
+                d =
+                    model.pageEditSubmitDraft
+            in
+            ( { model | pageEditSubmitDraft = { d | markdownBody = value } }
+            , Command.none
+            )
+
+        SubmissionConflictResubmitSubmitted ->
+            case model.route of
+                Route.WikiSubmissionDetail wikiSlug submissionId ->
+                    let
+                        d : PageEditSubmitDraft
+                        d =
+                            model.pageEditSubmitDraft
+                    in
+                    case Submission.validateEditMarkdown d.markdownBody of
+                        Err ve ->
+                            ( { model
+                                | pageEditSubmitDraft =
+                                    { d
+                                        | lastResubmitResult = Just (Err (Submission.ResubmitEditValidation ve))
+                                        , inFlight = False
+                                    }
+                              }
+                            , Command.none
+                            )
+
+                        Ok _ ->
+                            ( { model
+                                | pageEditSubmitDraft =
+                                    { d
+                                        | inFlight = True
+                                        , lastResubmitResult = Nothing
+                                    }
+                              }
+                            , Effect.Lamdera.sendToBackend
+                                (ResubmitPageEdit wikiSlug submissionId d.markdownBody)
+                            )
+
+                _ ->
+                    ( model, Command.none )
+
         ReviewApproveSubmitted ->
             case model.route of
                 Route.WikiReviewDetail wikiSlug submissionId ->
@@ -1192,9 +1310,6 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiHome _ ->
-                    ( model, Command.none )
-
-                Route.WikiPages _ ->
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
@@ -1272,9 +1387,6 @@ update msg model =
                 Route.WikiHome _ ->
                     ( model, Command.none )
 
-                Route.WikiPages _ ->
-                    ( model, Command.none )
-
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
@@ -1350,9 +1462,6 @@ update msg model =
                 Route.WikiHome _ ->
                     ( model, Command.none )
 
-                Route.WikiPages _ ->
-                    ( model, Command.none )
-
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
@@ -1409,9 +1518,6 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiHome _ ->
-                    ( model, Command.none )
-
-                Route.WikiPages _ ->
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
@@ -1472,9 +1578,6 @@ update msg model =
                 Route.WikiHome _ ->
                     ( model, Command.none )
 
-                Route.WikiPages _ ->
-                    ( model, Command.none )
-
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
@@ -1533,9 +1636,6 @@ update msg model =
                 Route.WikiHome _ ->
                     ( model, Command.none )
 
-                Route.WikiPages _ ->
-                    ( model, Command.none )
-
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
@@ -1592,9 +1692,6 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiHome _ ->
-                    ( model, Command.none )
-
-                Route.WikiPages _ ->
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
@@ -1699,9 +1796,6 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiHome _ ->
-                    ( model, Command.none )
-
-                Route.WikiPages _ ->
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
@@ -1828,9 +1922,6 @@ update msg model =
                 Route.WikiHome _ ->
                     ( model, Command.none )
 
-                Route.WikiPages _ ->
-                    ( model, Command.none )
-
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
@@ -1887,21 +1978,6 @@ update msg model =
             , Command.none
             )
 
-        HostAdminWikiDetailSlugPolicyFormChanged raw ->
-            case HostedWikiSlugPolicy.fromFormValue raw of
-                Nothing ->
-                    ( model, Command.none )
-
-                Just policy ->
-                    let
-                        d : HostAdminWikiDetailDraft
-                        d =
-                            model.hostAdminWikiDetailDraft
-                    in
-                    ( { model | hostAdminWikiDetailDraft = { d | slugPolicyDraft = policy } }
-                    , Command.none
-                    )
-
         HostAdminWikiDetailSaveClicked ->
             case model.route of
                 Route.HostAdminWikiDetail _ ->
@@ -1948,7 +2024,7 @@ update msg model =
                                                 }
                                           }
                                         , Effect.Lamdera.sendToBackend
-                                            (UpdateHostedWikiMetadata d.wikiSlug name summaryText d.slugPolicyDraft)
+                                            (UpdateHostedWikiMetadata d.wikiSlug name summaryText)
                                         )
 
                 Route.WikiList ->
@@ -1964,9 +2040,6 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiHome _ ->
-                    ( model, Command.none )
-
-                Route.WikiPages _ ->
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
@@ -2137,9 +2210,6 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiHome _ ->
-                    ( model, Command.none )
-
-                Route.WikiPages _ ->
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
@@ -2339,7 +2409,7 @@ updateFromBackend msg model =
             ( { model | store = nextStore }, Command.none )
                 |> runRouteStoreActions
 
-        PromoteContributorToTrustedResponse wikiSlug _ result ->
+        PromoteContributorToTrustedResponse wikiSlug result ->
             case result of
                 Ok () ->
                     let
@@ -2365,7 +2435,7 @@ updateFromBackend msg model =
                     , Command.none
                     )
 
-        DemoteTrustedToContributorResponse wikiSlug _ result ->
+        DemoteTrustedToContributorResponse wikiSlug result ->
             case result of
                 Ok () ->
                     let
@@ -2391,7 +2461,7 @@ updateFromBackend msg model =
                     , Command.none
                     )
 
-        GrantWikiAdminResponse wikiSlug _ result ->
+        GrantWikiAdminResponse wikiSlug result ->
             case result of
                 Ok () ->
                     let
@@ -2417,7 +2487,7 @@ updateFromBackend msg model =
                     , Command.none
                     )
 
-        RevokeWikiAdminResponse wikiSlug _ result ->
+        RevokeWikiAdminResponse wikiSlug result ->
             case result of
                 Ok () ->
                     let
@@ -2795,8 +2865,88 @@ updateFromBackend msg model =
                         | submissionDetails =
                             Dict.insert key (RemoteData.succeed result) store.submissionDetails
                     }
+
+                d : PageEditSubmitDraft
+                d =
+                    model.pageEditSubmitDraft
+
+                nextPageEditSubmitDraft : PageEditSubmitDraft
+                nextPageEditSubmitDraft =
+                    case result of
+                        Ok detail ->
+                            case detail.conflictContext of
+                                Just ctx ->
+                                    if detail.status == Submission.NeedsRevision then
+                                        { d
+                                            | markdownBody = ctx.proposedMarkdown
+                                            , inFlight = False
+                                        }
+
+                                    else
+                                        d
+
+                                Nothing ->
+                                    d
+
+                        Err _ ->
+                            d
             in
-            ( { model | store = nextStore }, Command.none )
+            ( { model | store = nextStore, pageEditSubmitDraft = nextPageEditSubmitDraft }, Command.none )
+                |> runRouteStoreActions
+
+        ResubmitPageEditResponse wikiSlug submissionId result ->
+            let
+                d : PageEditSubmitDraft
+                d =
+                    model.pageEditSubmitDraft
+
+                nextDraft : PageEditSubmitDraft
+                nextDraft =
+                    if d.inFlight then
+                        case result of
+                            Ok () ->
+                                { d
+                                    | inFlight = False
+                                    , lastResubmitResult = Just (Ok (Submission.EditSubmittedForReview (Submission.idFromKey submissionId)))
+                                }
+
+                            Err err ->
+                                { d
+                                    | inFlight = False
+                                    , lastResubmitResult = Just (Err err)
+                                }
+
+                    else
+                        d
+
+                nextStore : Store
+                nextStore =
+                    case result of
+                        Ok () ->
+                            let
+                                store : Store
+                                store =
+                                    model.store
+                            in
+                            { store
+                                | submissionDetails =
+                                    Dict.insert
+                                        ( wikiSlug, submissionId )
+                                        RemoteData.Loading
+                                        store.submissionDetails
+                            }
+
+                        Err _ ->
+                            model.store
+            in
+            ( { model | pageEditSubmitDraft = nextDraft, store = nextStore }
+            , case result of
+                Ok () ->
+                    Effect.Lamdera.sendToBackend (RequestSubmissionDetails wikiSlug submissionId)
+
+                Err _ ->
+                    Command.none
+            )
                 |> runRouteStoreActions
 
         ReviewSubmissionDetailResponse wikiSlug submissionId result ->
@@ -2951,19 +3101,14 @@ updateFromBackend msg model =
                 hostAfterLoginCmd =
                     case ( model.route, result ) of
                         ( Route.HostAdmin maybeRedirect, Ok () ) ->
-                            case maybeRedirect of
-                                Just _ ->
-                                    let
-                                        dest : String
-                                        dest =
-                                            maybeRedirect
-                                                |> Maybe.andThen SecureRedirect.safeHostAdminReturnPath
-                                                |> Maybe.withDefault Wiki.hostAdminWikisUrlPath
-                                    in
-                                    Effect.Browser.Navigation.pushUrl model.key dest
-
-                                Nothing ->
-                                    Command.none
+                            let
+                                dest : String
+                                dest =
+                                    maybeRedirect
+                                        |> Maybe.andThen SecureRedirect.safeHostAdminReturnPath
+                                        |> Maybe.withDefault Wiki.hostAdminWikisUrlPath
+                            in
+                            Effect.Browser.Navigation.pushUrl model.key dest
 
                         _ ->
                             Command.none
@@ -3051,7 +3196,6 @@ updateFromBackend msg model =
                                     | load = RemoteData.Success result
                                     , nameDraft = entry.name
                                     , summaryDraft = entry.summary
-                                    , slugPolicyDraft = entry.slugPolicy
                                     , deleteConfirmDraft = ""
                                     , deleteInFlight = False
                                     , lastDeleteResult = Nothing
@@ -3099,7 +3243,6 @@ updateFromBackend msg model =
                                     , load = RemoteData.Success (Ok entry)
                                     , nameDraft = entry.name
                                     , summaryDraft = entry.summary
-                                    , slugPolicyDraft = entry.slugPolicy
                                 }
 
                             store0 : Store
@@ -3146,7 +3289,6 @@ updateFromBackend msg model =
                                     , load = RemoteData.Success (Ok entry)
                                     , nameDraft = entry.name
                                     , summaryDraft = entry.summary
-                                    , slugPolicyDraft = entry.slugPolicy
                                 }
 
                             store0 : Store
@@ -3193,7 +3335,6 @@ updateFromBackend msg model =
                                     , load = RemoteData.Success (Ok entry)
                                     , nameDraft = entry.name
                                     , summaryDraft = entry.summary
-                                    , slugPolicyDraft = entry.slugPolicy
                                 }
 
                             store0 : Store
@@ -3280,24 +3421,14 @@ viewWikiList wikis =
     Html.div
         [ Attr.id "catalog-page"
         ]
-        [ Html.h1 [] [ Html.text "Hosted wikis" ]
-        , Html.table
-            [ TW.cls "data-table"
+        [ Html.div
+            [ TW.cls "grid w-full max-w-[72rem] grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
             , Attr.id "wiki-catalog"
             ]
-            [ Html.thead []
-                [ Html.tr []
-                    [ Html.th [] [ Html.text "Wiki" ]
-                    , Html.th [] [ Html.text "Slug" ]
-                    , Html.th [] [ Html.text "Summary" ]
-                    ]
-                ]
-            , Html.tbody []
-                (wikis
-                    |> catalogRows
-                    |> List.map viewWikiRow
-                )
-            ]
+            (wikis
+                |> catalogRows
+                |> List.map viewWikiRow
+            )
         ]
 
 
@@ -3330,16 +3461,27 @@ viewWikiListLoading =
 
 viewWikiRow : Wiki.CatalogEntry -> Html Msg
 viewWikiRow entry =
-    Html.tr
-        [ Attr.attribute "data-wiki-slug" entry.slug
+    Html.article
+        [ TW.cls "rounded border border-[var(--border)] bg-[var(--chrome-bg)] p-3 font-serif"
+        , Attr.attribute "data-wiki-slug" entry.slug
         ]
-        [ Html.td []
-            [ Html.a
-                [ Attr.href (Wiki.catalogUrlPath entry) ]
-                [ Html.text entry.name ]
+        [ Html.h3
+            [ TW.cls "m-0 text-[1.1rem] font-semibold"
             ]
-        , Html.td [] [ Html.text entry.slug ]
-        , Html.td []
+            [ Html.a
+                [ Attr.href (Wiki.catalogUrlPath entry)
+                , TW.cls "underline decoration-dotted underline-offset-[0.2em]"
+                ]
+                [ Html.text entry.name ]
+            , Html.text " "
+            , Html.em
+                [ TW.cls "text-[0.9rem] font-normal opacity-80"
+                ]
+                [ Html.text ("/w/" ++ entry.slug) ]
+            ]
+        , Html.p
+            [ TW.cls "m-0 mt-2 min-h-[1.25rem]"
+            ]
             [ if String.isEmpty entry.summary then
                 Html.text ""
 
@@ -3381,7 +3523,7 @@ viewWikiLoginLoading =
 viewWikiPublishedSlugTable : String -> Wiki.Slug -> List Page.Slug -> Html Msg
 viewWikiPublishedSlugTable tbodyId wikiSlug pageSlugs =
     Html.table
-        [ TW.cls "data-table" ]
+        [ TW.cls "w-full max-w-[72rem] border-collapse text-[1rem] border border-[var(--border)] [&_th]:px-[0.35rem] [&_th]:py-[0.15rem] [&_th]:border [&_th]:border-[var(--border)] [&_th]:text-left [&_th]:align-top [&_td]:px-[0.35rem] [&_td]:py-[0.15rem] [&_td]:border [&_td]:border-[var(--border)] [&_td]:text-left [&_td]:align-top [&_thead_th]:bg-[var(--chrome-bg)] [&_thead_th]:font-semibold [&_thead_th]:border-b [&_thead_th]:border-[var(--border)] [&_tbody_tr:nth-child(even)]:bg-[var(--table-stripe)]" ]
         [ Html.thead []
             [ Html.tr []
                 [ Html.th [] [ Html.text "Page" ]
@@ -3413,8 +3555,7 @@ viewWikiHome wikiSlug summary details =
         [ Attr.id "wiki-home-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
         ]
-        [ Html.h1 [] [ Html.text summary.name ]
-        , if String.isEmpty summary.summary then
+        [ if String.isEmpty summary.summary then
             Html.text ""
 
           else
@@ -3424,24 +3565,12 @@ viewWikiHome wikiSlug summary details =
         ]
 
 
-viewPagesList : Wiki.Slug -> Wiki.CatalogEntry -> Wiki.FrontendDetails -> Html Msg
-viewPagesList wikiSlug summary details =
-    Html.div
-        [ Attr.id "pages-list-page"
-        , Attr.attribute "data-wiki-slug" wikiSlug
-        ]
-        [ Html.h1 [] [ Html.text (summary.name ++ " — Pages") ]
-        , viewWikiPublishedSlugTable "pages-list-page-list" wikiSlug details.pageSlugs
-        ]
-
-
 viewNotFound : Html Msg
 viewNotFound =
     Html.div
         [ Attr.id "not-found-page"
         ]
-        [ Html.h1 [] [ Html.text "Page not found" ]
-        , Html.p [] [ Html.text "This URL is not part of SortOfWiki yet." ]
+        [ Html.p [] [ Html.text "This URL is not part of SortOfWiki yet." ]
         ]
 
 
@@ -3491,7 +3620,7 @@ viewThemeToggle model =
     Html.button
         [ Attr.type_ "button"
         , Attr.id "color-theme-toggle"
-        , TW.cls "theme-toggle-btn"
+        , TW.cls "shrink-0 inline-flex items-center justify-center w-[2.35rem] h-[2.35rem] p-0 m-0 border-0 rounded-none bg-transparent text-[var(--fg)] cursor-pointer hover:bg-[var(--chrome-bg)]"
         , Events.onClick ColorThemeToggled
         , case model.colorTheme of
             ColorTheme.Light ->
@@ -3509,30 +3638,13 @@ viewThemeToggle model =
         ]
 
 
-viewCatalogSideNav : Html Msg
-viewCatalogSideNav =
+viewAppChromeSideNav : Model -> Html Msg
+viewAppChromeSideNav model =
     Html.nav
-        [ TW.cls "side-nav"
-        , Attr.attribute "aria-label" "Catalog"
+        [ TW.cls "w-full"
+        , Attr.attribute "aria-label" "Site"
         ]
-        [ Html.ul [ TW.cls "side-nav-list" ]
-            [ Html.li [] [ Html.a [ Attr.href "/admin" ] [ Html.text "Host admin" ] ]
-            , Html.li [] [ Html.a [ Attr.href Wiki.hostAdminWikisUrlPath ] [ Html.text "Hosted wikis (admin)" ] ]
-            ]
-        ]
-
-
-viewHostAdminSideNav : Html Msg
-viewHostAdminSideNav =
-    Html.nav
-        [ TW.cls "side-nav"
-        , Attr.attribute "aria-label" "Host admin"
-        ]
-        [ Html.ul [ TW.cls "side-nav-list" ]
-            [ Html.li [] [ Html.a [ Attr.href "/" ] [ Html.text "Public catalog" ] ]
-            , Html.li [] [ Html.a [ Attr.href Wiki.hostAdminWikisUrlPath ] [ Html.text "Hosted wikis" ] ]
-            , Html.li [] [ Html.a [ Attr.href "/admin" ] [ Html.text "Host admin sign-in" ] ]
-            ]
+        [ Html.ul [ TW.cls "list-none m-0 p-0 flex flex-col gap-[0.35rem] items-start" ] (globalSideNavItems model)
         ]
 
 
@@ -3573,14 +3685,13 @@ viewWikiSideNav wikiSlug model =
                     ]
     in
     Html.nav
-        [ TW.cls "side-nav"
+        [ TW.cls "w-full"
         , Attr.attribute "aria-label" "Wiki"
         ]
-        [ Html.ul [ TW.cls "side-nav-list" ]
+        [ Html.ul [ TW.cls "list-none m-0 p-0 flex flex-col gap-[0.35rem] items-start" ]
             (List.concat
-                [ [ Html.li [] [ Html.a [ Attr.href "/" ] [ Html.text "All wikis" ] ] ]
+                [ globalSideNavItems model
                 , [ Html.li [] [ Html.a [ Attr.href wikiHomePath ] [ Html.text "Wiki home" ] ] ]
-                , [ Html.li [] [ Html.a [ Attr.href (Wiki.pageIndexUrlPath wikiSlug) ] [ Html.text "Pages" ] ] ]
                 , authItems
                 , wikiNavReviewLis wikiSlug model
                 , wikiNavWikiAdminLis wikiSlug model
@@ -3593,27 +3704,24 @@ viewRouteSideNav : Model -> Html Msg
 viewRouteSideNav model =
     case model.route of
         Route.WikiList ->
-            viewCatalogSideNav
+            viewAppChromeSideNav model
 
         Route.NotFound _ ->
-            viewCatalogSideNav
+            viewAppChromeSideNav model
 
         Route.HostAdmin _ ->
-            viewHostAdminSideNav
+            viewAppChromeSideNav model
 
         Route.HostAdminWikis ->
-            viewHostAdminSideNav
+            viewAppChromeSideNav model
 
         Route.HostAdminWikiNew ->
-            viewHostAdminSideNav
+            viewAppChromeSideNav model
 
         Route.HostAdminWikiDetail _ ->
-            viewHostAdminSideNav
+            viewAppChromeSideNav model
 
         Route.WikiHome slug ->
-            viewWikiSideNav slug model
-
-        Route.WikiPages slug ->
             viewWikiSideNav slug model
 
         Route.WikiPage slug _ ->
@@ -3650,11 +3758,217 @@ viewRouteSideNav model =
             viewWikiSideNav slug model
 
 
+wikiScopeHeaderTitle : Store -> Wiki.Slug -> (Wiki.CatalogEntry -> AppHeaderTitle) -> AppHeaderTitle
+wikiScopeHeaderTitle store slug whenLoaded =
+    case store.wikiCatalog of
+        RemoteData.Success dict ->
+            case Dict.get slug dict of
+                Just summary ->
+                    whenLoaded summary
+
+                Nothing ->
+                    { primary = "SortOfWiki"
+                    , secondary = Just (AppHeaderSecondaryPlain "Page not found")
+                    }
+
+        RemoteData.Failure _ ->
+            { primary = "SortOfWiki"
+            , secondary = Just (AppHeaderSecondaryPlain "Page not found")
+            }
+
+        RemoteData.Loading ->
+            { primary = "SortOfWiki"
+            , secondary = Just (AppHeaderSecondaryPlain ("Loading wiki: " ++ slug))
+            }
+
+        RemoteData.NotAsked ->
+            { primary = "SortOfWiki"
+            , secondary = Just (AppHeaderSecondaryPlain ("Loading wiki: " ++ slug))
+            }
+
+
+appHeaderTitle : Model -> AppHeaderTitle
+appHeaderTitle { store, route } =
+    case route of
+        Route.WikiList ->
+            { primary = "SortOfWiki"
+            , secondary = Nothing
+            }
+
+        Route.HostAdmin _ ->
+            { primary = "SortOfWiki"
+            , secondary = Just (AppHeaderSecondaryPlain "Admin login")
+            }
+
+        Route.HostAdminWikis ->
+            { primary = "SortOfWiki"
+            , secondary = Just (AppHeaderSecondaryPlain "Host wikis")
+            }
+
+        Route.HostAdminWikiNew ->
+            { primary = "SortOfWiki"
+            , secondary = Just (AppHeaderSecondaryPlain "Create hosted wiki")
+            }
+
+        Route.HostAdminWikiDetail _ ->
+            { primary = "SortOfWiki"
+            , secondary = Just (AppHeaderSecondaryPlain "Wiki settings")
+            }
+
+        Route.WikiHome slug ->
+            wikiScopeHeaderTitle store slug <|
+                \summary ->
+                    { primary = summary.name
+                    , secondary = Nothing
+                    }
+
+        Route.WikiPage wikiSlug pageSlug ->
+            wikiScopeHeaderTitle store wikiSlug <|
+                \summary ->
+                    case Store.get_ ( wikiSlug, pageSlug ) store.publishedPages of
+                        RemoteData.Success _ ->
+                            { primary = summary.name
+                            , secondary =
+                                Just
+                                    (AppHeaderSecondaryWikiLink
+                                        pageSlug
+                                    )
+                            }
+
+                        RemoteData.Failure _ ->
+                            { primary = summary.name
+                            , secondary = Just (AppHeaderSecondaryPlain "Page not found")
+                            }
+
+                        RemoteData.Loading ->
+                            { primary = summary.name
+                            , secondary = Just (AppHeaderSecondaryPlain "Loading…")
+                            }
+
+                        RemoteData.NotAsked ->
+                            { primary = summary.name
+                            , secondary = Just (AppHeaderSecondaryPlain "Loading…")
+                            }
+
+        Route.WikiRegister slug ->
+            wikiScopeHeaderTitle store slug <|
+                \summary ->
+                    { primary = summary.name
+                    , secondary = Just (AppHeaderSecondaryPlain "Register")
+                    }
+
+        Route.WikiLogin slug _ ->
+            wikiScopeHeaderTitle store slug <|
+                \summary ->
+                    { primary = summary.name
+                    , secondary = Just (AppHeaderSecondaryPlain "Log in")
+                    }
+
+        Route.WikiSubmitNew slug ->
+            wikiScopeHeaderTitle store slug <|
+                \summary ->
+                    { primary = summary.name
+                    , secondary = Just (AppHeaderSecondaryPlain "Submit page")
+                    }
+
+        Route.WikiSubmitEdit wikiSlug _ ->
+            wikiScopeHeaderTitle store wikiSlug <|
+                \summary ->
+                    { primary = summary.name
+                    , secondary = Just (AppHeaderSecondaryPlain "Propose edit")
+                    }
+
+        Route.WikiSubmitDelete wikiSlug _ ->
+            wikiScopeHeaderTitle store wikiSlug <|
+                \summary ->
+                    { primary = summary.name
+                    , secondary = Just (AppHeaderSecondaryPlain "Request deletion")
+                    }
+
+        Route.WikiSubmissionDetail slug _ ->
+            wikiScopeHeaderTitle store slug <|
+                \summary ->
+                    { primary = summary.name
+                    , secondary = Just (AppHeaderSecondaryPlain "Submission")
+                    }
+
+        Route.WikiReview slug ->
+            wikiScopeHeaderTitle store slug <|
+                \summary ->
+                    { primary = summary.name
+                    , secondary = Just (AppHeaderSecondaryPlain "Review")
+                    }
+
+        Route.WikiReviewDetail slug _ ->
+            wikiScopeHeaderTitle store slug <|
+                \summary ->
+                    { primary = summary.name
+                    , secondary = Just (AppHeaderSecondaryPlain "Review submission")
+                    }
+
+        Route.WikiAdminUsers slug ->
+            wikiScopeHeaderTitle store slug <|
+                \summary ->
+                    { primary = summary.name
+                    , secondary = Just (AppHeaderSecondaryPlain "Users")
+                    }
+
+        Route.WikiAdminAudit slug ->
+            wikiScopeHeaderTitle store slug <|
+                \summary ->
+                    { primary = summary.name
+                    , secondary = Just (AppHeaderSecondaryPlain "Audit log")
+                    }
+
+        Route.NotFound _ ->
+            { primary = "SortOfWiki"
+            , secondary = Just (AppHeaderSecondaryPlain "Page not found")
+            }
+
+
+viewAppHeaderSecondary : AppHeaderSecondary -> Html Msg
+viewAppHeaderSecondary secondary =
+    case secondary of
+        AppHeaderSecondaryPlain label ->
+            Html.span [ TW.cls "text-[var(--fg-muted)] text-[0.95em] font-normal max-w-full" ]
+                [ Html.em [] [ Html.text label ]
+                ]
+
+        AppHeaderSecondaryWikiLink label ->
+            Html.span [ TW.cls "text-[var(--fg-muted)] text-[0.95em] font-normal max-w-full inline-flex items-baseline flex-wrap gap-x-[0.15rem] gap-y-[0.05rem]" ]
+                [ Html.span [ TW.cls "not-italic text-[var(--fg-muted)] opacity-[0.55] text-[0.82em] font-normal" ] [ Html.text "[[" ]
+                , Html.em [ TW.cls "text-[var(--fg-muted)] font-normal" ] [ Html.text label ]
+                , Html.span [ TW.cls "not-italic text-[var(--fg-muted)] opacity-[0.55] text-[0.82em] font-normal" ] [ Html.text "]]" ]
+                ]
+
+
+viewAppHeaderTitleInner : AppHeaderTitle -> Html Msg
+viewAppHeaderTitleInner t =
+    case t.secondary of
+        Nothing ->
+            Html.span [ TW.cls "font-semibold" ]
+                [ Html.text t.primary ]
+
+        Just sec ->
+            Html.span [ TW.cls "inline-flex items-center flex-wrap gap-x-[0.65rem] gap-y-[0.35rem] max-w-full" ]
+                [ Html.span [ TW.cls "font-semibold" ] [ Html.text t.primary ]
+                , Html.span
+                    [ TW.cls "self-stretch w-0 my-0 border-l-2 border-[var(--border)] min-h-[1.15em]"
+                    , Attr.attribute "aria-hidden" "true"
+                    ]
+                    []
+                , viewAppHeaderSecondary sec
+                ]
+
+
 viewAppHeader : Model -> Html Msg
 viewAppHeader model =
-    Html.header [ TW.cls "layout-header" ]
-        [ Html.h1 [ TW.cls "app-header-title" ]
-            [ Html.text (documentHeading model) ]
+    Html.header
+        [ TW.cls "shrink-0 flex flex-row flex-wrap items-center justify-between gap-y-[0.5rem] gap-x-[0.75rem] -mx-[0.5rem] px-[0.5rem] pt-[0.2rem] pb-[0.5rem] border-b border-dashed border-[var(--border-dash)]"
+        , Attr.attribute "data-context" "layout-header"
+        ]
+        [ Html.h1 [ TW.cls "m-0 text-[1.35rem] font-semibold leading-[1.2] text-[var(--fg)] flex-1 min-w-0 font-serif" ]
+            [ viewAppHeaderTitleInner (appHeaderTitle model) ]
         , viewThemeToggle model
         ]
 
@@ -3685,8 +3999,7 @@ viewHostAdminLogin model =
     in
     Html.div
         [ Attr.id "host-admin-login-page" ]
-        [ Html.h1 [] [ Html.text "Platform host admin" ]
-        , Html.form
+        [ Html.form
             [ Attr.id "host-admin-login-form"
             , Events.onSubmit HostAdminLoginSubmitted
             ]
@@ -3718,8 +4031,7 @@ viewHostAdminWikis : Model -> Html Msg
 viewHostAdminWikis model =
     Html.div
         [ Attr.id "host-admin-wikis-page" ]
-        [ Html.h1 [] [ Html.text "Hosted wikis (host admin)" ]
-        , Html.p []
+        [ Html.p []
             [ Html.a
                 [ Attr.id "host-admin-wikis-create-link"
                 , Attr.href Wiki.hostAdminNewWikiUrlPath
@@ -3745,7 +4057,7 @@ viewHostAdminWikis model =
 
             RemoteData.Success (Ok summaries) ->
                 Html.table
-                    [ TW.cls "data-table" ]
+                    [ TW.cls "w-full max-w-[72rem] border-collapse text-[1rem] border border-[var(--border)] [&_th]:px-[0.35rem] [&_th]:py-[0.15rem] [&_th]:border [&_th]:border-[var(--border)] [&_th]:text-left [&_th]:align-top [&_td]:px-[0.35rem] [&_td]:py-[0.15rem] [&_td]:border [&_td]:border-[var(--border)] [&_td]:text-left [&_td]:align-top [&_thead_th]:bg-[var(--chrome-bg)] [&_thead_th]:font-semibold [&_thead_th]:border-b [&_thead_th]:border-[var(--border)] [&_tbody_tr:nth-child(even)]:bg-[var(--table-stripe)]" ]
                     [ Html.thead []
                         [ Html.tr []
                             [ Html.th [] [ Html.text "Wiki" ]
@@ -3815,8 +4127,7 @@ viewHostAdminCreateWiki : Model -> Html Msg
 viewHostAdminCreateWiki model =
     Html.div
         [ Attr.id "host-admin-create-wiki-page" ]
-        [ Html.h1 [] [ Html.text "Create hosted wiki" ]
-        , case model.hostAdminWikis of
+        [ case model.hostAdminWikis of
             RemoteData.Success (Err HostAdmin.NotHostAuthenticated) ->
                 Html.p
                     [ Attr.id "host-admin-create-wiki-sign-in-needed" ]
@@ -3951,8 +4262,7 @@ viewHostAdminWikiDetail model =
         [ Attr.id "host-admin-wiki-detail-page"
         , Attr.attribute "data-wiki-slug" d.wikiSlug
         ]
-        [ Html.h1 [] [ Html.text "Hosted wiki metadata" ]
-        , Html.p []
+        [ Html.p []
             [ Html.a [ Attr.href Wiki.hostAdminWikisUrlPath ] [ Html.text "Back to wiki list" ] ]
         , case d.load of
             RemoteData.NotAsked ->
@@ -3973,24 +4283,6 @@ viewHostAdminWikiDetail model =
 
             RemoteData.Success (Ok entry) ->
                 let
-                    policySelect : Html Msg
-                    policySelect =
-                        Html.select
-                            [ Attr.id "host-admin-wiki-detail-slug-policy"
-                            , Events.onInput HostAdminWikiDetailSlugPolicyFormChanged
-                            , Attr.disabled (d.saveInFlight || d.lifecycleInFlight || d.deleteInFlight)
-                            ]
-                            (HostedWikiSlugPolicy.all
-                                |> List.map
-                                    (\pol ->
-                                        Html.option
-                                            [ Attr.value (HostedWikiSlugPolicy.formValue pol)
-                                            , Attr.selected (pol == d.slugPolicyDraft)
-                                            ]
-                                            [ Html.text (HostedWikiSlugPolicy.label pol) ]
-                                    )
-                            )
-
                     busy : Bool
                     busy =
                         d.saveInFlight || d.lifecycleInFlight || d.deleteInFlight
@@ -4044,13 +4336,6 @@ viewHostAdminWikiDetail model =
                                 ]
                                 []
                             ]
-                        , Html.div []
-                            [ Html.label [ Attr.for "host-admin-wiki-detail-slug-policy" ]
-                                [ Html.text "Slug policy" ]
-                            , policySelect
-                            ]
-                        , Html.p [ Attr.id "host-admin-wiki-detail-policy-display" ]
-                            [ Html.text (HostedWikiSlugPolicy.label d.slugPolicyDraft) ]
                         , Html.p [ Attr.id "host-admin-wiki-detail-summary-display" ]
                             [ Html.text d.summaryDraft ]
                         , Html.button
@@ -4148,25 +4433,18 @@ documentTitle ({ store } as model) =
                 RemoteData.NotAsked ->
                     "Loading - SortOfWiki"
 
-        Route.WikiPages slug ->
-            case Store.get slug store.wikiCatalog of
-                RemoteData.Success summary ->
-                    "Pages - " ++ summary.name ++ " — SortOfWiki"
-
-                RemoteData.Failure _ ->
-                    "404 — SortOfWiki"
-
-                RemoteData.Loading ->
-                    "Loading - SortOfWiki"
-
-                RemoteData.NotAsked ->
-                    "Loading - SortOfWiki"
-
         Route.WikiPage wikiSlug pageSlug ->
             case Store.get wikiSlug store.wikiCatalog of
                 RemoteData.Success summary ->
-                    -- TODO we need the page name, not just the slug
-                    pageSlug ++ " — " ++ summary.name ++ " — SortOfWiki"
+                    case Store.get_ ( wikiSlug, pageSlug ) store.publishedPages of
+                        RemoteData.Success pageDetails ->
+                            Page.publishedPageTitle pageSlug pageDetails
+                                ++ " — "
+                                ++ summary.name
+                                ++ " — SortOfWiki"
+
+                        _ ->
+                            pageSlug ++ " — " ++ summary.name ++ " — SortOfWiki"
 
                 RemoteData.Failure _ ->
                     "404 — SortOfWiki"
@@ -4321,33 +4599,6 @@ documentTitle ({ store } as model) =
             "404 — SortOfWiki"
 
 
-documentHeading : Model -> String
-documentHeading model =
-    let
-        t : String
-        t =
-            documentTitle model
-
-        suffixEmDash : String
-        suffixEmDash =
-            " — SortOfWiki"
-    in
-    if String.endsWith suffixEmDash t then
-        String.dropRight (String.length suffixEmDash) t
-
-    else
-        let
-            suffixHyphen : String
-            suffixHyphen =
-                " - SortOfWiki"
-        in
-        if String.endsWith suffixHyphen t then
-            String.dropRight (String.length suffixHyphen) t
-
-        else
-            t
-
-
 viewWikiHomeRoute : Model -> Wiki.Slug -> Html Msg
 viewWikiHomeRoute { store } slug =
     case Store.get_ slug store.wikiDetails of
@@ -4355,33 +4606,6 @@ viewWikiHomeRoute { store } slug =
             case Store.get slug store.wikiCatalog of
                 RemoteData.Success summary ->
                     viewWikiHome slug summary details
-
-                RemoteData.Failure _ ->
-                    viewNotFound
-
-                RemoteData.Loading ->
-                    viewWikiHomeLoading
-
-                RemoteData.NotAsked ->
-                    viewWikiHomeLoading
-
-        RemoteData.Failure _ ->
-            viewNotFound
-
-        RemoteData.Loading ->
-            viewWikiHomeLoading
-
-        RemoteData.NotAsked ->
-            viewWikiHomeLoading
-
-
-viewPagesListRoute : Model -> Wiki.Slug -> Html Msg
-viewPagesListRoute { store } slug =
-    case Store.get_ slug store.wikiDetails of
-        RemoteData.Success details ->
-            case Store.get slug store.wikiCatalog of
-                RemoteData.Success summary ->
-                    viewPagesList slug summary details
 
                 RemoteData.Failure _ ->
                     viewNotFound
@@ -4442,14 +4666,13 @@ viewLoginFeedback maybeResult =
                 ]
 
 
-viewRegisterLoaded : Wiki.Slug -> Wiki.CatalogEntry -> RegisterDraft -> Html Msg
-viewRegisterLoaded wikiSlug summary draft =
+viewRegisterLoaded : Wiki.Slug -> RegisterDraft -> Html Msg
+viewRegisterLoaded wikiSlug draft =
     Html.div
         [ Attr.id "wiki-register-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
         ]
-        [ Html.h1 [] [ Html.text ("Register — " ++ summary.name) ]
-        , Html.form
+        [ Html.form
             [ Attr.id "wiki-register-form"
             , Events.onSubmit RegisterFormSubmitted
             ]
@@ -4502,8 +4725,8 @@ viewRegisterRoute model wikiSlug =
     case Store.get_ wikiSlug model.store.wikiDetails of
         RemoteData.Success _ ->
             case Store.get wikiSlug model.store.wikiCatalog of
-                RemoteData.Success summary ->
-                    viewRegisterLoaded wikiSlug summary model.registerDraft
+                RemoteData.Success _ ->
+                    viewRegisterLoaded wikiSlug model.registerDraft
 
                 RemoteData.Failure _ ->
                     viewNotFound
@@ -4524,14 +4747,13 @@ viewRegisterRoute model wikiSlug =
             viewWikiRegisterLoading
 
 
-viewLoginLoaded : Wiki.Slug -> Wiki.CatalogEntry -> LoginDraft -> Html Msg
-viewLoginLoaded wikiSlug summary draft =
+viewLoginLoaded : Wiki.Slug -> LoginDraft -> Html Msg
+viewLoginLoaded wikiSlug draft =
     Html.div
         [ Attr.id "wiki-login-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
         ]
-        [ Html.h1 [] [ Html.text ("Log in — " ++ summary.name) ]
-        , Html.form
+        [ Html.form
             [ Attr.id "wiki-login-form"
             , Events.onSubmit LoginFormSubmitted
             ]
@@ -4584,8 +4806,8 @@ viewLoginRoute model wikiSlug =
     case Store.get_ wikiSlug model.store.wikiDetails of
         RemoteData.Success _ ->
             case Store.get wikiSlug model.store.wikiCatalog of
-                RemoteData.Success summary ->
-                    viewLoginLoaded wikiSlug summary model.loginDraft
+                RemoteData.Success _ ->
+                    viewLoginLoaded wikiSlug model.loginDraft
 
                 RemoteData.Failure _ ->
                     viewNotFound
@@ -4660,14 +4882,13 @@ viewNewPageSubmitFeedback wikiSlug draft =
                 ]
 
 
-viewSubmitNewLoaded : Wiki.Slug -> Wiki.CatalogEntry -> NewPageSubmitDraft -> Html Msg
-viewSubmitNewLoaded wikiSlug summary draft =
+viewSubmitNewLoaded : Wiki.Slug -> NewPageSubmitDraft -> Html Msg
+viewSubmitNewLoaded wikiSlug draft =
     Html.div
         [ Attr.id "wiki-submit-new-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
         ]
-        [ Html.h1 [] [ Html.text ("Submit new page — " ++ summary.name) ]
-        , Html.p []
+        [ Html.p []
             [ Html.text "Requires an active contributor session (register or log in on this wiki)." ]
         , Html.form
             [ Attr.id "wiki-submit-new-form"
@@ -4714,8 +4935,8 @@ viewSubmitNewRoute model wikiSlug =
     case Store.get_ wikiSlug model.store.wikiDetails of
         RemoteData.Success _ ->
             case Store.get wikiSlug model.store.wikiCatalog of
-                RemoteData.Success summary ->
-                    viewSubmitNewLoaded wikiSlug summary model.newPageSubmitDraft
+                RemoteData.Success _ ->
+                    viewSubmitNewLoaded wikiSlug model.newPageSubmitDraft
 
                 RemoteData.Failure _ ->
                     viewNotFound
@@ -4782,15 +5003,14 @@ viewPageEditSubmitFeedback wikiSlug pageSlug draft =
                 ]
 
 
-viewSubmitEditLoaded : Wiki.Slug -> Page.Slug -> Wiki.CatalogEntry -> PageEditSubmitDraft -> Html Msg
-viewSubmitEditLoaded wikiSlug pageSlug summary draft =
+viewSubmitEditLoaded : Wiki.Slug -> Page.Slug -> PageEditSubmitDraft -> Html Msg
+viewSubmitEditLoaded wikiSlug pageSlug draft =
     Html.div
         [ Attr.id "wiki-submit-edit-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
         , Attr.attribute "data-page-slug" pageSlug
         ]
-        [ Html.h1 [] [ Html.text ("Propose edit — " ++ pageSlug ++ " — " ++ summary.name) ]
-        , Html.p []
+        [ Html.p []
             [ Html.text "Published content stays unchanged until a reviewer approves this proposal." ]
         , Html.p []
             [ Html.text "Requires an active contributor session (register or log in on this wiki)." ]
@@ -4830,8 +5050,8 @@ viewSubmitEditRoute model wikiSlug pageSlug =
         , Store.get_ ( wikiSlug, pageSlug ) model.store.publishedPages
         )
     of
-        ( RemoteData.Success _, RemoteData.Success summary, RemoteData.Success _ ) ->
-            viewSubmitEditLoaded wikiSlug pageSlug summary model.pageEditSubmitDraft
+        ( RemoteData.Success _, RemoteData.Success _, RemoteData.Success _ ) ->
+            viewSubmitEditLoaded wikiSlug pageSlug model.pageEditSubmitDraft
 
         ( _, _, RemoteData.Failure _ ) ->
             viewNotFound
@@ -4876,9 +5096,9 @@ viewPageDeleteSubmitFeedback wikiSlug pageSlug draft =
                             [ Html.text ("Published. Page \"" ++ pageSlug ++ "\" was removed. ") ]
                         , Html.a
                             [ Attr.id "wiki-submit-delete-success-pages-link"
-                            , Attr.href (Wiki.pageIndexUrlPath wikiSlug)
+                            , Attr.href ("/w/" ++ wikiSlug)
                             ]
-                            [ Html.text "Page index" ]
+                            [ Html.text "Wiki home" ]
                         ]
 
                 Submission.DeleteSubmittedForReview submissionId ->
@@ -4907,15 +5127,14 @@ viewPageDeleteSubmitFeedback wikiSlug pageSlug draft =
                 ]
 
 
-viewSubmitDeleteLoaded : Wiki.Slug -> Page.Slug -> Wiki.CatalogEntry -> PageDeleteSubmitDraft -> Html Msg
-viewSubmitDeleteLoaded wikiSlug pageSlug summary draft =
+viewSubmitDeleteLoaded : Wiki.Slug -> Page.Slug -> PageDeleteSubmitDraft -> Html Msg
+viewSubmitDeleteLoaded wikiSlug pageSlug draft =
     Html.div
         [ Attr.id "wiki-submit-delete-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
         , Attr.attribute "data-page-slug" pageSlug
         ]
-        [ Html.h1 [] [ Html.text ("Request deletion — " ++ pageSlug ++ " — " ++ summary.name) ]
-        , Html.p []
+        [ Html.p []
             [ Html.text "The page stays published until a reviewer approves this removal (story 17)." ]
         , Html.p []
             [ Html.text "Requires an active contributor session (register or log in on this wiki)." ]
@@ -4955,8 +5174,8 @@ viewSubmitDeleteRoute model wikiSlug pageSlug =
         , Store.get_ ( wikiSlug, pageSlug ) model.store.publishedPages
         )
     of
-        ( RemoteData.Success _, RemoteData.Success summary, RemoteData.Success _ ) ->
-            viewSubmitDeleteLoaded wikiSlug pageSlug summary model.pageDeleteSubmitDraft
+        ( RemoteData.Success _, RemoteData.Success _, RemoteData.Success _ ) ->
+            viewSubmitDeleteLoaded wikiSlug pageSlug model.pageDeleteSubmitDraft
 
         ( _, _, RemoteData.Failure _ ) ->
             viewNotFound
@@ -4987,9 +5206,12 @@ viewSubmitDeleteRoute model wikiSlug pageSlug =
 
 
 viewSubmissionDetailBody :
-    RemoteData () (Result Submission.DetailsError Submission.ContributorView)
+    Wiki.Slug
+    -> String
+    -> PageEditSubmitDraft
+    -> RemoteData () (Result Submission.DetailsError Submission.ContributorView)
     -> Html Msg
-viewSubmissionDetailBody remote =
+viewSubmissionDetailBody wikiSlug submissionId editDraft remote =
     case remote of
         RemoteData.NotAsked ->
             viewWikiSubmitNewLoading
@@ -5033,6 +5255,78 @@ viewSubmissionDetailBody remote =
                             [ Html.h2 [] [ Html.text "Reviewer note" ]
                             , Html.p [] [ Html.text noteText ]
                             ]
+                , case detail.conflictContext of
+                    Nothing ->
+                        Html.text ""
+
+                    Just ctx ->
+                        if detail.status /= Submission.NeedsRevision then
+                            Html.text ""
+
+                        else
+                            Html.section
+                                [ Attr.id "wiki-submission-detail-conflict"
+                                , Attr.attribute "data-page-slug" ctx.pageSlug
+                                ]
+                                [ Html.h2 [] [ Html.text "Resolve conflict" ]
+                                , Html.div []
+                                    [ Html.h3 [] [ Html.text "Original published version" ]
+                                    , Html.pre
+                                        [ Attr.id "wiki-submission-detail-base-markdown" ]
+                                        [ Html.text ctx.baseMarkdown ]
+                                    ]
+                                , Html.div []
+                                    [ Html.h3 [] [ Html.text "Your previous proposed edit" ]
+                                    , Html.pre
+                                        [ Attr.id "wiki-submission-detail-proposed-markdown" ]
+                                        [ Html.text ctx.proposedMarkdown ]
+                                    ]
+                                , Html.div []
+                                    [ Html.h3 [] [ Html.text "Current published version" ]
+                                    , Html.pre
+                                        [ Attr.id "wiki-submission-detail-current-markdown" ]
+                                        [ Html.text ctx.currentMarkdown ]
+                                    ]
+                                , Html.label [ Attr.for "wiki-submission-detail-resubmit-markdown" ]
+                                    [ Html.text "Resolved markdown" ]
+                                , Html.textarea
+                                    [ Attr.id "wiki-submission-detail-resubmit-markdown"
+                                    , Attr.value editDraft.markdownBody
+                                    , Events.onInput SubmissionConflictResubmitMarkdownChanged
+                                    , Attr.disabled editDraft.inFlight
+                                    , Attr.rows 12
+                                    ]
+                                    []
+                                , Html.button
+                                    [ Attr.id "wiki-submission-detail-resubmit-submit"
+                                    , Attr.type_ "button"
+                                    , Attr.disabled editDraft.inFlight
+                                    , Events.onClick SubmissionConflictResubmitSubmitted
+                                    ]
+                                    [ Html.text "Resubmit for review" ]
+                                , case editDraft.lastResubmitResult of
+                                    Just (Ok (Submission.EditSubmittedForReview submissionId_)) ->
+                                        if Submission.idToString submissionId_ == submissionId then
+                                            Html.div
+                                                [ Attr.id "wiki-submission-detail-resubmit-success" ]
+                                                [ Html.text "Resubmitted for review." ]
+
+                                        else
+                                            Html.text ""
+
+                                    _ ->
+                                        Html.text ""
+                                , case editDraft.lastResubmitResult of
+                                    Just (Err err) ->
+                                        Html.div
+                                            [ Attr.id "wiki-submission-detail-resubmit-error" ]
+                                            [ Html.text (Submission.resubmitPageEditErrorToUserText err) ]
+
+                                    _ ->
+                                        Html.text ""
+                                , Html.p []
+                                    [ Html.text ("Submission: " ++ submissionId ++ " · Wiki: " ++ wikiSlug) ]
+                                ]
                 ]
 
 
@@ -5074,7 +5368,7 @@ viewReviewQueueBody wikiSlug remote =
 
             else
                 Html.table
-                    [ TW.cls "data-table" ]
+                    [ TW.cls "w-full max-w-[72rem] border-collapse text-[1rem] border border-[var(--border)] [&_th]:px-[0.35rem] [&_th]:py-[0.15rem] [&_th]:border [&_th]:border-[var(--border)] [&_th]:text-left [&_th]:align-top [&_td]:px-[0.35rem] [&_td]:py-[0.15rem] [&_td]:border [&_td]:border-[var(--border)] [&_td]:text-left [&_td]:align-top [&_thead_th]:bg-[var(--chrome-bg)] [&_thead_th]:font-semibold [&_thead_th]:border-b [&_thead_th]:border-[var(--border)] [&_tbody_tr:nth-child(even)]:bg-[var(--table-stripe)]" ]
                     [ Html.thead []
                         [ Html.tr []
                             [ Html.th [] [ Html.text "Submission" ]
@@ -5134,14 +5428,13 @@ viewReviewQueueBody wikiSlug remote =
                     ]
 
 
-viewReviewQueueLoaded : Wiki.Slug -> Wiki.CatalogEntry -> Store -> Html Msg
-viewReviewQueueLoaded wikiSlug summary store =
+viewReviewQueueLoaded : Wiki.Slug -> Store -> Html Msg
+viewReviewQueueLoaded wikiSlug store =
     Html.div
         [ Attr.id "wiki-review-queue-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
         ]
-        [ Html.h1 [] [ Html.text ("Review queue — " ++ summary.name) ]
-        , viewReviewQueueBody wikiSlug (Store.get_ wikiSlug store.reviewQueues)
+        [ viewReviewQueueBody wikiSlug (Store.get_ wikiSlug store.reviewQueues)
         ]
 
 
@@ -5150,8 +5443,8 @@ viewReviewQueueRoute model wikiSlug =
     case Store.get_ wikiSlug model.store.wikiDetails of
         RemoteData.Success _ ->
             case Store.get wikiSlug model.store.wikiCatalog of
-                RemoteData.Success summary ->
-                    viewReviewQueueLoaded wikiSlug summary model.store
+                RemoteData.Success _ ->
+                    viewReviewQueueLoaded wikiSlug model.store
 
                 RemoteData.Failure _ ->
                     viewNotFound
@@ -5206,7 +5499,7 @@ viewWikiAdminUsersBody wikiSlug maybeSelfUsername remote =
         RemoteData.Success (Ok users) ->
             Html.table
                 [ Attr.id "wiki-admin-users-table"
-                , TW.cls "data-table"
+                , TW.cls "w-full max-w-[72rem] border-collapse text-[1rem] border border-[var(--border)] [&_th]:px-[0.35rem] [&_th]:py-[0.15rem] [&_th]:border [&_th]:border-[var(--border)] [&_th]:text-left [&_th]:align-top [&_td]:px-[0.35rem] [&_td]:py-[0.15rem] [&_td]:border [&_td]:border-[var(--border)] [&_td]:text-left [&_td]:align-top [&_thead_th]:bg-[var(--chrome-bg)] [&_thead_th]:font-semibold [&_thead_th]:border-b [&_thead_th]:border-[var(--border)] [&_tbody_tr:nth-child(even)]:bg-[var(--table-stripe)]"
                 ]
                 [ Html.thead []
                     [ Html.tr []
@@ -5326,7 +5619,6 @@ viewWikiAdminUsersRevokeAdminCell maybeSelfUsername u =
 
 viewWikiAdminUsersLoaded :
     Wiki.Slug
-    -> Wiki.CatalogEntry
     -> Store
     -> Maybe String
     -> Maybe String
@@ -5334,13 +5626,12 @@ viewWikiAdminUsersLoaded :
     -> Maybe String
     -> Maybe String
     -> Html Msg
-viewWikiAdminUsersLoaded wikiSlug summary store promoteError demoteError grantAdminError revokeAdminError maybeSelfUsername =
+viewWikiAdminUsersLoaded wikiSlug store promoteError demoteError grantAdminError revokeAdminError maybeSelfUsername =
     Html.div
         [ Attr.id "wiki-admin-users-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
         ]
-        [ Html.h1 [] [ Html.text ("Users — " ++ summary.name) ]
-        , viewWikiAdminUsersPromoteFeedback promoteError
+        [ viewWikiAdminUsersPromoteFeedback promoteError
         , viewWikiAdminUsersDemoteFeedback demoteError
         , viewWikiAdminUsersGrantAdminFeedback grantAdminError
         , viewWikiAdminUsersRevokeAdminFeedback revokeAdminError
@@ -5415,8 +5706,8 @@ viewWikiAdminUsersRoute model wikiSlug =
     case Store.get_ wikiSlug model.store.wikiDetails of
         RemoteData.Success _ ->
             case Store.get wikiSlug model.store.wikiCatalog of
-                RemoteData.Success summary ->
-                    viewWikiAdminUsersLoaded wikiSlug summary model.store model.adminPromoteError model.adminDemoteError model.adminGrantAdminError model.adminRevokeAdminError (wikiAdminUsersSelfUsernameOnPage model wikiSlug)
+                RemoteData.Success _ ->
+                    viewWikiAdminUsersLoaded wikiSlug model.store model.adminPromoteError model.adminDemoteError model.adminGrantAdminError model.adminRevokeAdminError (wikiAdminUsersSelfUsernameOnPage model wikiSlug)
 
                 RemoteData.Failure _ ->
                     viewNotFound
@@ -5549,14 +5840,13 @@ viewWikiAdminAuditKindCheckbox model ( tag, labelText ) =
         ]
 
 
-viewWikiAdminAuditLoaded : Wiki.Slug -> Wiki.CatalogEntry -> Model -> Html Msg
-viewWikiAdminAuditLoaded wikiSlug summary model =
+viewWikiAdminAuditLoaded : Wiki.Slug -> Model -> Html Msg
+viewWikiAdminAuditLoaded wikiSlug model =
     Html.div
         [ Attr.id "wiki-admin-audit-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
         ]
-        [ Html.h1 [] [ Html.text ("Audit log — " ++ summary.name) ]
-        , viewWikiAdminAuditFilters model
+        [ viewWikiAdminAuditFilters model
         , viewWikiAdminAuditBody wikiSlug (Store.getWikiAuditLog wikiSlug model.wikiAdminAuditAppliedFilter model.store)
         ]
 
@@ -5566,8 +5856,8 @@ viewWikiAdminAuditRoute model wikiSlug =
     case Store.get_ wikiSlug model.store.wikiDetails of
         RemoteData.Success _ ->
             case Store.get wikiSlug model.store.wikiCatalog of
-                RemoteData.Success summary ->
-                    viewWikiAdminAuditLoaded wikiSlug summary model
+                RemoteData.Success _ ->
+                    viewWikiAdminAuditLoaded wikiSlug model
 
                 RemoteData.Failure _ ->
                     viewNotFound
@@ -5810,14 +6100,13 @@ viewReviewDetailRoute model wikiSlug submissionId =
     case Store.get_ wikiSlug model.store.wikiDetails of
         RemoteData.Success _ ->
             case Store.get wikiSlug model.store.wikiCatalog of
-                RemoteData.Success summary ->
+                RemoteData.Success _ ->
                     Html.div
                         [ Attr.id "wiki-review-detail-page"
                         , Attr.attribute "data-wiki-slug" wikiSlug
                         , Attr.attribute "data-submission-id" submissionId
                         ]
-                        [ Html.h1 [] [ Html.text ("Review submission — " ++ summary.name) ]
-                        , viewReviewSubmissionDetailBody
+                        [ viewReviewSubmissionDetailBody
                             (Store.get_ ( wikiSlug, submissionId ) model.store.reviewSubmissionDetails)
                         , viewReviewApproveActions model wikiSlug submissionId
                         , viewReviewRequestChangesActions model wikiSlug submissionId
@@ -5861,8 +6150,10 @@ viewSubmissionDetailRoute model wikiSlug submissionId =
                         , Attr.attribute "data-wiki-slug" wikiSlug
                         , Attr.attribute "data-submission-id" submissionId
                         ]
-                        [ Html.h1 [] [ Html.text "Submission" ]
-                        , viewSubmissionDetailBody
+                        [ viewSubmissionDetailBody
+                            wikiSlug
+                            submissionId
+                            model.pageEditSubmitDraft
                             (Store.get_ ( wikiSlug, submissionId ) model.store.submissionDetails)
                         ]
 
@@ -5891,7 +6182,7 @@ viewBacklinks wikiSlug backlinks =
         [ Attr.id "page-backlinks" ]
         [ Html.h2 [] [ Html.text "Backlinks" ]
         , Html.table
-            [ TW.cls "data-table" ]
+            [ TW.cls "w-full max-w-[72rem] border-collapse text-[1rem] border border-[var(--border)] [&_th]:px-[0.35rem] [&_th]:py-[0.15rem] [&_th]:border [&_th]:border-[var(--border)] [&_th]:text-left [&_th]:align-top [&_td]:px-[0.35rem] [&_td]:py-[0.15rem] [&_td]:border [&_td]:border-[var(--border)] [&_td]:text-left [&_td]:align-top [&_thead_th]:bg-[var(--chrome-bg)] [&_thead_th]:font-semibold [&_thead_th]:border-b [&_thead_th]:border-[var(--border)] [&_tbody_tr:nth-child(even)]:bg-[var(--table-stripe)]" ]
             [ Html.tbody
                 [ Attr.id "page-backlinks-list" ]
                 (backlinks
@@ -5912,23 +6203,14 @@ viewBacklinks wikiSlug backlinks =
         ]
 
 
-viewPublishedPage : Wiki.Slug -> Page.Slug -> Wiki.CatalogEntry -> Page.FrontendDetails -> Maybe Wiki.Slug -> Html Msg
-viewPublishedPage wikiSlug pageSlug summary pageDetails maybeContributorWikiForThisWiki =
+viewPublishedPage : Wiki.Slug -> Page.Slug -> Page.FrontendDetails -> Maybe Wiki.Slug -> Html Msg
+viewPublishedPage wikiSlug pageSlug pageDetails maybeContributorWikiForThisWiki =
     Html.div
         [ Attr.id "page-published-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
         , Attr.attribute "data-page-slug" pageSlug
         ]
-        [ Html.header
-            [ TW.cls "page-published-header" ]
-            [ Html.h1 [] [ Html.text summary.name ]
-            , Html.p
-                [ TW.cls "page-published-meta"
-                , Attr.attribute "data-context" "page-published-slug"
-                ]
-                [ Html.text pageSlug ]
-            ]
-        , PageMarkdown.view wikiSlug pageDetails
+        [ PageMarkdown.view wikiSlug pageDetails
         , case maybeContributorWikiForThisWiki of
             Just sessionWiki ->
                 if sessionWiki /= wikiSlug then
@@ -5936,7 +6218,7 @@ viewPublishedPage wikiSlug pageSlug summary pageDetails maybeContributorWikiForT
 
                 else
                     Html.div
-                        [ TW.cls "page-published-actions" ]
+                        [ TW.cls "my-[0.25rem] mt-[0.15rem] text-[1rem]" ]
                         [ Html.a
                             [ Attr.id "wiki-page-propose-edit"
                             , Attr.href (Wiki.submitEditUrlPath wikiSlug pageSlug)
@@ -5964,8 +6246,8 @@ viewPublishedPageRoute model wikiSlug pageSlug =
         , Store.get_ ( wikiSlug, pageSlug ) model.store.publishedPages
         )
     of
-        ( RemoteData.Success _, RemoteData.Success summary, RemoteData.Success pageDetails ) ->
-            viewPublishedPage wikiSlug pageSlug summary pageDetails model.contributorWikiSession
+        ( RemoteData.Success _, RemoteData.Success _, RemoteData.Success pageDetails ) ->
+            viewPublishedPage wikiSlug pageSlug pageDetails model.contributorWikiSession
 
         ( _, _, RemoteData.Failure _ ) ->
             viewNotFound
@@ -6015,9 +6297,6 @@ viewBody model =
 
         Route.WikiHome slug ->
             viewWikiHomeRoute model slug
-
-        Route.WikiPages slug ->
-            viewPagesListRoute model slug
 
         Route.WikiPage wikiSlug pageSlug ->
             viewPublishedPageRoute model wikiSlug pageSlug
@@ -6086,24 +6365,32 @@ view model =
         holyGrailClass : String
         holyGrailClass =
             if List.isEmpty tocEntries then
-                "layout-holy-grail layout-holy-grail--no-toc-right"
+                "grid min-h-0 min-w-0 h-full w-full flex-1 items-stretch gap-y-[0.65rem] px-[0.5rem] -mx-[0.5rem] max-w-none grid-rows-[minmax(0,1fr)] grid-cols-[minmax(11rem,16rem)_minmax(0,1fr)] max-[56rem]:grid-cols-1"
 
             else
-                "layout-holy-grail"
+                "grid min-h-0 min-w-0 h-full w-full flex-1 items-stretch gap-y-[0.65rem] px-[0.5rem] -mx-[0.5rem] max-w-none grid-rows-[minmax(0,1fr)] grid-cols-[minmax(11rem,16rem)_minmax(0,1fr)_minmax(10rem,14rem)] max-[56rem]:grid-cols-1"
+
+        mainClass : String
+        mainClass =
+            if List.isEmpty tocEntries then
+                "min-w-0 py-[0.35rem] pl-[0.85rem] pr-0 border-r-0 max-[56rem]:px-0"
+
+            else
+                "min-w-0 px-[0.85rem] py-[0.35rem] border-r border-dashed border-[var(--border-dash)] max-[56rem]:border-r-0 max-[56rem]:px-0"
 
         mainColumns : List (Html Msg)
         mainColumns =
             List.concat
-                [ [ Html.aside [ TW.cls "layout-aside layout-aside-left" ]
+                [ [ Html.aside [ TW.cls "sticky top-[0.35rem] self-stretch min-h-0 leading-[1.35] text-[var(--fg)] text-[1rem] border-r border-dashed border-[var(--border-dash)] py-[0.35rem] pr-[0.85rem] pl-0 max-[56rem]:static max-[56rem]:border-r-0 max-[56rem]:px-0" ]
                         [ viewRouteSideNav model ]
-                  , Html.main_ [ TW.cls "layout-main" ]
+                  , Html.main_ [ TW.cls mainClass ]
                         [ viewBody model ]
                   ]
                 , if List.isEmpty tocEntries then
                     []
 
                   else
-                    [ Html.aside [ TW.cls "layout-aside layout-aside-right layout-aside-toc" ]
+                    [ Html.aside [ TW.cls "sticky top-[0.35rem] self-stretch min-h-0 leading-[1.35] text-[var(--fg-muted)] bg-transparent border-0 text-[0.85rem] py-[0.35rem] pl-[0.85rem] pr-0 font-serif max-[56rem]:hidden" ]
                         [ PageToc.view tocEntries ]
                     ]
                 ]

@@ -3,36 +3,34 @@ module Wiki exposing
     , FrontendDetails
     , Slug
     , Wiki
+    , adminAuditUrlPath
+    , adminUsersUrlPath
     , applyPublishedMarkdownEdit
     , catalogEntry
-    , publicCatalogDict
-    , wikiWithPages
     , catalogUrlPath
     , frontendDetails
+    , hostAdminLoginUrlPathWithRedirect
+    , hostAdminNewWikiUrlPath
+    , hostAdminWikiDetailUrlPath
+    , hostAdminWikisUrlPath
     , loginUrlPath
     , loginUrlPathWithRedirect
-    , hostAdminLoginUrlPathWithRedirect
-    , pageIndexUrlPath
+    , publicCatalogDict
     , publishNewPageOnWiki
     , publishedPageFrontendDetails
     , publishedPageUrlPath
     , registerUrlPath
     , removePublishedPage
-    , adminUsersUrlPath
-    , adminAuditUrlPath
     , reviewDetailUrlPath
     , reviewQueueUrlPath
     , submissionDetailUrlPath
-    , hostAdminNewWikiUrlPath
-    , hostAdminWikisUrlPath
-    , hostAdminWikiDetailUrlPath
     , submitDeleteUrlPath
     , submitEditUrlPath
     , submitNewPageUrlPath
+    , wikiWithPages
     )
 
 import Dict exposing (Dict)
-import HostedWikiSlugPolicy
 import Page
 import PageBacklinks
 import Url.Builder as UrlBuilder
@@ -46,7 +44,6 @@ type alias Wiki =
     { slug : String
     , name : String
     , summary : String
-    , slugPolicy : HostedWikiSlugPolicy.HostedWikiSlugPolicy
     , active : Bool
     , pages : Dict Page.Slug Page.Page
     }
@@ -58,7 +55,6 @@ type alias CatalogEntry =
     { slug : Slug
     , name : String
     , summary : String
-    , slugPolicy : HostedWikiSlugPolicy.HostedWikiSlugPolicy
     , active : Bool
     }
 
@@ -73,7 +69,6 @@ catalogEntry w =
     { slug = w.slug
     , name = w.name
     , summary = w.summary
-    , slugPolicy = w.slugPolicy
     , active = w.active
     }
 
@@ -87,14 +82,13 @@ publicCatalogDict wikis =
         |> Dict.map (\_ w -> catalogEntry w)
 
 
-{-| Wiki with empty public summary and strict slug policy (tests and simple fixtures).
+{-| Wiki with empty public summary (tests and simple fixtures).
 -}
 wikiWithPages : Slug -> String -> Dict Page.Slug Page.Page -> Wiki
 wikiWithPages slug name pages =
     { slug = slug
     , name = name
     , summary = ""
-    , slugPolicy = HostedWikiSlugPolicy.StrictSlugs
     , active = True
     , pages = pages
     }
@@ -113,11 +107,11 @@ frontendDetails w =
 
 publishedPageFrontendDetails : Page.Slug -> Wiki -> Maybe Page.FrontendDetails
 publishedPageFrontendDetails pageSlug wiki =
-    case Dict.get pageSlug wiki.pages of
+    case pageBySlugCaseInsensitive pageSlug wiki.pages of
         Nothing ->
             Nothing
 
-        Just page ->
+        Just ( resolvedSlug, page ) ->
             case page.publishedMarkdown of
                 Nothing ->
                     Nothing
@@ -125,8 +119,21 @@ publishedPageFrontendDetails pageSlug wiki =
                 Just markdown ->
                     Just
                         (Page.frontendDetails markdown
-                            (PageBacklinks.slugsPointingTo wiki.slug pageSlug wiki.pages)
+                            (PageBacklinks.slugsPointingTo wiki.slug resolvedSlug wiki.pages)
                         )
+
+
+pageBySlugCaseInsensitive : Page.Slug -> Dict Page.Slug Page.Page -> Maybe ( Page.Slug, Page.Page )
+pageBySlugCaseInsensitive rawSlug pages =
+    let
+        normalized : String
+        normalized =
+            String.toLower rawSlug
+    in
+    pages
+        |> Dict.toList
+        |> List.filter (\( slug, _ ) -> String.toLower slug == normalized)
+        |> List.head
 
 
 {-| Path segment after origin for the wiki homepage, e.g. `/w/my-wiki`.
@@ -134,13 +141,6 @@ publishedPageFrontendDetails pageSlug wiki =
 catalogUrlPath : CatalogEntry -> String
 catalogUrlPath s =
     "/w/" ++ s.slug
-
-
-{-| Published page index for a wiki, e.g. `/w/my-wiki/pages`.
--}
-pageIndexUrlPath : Slug -> String
-pageIndexUrlPath wikiSlug =
-    "/w/" ++ wikiSlug ++ "/pages"
 
 
 {-| Contributor login for a wiki.
@@ -276,9 +276,17 @@ applyPublishedMarkdownEdit pageSlug markdown wiki =
             wiki
 
         Just page ->
+            let
+                nextPage : Page.Page
+                nextPage =
+                    { page
+                        | publishedMarkdown = Just markdown
+                    }
+                        |> Page.incrementPublishedRevision
+            in
             { wiki
                 | pages =
-                    Dict.insert pageSlug { page | publishedMarkdown = Just markdown } wiki.pages
+                    Dict.insert pageSlug nextPage wiki.pages
             }
 
 

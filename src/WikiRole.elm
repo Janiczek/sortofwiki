@@ -1,8 +1,9 @@
 module WikiRole exposing (WikiRole(..), canAccessWikiAdminUsers, demoteTrustedToContributor, grantTrustedToAdmin, isTrustedModerator, label, promoteContributorToTrusted, revokeAdminToTrusted)
 
-
 {-| Per-wiki contributor capability tier (stories 14, 20).
 -}
+
+
 type WikiRole
     = Contributor
     | Trusted

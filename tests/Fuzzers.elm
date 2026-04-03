@@ -7,7 +7,6 @@ module Fuzzers exposing
     )
 
 import Fuzz exposing (Fuzzer)
-import HostedWikiSlugPolicy
 import Page
 import Wiki
 import WikiRole
@@ -19,6 +18,7 @@ page =
         (\slug published pending ->
             { slug = slug
             , publishedMarkdown = published
+            , publishedRevision = 1
             , pendingMarkdown = pending
             }
         )
@@ -29,15 +29,10 @@ page =
 
 wikiCatalogEntry : Fuzzer Wiki.CatalogEntry
 wikiCatalogEntry =
-    Fuzz.map5 Wiki.CatalogEntry
+    Fuzz.map4 Wiki.CatalogEntry
         wikiSlug
         wikiName
         Fuzz.string
-        (Fuzz.oneOf
-            [ Fuzz.constant HostedWikiSlugPolicy.StrictSlugs
-            , Fuzz.constant HostedWikiSlugPolicy.AllowAny
-            ]
-        )
         Fuzz.bool
 
 

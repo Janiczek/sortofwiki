@@ -14,10 +14,10 @@ suite : Test
 suite =
     Test.describe "Submission"
         [ Test.describe "validatePageSlug"
-            [ Test.test "normalizes like new-page slug" <|
+            [ Test.test "trims and validates PascalCase slug" <|
                 \() ->
-                    Submission.validatePageSlug "  MyPage-1  "
-                        |> Expect.equal (Ok "mypage-1")
+                    Submission.validatePageSlug "  MyPage1  "
+                        |> Expect.equal (Ok "MyPage1")
             , Test.fuzz Fuzz.string "aligns with validateNewPageFields for any slug when body non-empty" <|
                 \rawSlug ->
                     case Submission.validatePageSlug rawSlug of
@@ -48,24 +48,24 @@ suite =
                         |> Expect.equal (Err Submission.SlugInvalidChars)
             , Test.test "rejects empty body" <|
                 \() ->
-                    Submission.validateNewPageFields "ok" ""
+                    Submission.validateNewPageFields "ValidSlug" ""
                         |> Expect.equal (Err Submission.BodyEmpty)
             , Test.test "rejects whitespace-only body" <|
                 \() ->
-                    Submission.validateNewPageFields "ok" "  \n\t "
+                    Submission.validateNewPageFields "ValidSlug" "  \n\t "
                         |> Expect.equal (Err Submission.BodyEmpty)
-            , Test.test "normalizes slug to trimmed lowercase" <|
+            , Test.test "keeps trimmed PascalCase slug" <|
                 \() ->
-                    Submission.validateNewPageFields "  MyPage-1  " "# Hi"
-                        |> Expect.equal (Ok { pageSlug = "mypage-1", markdown = "# Hi" })
+                    Submission.validateNewPageFields "  MyPage1  " "# Hi"
+                        |> Expect.equal (Ok { pageSlug = "MyPage1", markdown = "# Hi" })
             , Test.fuzz Fuzz.string "body fuzz: empty trim fails" <|
                 \s ->
                     if String.isEmpty (String.trim s) then
-                        Submission.validateNewPageFields "validslug" s
+                        Submission.validateNewPageFields "ValidSlug" s
                             |> Expect.equal (Err Submission.BodyEmpty)
 
                     else
-                        Submission.validateNewPageFields "validslug" s
+                        Submission.validateNewPageFields "ValidSlug" s
                             |> Result.map .markdown
                             |> Expect.equal (Ok (String.trim s))
             ]
@@ -127,7 +127,9 @@ suite =
                             , kind =
                                 Submission.EditPage
                                     { pageSlug = "guides"
-                                    , markdown = "proposed"
+                                    , baseMarkdown = "base"
+                                    , baseRevision = 1
+                                    , proposedMarkdown = "proposed"
                                     }
                             , status = Submission.Pending
                             , reviewerNote = Nothing
@@ -322,7 +324,7 @@ suite =
             , Test.test "EditPage" <|
                 \() ->
                     Submission.kindSummaryUserText
-                        (Submission.EditPage { pageSlug = "home", markdown = "x" })
+                        (Submission.EditPage { pageSlug = "home", baseMarkdown = "b", baseRevision = 1, proposedMarkdown = "x" })
                         |> Expect.equal "Edit page: home"
             , Test.test "DeletePage" <|
                 \() ->
@@ -363,12 +365,13 @@ suite =
                             , reviewerNote = Nothing
                             }
                     in
-                    Submission.contributorViewFromSubmission sub
+                    Submission.contributorViewFromSubmission Nothing sub
                         |> Expect.equal
                             { id = Submission.idFromCounter 1
                             , status = Submission.Pending
                             , kindSummary = "New page: x"
                             , reviewerNote = Nothing
+                            , conflictContext = Nothing
                             }
             , Test.test "maps reviewer note through reviewerNoteForDisplay" <|
                 \() ->
@@ -379,17 +382,26 @@ suite =
                             , wikiSlug = "demo"
                             , authorId = ContributorAccount.newAccountId "demo" "u"
                             , kind =
-                                Submission.EditPage { pageSlug = "home", markdown = "m" }
+                                Submission.EditPage { pageSlug = "home", baseMarkdown = "old", baseRevision = 1, proposedMarkdown = "m" }
                             , status = Submission.Rejected
                             , reviewerNote = Just "  not suitable  "
                             }
                     in
-                    Submission.contributorViewFromSubmission sub
+                    Submission.contributorViewFromSubmission Nothing sub
                         |> Expect.equal
                             { id = Submission.idFromCounter 2
                             , status = Submission.Rejected
                             , kindSummary = "Edit page: home"
                             , reviewerNote = Just "not suitable"
+                            , conflictContext =
+                                Just
+                                    { pageSlug = "home"
+                                    , baseMarkdown = "old"
+                                    , baseRevision = 1
+                                    , proposedMarkdown = "m"
+                                    , currentMarkdown = "old"
+                                    , currentRevision = 1
+                                    }
                             }
             ]
         , Test.describe "pendingSubmissionsForWiki"
@@ -417,7 +429,7 @@ suite =
                             , wikiSlug = "demo"
                             , authorId = ContributorAccount.newAccountId "demo" "b"
                             , kind =
-                                Submission.EditPage { pageSlug = "home", markdown = "m" }
+                                Submission.EditPage { pageSlug = "home", baseMarkdown = "old", baseRevision = 1, proposedMarkdown = "m" }
                             , status = Submission.Pending
                             , reviewerNote = Nothing
                             }
@@ -469,6 +481,108 @@ suite =
                         |> Submission.pendingSubmissionsForWiki wikiSlug
                         |> Expect.equal [ pending ]
             ]
+        , Test.describe "pendingEditForAuthorOnPageInUse"
+            [ Test.test "true only for pending edit by same author on same page" <|
+                \() ->
+                    let
+                        author : ContributorAccount.Id
+                        author =
+                            ContributorAccount.newAccountId "demo" "a"
+
+                        sub : Submission.Submission
+                        sub =
+                            { id = Submission.idFromCounter 1
+                            , wikiSlug = "demo"
+                            , authorId = author
+                            , kind =
+                                Submission.EditPage { pageSlug = "home", baseMarkdown = "old", baseRevision = 1, proposedMarkdown = "new" }
+                            , status = Submission.Pending
+                            , reviewerNote = Nothing
+                            }
+                    in
+                    Submission.pendingEditForAuthorOnPageInUse "demo" author "home" (Dict.singleton "sub_1" sub)
+                        |> Expect.equal True
+            , Test.fuzz Fuzz.string "non-pending edit does not count" <|
+                \suffix ->
+                    let
+                        author : ContributorAccount.Id
+                        author =
+                            ContributorAccount.newAccountId "demo" "a"
+                    in
+                    Submission.pendingEditForAuthorOnPageInUse
+                        "demo"
+                        author
+                        ("home" ++ suffix)
+                        (Dict.singleton
+                            "sub_1"
+                            { id = Submission.idFromCounter 1
+                            , wikiSlug = "demo"
+                            , authorId = author
+                            , kind =
+                                Submission.EditPage { pageSlug = "home", baseMarkdown = "old", baseRevision = 1, proposedMarkdown = "new" }
+                            , status = Submission.Rejected
+                            , reviewerNote = Nothing
+                            }
+                        )
+                        |> Expect.equal False
+            ]
+        , Test.describe "isStalePendingEditSubmission"
+            [ Test.test "true when base revision differs from current" <|
+                \() ->
+                    Submission.isStalePendingEditSubmission
+                        { pageSlug = "home", currentRevision = 2 }
+                        { id = Submission.idFromCounter 1
+                        , wikiSlug = "demo"
+                        , authorId = ContributorAccount.newAccountId "demo" "u"
+                        , kind =
+                            Submission.EditPage { pageSlug = "home", baseMarkdown = "old", baseRevision = 1, proposedMarkdown = "new" }
+                        , status = Submission.Pending
+                        , reviewerNote = Nothing
+                        }
+                        |> Expect.equal True
+            , Test.test "false when revision matches" <|
+                \() ->
+                    Submission.isStalePendingEditSubmission
+                        { pageSlug = "home", currentRevision = 1 }
+                        { id = Submission.idFromCounter 1
+                        , wikiSlug = "demo"
+                        , authorId = ContributorAccount.newAccountId "demo" "u"
+                        , kind =
+                            Submission.EditPage { pageSlug = "home", baseMarkdown = "old", baseRevision = 1, proposedMarkdown = "new" }
+                        , status = Submission.Pending
+                        , reviewerNote = Nothing
+                        }
+                        |> Expect.equal False
+            ]
+        , Test.describe "resubmitNeedsRevisionEdit"
+            [ Test.test "resets to pending and updates base/proposed fields" <|
+                \() ->
+                    let
+                        sub : Submission.Submission
+                        sub =
+                            { id = Submission.idFromCounter 1
+                            , wikiSlug = "demo"
+                            , authorId = ContributorAccount.newAccountId "demo" "u"
+                            , kind =
+                                Submission.EditPage { pageSlug = "home", baseMarkdown = "old", baseRevision = 1, proposedMarkdown = "mine" }
+                            , status = Submission.NeedsRevision
+                            , reviewerNote = Just "fix conflict"
+                            }
+                    in
+                    Submission.resubmitNeedsRevisionEdit
+                        { markdown = "resolved"
+                        , currentMarkdown = "current"
+                        , currentRevision = 2
+                        }
+                        sub
+                        |> Result.map
+                            (\next ->
+                                ( next.status
+                                , next.reviewerNote
+                                )
+                            )
+                        |> Expect.equal (Ok ( Submission.Pending, Nothing ))
+            ]
         , Test.describe "pageSlugFromKind"
             [ Test.test "NewPage" <|
                 \() ->
@@ -476,7 +590,7 @@ suite =
                         |> Expect.equal (Just "a")
             , Test.test "EditPage" <|
                 \() ->
-                    Submission.pageSlugFromKind (Submission.EditPage { pageSlug = "b", markdown = "m" })
+                    Submission.pageSlugFromKind (Submission.EditPage { pageSlug = "b", baseMarkdown = "old", baseRevision = 1, proposedMarkdown = "m" })
                         |> Expect.equal (Just "b")
             , Test.test "DeletePage" <|
                 \() ->
@@ -530,7 +644,7 @@ suite =
                             , wikiSlug = "demo"
                             , authorId = accountId
                             , kind =
-                                Submission.EditPage { pageSlug = "h", markdown = "m" }
+                                Submission.EditPage { pageSlug = "h", baseMarkdown = "old", baseRevision = 1, proposedMarkdown = "m" }
                             , status = Submission.Pending
                             , reviewerNote = Nothing
                             }

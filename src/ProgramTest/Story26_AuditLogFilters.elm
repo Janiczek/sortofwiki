@@ -5,9 +5,9 @@ import Effect.Browser.Dom
 import Effect.Lamdera
 import Effect.Test
 import Effect.Time
+import Expect
 import Frontend
 import Html.Attributes
-import Expect
 import ProgramTest.Config
 import Test.Html.Query
 import Test.Html.Selector
