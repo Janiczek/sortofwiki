@@ -1,8 +1,9 @@
 module ProgramTest.Story48_ConcurrentEditConflicts exposing (endToEndTests)
 
 import Effect.Browser.Dom
-import ProgramTest.Config
+import Effect.Test
 import ProgramTest.Actions
+import ProgramTest.Config
 import ProgramTest.Query
 import ProgramTest.Start
 import Submission
@@ -37,6 +38,9 @@ editBResolved =
     "# Story48 resolved edit B"
 
 
+navigateToSubmitEditGuides :
+    Effect.Test.FrontendActions toBackend FrontendMsg frontendModel toFrontend backendMsg backendModel
+    -> List (Effect.Test.Action toBackend FrontendMsg frontendModel toFrontend backendMsg backendModel)
 navigateToSubmitEditGuides client =
     [ client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
     , client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
@@ -47,7 +51,7 @@ navigateToSubmitEditGuides client =
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
     [ ProgramTest.Start.startWith
-        { name = "48 — one concurrent edit approved; other needs revision, resubmit to pending, then approved"
+        { name = "48 — one concurrent edit approved; other needs revision, withdraw, draft resubmit, then approved"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , steps =
             [ ProgramTest.Start.connectFrontend
@@ -114,12 +118,12 @@ endToEndTests =
                                 }
                                 client
                             , [ client.clickLink 100 (Wiki.reviewQueueUrlPath "Demo")
-                        , client.clickLink 100 (Wiki.reviewDetailUrlPath "Demo" "sub_1")
-                        , client.click 100 (Effect.Browser.Dom.id "wiki-review-decision-submit")
-                        , client.checkView 400
-                            (ProgramTest.Query.withinId "wiki-review-approve-success"
-                                (ProgramTest.Query.expectHasText "Submission approved and published.")
-                            )
+                              , client.clickLink 100 (Wiki.reviewDetailUrlPath "Demo" "sub_1")
+                              , client.click 100 (Effect.Browser.Dom.id "wiki-review-decision-submit")
+                              , client.checkView 400
+                                    (ProgramTest.Query.withinId "wiki-review-approve-success"
+                                        (ProgramTest.Query.expectHasText "Submission approved and published.")
+                                    )
                               ]
                             ]
                 }
@@ -137,39 +141,42 @@ endToEndTests =
                                 }
                                 client
                             , [ client.clickLink 100 (Wiki.mySubmissionsUrlPath "Demo")
-                        , client.clickLink 100 (Wiki.submissionDetailUrlPath "Demo" "sub_2")
-                        , client.checkView 500
-                            (ProgramTest.Query.withinId "wiki-submission-detail-status"
-                                (ProgramTest.Query.expectHasText "Needs revision")
-                            )
-                        , client.checkView 200
-                            (ProgramTest.Query.withinId "wiki-submission-detail-reviewer-note"
-                                (ProgramTest.Query.expectHasText "Page changed after this edit was submitted")
-                            )
-                        , client.checkView 2500
-                            (ProgramTest.Query.withinId "wiki-submission-detail-base-markdown-preview"
-                                (ProgramTest.Query.expectHasText "How to use this wiki")
-                            )
-                        , client.checkView 200
-                            (ProgramTest.Query.withinId "wiki-submission-detail-current-markdown"
-                                (ProgramTest.Query.expectHasInputValue editA)
-                            )
-                        , client.input 100 (Effect.Browser.Dom.id "wiki-submission-detail-resubmit-markdown") "   "
-                        , client.click 100 (Effect.Browser.Dom.id "wiki-submission-detail-resubmit-submit")
-                        , client.checkView 200
-                            (ProgramTest.Query.withinId "wiki-submission-detail-resubmit-error"
-                                (ProgramTest.Query.expectHasText
-                                    (Submission.resubmitPageEditErrorToUserText
-                                        (Submission.ResubmitEditValidation Submission.BodyEmpty)
+                              , client.clickLink 100 (Wiki.submissionDetailUrlPath "Demo" "sub_2")
+                              , client.checkView 500
+                                    (ProgramTest.Query.withinId "wiki-submission-detail-status"
+                                        (ProgramTest.Query.expectHasText "Needs revision")
                                     )
-                                )
-                            )
-                        , client.input 100 (Effect.Browser.Dom.id "wiki-submission-detail-resubmit-markdown") editBResolved
-                        , client.click 100 (Effect.Browser.Dom.id "wiki-submission-detail-resubmit-submit")
-                        , client.checkView 400
-                            (ProgramTest.Query.withinId "wiki-submission-detail-status"
-                                (ProgramTest.Query.expectHasText "Pending review")
-                            )
+                              , client.checkView 200
+                                    (ProgramTest.Query.withinId "wiki-submission-detail-reviewer-note"
+                                        (ProgramTest.Query.expectHasText "Page changed after this edit was submitted")
+                                    )
+                              , client.checkView 2500
+                                    (ProgramTest.Query.withinId "original-preview"
+                                        (ProgramTest.Query.expectHasText "How to use this wiki")
+                                    )
+                              , client.checkView 200
+                                    (ProgramTest.Query.withinId "new-markdown-readonly-textarea"
+                                        (ProgramTest.Query.expectHasInputValue editB)
+                                    )
+                              , client.click 100 (Effect.Browser.Dom.id "wiki-submission-detail-withdraw")
+                              , client.checkView 600
+                                    (ProgramTest.Query.withinId "wiki-submission-detail-status"
+                                        (ProgramTest.Query.expectHasText "Draft")
+                                    )
+                              , client.input 100 (Effect.Browser.Dom.id "new-markdown-editable-textarea") "   "
+                              , client.click 100 (Effect.Browser.Dom.id "wiki-submission-detail-submit-for-review")
+                              , client.checkView 200
+                                    (ProgramTest.Query.withinId "wiki-submission-detail-action-error"
+                                        (ProgramTest.Query.expectHasText
+                                            (Submission.validationErrorToUserText Submission.BodyEmpty)
+                                        )
+                                    )
+                              , client.input 100 (Effect.Browser.Dom.id "new-markdown-editable-textarea") editBResolved
+                              , client.click 100 (Effect.Browser.Dom.id "wiki-submission-detail-submit-for-review")
+                              , client.checkView 400
+                                    (ProgramTest.Query.withinId "wiki-submission-detail-status"
+                                        (ProgramTest.Query.expectHasText "Pending review")
+                                    )
                               ]
                             ]
                 }
@@ -187,18 +194,18 @@ endToEndTests =
                                 }
                                 client
                             , [ client.clickLink 100 (Wiki.reviewQueueUrlPath "Demo")
-                        , client.clickLink 100 (Wiki.reviewDetailUrlPath "Demo" "sub_2")
-                        , client.click 100 (Effect.Browser.Dom.id "wiki-review-decision-submit")
-                        , client.checkView 400
-                            (ProgramTest.Query.withinId "wiki-review-approve-success"
-                                (ProgramTest.Query.expectHasText "Submission approved and published.")
-                            )
-                        , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
-                        , client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
-                        , client.checkView 400
-                            (ProgramTest.Query.withinPageMarkdownHeading "h1"
-                                (ProgramTest.Query.expectHasText "Story48 resolved edit B")
-                            )
+                              , client.clickLink 100 (Wiki.reviewDetailUrlPath "Demo" "sub_2")
+                              , client.click 100 (Effect.Browser.Dom.id "wiki-review-decision-submit")
+                              , client.checkView 400
+                                    (ProgramTest.Query.withinId "wiki-review-approve-success"
+                                        (ProgramTest.Query.expectHasText "Submission approved and published.")
+                                    )
+                              , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
+                              , client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
+                              , client.checkView 400
+                                    (ProgramTest.Query.withinPageMarkdownHeading "h1"
+                                        (ProgramTest.Query.expectHasText "Story48 resolved edit B")
+                                    )
                               ]
                             ]
                 }

@@ -188,8 +188,13 @@ suite =
                                             { id = Submission.idFromCounter 1
                                             , status = Submission.Pending
                                             , kindSummary = "New page: x"
+                                            , contributionKind = Submission.ContributorKindNewPage
                                             , reviewerNote = Nothing
                                             , conflictContext = Nothing
+                                            , compareOriginalMarkdown = "(No published page yet.)"
+                                            , compareNewMarkdown = "m"
+                                            , maybeNewPageSlug = Just "x"
+                                            , maybeEditPageSlug = Nothing
                                             }
                                         )
                                     )

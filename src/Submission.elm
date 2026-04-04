@@ -1,6 +1,8 @@
 module Submission exposing
     ( ApproveSubmissionError(..)
+    , ContributorSubmissionKind(..)
     , ContributorView
+    , DeleteMySubmissionError(..)
     , DeletePageBody
     , DeleteReasonError(..)
     , DeleteSubmitSuccess(..)
@@ -17,19 +19,24 @@ module Submission exposing
     , RejectReasonError(..)
     , RejectSubmissionError(..)
     , RequestChangesSubmissionError(..)
-    , ResubmitPageEditError(..)
     , ReviewQueueError(..)
     , ReviewQueueItem
+    , SaveNewPageDraftError(..)
+    , SavePageDeleteDraftError(..)
+    , SavePageEditDraftError(..)
     , Status(..)
     , Submission
+    , SubmitDraftForReviewError(..)
     , SubmitNewPageError(..)
     , SubmitPageDeleteError(..)
     , SubmitPageEditError(..)
     , ValidationError(..)
+    , WithdrawSubmissionError(..)
     , applyApprovedSubmission
     , approveSubmissionErrorToUserText
     , contributorViewFromSubmission
     , currentPublishedRevision
+    , deleteMySubmissionErrorToUserText
     , detailsErrorToUserText
     , idFromCounter
     , idFromKey
@@ -37,34 +44,47 @@ module Submission exposing
     , isStalePendingEditSubmission
     , kindSummaryUserText
     , markStalePendingEditNeedsRevision
+    , mayContributorDeleteSubmission
     , myPendingSubmissionListItemFromSubmission
     , myPendingSubmissionsErrorToUserText
+    , mySubmissionsForAuthorOnWiki
+    , pageSlugConstraintTitle
     , pageSlugFromKind
+    , pageSlugHtmlMaxLength
+    , pageSlugHtmlPattern
     , pendingEditForAuthorOnPageInUse
     , pendingNewPageSlugInUse
-    , mySubmissionsForAuthorOnWiki
+    , pendingNewPageSlugInUseExcept
     , pendingSubmissionsForWiki
+    , promoteDraftToPending
     , rejectPendingSubmission
     , rejectReasonMaxLength
     , rejectSubmissionErrorToUserText
     , remapWikiSlugInSubmissions
     , requestChangesSubmissionErrorToUserText
     , requestPendingSubmissionChanges
-    , resubmitNeedsRevisionEdit
-    , resubmitPageEditErrorToUserText
     , reviewQueueErrorToUserText
     , reviewQueueItemFromSubmission
     , reviewerNoteForDisplay
+    , saveNewPageDraftErrorToUserText
+    , savePageDeleteDraftErrorToUserText
+    , savePageEditDraftErrorToUserText
     , statusLabelUserText
+    , submitDraftForReviewErrorToUserText
     , submitNewPageErrorToUserText
     , submitPageDeleteErrorToUserText
     , submitPageEditErrorToUserText
     , validateDeleteReason
     , validateEditMarkdown
+    , validateEditMarkdownDraft
+    , validateNewPageDraftFields
     , validateNewPageFields
     , validatePageSlug
     , validateRejectReason
+    , validationErrorToUserText
     , wikiHasPublishedPage
+    , withdrawSubmissionErrorToUserText
+    , withdrawSubmissionToDraft
     )
 
 import ContributorAccount
@@ -98,8 +118,14 @@ idFromKey s =
     Id s
 
 
+idEquals : Id -> Id -> Bool
+idEquals (Id a) (Id b) =
+    a == b
+
+
 type Status
-    = Pending
+    = Draft
+    | Pending
     | Approved
     | Rejected
     | NeedsRevision
@@ -108,6 +134,9 @@ type Status
 statusLabelUserText : Status -> String
 statusLabelUserText status =
     case status of
+        Draft ->
+            "Draft"
+
         Pending ->
             "Pending review"
 
@@ -161,15 +190,29 @@ detailsErrorToUserText err =
             "You cannot view this submission."
 
 
-{-| Payload for contributor submission detail (story 12); no full markdown on the wire.
+{-| Which contribution shape this submission uses (for client save/submit wiring).
+-}
+type ContributorSubmissionKind
+    = ContributorKindNewPage
+    | ContributorKindEditPage
+    | ContributorKindDeletePage
+
+
+{-| Payload for contributor submission detail (story 12).
 Story 13: optional reviewer feedback when status is Rejected or NeedsRevision.
+Compare columns: original vs proposed (or placeholder for new pages / delete reasons).
 -}
 type alias ContributorView =
     { id : Id
     , status : Status
     , kindSummary : String
+    , contributionKind : ContributorSubmissionKind
     , reviewerNote : Maybe String
     , conflictContext : Maybe EditConflictContext
+    , compareOriginalMarkdown : String
+    , compareNewMarkdown : String
+    , maybeNewPageSlug : Maybe Page.Slug
+    , maybeEditPageSlug : Maybe Page.Slug
     }
 
 
@@ -206,33 +249,73 @@ reviewerNoteForDisplay maybeRaw =
 
 contributorViewFromSubmission : Maybe Wiki.Wiki -> Submission -> ContributorView
 contributorViewFromSubmission maybeWiki sub =
+    let
+        fromKind :
+            { original : String
+            , new_ : String
+            , maybeNewSlug : Maybe Page.Slug
+            , maybeEditSlug : Maybe Page.Slug
+            , ck : ContributorSubmissionKind
+            , conflict : Maybe EditConflictContext
+            }
+        fromKind =
+            case sub.kind of
+                NewPage body ->
+                    { original = "(No published page yet.)"
+                    , new_ = body.markdown
+                    , maybeNewSlug = Just body.pageSlug
+                    , maybeEditSlug = Nothing
+                    , ck = ContributorKindNewPage
+                    , conflict = Nothing
+                    }
+
+                EditPage body ->
+                    { original = body.baseMarkdown
+                    , new_ = body.proposedMarkdown
+                    , maybeNewSlug = Nothing
+                    , maybeEditSlug = Just body.pageSlug
+                    , ck = ContributorKindEditPage
+                    , conflict =
+                        Just
+                            { pageSlug = body.pageSlug
+                            , baseMarkdown = body.baseMarkdown
+                            , baseRevision = body.baseRevision
+                            , proposedMarkdown = body.proposedMarkdown
+                            , currentMarkdown =
+                                maybeWiki
+                                    |> Maybe.map (\wiki -> currentPublishedMarkdown wiki body.pageSlug)
+                                    |> Maybe.withDefault body.baseMarkdown
+                            , currentRevision =
+                                maybeWiki
+                                    |> Maybe.andThen (\wiki -> currentPublishedRevision wiki body.pageSlug)
+                                    |> Maybe.withDefault body.baseRevision
+                            }
+                    }
+
+                DeletePage body ->
+                    { original =
+                        maybeWiki
+                            |> Maybe.map (\wiki -> currentPublishedMarkdown wiki body.pageSlug)
+                            |> Maybe.withDefault "(Page not found.)"
+                    , new_ =
+                        body.reason
+                            |> Maybe.withDefault "(No reason given.)"
+                    , maybeNewSlug = Nothing
+                    , maybeEditSlug = Just body.pageSlug
+                    , ck = ContributorKindDeletePage
+                    , conflict = Nothing
+                    }
+    in
     { id = sub.id
     , status = sub.status
     , kindSummary = kindSummaryUserText sub.kind
+    , contributionKind = fromKind.ck
     , reviewerNote = reviewerNoteForDisplay sub.reviewerNote
-    , conflictContext =
-        case sub.kind of
-            NewPage _ ->
-                Nothing
-
-            EditPage body ->
-                Just
-                    { pageSlug = body.pageSlug
-                    , baseMarkdown = body.baseMarkdown
-                    , baseRevision = body.baseRevision
-                    , proposedMarkdown = body.proposedMarkdown
-                    , currentMarkdown =
-                        maybeWiki
-                            |> Maybe.map (\wiki -> currentPublishedMarkdown wiki body.pageSlug)
-                            |> Maybe.withDefault body.baseMarkdown
-                    , currentRevision =
-                        maybeWiki
-                            |> Maybe.andThen (\wiki -> currentPublishedRevision wiki body.pageSlug)
-                            |> Maybe.withDefault body.baseRevision
-                    }
-
-            DeletePage _ ->
-                Nothing
+    , conflictContext = fromKind.conflict
+    , compareOriginalMarkdown = fromKind.original
+    , compareNewMarkdown = fromKind.new_
+    , maybeNewPageSlug = fromKind.maybeNewSlug
+    , maybeEditPageSlug = fromKind.maybeEditSlug
     }
 
 
@@ -353,6 +436,8 @@ myPendingSubmissionsErrorToUserText err =
 
 type alias MyPendingSubmissionListItem =
     { id : Id
+    , status : Status
+    , statusLabel : String
     , kindLabel : String
     , maybePageSlug : Maybe Page.Slug
     }
@@ -366,6 +451,9 @@ mySubmissionsForAuthorOnWiki wikiSlug authorId submissions =
         listedStatus : Status -> Bool
         listedStatus status =
             case status of
+                Draft ->
+                    True
+
                 Pending ->
                     True
 
@@ -390,6 +478,8 @@ mySubmissionsForAuthorOnWiki wikiSlug authorId submissions =
 myPendingSubmissionListItemFromSubmission : Submission -> MyPendingSubmissionListItem
 myPendingSubmissionListItemFromSubmission sub =
     { id = sub.id
+    , status = sub.status
+    , statusLabel = statusLabelUserText sub.status
     , kindLabel = kindSummaryUserText sub.kind
     , maybePageSlug = pageSlugFromKind sub.kind
     }
@@ -908,6 +998,35 @@ slugCharsOk s =
             Char.isUpper first && String.all Char.isAlphaNum rest
 
 
+{-| Max length after trim (wiki and page slugs).
+-}
+pageSlugMaxLength : Int
+pageSlugMaxLength =
+    64
+
+
+{-| HTML [`pattern`](https://developer.mozilla.org/en-US/docs/Web/HTML/Attributes/pattern) for constraint validation.
+Uses implicit full-string anchoring; allows optional surrounding ASCII whitespace so values still align with `String.trim` in `validatePageSlug`.
+-}
+pageSlugHtmlPattern : String
+pageSlugHtmlPattern =
+    "\\s*[A-Z][A-Za-z0-9]{0,63}\\s*"
+
+
+{-| Upper bound on raw field length (trimmed slug is at most `pageSlugMaxLength`; allows modest surrounding whitespace).
+-}
+pageSlugHtmlMaxLength : Int
+pageSlugHtmlMaxLength =
+    96
+
+
+{-| Shown as native validation hint (`title`) for pattern mismatches.
+-}
+pageSlugConstraintTitle : String
+pageSlugConstraintTitle =
+    "PascalCase: capital first letter, then letters or digits only; at most 64 characters after trimming spaces."
+
+
 {-| Trim slug before validating.
 -}
 normalizePageSlug : String -> String
@@ -928,7 +1047,7 @@ validatePageSlug rawSlug =
     if String.isEmpty pageSlug then
         Err SlugEmpty
 
-    else if String.length pageSlug > 64 then
+    else if String.length pageSlug > pageSlugMaxLength then
         Err SlugTooLong
 
     else if not (slugCharsOk pageSlug) then
@@ -957,6 +1076,27 @@ validateNewPageFields rawSlug rawMarkdown =
                 Ok { pageSlug = pageSlug, markdown = markdown }
 
 
+{-| Draft save: slug rules apply; markdown may be empty.
+-}
+validateNewPageDraftFields : String -> String -> Result ValidationError { pageSlug : Page.Slug, markdown : String }
+validateNewPageDraftFields rawSlug rawMarkdown =
+    case validatePageSlug rawSlug of
+        Err e ->
+            Err e
+
+        Ok pageSlug ->
+            Ok { pageSlug = pageSlug, markdown = String.trim rawMarkdown }
+
+
+{-| Draft save: proposed markdown may be empty.
+-}
+validateEditMarkdownDraft : String -> Result ValidationError String
+validateEditMarkdownDraft rawMarkdown =
+    Ok (String.trim rawMarkdown)
+
+
+{-| True when a draft or pending new-page submission already uses this slug on the wiki (any author).
+-}
 pendingNewPageSlugInUse : Wiki.Slug -> Page.Slug -> Dict String Submission -> Bool
 pendingNewPageSlugInUse wikiSlug pageSlug submissions =
     submissions
@@ -969,15 +1109,10 @@ pendingNewPageSlugInUse wikiSlug pageSlug submissions =
                 else
                     case sub.status of
                         Pending ->
-                            case sub.kind of
-                                NewPage body ->
-                                    body.pageSlug == pageSlug
+                            newPageKindUsesSlug pageSlug sub
 
-                                EditPage _ ->
-                                    False
-
-                                DeletePage _ ->
-                                    False
+                        Draft ->
+                            newPageKindUsesSlug pageSlug sub
 
                         Approved ->
                             False
@@ -990,26 +1125,146 @@ pendingNewPageSlugInUse wikiSlug pageSlug submissions =
             )
 
 
+newPageKindUsesSlug : Page.Slug -> Submission -> Bool
+newPageKindUsesSlug pageSlug sub =
+    case sub.kind of
+        NewPage body ->
+            body.pageSlug == pageSlug
+
+        EditPage _ ->
+            False
+
+        DeletePage _ ->
+            False
+
+
+{-| Same as `pendingNewPageSlugInUse` but ignores one submission id (e.g. promoting own draft).
+-}
+pendingNewPageSlugInUseExcept : Maybe Id -> Wiki.Slug -> Page.Slug -> Dict String Submission -> Bool
+pendingNewPageSlugInUseExcept maybeExcludeId wikiSlug pageSlug submissions =
+    submissions
+        |> Dict.toList
+        |> List.any
+            (\( key, sub ) ->
+                case maybeExcludeId of
+                    Just ex ->
+                        if idEquals (idFromKey key) ex || idEquals sub.id ex then
+                            False
+
+                        else
+                            sub.wikiSlug == wikiSlug && statusReservesNewPageSlug sub.status && newPageKindUsesSlug pageSlug sub
+
+                    Nothing ->
+                        sub.wikiSlug == wikiSlug && statusReservesNewPageSlug sub.status && newPageKindUsesSlug pageSlug sub
+            )
+
+
+statusReservesNewPageSlug : Status -> Bool
+statusReservesNewPageSlug status =
+    case status of
+        Draft ->
+            True
+
+        Pending ->
+            True
+
+        NeedsRevision ->
+            False
+
+        Approved ->
+            False
+
+        Rejected ->
+            False
+
+
 pendingEditForAuthorOnPageInUse : Wiki.Slug -> ContributorAccount.Id -> Page.Slug -> Dict String Submission -> Bool
 pendingEditForAuthorOnPageInUse wikiSlug authorId pageSlug submissions =
     submissions
         |> Dict.values
         |> List.any
             (\sub ->
-                if sub.wikiSlug /= wikiSlug || sub.authorId /= authorId || sub.status /= Pending then
+                if sub.wikiSlug /= wikiSlug || sub.authorId /= authorId then
                     False
 
                 else
-                    case sub.kind of
-                        EditPage body ->
-                            body.pageSlug == pageSlug
+                    case sub.status of
+                        Draft ->
+                            editKindUsesSlug pageSlug sub
 
-                        NewPage _ ->
+                        Pending ->
+                            editKindUsesSlug pageSlug sub
+
+                        Approved ->
                             False
 
-                        DeletePage _ ->
+                        Rejected ->
                             False
+
+                        NeedsRevision ->
+                            editKindUsesSlug pageSlug sub
             )
+
+
+editKindUsesSlug : Page.Slug -> Submission -> Bool
+editKindUsesSlug pageSlug sub =
+    case sub.kind of
+        EditPage body ->
+            body.pageSlug == pageSlug
+
+        NewPage _ ->
+            False
+
+        DeletePage _ ->
+            False
+
+
+pendingEditForAuthorOnPageInUseExcept : Maybe Id -> Wiki.Slug -> ContributorAccount.Id -> Page.Slug -> Dict String Submission -> Bool
+pendingEditForAuthorOnPageInUseExcept maybeExcludeId wikiSlug authorId pageSlug submissions =
+    submissions
+        |> Dict.toList
+        |> List.any
+            (\( key, sub ) ->
+                let
+                    excluded : Bool
+                    excluded =
+                        case maybeExcludeId of
+                            Just ex ->
+                                idEquals (idFromKey key) ex || idEquals sub.id ex
+
+                            Nothing ->
+                                False
+                in
+                if excluded then
+                    False
+
+                else
+                    sub.wikiSlug
+                        == wikiSlug
+                        && sub.authorId
+                        == authorId
+                        && statusReservesEditSubmission sub.status
+                        && editKindUsesSlug pageSlug sub
+            )
+
+
+statusReservesEditSubmission : Status -> Bool
+statusReservesEditSubmission status =
+    case status of
+        Draft ->
+            True
+
+        Pending ->
+            True
+
+        NeedsRevision ->
+            True
+
+        Approved ->
+            False
+
+        Rejected ->
+            False
 
 
 currentPublishedRevision : Wiki.Wiki -> Page.Slug -> Maybe Int
@@ -1032,84 +1287,389 @@ currentPublishedMarkdown wiki pageSlug =
         |> Maybe.withDefault ""
 
 
-type ResubmitPageEditError
-    = ResubmitEditNotLoggedIn
-    | ResubmitEditWrongWikiSession
-    | ResubmitEditWikiNotFound
-    | ResubmitEditWikiInactive
-    | ResubmitEditSubmissionNotFound
-    | ResubmitEditForbidden
-    | ResubmitEditTargetPageNotPublished
-    | ResubmitEditNotNeedsRevision
-    | ResubmitEditNotEditKind
-    | ResubmitEditValidation ValidationError
+type SaveNewPageDraftError
+    = SaveNewPageDraftNotLoggedIn
+    | SaveNewPageDraftWrongWikiSession
+    | SaveNewPageDraftValidation ValidationError
+    | SaveNewPageDraftSlugReserved
+    | SaveNewPageDraftNotFound
+    | SaveNewPageDraftForbidden
+    | SaveNewPageDraftWikiNotFound
+    | SaveNewPageDraftWikiInactive
 
 
-resubmitPageEditErrorToUserText : ResubmitPageEditError -> String
-resubmitPageEditErrorToUserText err =
+saveNewPageDraftErrorToUserText : SaveNewPageDraftError -> String
+saveNewPageDraftErrorToUserText err =
     case err of
-        ResubmitEditNotLoggedIn ->
-            "You must be logged in to resubmit this edit."
+        SaveNewPageDraftNotLoggedIn ->
+            "You must be logged in to save a draft."
 
-        ResubmitEditWrongWikiSession ->
+        SaveNewPageDraftWrongWikiSession ->
             "Your session is for a different wiki. Log in again on this wiki."
 
-        ResubmitEditWikiNotFound ->
+        SaveNewPageDraftValidation e ->
+            validationErrorToUserText e
+
+        SaveNewPageDraftSlugReserved ->
+            "Another draft or submission already uses this page slug."
+
+        SaveNewPageDraftNotFound ->
+            "That draft was not found."
+
+        SaveNewPageDraftForbidden ->
+            "You cannot update this draft."
+
+        SaveNewPageDraftWikiNotFound ->
             "This wiki does not exist."
 
-        ResubmitEditWikiInactive ->
+        SaveNewPageDraftWikiInactive ->
             "This wiki is currently paused."
 
-        ResubmitEditSubmissionNotFound ->
-            "This submission was not found."
 
-        ResubmitEditForbidden ->
-            "You can only resubmit your own submissions."
+type SavePageEditDraftError
+    = SavePageEditDraftNotLoggedIn
+    | SavePageEditDraftWrongWikiSession
+    | SavePageEditDraftValidation ValidationError
+    | SavePageEditDraftTargetNotPublished
+    | SavePageEditDraftAlreadyPendingEdit
+    | SavePageEditDraftNotFound
+    | SavePageEditDraftForbidden
+    | SavePageEditDraftWikiNotFound
+    | SavePageEditDraftWikiInactive
 
-        ResubmitEditTargetPageNotPublished ->
+
+savePageEditDraftErrorToUserText : SavePageEditDraftError -> String
+savePageEditDraftErrorToUserText err =
+    case err of
+        SavePageEditDraftNotLoggedIn ->
+            "You must be logged in to save a draft."
+
+        SavePageEditDraftWrongWikiSession ->
+            "Your session is for a different wiki. Log in again on this wiki."
+
+        SavePageEditDraftValidation e ->
+            validationErrorToUserText e
+
+        SavePageEditDraftTargetNotPublished ->
             "That page does not exist or has no published content yet."
 
-        ResubmitEditNotNeedsRevision ->
-            "Only submissions in \"Needs revision\" can be resubmitted."
+        SavePageEditDraftAlreadyPendingEdit ->
+            "You already have a draft or pending edit for this page."
 
-        ResubmitEditNotEditKind ->
-            "Only page-edit submissions can be resubmitted from this form."
+        SavePageEditDraftNotFound ->
+            "That draft was not found."
 
-        ResubmitEditValidation validationError ->
-            validationErrorToUserText validationError
+        SavePageEditDraftForbidden ->
+            "You cannot update this draft."
+
+        SavePageEditDraftWikiNotFound ->
+            "This wiki does not exist."
+
+        SavePageEditDraftWikiInactive ->
+            "This wiki is currently paused."
 
 
-resubmitNeedsRevisionEdit : { markdown : String, currentMarkdown : String, currentRevision : Int } -> Submission -> Result ResubmitPageEditError Submission
-resubmitNeedsRevisionEdit payload sub =
-    if sub.status /= NeedsRevision then
-        Err ResubmitEditNotNeedsRevision
+type SavePageDeleteDraftError
+    = SavePageDeleteDraftNotLoggedIn
+    | SavePageDeleteDraftWrongWikiSession
+    | SavePageDeleteDraftReasonInvalid DeleteReasonError
+    | SavePageDeleteDraftTargetNotPublished
+    | SavePageDeleteDraftNotFound
+    | SavePageDeleteDraftForbidden
+    | SavePageDeleteDraftWikiNotFound
+    | SavePageDeleteDraftWikiInactive
+
+
+savePageDeleteDraftErrorToUserText : SavePageDeleteDraftError -> String
+savePageDeleteDraftErrorToUserText err =
+    case err of
+        SavePageDeleteDraftNotLoggedIn ->
+            "You must be logged in to save a draft."
+
+        SavePageDeleteDraftWrongWikiSession ->
+            "Your session is for a different wiki. Log in again on this wiki."
+
+        SavePageDeleteDraftReasonInvalid e ->
+            deleteReasonErrorToUserText e
+
+        SavePageDeleteDraftTargetNotPublished ->
+            "That page does not exist or has no published content yet."
+
+        SavePageDeleteDraftNotFound ->
+            "That draft was not found."
+
+        SavePageDeleteDraftForbidden ->
+            "You cannot update this draft."
+
+        SavePageDeleteDraftWikiNotFound ->
+            "This wiki does not exist."
+
+        SavePageDeleteDraftWikiInactive ->
+            "This wiki is currently paused."
+
+
+type WithdrawSubmissionError
+    = WithdrawSubmissionNotLoggedIn
+    | WithdrawSubmissionWrongWikiSession
+    | WithdrawSubmissionWikiNotFound
+    | WithdrawSubmissionWikiInactive
+    | WithdrawSubmissionNotPendingOrNeedsRevision
+    | WithdrawSubmissionNotFound
+    | WithdrawSubmissionForbidden
+
+
+withdrawSubmissionErrorToUserText : WithdrawSubmissionError -> String
+withdrawSubmissionErrorToUserText err =
+    case err of
+        WithdrawSubmissionNotLoggedIn ->
+            "You must be logged in to withdraw a submission."
+
+        WithdrawSubmissionWrongWikiSession ->
+            "Your session is for a different wiki. Log in again on this wiki."
+
+        WithdrawSubmissionWikiNotFound ->
+            "This wiki does not exist."
+
+        WithdrawSubmissionWikiInactive ->
+            "This wiki is currently paused."
+
+        WithdrawSubmissionNotPendingOrNeedsRevision ->
+            "Only submissions waiting for review can be withdrawn to edit as a draft."
+
+        WithdrawSubmissionNotFound ->
+            "That submission was not found."
+
+        WithdrawSubmissionForbidden ->
+            "You cannot withdraw this submission."
+
+
+withdrawSubmissionToDraft : Submission -> Result WithdrawSubmissionError Submission
+withdrawSubmissionToDraft sub =
+    case sub.status of
+        Pending ->
+            Ok { sub | status = Draft }
+
+        NeedsRevision ->
+            Ok { sub | status = Draft }
+
+        Draft ->
+            Err WithdrawSubmissionNotPendingOrNeedsRevision
+
+        Approved ->
+            Err WithdrawSubmissionNotPendingOrNeedsRevision
+
+        Rejected ->
+            Err WithdrawSubmissionNotPendingOrNeedsRevision
+
+
+type SubmitDraftForReviewError
+    = SubmitDraftForReviewNotLoggedIn
+    | SubmitDraftForReviewWrongWikiSession
+    | SubmitDraftForReviewWikiNotFound
+    | SubmitDraftForReviewWikiInactive
+    | SubmitDraftForReviewNotDraft
+    | SubmitDraftForReviewValidation ValidationError
+    | SubmitDraftForReviewSlugInUse
+    | SubmitDraftForReviewPageExists
+    | SubmitDraftForReviewEditTargetNotPublished
+    | SubmitDraftForReviewEditAlreadyPending
+    | SubmitDraftForReviewDeleteTargetNotPublished
+    | SubmitDraftForReviewDeleteReasonInvalid DeleteReasonError
+    | SubmitDraftForReviewNotFound
+    | SubmitDraftForReviewForbidden
+
+
+submitDraftForReviewErrorToUserText : SubmitDraftForReviewError -> String
+submitDraftForReviewErrorToUserText err =
+    case err of
+        SubmitDraftForReviewNotLoggedIn ->
+            "You must be logged in to submit for review."
+
+        SubmitDraftForReviewWrongWikiSession ->
+            "Your session is for a different wiki. Log in again on this wiki."
+
+        SubmitDraftForReviewWikiNotFound ->
+            "This wiki does not exist."
+
+        SubmitDraftForReviewWikiInactive ->
+            "This wiki is currently paused."
+
+        SubmitDraftForReviewNotDraft ->
+            "That submission is not a draft."
+
+        SubmitDraftForReviewValidation e ->
+            validationErrorToUserText e
+
+        SubmitDraftForReviewSlugInUse ->
+            "A page or pending submission already uses this slug."
+
+        SubmitDraftForReviewPageExists ->
+            "A published page already uses this slug."
+
+        SubmitDraftForReviewEditTargetNotPublished ->
+            "That page does not exist or has no published content yet."
+
+        SubmitDraftForReviewEditAlreadyPending ->
+            "You already have a pending edit for this page."
+
+        SubmitDraftForReviewDeleteTargetNotPublished ->
+            "That page does not exist or has no published content yet."
+
+        SubmitDraftForReviewDeleteReasonInvalid e ->
+            deleteReasonErrorToUserText e
+
+        SubmitDraftForReviewNotFound ->
+            "That submission was not found."
+
+        SubmitDraftForReviewForbidden ->
+            "You cannot submit this draft."
+
+
+{-| Turn a contributor draft into a pending review submission (pure). Rebases edit proposals on current published markdown.
+-}
+promoteDraftToPending : Wiki.Wiki -> Dict String Submission -> Submission -> Result SubmitDraftForReviewError Submission
+promoteDraftToPending wiki allSubs sub =
+    if sub.status /= Draft then
+        Err SubmitDraftForReviewNotDraft
 
     else
         case sub.kind of
-            NewPage _ ->
-                Err ResubmitEditNotEditKind
+            NewPage body ->
+                case validateNewPageFields body.pageSlug body.markdown of
+                    Err e ->
+                        Err (SubmitDraftForReviewValidation e)
+
+                    Ok payload ->
+                        if Dict.member payload.pageSlug wiki.pages then
+                            Err SubmitDraftForReviewPageExists
+
+                        else if pendingNewPageSlugInUseExcept (Just sub.id) sub.wikiSlug payload.pageSlug allSubs then
+                            Err SubmitDraftForReviewSlugInUse
+
+                        else
+                            Ok
+                                { sub
+                                    | status = Pending
+                                    , reviewerNote = Nothing
+                                    , kind =
+                                        NewPage
+                                            { pageSlug = payload.pageSlug
+                                            , markdown = payload.markdown
+                                            }
+                                }
 
             EditPage body ->
-                case validateEditMarkdown payload.markdown of
-                    Err validationError ->
-                        Err (ResubmitEditValidation validationError)
+                case validateEditMarkdown body.proposedMarkdown of
+                    Err e ->
+                        Err (SubmitDraftForReviewValidation e)
 
                     Ok proposedMarkdown ->
-                        Ok
-                            { sub
-                                | status = Pending
-                                , reviewerNote = Nothing
-                                , kind =
-                                    EditPage
-                                        { body
-                                            | baseMarkdown = payload.currentMarkdown
-                                            , baseRevision = payload.currentRevision
-                                            , proposedMarkdown = proposedMarkdown
-                                        }
-                            }
+                        if not (wikiHasPublishedPage body.pageSlug wiki) then
+                            Err SubmitDraftForReviewEditTargetNotPublished
 
-            DeletePage _ ->
-                Err ResubmitEditNotEditKind
+                        else if pendingEditForAuthorOnPageInUseExcept (Just sub.id) sub.wikiSlug sub.authorId body.pageSlug allSubs then
+                            Err SubmitDraftForReviewEditAlreadyPending
+
+                        else
+                            let
+                                currentMarkdown : String
+                                currentMarkdown =
+                                    currentPublishedMarkdown wiki body.pageSlug
+
+                                currentRevision : Int
+                                currentRevision =
+                                    currentPublishedRevision wiki body.pageSlug
+                                        |> Maybe.withDefault 0
+                            in
+                            Ok
+                                { sub
+                                    | status = Pending
+                                    , reviewerNote = Nothing
+                                    , kind =
+                                        EditPage
+                                            { pageSlug = body.pageSlug
+                                            , baseMarkdown = currentMarkdown
+                                            , baseRevision = currentRevision
+                                            , proposedMarkdown = proposedMarkdown
+                                            }
+                                }
+
+            DeletePage body ->
+                case validateDeleteReason (body.reason |> Maybe.withDefault "") of
+                    Err e ->
+                        Err (SubmitDraftForReviewDeleteReasonInvalid e)
+
+                    Ok maybeReason ->
+                        if not (wikiHasPublishedPage body.pageSlug wiki) then
+                            Err SubmitDraftForReviewDeleteTargetNotPublished
+
+                        else
+                            Ok
+                                { sub
+                                    | status = Pending
+                                    , reviewerNote = Nothing
+                                    , kind =
+                                        DeletePage
+                                            { pageSlug = body.pageSlug
+                                            , reason = maybeReason
+                                            }
+                                }
+
+
+type DeleteMySubmissionError
+    = DeleteMySubmissionNotLoggedIn
+    | DeleteMySubmissionWrongWikiSession
+    | DeleteMySubmissionWikiNotFound
+    | DeleteMySubmissionWikiInactive
+    | DeleteMySubmissionApproved
+    | DeleteMySubmissionNotFound
+    | DeleteMySubmissionForbidden
+
+
+deleteMySubmissionErrorToUserText : DeleteMySubmissionError -> String
+deleteMySubmissionErrorToUserText err =
+    case err of
+        DeleteMySubmissionNotLoggedIn ->
+            "You must be logged in to delete a submission."
+
+        DeleteMySubmissionWrongWikiSession ->
+            "Your session is for a different wiki. Log in again on this wiki."
+
+        DeleteMySubmissionWikiNotFound ->
+            "This wiki does not exist."
+
+        DeleteMySubmissionWikiInactive ->
+            "This wiki is currently paused."
+
+        DeleteMySubmissionApproved ->
+            "Approved submissions cannot be deleted."
+
+        DeleteMySubmissionNotFound ->
+            "That submission was not found."
+
+        DeleteMySubmissionForbidden ->
+            "You cannot delete this submission."
+
+
+{-| Pure: contributor may delete non-approved submissions.
+-}
+mayContributorDeleteSubmission : Submission -> Result DeleteMySubmissionError ()
+mayContributorDeleteSubmission sub =
+    case sub.status of
+        Draft ->
+            Ok ()
+
+        Pending ->
+            Ok ()
+
+        NeedsRevision ->
+            Ok ()
+
+        Rejected ->
+            Ok ()
+
+        Approved ->
+            Err DeleteMySubmissionApproved
 
 
 isStalePendingEditSubmission : { pageSlug : Page.Slug, currentRevision : Int } -> Submission -> Bool

@@ -13,8 +13,9 @@ module ProgramTest.Config exposing
     )
 
 import Backend
-import Effect.Command as Command
-import Effect.Lamdera
+import Effect.Command as Command exposing (BackendOnly, Command)
+import Effect.Lamdera exposing (ClientId, SessionId)
+import Effect.Subscription exposing (Subscription)
 import Effect.Test
 import Env
 import Frontend
@@ -90,9 +91,31 @@ type ConfigBuilder
 finish : ConfigBuilder -> Effect.Test.Config ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model
 finish (ConfigBuilder steps) =
     let
+        baseBackendApp :
+            { init : ( Backend.Model, Command BackendOnly ToFrontend Backend.Msg )
+            , update : Backend.Msg -> Backend.Model -> ( Backend.Model, Command BackendOnly ToFrontend Backend.Msg )
+            , updateFromFrontend :
+                SessionId
+                -> ClientId
+                -> ToBackend
+                -> Backend.Model
+                -> ( Backend.Model, Command BackendOnly ToFrontend Backend.Msg )
+            , subscriptions : Backend.Model -> Subscription BackendOnly Backend.Msg
+            }
         baseBackendApp =
             Backend.app_
 
+        backendApp :
+            { init : ( Backend.Model, Command BackendOnly ToFrontend Backend.Msg )
+            , update : Backend.Msg -> Backend.Model -> ( Backend.Model, Command BackendOnly ToFrontend Backend.Msg )
+            , updateFromFrontend :
+                SessionId
+                -> ClientId
+                -> ToBackend
+                -> Backend.Model
+                -> ( Backend.Model, Command BackendOnly ToFrontend Backend.Msg )
+            , subscriptions : Backend.Model -> Subscription BackendOnly Backend.Msg
+            }
         backendApp =
             { baseBackendApp
                 | init =

@@ -191,13 +191,14 @@ suite =
                                 , Store.AskForWikiFrontendDetails slug
                                 , Store.AskForWikiAuditLog slug WikiAuditLog.emptyAuditLogFilter
                                 ]
-              , Test.fuzz (Fuzz.map2 Tuple.pair Fuzzers.wikiSlug Fuzzers.pageSlug) "storeActions WikiPage asks catalog, details, and published page" <|
+              , Test.fuzz (Fuzz.map2 Tuple.pair Fuzzers.wikiSlug Fuzzers.pageSlug) "storeActions WikiPage asks catalog, details, published page, and my submissions" <|
                     \( wikiSlug, pageSlug ) ->
                         Route.storeActions (Route.WikiPage wikiSlug pageSlug)
                             |> Expect.equal
                                 [ Store.AskForWikiCatalog
                                 , Store.AskForWikiFrontendDetails wikiSlug
                                 , Store.AskForPageFrontendDetails wikiSlug pageSlug
+                                , Store.AskForMyPendingSubmissions wikiSlug
                                 ]
               , Test.test "storeActions HostAdmin asks nothing" <|
                     \_ ->

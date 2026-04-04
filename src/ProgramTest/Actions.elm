@@ -62,6 +62,7 @@ markdownH1OrPageSlug pageSlug markdownBody =
 
         Just line ->
             let
+                trimmed : String
                 trimmed =
                     String.trim line
             in

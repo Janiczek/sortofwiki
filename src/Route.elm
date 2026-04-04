@@ -468,6 +468,7 @@ storeActions route =
             [ AskForWikiCatalog
             , AskForWikiFrontendDetails wikiSlug
             , AskForPageFrontendDetails wikiSlug pageSlug
+            , AskForMyPendingSubmissions wikiSlug
             ]
 
         WikiLogin slug _ ->

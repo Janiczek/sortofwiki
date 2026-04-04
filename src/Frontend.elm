@@ -23,7 +23,7 @@ import Effect.Lamdera
 import Effect.Subscription as Subscription exposing (Subscription)
 import Effect.Task
 import HostAdmin
-import Html exposing (Attribute, Html)
+import Html exposing (Html)
 import Html.Attributes as Attr
 import Html.Events as Events
 import Json.Decode
@@ -43,7 +43,7 @@ import SubmissionReviewDetail
 import Svg
 import Svg.Attributes as SvgAttr
 import TW
-import Types exposing (FrontendModel, FrontendMsg(..), HostAdminCreateWikiDraft, HostAdminLoginDraft, HostAdminWikiDetailDraft, LoginDraft, NewPageSubmitDraft, PageDeleteSubmitDraft, PageEditSubmitDraft, RegisterDraft, ReviewApproveDraft, ReviewDecision(..), ReviewRejectDraft, ReviewRequestChangesDraft, ToBackend(..), ToFrontend(..))
+import Types exposing (FrontendModel, FrontendMsg(..), HostAdminCreateWikiDraft, HostAdminLoginDraft, HostAdminWikiDetailDraft, LoginDraft, NewPageSubmitDraft, PageDeleteSubmitDraft, PageEditSubmitDraft, RegisterDraft, ReviewApproveDraft, ReviewDecision(..), ReviewRejectDraft, ReviewRequestChangesDraft, SubmissionDetailEditDraft, ToBackend(..), ToFrontend(..), emptySubmissionDetailEditDraft)
 import UI
 import Url exposing (Url)
 import Wiki
@@ -65,7 +65,6 @@ type AppHeaderSecondary
     | AppHeaderSecondaryWikiLink String
     | AppHeaderSecondaryPlainThenWikiLink { plainPrefix : String, wikiLabel : String }
     | AppHeaderSecondaryWikiLinkThenPlain { wikiLabel : String, plainSuffix : String }
-    | AppHeaderSecondaryConflictResolve { pageSlug : Page.Slug, submissionId : String }
 
 
 type alias AppHeaderTitle =
@@ -91,29 +90,9 @@ sortOfWikiAppHeaderTitle secondary =
     }
 
 
-submissionDetailConflictResolveSecondary :
-    Store
-    -> Wiki.Slug
-    -> String
-    -> Maybe AppHeaderSecondary
-submissionDetailConflictResolveSecondary store wikiSlug submissionId =
-    case Store.get_ ( wikiSlug, submissionId ) store.submissionDetails of
-        RemoteData.Success (Ok detail) ->
-            if detail.status == Submission.NeedsRevision then
-                detail.conflictContext
-                    |> Maybe.map
-                        (\ctx ->
-                            AppHeaderSecondaryConflictResolve
-                                { pageSlug = ctx.pageSlug
-                                , submissionId = submissionId
-                                }
-                        )
-
-            else
-                Nothing
-
-        _ ->
-            Nothing
+submissionDetailConflictResolveSecondary : Maybe AppHeaderSecondary
+submissionDetailConflictResolveSecondary =
+    Nothing
 
 
 storeConfig : Store.Config ToBackend
@@ -206,8 +185,12 @@ emptyNewPageSubmitDraft =
     { pageSlug = ""
     , pageSlugLockedFromQuery = False
     , markdownBody = ""
+    , maybeSavedDraftId = Nothing
     , inFlight = False
+    , saveDraftInFlight = False
+    , pendingSubmitAfterSave = False
     , lastResult = Nothing
+    , lastSaveDraftResult = Nothing
     }
 
 
@@ -309,11 +292,6 @@ submissionDetailMarkdownTextareaEditableClass =
     submissionDetailMarkdownTextareaBaseClass ++ " resize-y text-[var(--fg)]"
 
 
-submissionDetailMarkdownTextareaGridStretchClass : String
-submissionDetailMarkdownTextareaGridStretchClass =
-    " h-full"
-
-
 submissionDetailMarkdownTextareaDiffCellClass : String
 submissionDetailMarkdownTextareaDiffCellClass =
     " h-full min-h-0 flex-1"
@@ -386,9 +364,12 @@ wikiSideNavSlugIfActive model =
 emptyPageEditSubmitDraft : PageEditSubmitDraft
 emptyPageEditSubmitDraft =
     { markdownBody = ""
+    , maybeSavedDraftId = Nothing
     , inFlight = False
+    , saveDraftInFlight = False
+    , pendingSubmitAfterSave = False
     , lastResult = Nothing
-    , lastResubmitResult = Nothing
+    , lastSaveDraftResult = Nothing
     }
 
 
@@ -416,8 +397,12 @@ pageEditSubmitDraftForRoute route store =
 emptyPageDeleteSubmitDraft : PageDeleteSubmitDraft
 emptyPageDeleteSubmitDraft =
     { reasonText = ""
+    , maybeSavedDraftId = Nothing
     , inFlight = False
+    , saveDraftInFlight = False
+    , pendingSubmitAfterSave = False
     , lastResult = Nothing
+    , lastSaveDraftResult = Nothing
     }
 
 
@@ -442,6 +427,171 @@ emptyReviewRequestChangesDraft =
     , inFlight = False
     , lastResult = Nothing
     }
+
+
+submissionDetailEditDraftFromDetail : Submission.ContributorView -> SubmissionDetailEditDraft
+submissionDetailEditDraftFromDetail detail =
+    { emptySubmissionDetailEditDraft
+        | markdownBody = detail.compareNewMarkdown
+        , newPageSlug = detail.maybeNewPageSlug |> Maybe.withDefault ""
+    }
+
+
+submissionDetailNextStepsText : Submission.Status -> String
+submissionDetailNextStepsText status =
+    case status of
+        Submission.Draft ->
+            "This is a draft. Save your changes, then submit for review when you are ready. A trusted contributor will approve, reject, or request changes before anything goes live on the wiki."
+
+        Submission.Pending ->
+            "A trusted contributor will review this submission. They may approve it, reject it, or ask you to revise it before it affects the wiki."
+
+        Submission.NeedsRevision ->
+            "A reviewer asked for changes. Withdraw to edit as a draft, then submit again when you are ready."
+
+        Submission.Rejected ->
+            "This submission was rejected. You can delete it to remove it from your list."
+
+        Submission.Approved ->
+            "This submission was approved and applied to the wiki."
+
+
+submitDraftForReviewErrorToSubmitNewPageError : Submission.SubmitDraftForReviewError -> Submission.SubmitNewPageError
+submitDraftForReviewErrorToSubmitNewPageError err =
+    case err of
+        Submission.SubmitDraftForReviewNotLoggedIn ->
+            Submission.NotLoggedIn
+
+        Submission.SubmitDraftForReviewWrongWikiSession ->
+            Submission.WrongWikiSession
+
+        Submission.SubmitDraftForReviewWikiNotFound ->
+            Submission.WikiNotFound
+
+        Submission.SubmitDraftForReviewWikiInactive ->
+            Submission.WikiInactive
+
+        Submission.SubmitDraftForReviewNotDraft ->
+            Submission.Validation Submission.BodyEmpty
+
+        Submission.SubmitDraftForReviewValidation ve ->
+            Submission.Validation ve
+
+        Submission.SubmitDraftForReviewSlugInUse ->
+            Submission.SlugAlreadyInUse
+
+        Submission.SubmitDraftForReviewPageExists ->
+            Submission.SlugAlreadyInUse
+
+        Submission.SubmitDraftForReviewEditTargetNotPublished ->
+            Submission.Validation Submission.BodyEmpty
+
+        Submission.SubmitDraftForReviewEditAlreadyPending ->
+            Submission.Validation Submission.BodyEmpty
+
+        Submission.SubmitDraftForReviewDeleteTargetNotPublished ->
+            Submission.Validation Submission.BodyEmpty
+
+        Submission.SubmitDraftForReviewDeleteReasonInvalid _ ->
+            Submission.Validation Submission.BodyEmpty
+
+        Submission.SubmitDraftForReviewNotFound ->
+            Submission.WikiNotFound
+
+        Submission.SubmitDraftForReviewForbidden ->
+            Submission.WrongWikiSession
+
+
+submitDraftForReviewErrorToSubmitPageEditError : Submission.SubmitDraftForReviewError -> Submission.SubmitPageEditError
+submitDraftForReviewErrorToSubmitPageEditError err =
+    case err of
+        Submission.SubmitDraftForReviewNotLoggedIn ->
+            Submission.EditNotLoggedIn
+
+        Submission.SubmitDraftForReviewWrongWikiSession ->
+            Submission.EditWrongWikiSession
+
+        Submission.SubmitDraftForReviewWikiNotFound ->
+            Submission.EditWikiNotFound
+
+        Submission.SubmitDraftForReviewWikiInactive ->
+            Submission.EditWikiInactive
+
+        Submission.SubmitDraftForReviewNotDraft ->
+            Submission.EditValidation Submission.BodyEmpty
+
+        Submission.SubmitDraftForReviewValidation ve ->
+            Submission.EditValidation ve
+
+        Submission.SubmitDraftForReviewSlugInUse ->
+            Submission.EditValidation Submission.BodyEmpty
+
+        Submission.SubmitDraftForReviewPageExists ->
+            Submission.EditValidation Submission.BodyEmpty
+
+        Submission.SubmitDraftForReviewEditTargetNotPublished ->
+            Submission.EditTargetPageNotPublished
+
+        Submission.SubmitDraftForReviewEditAlreadyPending ->
+            Submission.EditAlreadyPendingForAuthor
+
+        Submission.SubmitDraftForReviewDeleteTargetNotPublished ->
+            Submission.EditValidation Submission.BodyEmpty
+
+        Submission.SubmitDraftForReviewDeleteReasonInvalid _ ->
+            Submission.EditValidation Submission.BodyEmpty
+
+        Submission.SubmitDraftForReviewNotFound ->
+            Submission.EditWikiNotFound
+
+        Submission.SubmitDraftForReviewForbidden ->
+            Submission.EditWrongWikiSession
+
+
+submitDraftForReviewErrorToSubmitPageDeleteError : Submission.SubmitDraftForReviewError -> Submission.SubmitPageDeleteError
+submitDraftForReviewErrorToSubmitPageDeleteError err =
+    case err of
+        Submission.SubmitDraftForReviewNotLoggedIn ->
+            Submission.DeleteNotLoggedIn
+
+        Submission.SubmitDraftForReviewWrongWikiSession ->
+            Submission.DeleteWrongWikiSession
+
+        Submission.SubmitDraftForReviewWikiNotFound ->
+            Submission.DeleteWikiNotFound
+
+        Submission.SubmitDraftForReviewWikiInactive ->
+            Submission.DeleteWikiInactive
+
+        Submission.SubmitDraftForReviewNotDraft ->
+            Submission.DeleteValidation Submission.ReasonTooLong
+
+        Submission.SubmitDraftForReviewValidation _ ->
+            Submission.DeleteValidation Submission.ReasonTooLong
+
+        Submission.SubmitDraftForReviewSlugInUse ->
+            Submission.DeleteValidation Submission.ReasonTooLong
+
+        Submission.SubmitDraftForReviewPageExists ->
+            Submission.DeleteValidation Submission.ReasonTooLong
+
+        Submission.SubmitDraftForReviewEditTargetNotPublished ->
+            Submission.DeleteValidation Submission.ReasonTooLong
+
+        Submission.SubmitDraftForReviewEditAlreadyPending ->
+            Submission.DeleteValidation Submission.ReasonTooLong
+
+        Submission.SubmitDraftForReviewDeleteTargetNotPublished ->
+            Submission.DeleteTargetPageNotPublished
+
+        Submission.SubmitDraftForReviewDeleteReasonInvalid de ->
+            Submission.DeleteValidation de
+
+        Submission.SubmitDraftForReviewNotFound ->
+            Submission.DeleteWikiNotFound
+
+        Submission.SubmitDraftForReviewForbidden ->
+            Submission.DeleteWrongWikiSession
 
 
 app_ :
@@ -849,6 +999,7 @@ init url key =
             , reviewDecision = ReviewDecisionApprove
             , reviewRejectDraft = emptyReviewRejectDraft
             , reviewRequestChangesDraft = emptyReviewRequestChangesDraft
+            , submissionDetailEditDraft = emptySubmissionDetailEditDraft
             , adminPromoteError = Nothing
             , adminDemoteError = Nothing
             , adminGrantAdminError = Nothing
@@ -904,6 +1055,7 @@ init url key =
             , reviewDecision = ReviewDecisionApprove
             , reviewRejectDraft = emptyReviewRejectDraft
             , reviewRequestChangesDraft = emptyReviewRequestChangesDraft
+            , submissionDetailEditDraft = emptySubmissionDetailEditDraft
             , adminPromoteError = Nothing
             , adminDemoteError = Nothing
             , adminGrantAdminError = Nothing
@@ -1401,6 +1553,7 @@ update msg model =
                         , reviewDecision = ReviewDecisionApprove
                         , reviewRejectDraft = emptyReviewRejectDraft
                         , reviewRequestChangesDraft = emptyReviewRequestChangesDraft
+                        , submissionDetailEditDraft = emptySubmissionDetailEditDraft
                         , adminPromoteError = Nothing
                         , adminDemoteError = Nothing
                         , adminGrantAdminError = Nothing
@@ -1798,29 +1951,55 @@ update msg model =
                         d =
                             model.newPageSubmitDraft
                     in
-                    case Submission.validateNewPageFields d.pageSlug d.markdownBody of
-                        Err ve ->
-                            ( { model
-                                | newPageSubmitDraft =
-                                    { d
-                                        | lastResult = Just (Err (Submission.Validation ve))
-                                        , inFlight = False
-                                    }
-                              }
-                            , Command.none
-                            )
+                    case d.maybeSavedDraftId of
+                        Just draftId ->
+                            case Submission.validateNewPageFields d.pageSlug d.markdownBody of
+                                Err ve ->
+                                    ( { model
+                                        | newPageSubmitDraft =
+                                            { d
+                                                | lastResult = Just (Err (Submission.Validation ve))
+                                                , inFlight = False
+                                            }
+                                      }
+                                    , Command.none
+                                    )
 
-                        Ok _ ->
-                            ( { model
-                                | newPageSubmitDraft =
-                                    { d
-                                        | inFlight = True
-                                        , lastResult = Nothing
-                                    }
-                              }
-                            , Effect.Lamdera.sendToBackend
-                                (SubmitNewPage wikiSlug { rawPageSlug = d.pageSlug, rawMarkdown = d.markdownBody })
-                            )
+                                Ok _ ->
+                                    ( { model
+                                        | newPageSubmitDraft =
+                                            { d
+                                                | inFlight = True
+                                                , lastResult = Nothing
+                                            }
+                                      }
+                                    , Effect.Lamdera.sendToBackend (SubmitDraftForReview wikiSlug draftId)
+                                    )
+
+                        Nothing ->
+                            case Submission.validateNewPageFields d.pageSlug d.markdownBody of
+                                Err ve ->
+                                    ( { model
+                                        | newPageSubmitDraft =
+                                            { d
+                                                | lastResult = Just (Err (Submission.Validation ve))
+                                                , inFlight = False
+                                            }
+                                      }
+                                    , Command.none
+                                    )
+
+                                Ok _ ->
+                                    ( { model
+                                        | newPageSubmitDraft =
+                                            { d
+                                                | inFlight = True
+                                                , lastResult = Nothing
+                                            }
+                                      }
+                                    , Effect.Lamdera.sendToBackend
+                                        (SubmitNewPage wikiSlug { rawPageSlug = d.pageSlug, rawMarkdown = d.markdownBody })
+                                    )
 
                 Route.WikiSubmitEdit _ _ ->
                     ( model, Command.none )
@@ -1867,6 +2046,47 @@ update msg model =
                 Route.NotFound _ ->
                     ( model, Command.none )
 
+        NewPageSaveDraftClicked ->
+            case model.route of
+                Route.WikiSubmitNew wikiSlug ->
+                    let
+                        d : NewPageSubmitDraft
+                        d =
+                            model.newPageSubmitDraft
+                    in
+                    case Submission.validateNewPageDraftFields d.pageSlug d.markdownBody of
+                        Err ve ->
+                            ( { model
+                                | newPageSubmitDraft =
+                                    { d
+                                        | lastSaveDraftResult = Just (Err (Submission.SaveNewPageDraftValidation ve))
+                                        , saveDraftInFlight = False
+                                    }
+                              }
+                            , Command.none
+                            )
+
+                        Ok _ ->
+                            ( { model
+                                | newPageSubmitDraft =
+                                    { d
+                                        | saveDraftInFlight = True
+                                        , pendingSubmitAfterSave = False
+                                        , lastSaveDraftResult = Nothing
+                                    }
+                              }
+                            , Effect.Lamdera.sendToBackend
+                                (SaveNewPageDraft wikiSlug
+                                    { maybeSubmissionId = d.maybeSavedDraftId
+                                    , rawPageSlug = d.pageSlug
+                                    , rawMarkdown = d.markdownBody
+                                    }
+                                )
+                            )
+
+                _ ->
+                    ( model, Command.none )
+
         PageEditSubmitMarkdownChanged value ->
             let
                 d : PageEditSubmitDraft
@@ -1903,31 +2123,55 @@ update msg model =
                         d =
                             model.pageEditSubmitDraft
                     in
-                    case Submission.validateEditMarkdown d.markdownBody of
-                        Err ve ->
-                            ( { model
-                                | pageEditSubmitDraft =
-                                    { d
-                                        | lastResult = Just (Err (Submission.EditValidation ve))
-                                        , lastResubmitResult = Nothing
-                                        , inFlight = False
-                                    }
-                              }
-                            , Command.none
-                            )
+                    case d.maybeSavedDraftId of
+                        Just draftId ->
+                            case Submission.validateEditMarkdown d.markdownBody of
+                                Err ve ->
+                                    ( { model
+                                        | pageEditSubmitDraft =
+                                            { d
+                                                | lastResult = Just (Err (Submission.EditValidation ve))
+                                                , inFlight = False
+                                            }
+                                      }
+                                    , Command.none
+                                    )
 
-                        Ok _ ->
-                            ( { model
-                                | pageEditSubmitDraft =
-                                    { d
-                                        | inFlight = True
-                                        , lastResult = Nothing
-                                        , lastResubmitResult = Nothing
-                                    }
-                              }
-                            , Effect.Lamdera.sendToBackend
-                                (SubmitPageEdit wikiSlug pageSlug d.markdownBody)
-                            )
+                                Ok _ ->
+                                    ( { model
+                                        | pageEditSubmitDraft =
+                                            { d
+                                                | inFlight = True
+                                                , lastResult = Nothing
+                                            }
+                                      }
+                                    , Effect.Lamdera.sendToBackend (SubmitDraftForReview wikiSlug draftId)
+                                    )
+
+                        Nothing ->
+                            case Submission.validateEditMarkdown d.markdownBody of
+                                Err ve ->
+                                    ( { model
+                                        | pageEditSubmitDraft =
+                                            { d
+                                                | lastResult = Just (Err (Submission.EditValidation ve))
+                                                , inFlight = False
+                                            }
+                                      }
+                                    , Command.none
+                                    )
+
+                                Ok _ ->
+                                    ( { model
+                                        | pageEditSubmitDraft =
+                                            { d
+                                                | inFlight = True
+                                                , lastResult = Nothing
+                                            }
+                                      }
+                                    , Effect.Lamdera.sendToBackend
+                                        (SubmitPageEdit wikiSlug pageSlug d.markdownBody)
+                                    )
 
                 Route.WikiSubmitDelete _ _ ->
                     ( model, Command.none )
@@ -1969,6 +2213,47 @@ update msg model =
                     ( model, Command.none )
 
                 Route.NotFound _ ->
+                    ( model, Command.none )
+
+        PageEditSaveDraftClicked ->
+            case model.route of
+                Route.WikiSubmitEdit wikiSlug pageSlug ->
+                    let
+                        d : PageEditSubmitDraft
+                        d =
+                            model.pageEditSubmitDraft
+                    in
+                    case Submission.validateEditMarkdownDraft d.markdownBody of
+                        Err ve ->
+                            ( { model
+                                | pageEditSubmitDraft =
+                                    { d
+                                        | lastSaveDraftResult = Just (Err (Submission.SavePageEditDraftValidation ve))
+                                        , saveDraftInFlight = False
+                                    }
+                              }
+                            , Command.none
+                            )
+
+                        Ok _ ->
+                            ( { model
+                                | pageEditSubmitDraft =
+                                    { d
+                                        | saveDraftInFlight = True
+                                        , pendingSubmitAfterSave = False
+                                        , lastSaveDraftResult = Nothing
+                                    }
+                              }
+                            , Effect.Lamdera.sendToBackend
+                                (SavePageEditDraft wikiSlug
+                                    { maybeSubmissionId = d.maybeSavedDraftId
+                                    , pageSlug = pageSlug
+                                    , rawMarkdown = d.markdownBody
+                                    }
+                                )
+                            )
+
+                _ ->
                     ( model, Command.none )
 
         PageDeleteSubmitReasonChanged value ->
@@ -2010,29 +2295,55 @@ update msg model =
                         d =
                             model.pageDeleteSubmitDraft
                     in
-                    case Submission.validateDeleteReason d.reasonText of
-                        Err ve ->
-                            ( { model
-                                | pageDeleteSubmitDraft =
-                                    { d
-                                        | lastResult = Just (Err (Submission.DeleteValidation ve))
-                                        , inFlight = False
-                                    }
-                              }
-                            , Command.none
-                            )
+                    case d.maybeSavedDraftId of
+                        Just draftId ->
+                            case Submission.validateDeleteReason d.reasonText of
+                                Err ve ->
+                                    ( { model
+                                        | pageDeleteSubmitDraft =
+                                            { d
+                                                | lastResult = Just (Err (Submission.DeleteValidation ve))
+                                                , inFlight = False
+                                            }
+                                      }
+                                    , Command.none
+                                    )
 
-                        Ok _ ->
-                            ( { model
-                                | pageDeleteSubmitDraft =
-                                    { d
-                                        | inFlight = True
-                                        , lastResult = Nothing
-                                    }
-                              }
-                            , Effect.Lamdera.sendToBackend
-                                (SubmitPageDelete wikiSlug pageSlug d.reasonText)
-                            )
+                                Ok _ ->
+                                    ( { model
+                                        | pageDeleteSubmitDraft =
+                                            { d
+                                                | inFlight = True
+                                                , lastResult = Nothing
+                                            }
+                                      }
+                                    , Effect.Lamdera.sendToBackend (SubmitDraftForReview wikiSlug draftId)
+                                    )
+
+                        Nothing ->
+                            case Submission.validateDeleteReason d.reasonText of
+                                Err ve ->
+                                    ( { model
+                                        | pageDeleteSubmitDraft =
+                                            { d
+                                                | lastResult = Just (Err (Submission.DeleteValidation ve))
+                                                , inFlight = False
+                                            }
+                                      }
+                                    , Command.none
+                                    )
+
+                                Ok _ ->
+                                    ( { model
+                                        | pageDeleteSubmitDraft =
+                                            { d
+                                                | inFlight = True
+                                                , lastResult = Nothing
+                                            }
+                                      }
+                                    , Effect.Lamdera.sendToBackend
+                                        (SubmitPageDelete wikiSlug pageSlug d.reasonText)
+                                    )
 
                 Route.WikiSubmissionDetail _ _ ->
                     ( model, Command.none )
@@ -2073,31 +2384,21 @@ update msg model =
                 Route.NotFound _ ->
                     ( model, Command.none )
 
-        SubmissionConflictResubmitMarkdownChanged value ->
-            let
-                d : PageEditSubmitDraft
-                d =
-                    model.pageEditSubmitDraft
-            in
-            ( { model | pageEditSubmitDraft = { d | markdownBody = value } }
-            , Command.none
-            )
-
-        SubmissionConflictResubmitSubmitted ->
+        PageDeleteSaveDraftClicked ->
             case model.route of
-                Route.WikiSubmissionDetail wikiSlug submissionId ->
+                Route.WikiSubmitDelete wikiSlug pageSlug ->
                     let
-                        d : PageEditSubmitDraft
+                        d : PageDeleteSubmitDraft
                         d =
-                            model.pageEditSubmitDraft
+                            model.pageDeleteSubmitDraft
                     in
-                    case Submission.validateEditMarkdown d.markdownBody of
+                    case Submission.validateDeleteReason d.reasonText of
                         Err ve ->
                             ( { model
-                                | pageEditSubmitDraft =
+                                | pageDeleteSubmitDraft =
                                     { d
-                                        | lastResubmitResult = Just (Err (Submission.ResubmitEditValidation ve))
-                                        , inFlight = False
+                                        | lastSaveDraftResult = Just (Err (Submission.SavePageDeleteDraftReasonInvalid ve))
+                                        , saveDraftInFlight = False
                                     }
                               }
                             , Command.none
@@ -2105,15 +2406,227 @@ update msg model =
 
                         Ok _ ->
                             ( { model
-                                | pageEditSubmitDraft =
+                                | pageDeleteSubmitDraft =
                                     { d
-                                        | inFlight = True
-                                        , lastResubmitResult = Nothing
+                                        | saveDraftInFlight = True
+                                        , pendingSubmitAfterSave = False
+                                        , lastSaveDraftResult = Nothing
                                     }
                               }
                             , Effect.Lamdera.sendToBackend
-                                (ResubmitPageEdit wikiSlug { submissionId = submissionId, rawMarkdown = d.markdownBody })
+                                (SavePageDeleteDraft wikiSlug
+                                    { maybeSubmissionId = d.maybeSavedDraftId
+                                    , pageSlug = pageSlug
+                                    , rawReason = d.reasonText
+                                    }
+                                )
                             )
+
+                _ ->
+                    ( model, Command.none )
+
+        SubmissionDetailNewMarkdownChanged value ->
+            let
+                inter : SubmissionDetailEditDraft
+                inter =
+                    model.submissionDetailEditDraft
+            in
+            ( { model | submissionDetailEditDraft = { inter | markdownBody = value } }
+            , Command.none
+            )
+
+        SubmissionDetailNewPageSlugChanged value ->
+            let
+                inter : SubmissionDetailEditDraft
+                inter =
+                    model.submissionDetailEditDraft
+            in
+            ( { model | submissionDetailEditDraft = { inter | newPageSlug = value } }
+            , Command.none
+            )
+
+        SubmissionDetailSaveDraftClicked ->
+            case model.route of
+                Route.WikiSubmissionDetail wikiSlug submissionId ->
+                    case Store.get_ ( wikiSlug, submissionId ) model.store.submissionDetails of
+                        RemoteData.Success (Ok detail) ->
+                            if detail.status /= Submission.Draft then
+                                ( model, Command.none )
+
+                            else
+                                let
+                                    inter : SubmissionDetailEditDraft
+                                    inter =
+                                        model.submissionDetailEditDraft
+
+                                    nextInter : SubmissionDetailEditDraft
+                                    nextInter =
+                                        { inter
+                                            | saveDraftInFlight = True
+                                            , pendingSubmitAfterSave = False
+                                            , lastError = Nothing
+                                        }
+                                in
+                                case detail.contributionKind of
+                                    Submission.ContributorKindNewPage ->
+                                        ( { model | submissionDetailEditDraft = nextInter }
+                                        , Effect.Lamdera.sendToBackend
+                                            (SaveNewPageDraft wikiSlug
+                                                { maybeSubmissionId = Just submissionId
+                                                , rawPageSlug = inter.newPageSlug
+                                                , rawMarkdown = inter.markdownBody
+                                                }
+                                            )
+                                        )
+
+                                    Submission.ContributorKindEditPage ->
+                                        case detail.maybeEditPageSlug of
+                                            Just pageSlug ->
+                                                ( { model | submissionDetailEditDraft = nextInter }
+                                                , Effect.Lamdera.sendToBackend
+                                                    (SavePageEditDraft wikiSlug
+                                                        { maybeSubmissionId = Just submissionId
+                                                        , pageSlug = pageSlug
+                                                        , rawMarkdown = inter.markdownBody
+                                                        }
+                                                    )
+                                                )
+
+                                            Nothing ->
+                                                ( model, Command.none )
+
+                                    Submission.ContributorKindDeletePage ->
+                                        case detail.maybeEditPageSlug of
+                                            Just pageSlug ->
+                                                ( { model | submissionDetailEditDraft = nextInter }
+                                                , Effect.Lamdera.sendToBackend
+                                                    (SavePageDeleteDraft wikiSlug
+                                                        { maybeSubmissionId = Just submissionId
+                                                        , pageSlug = pageSlug
+                                                        , rawReason = inter.markdownBody
+                                                        }
+                                                    )
+                                                )
+
+                                            Nothing ->
+                                                ( model, Command.none )
+
+                        _ ->
+                            ( model, Command.none )
+
+                _ ->
+                    ( model, Command.none )
+
+        SubmissionDetailSubmitForReviewClicked ->
+            case model.route of
+                Route.WikiSubmissionDetail wikiSlug submissionId ->
+                    case Store.get_ ( wikiSlug, submissionId ) model.store.submissionDetails of
+                        RemoteData.Success (Ok detail) ->
+                            if detail.status /= Submission.Draft then
+                                ( model, Command.none )
+
+                            else
+                                let
+                                    inter : SubmissionDetailEditDraft
+                                    inter =
+                                        model.submissionDetailEditDraft
+
+                                    nextInter : SubmissionDetailEditDraft
+                                    nextInter =
+                                        { inter
+                                            | saveDraftInFlight = True
+                                            , pendingSubmitAfterSave = True
+                                            , lastError = Nothing
+                                        }
+                                in
+                                case detail.contributionKind of
+                                    Submission.ContributorKindNewPage ->
+                                        ( { model | submissionDetailEditDraft = nextInter }
+                                        , Effect.Lamdera.sendToBackend
+                                            (SaveNewPageDraft wikiSlug
+                                                { maybeSubmissionId = Just submissionId
+                                                , rawPageSlug = inter.newPageSlug
+                                                , rawMarkdown = inter.markdownBody
+                                                }
+                                            )
+                                        )
+
+                                    Submission.ContributorKindEditPage ->
+                                        case detail.maybeEditPageSlug of
+                                            Just pageSlug ->
+                                                ( { model | submissionDetailEditDraft = nextInter }
+                                                , Effect.Lamdera.sendToBackend
+                                                    (SavePageEditDraft wikiSlug
+                                                        { maybeSubmissionId = Just submissionId
+                                                        , pageSlug = pageSlug
+                                                        , rawMarkdown = inter.markdownBody
+                                                        }
+                                                    )
+                                                )
+
+                                            Nothing ->
+                                                ( model, Command.none )
+
+                                    Submission.ContributorKindDeletePage ->
+                                        case detail.maybeEditPageSlug of
+                                            Just pageSlug ->
+                                                ( { model | submissionDetailEditDraft = nextInter }
+                                                , Effect.Lamdera.sendToBackend
+                                                    (SavePageDeleteDraft wikiSlug
+                                                        { maybeSubmissionId = Just submissionId
+                                                        , pageSlug = pageSlug
+                                                        , rawReason = inter.markdownBody
+                                                        }
+                                                    )
+                                                )
+
+                                            Nothing ->
+                                                ( model, Command.none )
+
+                        _ ->
+                            ( model, Command.none )
+
+                _ ->
+                    ( model, Command.none )
+
+        SubmissionDetailWithdrawClicked ->
+            case model.route of
+                Route.WikiSubmissionDetail wikiSlug submissionId ->
+                    let
+                        inter : SubmissionDetailEditDraft
+                        inter =
+                            model.submissionDetailEditDraft
+                    in
+                    ( { model
+                        | submissionDetailEditDraft =
+                            { inter
+                                | withdrawInFlight = True
+                                , lastError = Nothing
+                            }
+                      }
+                    , Effect.Lamdera.sendToBackend (WithdrawSubmission wikiSlug submissionId)
+                    )
+
+                _ ->
+                    ( model, Command.none )
+
+        SubmissionDetailDeleteClicked ->
+            case model.route of
+                Route.WikiSubmissionDetail wikiSlug submissionId ->
+                    let
+                        inter : SubmissionDetailEditDraft
+                        inter =
+                            model.submissionDetailEditDraft
+                    in
+                    ( { model
+                        | submissionDetailEditDraft =
+                            { inter
+                                | deleteInFlight = True
+                                , lastError = Nothing
+                            }
+                      }
+                    , Effect.Lamdera.sendToBackend (DeleteMySubmission wikiSlug submissionId)
+                    )
 
                 _ ->
                     ( model, Command.none )
@@ -2705,12 +3218,12 @@ update msg model =
                         d =
                             model.hostAdminCreateWikiDraft
                     in
-                    case Submission.validatePageSlug d.slug of
-                        Err ve ->
+                    case HostAdmin.validateHostedWikiName d.name of
+                        Err ne ->
                             ( { model
                                 | hostAdminCreateWikiDraft =
                                     { d
-                                        | lastResult = Just (Err (HostAdmin.CreateSlugInvalid ve))
+                                        | lastResult = Just (Err (HostAdmin.CreateWikiNameInvalid ne))
                                         , inFlight = False
                                     }
                               }
@@ -2718,12 +3231,13 @@ update msg model =
                             )
 
                         Ok _ ->
-                            case HostAdmin.validateHostedWikiName d.name of
-                                Err ne ->
+                            case ContributorAccount.validateRegistrationFields d.initialAdminUsername d.initialAdminPassword of
+                                Err regErr ->
                                     ( { model
                                         | hostAdminCreateWikiDraft =
                                             { d
-                                                | lastResult = Just (Err (HostAdmin.CreateWikiNameInvalid ne))
+                                                | lastResult =
+                                                    Just (Err (HostAdmin.CreateInitialAdminInvalid regErr))
                                                 , inFlight = False
                                             }
                                       }
@@ -2731,36 +3245,22 @@ update msg model =
                                     )
 
                                 Ok _ ->
-                                    case ContributorAccount.validateRegistrationFields d.initialAdminUsername d.initialAdminPassword of
-                                        Err regErr ->
-                                            ( { model
-                                                | hostAdminCreateWikiDraft =
-                                                    { d
-                                                        | lastResult =
-                                                            Just (Err (HostAdmin.CreateInitialAdminInvalid regErr))
-                                                        , inFlight = False
-                                                    }
-                                              }
-                                            , Command.none
-                                            )
-
-                                        Ok _ ->
-                                            ( { model
-                                                | hostAdminCreateWikiDraft =
-                                                    { d
-                                                        | inFlight = True
-                                                        , lastResult = Nothing
-                                                    }
-                                              }
-                                            , Effect.Lamdera.sendToBackend
-                                                (CreateHostedWiki
-                                                    { rawSlug = d.slug
-                                                    , rawName = d.name
-                                                    , initialAdminUsername = d.initialAdminUsername
-                                                    , initialAdminPassword = d.initialAdminPassword
-                                                    }
-                                                )
-                                            )
+                                    ( { model
+                                        | hostAdminCreateWikiDraft =
+                                            { d
+                                                | inFlight = True
+                                                , lastResult = Nothing
+                                            }
+                                      }
+                                    , Effect.Lamdera.sendToBackend
+                                        (CreateHostedWiki
+                                            { rawSlug = d.slug
+                                            , rawName = d.name
+                                            , initialAdminUsername = d.initialAdminUsername
+                                            , initialAdminPassword = d.initialAdminPassword
+                                            }
+                                        )
+                                    )
 
                 Route.WikiList ->
                     ( model, Command.none )
@@ -3259,8 +3759,22 @@ updateFromBackend msg model =
 
                         _ ->
                             Command.none
+
+                ( storeAfterPendingFetch, fetchMyPendingCmd ) =
+                    case ( maybeDetails, model.route ) of
+                        ( Nothing, Route.WikiPage rs rp ) ->
+                            if rs == wikiSlug && rp == pageSlug && contributorLoggedInOnWikiSlug wikiSlug model then
+                                runStoreActions nextStore [ Store.AskForMyPendingSubmissions wikiSlug ]
+
+                            else
+                                ( nextStore, Command.none )
+
+                        _ ->
+                            ( nextStore, Command.none )
             in
-            ( { model | store = nextStore, pageEditSubmitDraft = nextPageEditSubmitDraft }, Command.none )
+            ( { model | store = storeAfterPendingFetch, pageEditSubmitDraft = nextPageEditSubmitDraft }
+            , fetchMyPendingCmd
+            )
                 |> runRouteStoreActions
                 |> (\( m, c ) -> ( m, Command.batch [ c, pageScrollCmd ] ))
 
@@ -3840,6 +4354,492 @@ updateFromBackend msg model =
             ( { model | pageDeleteSubmitDraft = nextDraft, store = nextStore }, Command.none )
                 |> runRouteStoreActions
 
+        SaveNewPageDraftResponse wikiSlug result ->
+            let
+                formD : NewPageSubmitDraft
+                formD =
+                    model.newPageSubmitDraft
+
+                inter : SubmissionDetailEditDraft
+                inter =
+                    model.submissionDetailEditDraft
+
+                store0 : Store
+                store0 =
+                    model.store
+
+                nextForm : NewPageSubmitDraft
+                nextForm =
+                    if formD.saveDraftInFlight then
+                        case result of
+                            Ok id ->
+                                let
+                                    base : NewPageSubmitDraft
+                                    base =
+                                        { formD
+                                            | saveDraftInFlight = False
+                                            , maybeSavedDraftId = Just (Submission.idToString id)
+                                            , lastSaveDraftResult = Just result
+                                        }
+                                in
+                                if formD.pendingSubmitAfterSave then
+                                    case model.route of
+                                        Route.WikiSubmitNew w ->
+                                            if w == wikiSlug then
+                                                { base | pendingSubmitAfterSave = False, inFlight = True }
+
+                                            else
+                                                { base | pendingSubmitAfterSave = False }
+
+                                        _ ->
+                                            { base | pendingSubmitAfterSave = False }
+
+                                else
+                                    base
+
+                            Err _ ->
+                                { formD
+                                    | saveDraftInFlight = False
+                                    , pendingSubmitAfterSave = False
+                                    , lastSaveDraftResult = Just result
+                                }
+
+                    else
+                        formD
+
+                formChainCmd : Command FrontendOnly ToBackend Msg
+                formChainCmd =
+                    case result of
+                        Ok id ->
+                            if formD.saveDraftInFlight && formD.pendingSubmitAfterSave then
+                                case model.route of
+                                    Route.WikiSubmitNew w ->
+                                        if w == wikiSlug then
+                                            Effect.Lamdera.sendToBackend (SubmitDraftForReview wikiSlug (Submission.idToString id))
+
+                                        else
+                                            Command.none
+
+                                    _ ->
+                                        Command.none
+
+                            else
+                                Command.none
+
+                        _ ->
+                            Command.none
+
+                ( nextInter, detailCmd, storeFromDetail ) =
+                    if inter.saveDraftInFlight then
+                        case model.route of
+                            Route.WikiSubmissionDetail w sid ->
+                                if w == wikiSlug then
+                                    case result of
+                                        Ok _ ->
+                                            let
+                                                invalidateMy : Store
+                                                invalidateMy =
+                                                    { store0
+                                                        | myPendingSubmissions =
+                                                            Dict.remove wikiSlug store0.myPendingSubmissions
+                                                    }
+
+                                                baseInter : SubmissionDetailEditDraft
+                                                baseInter =
+                                                    { inter
+                                                        | saveDraftInFlight = False
+                                                        , lastError = Nothing
+                                                    }
+
+                                                afterInter : SubmissionDetailEditDraft
+                                                afterInter =
+                                                    if inter.pendingSubmitAfterSave then
+                                                        { baseInter
+                                                            | pendingSubmitAfterSave = False
+                                                            , submitForReviewInFlight = True
+                                                        }
+
+                                                    else
+                                                        { baseInter | pendingSubmitAfterSave = False }
+
+                                                dCmd : Command FrontendOnly ToBackend Msg
+                                                dCmd =
+                                                    if inter.pendingSubmitAfterSave then
+                                                        Effect.Lamdera.sendToBackend (SubmitDraftForReview wikiSlug sid)
+
+                                                    else
+                                                        Command.none
+                                            in
+                                            ( afterInter, dCmd, invalidateMy )
+
+                                        Err err ->
+                                            ( { inter
+                                                | saveDraftInFlight = False
+                                                , pendingSubmitAfterSave = False
+                                                , lastError = Just (Submission.saveNewPageDraftErrorToUserText err)
+                                              }
+                                            , Command.none
+                                            , store0
+                                            )
+
+                                else
+                                    ( inter, Command.none, store0 )
+
+                            _ ->
+                                ( inter, Command.none, store0 )
+
+                    else
+                        ( inter, Command.none, store0 )
+
+                nextStore : Store
+                nextStore =
+                    let
+                        baseStore : Store
+                        baseStore =
+                            storeFromDetail
+                    in
+                    if formD.saveDraftInFlight then
+                        { baseStore
+                            | myPendingSubmissions =
+                                Dict.remove wikiSlug baseStore.myPendingSubmissions
+                        }
+
+                    else
+                        baseStore
+            in
+            ( { model
+                | newPageSubmitDraft = nextForm
+                , submissionDetailEditDraft = nextInter
+                , store = nextStore
+              }
+            , Command.batch [ formChainCmd, detailCmd ]
+            )
+                |> runRouteStoreActions
+
+        SavePageEditDraftResponse wikiSlug result ->
+            let
+                formD : PageEditSubmitDraft
+                formD =
+                    model.pageEditSubmitDraft
+
+                inter : SubmissionDetailEditDraft
+                inter =
+                    model.submissionDetailEditDraft
+
+                store0 : Store
+                store0 =
+                    model.store
+
+                nextForm : PageEditSubmitDraft
+                nextForm =
+                    if formD.saveDraftInFlight then
+                        case result of
+                            Ok id ->
+                                let
+                                    base : PageEditSubmitDraft
+                                    base =
+                                        { formD
+                                            | saveDraftInFlight = False
+                                            , maybeSavedDraftId = Just (Submission.idToString id)
+                                            , lastSaveDraftResult = Just result
+                                        }
+                                in
+                                if formD.pendingSubmitAfterSave then
+                                    case model.route of
+                                        Route.WikiSubmitEdit w _ ->
+                                            if w == wikiSlug then
+                                                { base | pendingSubmitAfterSave = False, inFlight = True }
+
+                                            else
+                                                { base | pendingSubmitAfterSave = False }
+
+                                        _ ->
+                                            { base | pendingSubmitAfterSave = False }
+
+                                else
+                                    base
+
+                            Err _ ->
+                                { formD
+                                    | saveDraftInFlight = False
+                                    , pendingSubmitAfterSave = False
+                                    , lastSaveDraftResult = Just result
+                                }
+
+                    else
+                        formD
+
+                formChainCmd : Command FrontendOnly ToBackend Msg
+                formChainCmd =
+                    case result of
+                        Ok id ->
+                            if formD.saveDraftInFlight && formD.pendingSubmitAfterSave then
+                                case model.route of
+                                    Route.WikiSubmitEdit w _ ->
+                                        if w == wikiSlug then
+                                            Effect.Lamdera.sendToBackend (SubmitDraftForReview wikiSlug (Submission.idToString id))
+
+                                        else
+                                            Command.none
+
+                                    _ ->
+                                        Command.none
+
+                            else
+                                Command.none
+
+                        _ ->
+                            Command.none
+
+                ( nextInter, detailCmd, storeFromDetail ) =
+                    if inter.saveDraftInFlight then
+                        case model.route of
+                            Route.WikiSubmissionDetail w sid ->
+                                if w == wikiSlug then
+                                    case result of
+                                        Ok _ ->
+                                            let
+                                                invalidateMy : Store
+                                                invalidateMy =
+                                                    { store0
+                                                        | myPendingSubmissions =
+                                                            Dict.remove wikiSlug store0.myPendingSubmissions
+                                                    }
+
+                                                baseInter : SubmissionDetailEditDraft
+                                                baseInter =
+                                                    { inter
+                                                        | saveDraftInFlight = False
+                                                        , lastError = Nothing
+                                                    }
+
+                                                afterInter : SubmissionDetailEditDraft
+                                                afterInter =
+                                                    if inter.pendingSubmitAfterSave then
+                                                        { baseInter
+                                                            | pendingSubmitAfterSave = False
+                                                            , submitForReviewInFlight = True
+                                                        }
+
+                                                    else
+                                                        { baseInter | pendingSubmitAfterSave = False }
+
+                                                dCmd : Command FrontendOnly ToBackend Msg
+                                                dCmd =
+                                                    if inter.pendingSubmitAfterSave then
+                                                        Effect.Lamdera.sendToBackend (SubmitDraftForReview wikiSlug sid)
+
+                                                    else
+                                                        Command.none
+                                            in
+                                            ( afterInter, dCmd, invalidateMy )
+
+                                        Err err ->
+                                            ( { inter
+                                                | saveDraftInFlight = False
+                                                , pendingSubmitAfterSave = False
+                                                , lastError = Just (Submission.savePageEditDraftErrorToUserText err)
+                                              }
+                                            , Command.none
+                                            , store0
+                                            )
+
+                                else
+                                    ( inter, Command.none, store0 )
+
+                            _ ->
+                                ( inter, Command.none, store0 )
+
+                    else
+                        ( inter, Command.none, store0 )
+
+                nextStore : Store
+                nextStore =
+                    let
+                        baseStore : Store
+                        baseStore =
+                            storeFromDetail
+                    in
+                    if formD.saveDraftInFlight then
+                        { baseStore
+                            | myPendingSubmissions =
+                                Dict.remove wikiSlug baseStore.myPendingSubmissions
+                        }
+
+                    else
+                        baseStore
+            in
+            ( { model
+                | pageEditSubmitDraft = nextForm
+                , submissionDetailEditDraft = nextInter
+                , store = nextStore
+              }
+            , Command.batch [ formChainCmd, detailCmd ]
+            )
+                |> runRouteStoreActions
+
+        SavePageDeleteDraftResponse wikiSlug result ->
+            let
+                formD : PageDeleteSubmitDraft
+                formD =
+                    model.pageDeleteSubmitDraft
+
+                inter : SubmissionDetailEditDraft
+                inter =
+                    model.submissionDetailEditDraft
+
+                store0 : Store
+                store0 =
+                    model.store
+
+                nextForm : PageDeleteSubmitDraft
+                nextForm =
+                    if formD.saveDraftInFlight then
+                        case result of
+                            Ok id ->
+                                let
+                                    base : PageDeleteSubmitDraft
+                                    base =
+                                        { formD
+                                            | saveDraftInFlight = False
+                                            , maybeSavedDraftId = Just (Submission.idToString id)
+                                            , lastSaveDraftResult = Just result
+                                        }
+                                in
+                                if formD.pendingSubmitAfterSave then
+                                    case model.route of
+                                        Route.WikiSubmitDelete w _ ->
+                                            if w == wikiSlug then
+                                                { base | pendingSubmitAfterSave = False, inFlight = True }
+
+                                            else
+                                                { base | pendingSubmitAfterSave = False }
+
+                                        _ ->
+                                            { base | pendingSubmitAfterSave = False }
+
+                                else
+                                    base
+
+                            Err _ ->
+                                { formD
+                                    | saveDraftInFlight = False
+                                    , pendingSubmitAfterSave = False
+                                    , lastSaveDraftResult = Just result
+                                }
+
+                    else
+                        formD
+
+                formChainCmd : Command FrontendOnly ToBackend Msg
+                formChainCmd =
+                    case result of
+                        Ok id ->
+                            if formD.saveDraftInFlight && formD.pendingSubmitAfterSave then
+                                case model.route of
+                                    Route.WikiSubmitDelete w _ ->
+                                        if w == wikiSlug then
+                                            Effect.Lamdera.sendToBackend (SubmitDraftForReview wikiSlug (Submission.idToString id))
+
+                                        else
+                                            Command.none
+
+                                    _ ->
+                                        Command.none
+
+                            else
+                                Command.none
+
+                        _ ->
+                            Command.none
+
+                ( nextInter, detailCmd, storeFromDetail ) =
+                    if inter.saveDraftInFlight then
+                        case model.route of
+                            Route.WikiSubmissionDetail w sid ->
+                                if w == wikiSlug then
+                                    case result of
+                                        Ok _ ->
+                                            let
+                                                invalidateMy : Store
+                                                invalidateMy =
+                                                    { store0
+                                                        | myPendingSubmissions =
+                                                            Dict.remove wikiSlug store0.myPendingSubmissions
+                                                    }
+
+                                                baseInter : SubmissionDetailEditDraft
+                                                baseInter =
+                                                    { inter
+                                                        | saveDraftInFlight = False
+                                                        , lastError = Nothing
+                                                    }
+
+                                                afterInter : SubmissionDetailEditDraft
+                                                afterInter =
+                                                    if inter.pendingSubmitAfterSave then
+                                                        { baseInter
+                                                            | pendingSubmitAfterSave = False
+                                                            , submitForReviewInFlight = True
+                                                        }
+
+                                                    else
+                                                        { baseInter | pendingSubmitAfterSave = False }
+
+                                                dCmd : Command FrontendOnly ToBackend Msg
+                                                dCmd =
+                                                    if inter.pendingSubmitAfterSave then
+                                                        Effect.Lamdera.sendToBackend (SubmitDraftForReview wikiSlug sid)
+
+                                                    else
+                                                        Command.none
+                                            in
+                                            ( afterInter, dCmd, invalidateMy )
+
+                                        Err err ->
+                                            ( { inter
+                                                | saveDraftInFlight = False
+                                                , pendingSubmitAfterSave = False
+                                                , lastError = Just (Submission.savePageDeleteDraftErrorToUserText err)
+                                              }
+                                            , Command.none
+                                            , store0
+                                            )
+
+                                else
+                                    ( inter, Command.none, store0 )
+
+                            _ ->
+                                ( inter, Command.none, store0 )
+
+                    else
+                        ( inter, Command.none, store0 )
+
+                nextStore : Store
+                nextStore =
+                    let
+                        baseStore : Store
+                        baseStore =
+                            storeFromDetail
+                    in
+                    if formD.saveDraftInFlight then
+                        { baseStore
+                            | myPendingSubmissions =
+                                Dict.remove wikiSlug baseStore.myPendingSubmissions
+                        }
+
+                    else
+                        baseStore
+            in
+            ( { model
+                | pageDeleteSubmitDraft = nextForm
+                , submissionDetailEditDraft = nextInter
+                , store = nextStore
+              }
+            , Command.batch [ formChainCmd, detailCmd ]
+            )
+                |> runRouteStoreActions
+
         SubmissionDetailsResponse wikiSlug submissionId result ->
             let
                 store : Store
@@ -3857,89 +4857,300 @@ updateFromBackend msg model =
                             Dict.insert key (RemoteData.succeed result) store.submissionDetails
                     }
 
-                d : PageEditSubmitDraft
-                d =
-                    model.pageEditSubmitDraft
+                nextSubmissionDetailEditDraft : SubmissionDetailEditDraft
+                nextSubmissionDetailEditDraft =
+                    case model.route of
+                        Route.WikiSubmissionDetail rWiki rSid ->
+                            if rWiki == wikiSlug && rSid == submissionId then
+                                case result of
+                                    Ok detail ->
+                                        submissionDetailEditDraftFromDetail detail
 
-                nextPageEditSubmitDraft : PageEditSubmitDraft
-                nextPageEditSubmitDraft =
-                    case result of
-                        Ok detail ->
-                            case detail.conflictContext of
-                                Just ctx ->
-                                    if detail.status == Submission.NeedsRevision then
-                                        { d
-                                            | markdownBody = ctx.proposedMarkdown
-                                            , inFlight = False
-                                        }
+                                    Err _ ->
+                                        model.submissionDetailEditDraft
 
-                                    else
-                                        d
+                            else
+                                model.submissionDetailEditDraft
 
-                                Nothing ->
-                                    d
-
-                        Err _ ->
-                            d
+                        _ ->
+                            model.submissionDetailEditDraft
             in
-            ( { model | store = nextStore, pageEditSubmitDraft = nextPageEditSubmitDraft }, Command.none )
+            ( { model | store = nextStore, submissionDetailEditDraft = nextSubmissionDetailEditDraft }, Command.none )
                 |> runRouteStoreActions
 
-        ResubmitPageEditResponse wikiSlug submissionId result ->
+        SubmitDraftForReviewResponse wikiSlug submissionIdStr result ->
             let
-                d : PageEditSubmitDraft
-                d =
-                    model.pageEditSubmitDraft
+                formNew : NewPageSubmitDraft
+                formNew =
+                    model.newPageSubmitDraft
 
-                nextDraft : PageEditSubmitDraft
-                nextDraft =
-                    if d.inFlight then
-                        case result of
-                            Ok () ->
-                                { d
-                                    | inFlight = False
-                                    , lastResubmitResult = Just (Ok (Submission.EditSubmittedForReview (Submission.idFromKey submissionId)))
-                                }
+                nextFormNew : NewPageSubmitDraft
+                nextFormNew =
+                    if formNew.inFlight then
+                        case model.route of
+                            Route.WikiSubmitNew w ->
+                                if w == wikiSlug && formNew.maybeSavedDraftId == Just submissionIdStr then
+                                    case result of
+                                        Ok () ->
+                                            { formNew
+                                                | inFlight = False
+                                                , lastResult =
+                                                    Just
+                                                        (Ok
+                                                            (Submission.NewPageSubmittedForReview (Submission.idFromKey submissionIdStr))
+                                                        )
+                                            }
 
-                            Err err ->
-                                { d
-                                    | inFlight = False
-                                    , lastResubmitResult = Just (Err err)
-                                }
+                                        Err err ->
+                                            { formNew
+                                                | inFlight = False
+                                                , lastResult = Just (Err (submitDraftForReviewErrorToSubmitNewPageError err))
+                                            }
+
+                                else
+                                    formNew
+
+                            _ ->
+                                formNew
 
                     else
-                        d
+                        formNew
+
+                formEdit : PageEditSubmitDraft
+                formEdit =
+                    model.pageEditSubmitDraft
+
+                nextFormEdit : PageEditSubmitDraft
+                nextFormEdit =
+                    if formEdit.inFlight then
+                        case model.route of
+                            Route.WikiSubmitEdit w _ ->
+                                if w == wikiSlug && formEdit.maybeSavedDraftId == Just submissionIdStr then
+                                    case result of
+                                        Ok () ->
+                                            { formEdit
+                                                | inFlight = False
+                                                , lastResult =
+                                                    Just
+                                                        (Ok
+                                                            (Submission.EditSubmittedForReview (Submission.idFromKey submissionIdStr))
+                                                        )
+                                            }
+
+                                        Err err ->
+                                            { formEdit
+                                                | inFlight = False
+                                                , lastResult = Just (Err (submitDraftForReviewErrorToSubmitPageEditError err))
+                                            }
+
+                                else
+                                    formEdit
+
+                            _ ->
+                                formEdit
+
+                    else
+                        formEdit
+
+                formDel : PageDeleteSubmitDraft
+                formDel =
+                    model.pageDeleteSubmitDraft
+
+                nextFormDel : PageDeleteSubmitDraft
+                nextFormDel =
+                    if formDel.inFlight then
+                        case model.route of
+                            Route.WikiSubmitDelete w _ ->
+                                if w == wikiSlug && formDel.maybeSavedDraftId == Just submissionIdStr then
+                                    case result of
+                                        Ok () ->
+                                            { formDel
+                                                | inFlight = False
+                                                , lastResult =
+                                                    Just
+                                                        (Ok
+                                                            (Submission.DeleteSubmittedForReview (Submission.idFromKey submissionIdStr))
+                                                        )
+                                            }
+
+                                        Err err ->
+                                            { formDel
+                                                | inFlight = False
+                                                , lastResult = Just (Err (submitDraftForReviewErrorToSubmitPageDeleteError err))
+                                            }
+
+                                else
+                                    formDel
+
+                            _ ->
+                                formDel
+
+                    else
+                        formDel
+
+                inter : SubmissionDetailEditDraft
+                inter =
+                    model.submissionDetailEditDraft
+
+                nextInter : SubmissionDetailEditDraft
+                nextInter =
+                    if inter.submitForReviewInFlight then
+                        case model.route of
+                            Route.WikiSubmissionDetail w sid ->
+                                if w == wikiSlug && sid == submissionIdStr then
+                                    case result of
+                                        Ok () ->
+                                            { inter
+                                                | submitForReviewInFlight = False
+                                                , lastError = Nothing
+                                            }
+
+                                        Err err ->
+                                            { inter
+                                                | submitForReviewInFlight = False
+                                                , lastError = Just (Submission.submitDraftForReviewErrorToUserText err)
+                                            }
+
+                                else
+                                    inter
+
+                            _ ->
+                                inter
+
+                    else
+                        inter
+
+                store0 : Store
+                store0 =
+                    model.store
 
                 nextStore : Store
                 nextStore =
                     case result of
                         Ok () ->
-                            let
-                                store : Store
-                                store =
-                                    model.store
-                            in
-                            { store
-                                | submissionDetails =
+                            { store0
+                                | myPendingSubmissions =
+                                    Dict.remove wikiSlug store0.myPendingSubmissions
+                                , submissionDetails =
                                     Dict.insert
-                                        ( wikiSlug, submissionId )
+                                        ( wikiSlug, submissionIdStr )
                                         RemoteData.Loading
-                                        store.submissionDetails
-                                , myPendingSubmissions =
-                                    Dict.remove wikiSlug store.myPendingSubmissions
+                                        store0.submissionDetails
                             }
 
                         Err _ ->
-                            model.store
-            in
-            ( { model | pageEditSubmitDraft = nextDraft, store = nextStore }
-            , case result of
-                Ok () ->
-                    Effect.Lamdera.sendToBackend (RequestSubmissionDetails wikiSlug submissionId)
+                            store0
 
-                Err _ ->
-                    Command.none
+                refetchCmd : Command FrontendOnly ToBackend Msg
+                refetchCmd =
+                    case result of
+                        Ok () ->
+                            Effect.Lamdera.sendToBackend (RequestSubmissionDetails wikiSlug submissionIdStr)
+
+                        _ ->
+                            Command.none
+            in
+            ( { model
+                | newPageSubmitDraft = nextFormNew
+                , pageEditSubmitDraft = nextFormEdit
+                , pageDeleteSubmitDraft = nextFormDel
+                , submissionDetailEditDraft = nextInter
+                , store = nextStore
+              }
+            , refetchCmd
             )
+                |> runRouteStoreActions
+
+        WithdrawSubmissionResponse wikiSlug submissionIdStr result ->
+            let
+                inter : SubmissionDetailEditDraft
+                inter =
+                    model.submissionDetailEditDraft
+
+                nextInter : SubmissionDetailEditDraft
+                nextInter =
+                    { inter
+                        | withdrawInFlight = False
+                        , lastError =
+                            case result of
+                                Err err ->
+                                    Just (Submission.withdrawSubmissionErrorToUserText err)
+
+                                Ok () ->
+                                    Nothing
+                    }
+
+                store0 : Store
+                store0 =
+                    model.store
+
+                nextStore : Store
+                nextStore =
+                    case result of
+                        Ok () ->
+                            { store0
+                                | myPendingSubmissions =
+                                    Dict.remove wikiSlug store0.myPendingSubmissions
+                                , submissionDetails =
+                                    Dict.insert
+                                        ( wikiSlug, submissionIdStr )
+                                        RemoteData.Loading
+                                        store0.submissionDetails
+                            }
+
+                        Err _ ->
+                            store0
+
+                refetchCmd : Command FrontendOnly ToBackend Msg
+                refetchCmd =
+                    case result of
+                        Ok () ->
+                            Effect.Lamdera.sendToBackend (RequestSubmissionDetails wikiSlug submissionIdStr)
+
+                        _ ->
+                            Command.none
+            in
+            ( { model | submissionDetailEditDraft = nextInter, store = nextStore }, refetchCmd )
+                |> runRouteStoreActions
+
+        DeleteMySubmissionResponse wikiSlug submissionIdStr result ->
+            let
+                inter : SubmissionDetailEditDraft
+                inter =
+                    model.submissionDetailEditDraft
+
+                nextInter : SubmissionDetailEditDraft
+                nextInter =
+                    { inter
+                        | deleteInFlight = False
+                        , lastError =
+                            case result of
+                                Err err ->
+                                    Just (Submission.deleteMySubmissionErrorToUserText err)
+
+                                Ok () ->
+                                    Nothing
+                    }
+
+                store0 : Store
+                store0 =
+                    model.store
+
+                nextStore : Store
+                nextStore =
+                    case result of
+                        Ok () ->
+                            { store0
+                                | myPendingSubmissions =
+                                    Dict.remove wikiSlug store0.myPendingSubmissions
+                                , submissionDetails =
+                                    Dict.remove ( wikiSlug, submissionIdStr ) store0.submissionDetails
+                            }
+
+                        Err _ ->
+                            store0
+            in
+            ( { model | submissionDetailEditDraft = nextInter, store = nextStore }, Command.none )
                 |> runRouteStoreActions
 
         ReviewSubmissionDetailResponse wikiSlug submissionId result ->
@@ -5108,11 +6319,11 @@ appHeaderTitle ({ store, route } as model) =
                 \summary ->
                     wikiLoadedHeaderTitle summary (Just (AppHeaderSecondaryPlain "Request deletion"))
 
-        Route.WikiSubmissionDetail slug submissionId ->
+        Route.WikiSubmissionDetail slug _ ->
             wikiScopeHeaderTitle store slug <|
                 \summary ->
                     wikiLoadedHeaderTitle summary <|
-                        case submissionDetailConflictResolveSecondary store slug submissionId of
+                        case submissionDetailConflictResolveSecondary of
                             Just sec ->
                                 Just sec
 
@@ -5173,12 +6384,6 @@ viewAppHeaderSecondary secondary =
             Html.span [ TW.cls UI.appHeaderSecondaryMetaClass ]
                 [ viewAppHeaderSecondary (AppHeaderSecondaryWikiLink wikiLabel)
                 , Html.text plainSuffix
-                ]
-
-        AppHeaderSecondaryConflictResolve { pageSlug, submissionId } ->
-            Html.span [ TW.cls UI.appHeaderSecondaryMetaClass ]
-                [ viewAppHeaderSecondary (AppHeaderSecondaryWikiLink pageSlug)
-                , Html.text (" - Submission " ++ submissionId ++ ": Resolve edit conflict")
                 ]
 
 
@@ -5700,8 +6905,13 @@ viewHostAdminCreateWiki model =
                                     [ Html.text "Wiki slug" ]
                                 , Html.input
                                     [ Attr.id "host-admin-create-wiki-slug"
+                                    , Attr.name "wikiSlug"
                                     , Attr.type_ "text"
                                     , Attr.value draft.slug
+                                    , Attr.required True
+                                    , Attr.pattern Submission.pageSlugHtmlPattern
+                                    , Attr.maxlength Submission.pageSlugHtmlMaxLength
+                                    , Attr.title Submission.pageSlugConstraintTitle
                                     , Events.onInput HostAdminCreateWikiSlugChanged
                                     , Attr.disabled draft.inFlight
                                     , TW.cls UI.formTextInputClass
@@ -5749,8 +6959,7 @@ viewHostAdminCreateWiki model =
                                 ]
                             , UI.button
                                 [ Attr.id "host-admin-create-wiki-submit"
-                                , Attr.type_ "button"
-                                , Events.onClick HostAdminCreateWikiSubmitted
+                                , Attr.type_ "submit"
                                 , Attr.disabled draft.inFlight
                                 ]
                                 [ Html.text "Create wiki" ]
@@ -6162,21 +7371,10 @@ documentTitle ({ store, route } as model) =
                 RemoteData.NotAsked ->
                     "Loading - SortOfWiki"
 
-        Route.WikiSubmissionDetail slug submissionId ->
+        Route.WikiSubmissionDetail slug _ ->
             case Store.get slug store.wikiCatalog of
                 RemoteData.Success summary ->
-                    case submissionDetailConflictResolveSecondary store slug submissionId of
-                        Just (AppHeaderSecondaryConflictResolve { pageSlug }) ->
-                            "[["
-                                ++ pageSlug
-                                ++ "]] - Submission "
-                                ++ submissionId
-                                ++ ": Resolve edit conflict — "
-                                ++ summary.name
-                                ++ " — SortOfWiki"
-
-                        _ ->
-                            "Submission — " ++ summary.name ++ " — SortOfWiki"
+                    "Submission — " ++ summary.name ++ " — SortOfWiki"
 
                 RemoteData.Failure _ ->
                     "404 — SortOfWiki"
@@ -6502,48 +7700,75 @@ viewWikiSubmitNewLoading =
         [ Html.p [] [ Html.text "Loading…" ] ]
 
 
-viewNewPageSubmitFeedback : Wiki.Slug -> NewPageSubmitDraft -> Html Msg
-viewNewPageSubmitFeedback wikiSlug draft =
-    case draft.lastResult of
+viewNewPageSaveDraftFeedback : NewPageSubmitDraft -> Html Msg
+viewNewPageSaveDraftFeedback draft =
+    case draft.lastSaveDraftResult of
         Nothing ->
             Html.text ""
 
-        Just (Ok success) ->
-            case success of
-                Submission.NewPagePublishedImmediately ->
-                    Html.text ""
-
-                Submission.NewPageSubmittedForReview submissionId ->
-                    let
-                        idStr : String
-                        idStr =
-                            Submission.idToString submissionId
-                    in
-                    Html.div
-                        [ Attr.id "wiki-submit-new-success"
-                        , Attr.attribute "data-submission-id" idStr
-                        ]
-                        [ Html.p []
-                            [ Html.text "Submitted for review." ]
-                        , Html.a
-                            [ Attr.id "wiki-submit-new-success-link"
-                            , Attr.href (Wiki.submissionDetailUrlPath wikiSlug idStr)
-                            ]
-                            [ Html.text "Open submission" ]
-                        ]
+        Just (Ok _) ->
+            Html.div
+                [ Attr.id "wiki-submit-new-save-draft-success" ]
+                [ Html.text "Draft saved." ]
 
         Just (Err e) ->
             Html.div
-                [ Attr.id "wiki-submit-new-error" ]
+                [ Attr.id "wiki-submit-new-save-draft-error" ]
                 [ Html.span
-                    [ Attr.id "wiki-submit-new-error-text" ]
-                    [ Html.text (Submission.submitNewPageErrorToUserText e) ]
+                    [ Attr.id "wiki-submit-new-save-draft-error-text" ]
+                    [ Html.text (Submission.saveNewPageDraftErrorToUserText e) ]
                 ]
+
+
+viewNewPageSubmitFeedback : Wiki.Slug -> NewPageSubmitDraft -> Html Msg
+viewNewPageSubmitFeedback wikiSlug draft =
+    Html.div []
+        [ viewNewPageSaveDraftFeedback draft
+        , case draft.lastResult of
+            Nothing ->
+                Html.text ""
+
+            Just (Ok success) ->
+                case success of
+                    Submission.NewPagePublishedImmediately ->
+                        Html.text ""
+
+                    Submission.NewPageSubmittedForReview submissionId ->
+                        let
+                            idStr : String
+                            idStr =
+                                Submission.idToString submissionId
+                        in
+                        Html.div
+                            [ Attr.id "wiki-submit-new-success"
+                            , Attr.attribute "data-submission-id" idStr
+                            ]
+                            [ Html.p []
+                                [ Html.text "Submitted for review." ]
+                            , Html.a
+                                [ Attr.id "wiki-submit-new-success-link"
+                                , Attr.href (Wiki.submissionDetailUrlPath wikiSlug idStr)
+                                ]
+                                [ Html.text "Open submission" ]
+                            ]
+
+            Just (Err e) ->
+                Html.div
+                    [ Attr.id "wiki-submit-new-error" ]
+                    [ Html.span
+                        [ Attr.id "wiki-submit-new-error-text" ]
+                        [ Html.text (Submission.submitNewPageErrorToUserText e) ]
+                    ]
+        ]
 
 
 viewSubmitNewLoaded : Wiki.Slug -> (Page.Slug -> Bool) -> NewPageSubmitDraft -> Html Msg
 viewSubmitNewLoaded wikiSlug publishedSlugExists draft =
     let
+        formBusy : Bool
+        formBusy =
+            draft.inFlight || draft.saveDraftInFlight
+
         newPageMarkdownHeadingClass : String
         newPageMarkdownHeadingClass =
             "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)]"
@@ -6572,7 +7797,7 @@ viewSubmitNewLoaded wikiSlug publishedSlugExists draft =
                     ([ Attr.id "slug-input"
                      , Attr.type_ "text"
                      , Attr.value draft.pageSlug
-                     , Attr.disabled draft.inFlight
+                     , Attr.disabled formBusy
                      , TW.cls UI.formTextInputClass
                      ]
                         ++ (if draft.pageSlugLockedFromQuery then
@@ -6595,7 +7820,7 @@ viewSubmitNewLoaded wikiSlug publishedSlugExists draft =
                         [ Attr.id "content-markdown-textarea"
                         , Attr.value draft.markdownBody
                         , Events.onInput NewPageSubmitMarkdownChanged
-                        , Attr.disabled draft.inFlight
+                        , Attr.disabled formBusy
                         , Attr.rows 12
                         , TW.cls (submissionDetailMarkdownTextareaEditableClass ++ submissionDetailMarkdownTextareaDiffCellClass)
                         ]
@@ -6611,13 +7836,23 @@ viewSubmitNewLoaded wikiSlug publishedSlugExists draft =
                         [ PageMarkdown.viewPreview "content-preview" wikiSlug publishedSlugExists draft.markdownBody ]
                     ]
                 ]
-            , UI.button
-                [ Attr.id "wiki-submit-new-submit"
-                , Attr.type_ "button"
-                , Events.onClick NewPageSubmitFormSubmitted
-                , Attr.disabled draft.inFlight
+            , Html.div
+                [ TW.cls "flex flex-wrap gap-2" ]
+                [ UI.button
+                    [ Attr.id "wiki-submit-new-save-draft"
+                    , Attr.type_ "button"
+                    , Events.onClick NewPageSaveDraftClicked
+                    , Attr.disabled formBusy
+                    ]
+                    [ Html.text "Save draft" ]
+                , UI.button
+                    [ Attr.id "wiki-submit-new-submit"
+                    , Attr.type_ "button"
+                    , Events.onClick NewPageSubmitFormSubmitted
+                    , Attr.disabled formBusy
+                    ]
+                    [ Html.text "Submit for review" ]
                 ]
-                [ Html.text "Submit draft" ]
             ]
         , viewNewPageSubmitFeedback wikiSlug draft
         ]
@@ -6650,52 +7885,75 @@ viewSubmitNewRoute model wikiSlug =
             viewWikiSubmitNewLoading
 
 
-viewPageEditSubmitFeedback : Wiki.Slug -> Page.Slug -> PageEditSubmitDraft -> Html Msg
-viewPageEditSubmitFeedback wikiSlug pageSlug draft =
-    case draft.lastResult of
+viewPageEditSaveDraftFeedback : PageEditSubmitDraft -> Html Msg
+viewPageEditSaveDraftFeedback draft =
+    case draft.lastSaveDraftResult of
         Nothing ->
             Html.text ""
 
-        Just (Ok success) ->
-            case success of
-                Submission.EditPublishedImmediately ->
-                    Html.div
-                        [ Attr.id "wiki-submit-edit-success" ]
-                        [ Html.p []
-                            [ Html.text "Published. Your edit is live. " ]
-                        , Html.a
-                            [ Attr.id "wiki-submit-edit-success-published-link"
-                            , Attr.href (Wiki.publishedPageUrlPath wikiSlug pageSlug)
-                            ]
-                            [ Html.text "Open page" ]
-                        ]
-
-                Submission.EditSubmittedForReview submissionId ->
-                    let
-                        idStr : String
-                        idStr =
-                            Submission.idToString submissionId
-                    in
-                    Html.div
-                        [ Attr.id "wiki-submit-edit-success"
-                        , Attr.attribute "data-submission-id" idStr
-                        ]
-                        [ Html.p []
-                            [ Html.text "Submitted for review." ]
-                        , Html.a
-                            [ Attr.id "wiki-submit-edit-success-link"
-                            , Attr.href (Wiki.submissionDetailUrlPath wikiSlug idStr)
-                            ]
-                            [ Html.text "Open submission" ]
-                        ]
+        Just (Ok _) ->
+            Html.div
+                [ Attr.id "wiki-submit-edit-save-draft-success" ]
+                [ Html.text "Draft saved." ]
 
         Just (Err e) ->
             Html.div
-                [ Attr.id "wiki-submit-edit-error" ]
+                [ Attr.id "wiki-submit-edit-save-draft-error" ]
                 [ Html.span
-                    [ Attr.id "wiki-submit-edit-error-text" ]
-                    [ Html.text (Submission.submitPageEditErrorToUserText e) ]
+                    [ Attr.id "wiki-submit-edit-save-draft-error-text" ]
+                    [ Html.text (Submission.savePageEditDraftErrorToUserText e) ]
                 ]
+
+
+viewPageEditSubmitFeedback : Wiki.Slug -> Page.Slug -> PageEditSubmitDraft -> Html Msg
+viewPageEditSubmitFeedback wikiSlug pageSlug draft =
+    Html.div []
+        [ viewPageEditSaveDraftFeedback draft
+        , case draft.lastResult of
+            Nothing ->
+                Html.text ""
+
+            Just (Ok success) ->
+                case success of
+                    Submission.EditPublishedImmediately ->
+                        Html.div
+                            [ Attr.id "wiki-submit-edit-success" ]
+                            [ Html.p []
+                                [ Html.text "Published. Your edit is live. " ]
+                            , Html.a
+                                [ Attr.id "wiki-submit-edit-success-published-link"
+                                , Attr.href (Wiki.publishedPageUrlPath wikiSlug pageSlug)
+                                ]
+                                [ Html.text "Open page" ]
+                            ]
+
+                    Submission.EditSubmittedForReview submissionId ->
+                        let
+                            idStr : String
+                            idStr =
+                                Submission.idToString submissionId
+                        in
+                        Html.div
+                            [ Attr.id "wiki-submit-edit-success"
+                            , Attr.attribute "data-submission-id" idStr
+                            ]
+                            [ Html.p []
+                                [ Html.text "Submitted for review." ]
+                            , Html.a
+                                [ Attr.id "wiki-submit-edit-success-link"
+                                , Attr.href (Wiki.submissionDetailUrlPath wikiSlug idStr)
+                                ]
+                                [ Html.text "Open submission" ]
+                            ]
+
+            Just (Err e) ->
+                Html.div
+                    [ Attr.id "wiki-submit-edit-error" ]
+                    [ Html.span
+                        [ Attr.id "wiki-submit-edit-error-text" ]
+                        [ Html.text (Submission.submitPageEditErrorToUserText e) ]
+                    ]
+        ]
 
 
 viewSubmitEditLoaded :
@@ -6708,6 +7966,10 @@ viewSubmitEditLoaded :
     -> Html Msg
 viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publishedSlugExists pageDetails draft =
     let
+        formBusy : Bool
+        formBusy =
+            draft.inFlight || draft.saveDraftInFlight
+
         originalMarkdown : String
         originalMarkdown =
             pageDetails.markdownSource
@@ -6776,7 +8038,7 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
                                 [ Attr.id "wiki-submit-edit-markdown"
                                 , Attr.value draft.markdownBody
                                 , Events.onInput PageEditSubmitMarkdownChanged
-                                , Attr.disabled draft.inFlight
+                                , Attr.disabled formBusy
                                 , Attr.rows 12
                                 , TW.cls (submissionDetailMarkdownTextareaEditableClass ++ submissionDetailMarkdownTextareaDiffCellClass)
                                 ]
@@ -6797,19 +8059,29 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
                             , submitEditPreviewInCell "wiki-submit-edit-new-preview" draft.markdownBody
                             ]
                         ]
-                    , UI.button
-                        [ Attr.id "wiki-submit-edit-submit"
-                        , Attr.type_ "button"
-                        , Events.onClick PageEditSubmitFormSubmitted
-                        , Attr.disabled draft.inFlight
-                        ]
-                        [ Html.text
-                            (if showUntrustedContributorDisclaimer then
-                                "Submit edit proposal"
+                    , Html.div
+                        [ TW.cls "flex flex-wrap gap-2" ]
+                        [ UI.button
+                            [ Attr.id "wiki-submit-edit-save-draft"
+                            , Attr.type_ "button"
+                            , Events.onClick PageEditSaveDraftClicked
+                            , Attr.disabled formBusy
+                            ]
+                            [ Html.text "Save draft" ]
+                        , UI.button
+                            [ Attr.id "wiki-submit-edit-submit"
+                            , Attr.type_ "button"
+                            , Events.onClick PageEditSubmitFormSubmitted
+                            , Attr.disabled formBusy
+                            ]
+                            [ Html.text
+                                (if showUntrustedContributorDisclaimer then
+                                    "Submit for review"
 
-                             else
-                                "Save"
-                            )
+                                 else
+                                    "Save"
+                                )
+                            ]
                         ]
                     ]
               , viewPageEditSubmitFeedback wikiSlug pageSlug draft
@@ -6861,51 +8133,79 @@ viewSubmitEditRoute model wikiSlug pageSlug =
                                 model.pageEditSubmitDraft
 
 
-viewPageDeleteSubmitFeedback : Wiki.Slug -> Page.Slug -> PageDeleteSubmitDraft -> Html Msg
-viewPageDeleteSubmitFeedback wikiSlug pageSlug draft =
-    case draft.lastResult of
+viewPageDeleteSaveDraftFeedback : PageDeleteSubmitDraft -> Html Msg
+viewPageDeleteSaveDraftFeedback draft =
+    case draft.lastSaveDraftResult of
         Nothing ->
             Html.text ""
 
-        Just (Ok success) ->
-            case success of
-                Submission.DeletePublishedImmediately ->
-                    Html.div
-                        [ Attr.id "wiki-submit-delete-success" ]
-                        [ Html.p []
-                            [ Html.text ("Published. Page \"" ++ pageSlug ++ "\" was removed.") ]
-                        ]
-
-                Submission.DeleteSubmittedForReview submissionId ->
-                    let
-                        idStr : String
-                        idStr =
-                            Submission.idToString submissionId
-                    in
-                    Html.div
-                        [ Attr.id "wiki-submit-delete-success"
-                        , Attr.attribute "data-submission-id" idStr
-                        ]
-                        [ Html.p []
-                            [ Html.text "Submitted for review." ]
-                        , Html.a
-                            [ Attr.id "wiki-submit-delete-success-link"
-                            , Attr.href (Wiki.submissionDetailUrlPath wikiSlug idStr)
-                            ]
-                            [ Html.text "Open submission" ]
-                        ]
+        Just (Ok _) ->
+            Html.div
+                [ Attr.id "wiki-submit-delete-save-draft-success" ]
+                [ Html.text "Draft saved." ]
 
         Just (Err e) ->
             Html.div
-                [ Attr.id "wiki-submit-delete-error" ]
+                [ Attr.id "wiki-submit-delete-save-draft-error" ]
                 [ Html.span
-                    [ Attr.id "wiki-submit-delete-error-text" ]
-                    [ Html.text (Submission.submitPageDeleteErrorToUserText e) ]
+                    [ Attr.id "wiki-submit-delete-save-draft-error-text" ]
+                    [ Html.text (Submission.savePageDeleteDraftErrorToUserText e) ]
                 ]
+
+
+viewPageDeleteSubmitFeedback : Wiki.Slug -> Page.Slug -> PageDeleteSubmitDraft -> Html Msg
+viewPageDeleteSubmitFeedback wikiSlug pageSlug draft =
+    Html.div []
+        [ viewPageDeleteSaveDraftFeedback draft
+        , case draft.lastResult of
+            Nothing ->
+                Html.text ""
+
+            Just (Ok success) ->
+                case success of
+                    Submission.DeletePublishedImmediately ->
+                        Html.div
+                            [ Attr.id "wiki-submit-delete-success" ]
+                            [ Html.p []
+                                [ Html.text ("Published. Page \"" ++ pageSlug ++ "\" was removed.") ]
+                            ]
+
+                    Submission.DeleteSubmittedForReview submissionId ->
+                        let
+                            idStr : String
+                            idStr =
+                                Submission.idToString submissionId
+                        in
+                        Html.div
+                            [ Attr.id "wiki-submit-delete-success"
+                            , Attr.attribute "data-submission-id" idStr
+                            ]
+                            [ Html.p []
+                                [ Html.text "Submitted for review." ]
+                            , Html.a
+                                [ Attr.id "wiki-submit-delete-success-link"
+                                , Attr.href (Wiki.submissionDetailUrlPath wikiSlug idStr)
+                                ]
+                                [ Html.text "Open submission" ]
+                            ]
+
+            Just (Err e) ->
+                Html.div
+                    [ Attr.id "wiki-submit-delete-error" ]
+                    [ Html.span
+                        [ Attr.id "wiki-submit-delete-error-text" ]
+                        [ Html.text (Submission.submitPageDeleteErrorToUserText e) ]
+                    ]
+        ]
 
 
 viewSubmitDeleteLoaded : Wiki.Slug -> Page.Slug -> PageDeleteSubmitDraft -> Html Msg
 viewSubmitDeleteLoaded wikiSlug pageSlug draft =
+    let
+        formBusy : Bool
+        formBusy =
+            draft.inFlight || draft.saveDraftInFlight
+    in
     Html.div
         [ Attr.id "wiki-submit-delete-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
@@ -6924,19 +8224,29 @@ viewSubmitDeleteLoaded wikiSlug pageSlug draft =
                     [ Attr.id "wiki-submit-delete-reason"
                     , Attr.value draft.reasonText
                     , Events.onInput PageDeleteSubmitReasonChanged
-                    , Attr.disabled draft.inFlight
+                    , Attr.disabled formBusy
                     , Attr.rows 4
                     , TW.cls UI.formTextareaClass
                     ]
                     []
                 ]
-            , UI.button
-                [ Attr.id "wiki-submit-delete-submit"
-                , Attr.type_ "button"
-                , Events.onClick PageDeleteSubmitFormSubmitted
-                , Attr.disabled draft.inFlight
+            , Html.div
+                [ TW.cls "flex flex-wrap gap-2" ]
+                [ UI.button
+                    [ Attr.id "wiki-submit-delete-save-draft"
+                    , Attr.type_ "button"
+                    , Events.onClick PageDeleteSaveDraftClicked
+                    , Attr.disabled formBusy
+                    ]
+                    [ Html.text "Save draft" ]
+                , UI.button
+                    [ Attr.id "wiki-submit-delete-submit"
+                    , Attr.type_ "button"
+                    , Events.onClick PageDeleteSubmitFormSubmitted
+                    , Attr.disabled formBusy
+                    ]
+                    [ Html.text "Submit for review" ]
                 ]
-                [ Html.text "Submit deletion request" ]
             ]
         , viewPageDeleteSubmitFeedback wikiSlug pageSlug draft
         ]
@@ -6983,11 +8293,10 @@ viewSubmitDeleteRoute model wikiSlug pageSlug =
 viewSubmissionDetailBody :
     Wiki.Slug
     -> (Page.Slug -> Bool)
-    -> String
-    -> PageEditSubmitDraft
+    -> SubmissionDetailEditDraft
     -> RemoteData () (Result Submission.DetailsError Submission.ContributorView)
     -> Html Msg
-viewSubmissionDetailBody wikiSlug publishedSlugExists submissionId editDraft remote =
+viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
     case remote of
         RemoteData.NotAsked ->
             viewWikiSubmitNewLoading
@@ -7008,6 +8317,168 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists submissionId editDraft rem
                 ]
 
         RemoteData.Success (Ok detail) ->
+            let
+                anyBusy : Bool
+                anyBusy =
+                    interaction.saveDraftInFlight
+                        || interaction.submitForReviewInFlight
+                        || interaction.withdrawInFlight
+                        || interaction.deleteInFlight
+
+                newMarkdownForPreview : String
+                newMarkdownForPreview =
+                    if detail.status == Submission.Draft then
+                        interaction.markdownBody
+
+                    else
+                        detail.compareNewMarkdown
+
+                comparePreview : String -> String -> Html Msg
+                comparePreview previewId markdown =
+                    Html.div
+                        [ TW.cls markdownPreviewScrollClass ]
+                        [ PageMarkdown.viewPreview previewId wikiSlug publishedSlugExists markdown ]
+
+                newPageSlugField : Html Msg
+                newPageSlugField =
+                    if detail.status == Submission.Draft && detail.contributionKind == Submission.ContributorKindNewPage then
+                        Html.div
+                            [ TW.cls "mb-2" ]
+                            [ Html.label
+                                [ Attr.for "wiki-submission-detail-new-page-slug" ]
+                                [ Html.text "Page slug" ]
+                            , Html.input
+                                [ Attr.id "wiki-submission-detail-new-page-slug"
+                                , Attr.type_ "text"
+                                , Attr.value interaction.newPageSlug
+                                , Events.onInput SubmissionDetailNewPageSlugChanged
+                                , Attr.disabled anyBusy
+                                , TW.cls UI.formTextInputClass
+                                ]
+                                []
+                            ]
+
+                    else
+                        Html.text ""
+
+                newMarkdownField : Html Msg
+                newMarkdownField =
+                    if detail.status == Submission.Draft then
+                        Html.textarea
+                            [ Attr.id "new-markdown-editable-textarea"
+                            , Attr.value interaction.markdownBody
+                            , Events.onInput SubmissionDetailNewMarkdownChanged
+                            , Attr.readonly anyBusy
+                            , Attr.rows 14
+                            , TW.cls (submissionDetailMarkdownTextareaEditableClass ++ submissionDetailMarkdownTextareaDiffCellClass)
+                            ]
+                            []
+
+                    else
+                        Html.textarea
+                            [ Attr.id "new-markdown-readonly-textarea"
+                            , Attr.readonly True
+                            , Attr.rows 14
+                            , Attr.value detail.compareNewMarkdown
+                            , TW.cls (submissionDetailMarkdownTextareaReadonlyClass ++ submissionDetailMarkdownTextareaDiffCellClass)
+                            ]
+                            []
+
+                withdrawDeleteRow : Html Msg
+                withdrawDeleteRow =
+                    case detail.status of
+                        Submission.Pending ->
+                            Html.div
+                                [ TW.cls "flex flex-wrap gap-2 mt-3" ]
+                                [ UI.button
+                                    [ Attr.id "wiki-submission-detail-withdraw"
+                                    , Attr.type_ "button"
+                                    , Attr.disabled (anyBusy || interaction.withdrawInFlight)
+                                    , Events.onClick SubmissionDetailWithdrawClicked
+                                    ]
+                                    [ Html.text "Withdraw (edit)" ]
+                                , UI.button
+                                    [ Attr.id "wiki-submission-detail-delete"
+                                    , Attr.type_ "button"
+                                    , Attr.disabled (anyBusy || interaction.deleteInFlight)
+                                    , Events.onClick SubmissionDetailDeleteClicked
+                                    ]
+                                    [ Html.text "Delete" ]
+                                ]
+
+                        Submission.NeedsRevision ->
+                            Html.div
+                                [ TW.cls "flex flex-wrap gap-2 mt-3" ]
+                                [ UI.button
+                                    [ Attr.id "wiki-submission-detail-withdraw"
+                                    , Attr.type_ "button"
+                                    , Attr.disabled (anyBusy || interaction.withdrawInFlight)
+                                    , Events.onClick SubmissionDetailWithdrawClicked
+                                    ]
+                                    [ Html.text "Withdraw (edit)" ]
+                                , UI.button
+                                    [ Attr.id "wiki-submission-detail-delete"
+                                    , Attr.type_ "button"
+                                    , Attr.disabled (anyBusy || interaction.deleteInFlight)
+                                    , Events.onClick SubmissionDetailDeleteClicked
+                                    ]
+                                    [ Html.text "Delete" ]
+                                ]
+
+                        Submission.Rejected ->
+                            Html.div
+                                [ TW.cls "flex flex-wrap gap-2 mt-3" ]
+                                [ UI.button
+                                    [ Attr.id "wiki-submission-detail-delete"
+                                    , Attr.type_ "button"
+                                    , Attr.disabled (anyBusy || interaction.deleteInFlight)
+                                    , Events.onClick SubmissionDetailDeleteClicked
+                                    ]
+                                    [ Html.text "Delete" ]
+                                ]
+
+                        Submission.Draft ->
+                            Html.div
+                                [ TW.cls "flex flex-wrap gap-2 mt-3" ]
+                                [ UI.button
+                                    [ Attr.id "wiki-submission-detail-save-draft"
+                                    , Attr.type_ "button"
+                                    , Attr.disabled (anyBusy || interaction.saveDraftInFlight)
+                                    , Events.onClick SubmissionDetailSaveDraftClicked
+                                    ]
+                                    [ Html.text "Save draft" ]
+                                , UI.button
+                                    [ Attr.id "wiki-submission-detail-submit-for-review"
+                                    , Attr.type_ "button"
+                                    , Attr.disabled (anyBusy || interaction.submitForReviewInFlight)
+                                    , Events.onClick SubmissionDetailSubmitForReviewClicked
+                                    ]
+                                    [ Html.text "Submit for review" ]
+                                , UI.button
+                                    [ Attr.id "wiki-submission-detail-delete"
+                                    , Attr.type_ "button"
+                                    , Attr.disabled (anyBusy || interaction.deleteInFlight)
+                                    , Events.onClick SubmissionDetailDeleteClicked
+                                    ]
+                                    [ Html.text "Delete" ]
+                                ]
+
+                        Submission.Approved ->
+                            Html.text ""
+
+                actionFeedback : Html Msg
+                actionFeedback =
+                    case interaction.lastError of
+                        Nothing ->
+                            Html.text ""
+
+                        Just errText ->
+                            Html.p
+                                [ Attr.id "wiki-submission-detail-action-error"
+                                , TW.cls "text-[var(--danger)] m-0 mt-2"
+                                ]
+                                [ Html.text errText ]
+            in
             Html.div []
                 [ Html.p []
                     [ Html.span
@@ -7031,140 +8502,54 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists submissionId editDraft rem
                             [ Html.h2 [] [ Html.text "Reviewer note" ]
                             , Html.p [] [ Html.text noteText ]
                             ]
-                , case detail.conflictContext of
-                    Nothing ->
-                        Html.text ""
+                , Html.section
+                    [ Attr.id "wiki-submission-detail-next-steps"
+                    , TW.cls "mt-3 mb-3"
+                    ]
+                    [ Html.p [ TW.cls "m-0 text-[0.95rem] leading-[1.45]" ]
+                        [ Html.text (submissionDetailNextStepsText detail.status) ]
+                    ]
+                , newPageSlugField
+                , Html.div
+                    [ TW.cls "grid grid-cols-1 md:grid-cols-2 gap-3 min-w-0" ]
+                    [ Html.div [ TW.cls "flex flex-col gap-1 min-w-0" ]
+                        [ Html.label [ Attr.for "original-markdown-readonly-textarea" ]
+                            [ Html.text "Original" ]
+                        , Html.textarea
+                            [ Attr.id "original-markdown-readonly-textarea"
+                            , Attr.readonly True
+                            , Attr.rows 14
+                            , Attr.value detail.compareOriginalMarkdown
+                            , TW.cls (submissionDetailMarkdownTextareaReadonlyClass ++ submissionDetailMarkdownTextareaDiffCellClass)
+                            ]
+                            []
+                        , Html.div
+                            [ Attr.id "original-preview"
+                            , TW.cls "min-h-0 min-w-0"
+                            ]
+                            [ comparePreview "original-preview-inner" detail.compareOriginalMarkdown ]
+                        ]
+                    , Html.div [ TW.cls "flex flex-col gap-1 min-w-0" ]
+                        [ Html.label
+                            [ Attr.for
+                                (if detail.status == Submission.Draft then
+                                    "new-markdown-editable-textarea"
 
-                    Just ctx ->
-                        if detail.status /= Submission.NeedsRevision then
-                            Html.text ""
-
-                        else
-                            let
-                                submissionConflictMarkdownBoxDataAttr : Attribute Msg
-                                submissionConflictMarkdownBoxDataAttr =
-                                    Attr.attribute "data-submission-conflict-box" "true"
-
-                                conflictPreview : String -> String -> Html Msg
-                                conflictPreview previewId markdown =
-                                    Html.div
-                                        [ TW.cls markdownPreviewScrollClass ]
-                                        [ PageMarkdown.viewPreview previewId wikiSlug publishedSlugExists markdown ]
-                            in
-                            Html.section
-                                [ Attr.id "wiki-submission-detail-conflict"
-                                , Attr.attribute "data-page-slug" ctx.pageSlug
-                                ]
-                                [ Html.h2 [] [ Html.text "Resolve conflict" ]
-                                , Html.div
-                                    [ TW.cls "w-full overflow-x-auto pb-2" ]
-                                    [ Html.div
-                                        [ TW.cls "grid min-w-[56rem] grid-cols-4 grid-rows-[auto_auto_auto_auto] gap-x-4 gap-y-2 items-stretch" ]
-                                        [ Html.h3
-                                            [ TW.cls "m-0 min-w-0 self-end text-sm font-semibold text-[var(--fg-muted)]" ]
-                                            [ Html.text "Before your change" ]
-                                        , Html.h3
-                                            [ TW.cls "m-0 min-w-0 self-end text-sm font-semibold text-[var(--fg-muted)]" ]
-                                            [ Html.text "After your change" ]
-                                        , Html.h3
-                                            [ TW.cls "m-0 min-w-0 self-end text-sm font-semibold text-[var(--fg-muted)]" ]
-                                            [ Html.text "Currently live" ]
-                                        , Html.label
-                                            [ Attr.for "wiki-submission-detail-resubmit-markdown"
-                                            , TW.cls "m-0 min-w-0 self-end text-sm font-semibold text-[var(--fg-muted)]"
-                                            ]
-                                            [ Html.text "Your new proposal" ]
-                                        , Html.textarea
-                                            [ submissionConflictMarkdownBoxDataAttr
-                                            , Attr.id "wiki-submission-detail-base-markdown"
-                                            , Attr.readonly True
-                                            , Attr.rows 12
-                                            , Attr.value ctx.baseMarkdown
-                                            , TW.cls (submissionDetailMarkdownTextareaReadonlyClass ++ submissionDetailMarkdownTextareaGridStretchClass)
-                                            ]
-                                            []
-                                        , Html.textarea
-                                            [ submissionConflictMarkdownBoxDataAttr
-                                            , Attr.id "wiki-submission-detail-proposed-markdown"
-                                            , Attr.readonly True
-                                            , Attr.rows 12
-                                            , Attr.value ctx.proposedMarkdown
-                                            , TW.cls (submissionDetailMarkdownTextareaReadonlyClass ++ submissionDetailMarkdownTextareaGridStretchClass)
-                                            ]
-                                            []
-                                        , Html.textarea
-                                            [ submissionConflictMarkdownBoxDataAttr
-                                            , Attr.id "wiki-submission-detail-current-markdown"
-                                            , Attr.readonly True
-                                            , Attr.rows 12
-                                            , Attr.value ctx.currentMarkdown
-                                            , TW.cls (submissionDetailMarkdownTextareaReadonlyClass ++ submissionDetailMarkdownTextareaGridStretchClass)
-                                            ]
-                                            []
-                                        , Html.textarea
-                                            [ submissionConflictMarkdownBoxDataAttr
-                                            , Attr.id "wiki-submission-detail-resubmit-markdown"
-                                            , Attr.value editDraft.markdownBody
-                                            , Events.onInput SubmissionConflictResubmitMarkdownChanged
-                                            , Attr.disabled editDraft.inFlight
-                                            , Attr.rows 12
-                                            , TW.cls (submissionDetailMarkdownTextareaEditableClass ++ submissionDetailMarkdownTextareaGridStretchClass)
-                                            ]
-                                            []
-                                        , Html.h3
-                                            [ TW.cls "m-0 min-w-0 text-sm font-semibold text-[var(--fg-muted)]" ]
-                                            [ Html.text "Preview" ]
-                                        , Html.h3
-                                            [ TW.cls "m-0 min-w-0 text-sm font-semibold text-[var(--fg-muted)]" ]
-                                            [ Html.text "Preview" ]
-                                        , Html.h3
-                                            [ TW.cls "m-0 min-w-0 text-sm font-semibold text-[var(--fg-muted)]" ]
-                                            [ Html.text "Preview" ]
-                                        , Html.h3
-                                            [ TW.cls "m-0 min-w-0 text-sm font-semibold text-[var(--fg-muted)]" ]
-                                            [ Html.text "Preview" ]
-                                        , Html.div
-                                            [ TW.cls "min-h-0 min-w-0" ]
-                                            [ conflictPreview "wiki-submission-detail-base-markdown-preview" ctx.baseMarkdown ]
-                                        , Html.div
-                                            [ TW.cls "min-h-0 min-w-0" ]
-                                            [ conflictPreview "wiki-submission-detail-proposed-markdown-preview" ctx.proposedMarkdown ]
-                                        , Html.div
-                                            [ TW.cls "min-h-0 min-w-0" ]
-                                            [ conflictPreview "wiki-submission-detail-current-markdown-preview" ctx.currentMarkdown ]
-                                        , Html.div
-                                            [ TW.cls "min-h-0 min-w-0" ]
-                                            [ conflictPreview "wiki-submission-detail-resubmit-markdown-preview" editDraft.markdownBody ]
-                                        ]
-                                    ]
-                                , UI.button
-                                    [ Attr.id "wiki-submission-detail-resubmit-submit"
-                                    , Attr.type_ "button"
-                                    , Attr.disabled editDraft.inFlight
-                                    , Events.onClick SubmissionConflictResubmitSubmitted
-                                    ]
-                                    [ Html.text "Resubmit for review" ]
-                                , case editDraft.lastResubmitResult of
-                                    Just (Ok (Submission.EditSubmittedForReview submissionId_)) ->
-                                        if Submission.idToString submissionId_ == submissionId then
-                                            Html.div
-                                                [ Attr.id "wiki-submission-detail-resubmit-success" ]
-                                                [ Html.text "Resubmitted for review." ]
-
-                                        else
-                                            Html.text ""
-
-                                    _ ->
-                                        Html.text ""
-                                , case editDraft.lastResubmitResult of
-                                    Just (Err err) ->
-                                        Html.div
-                                            [ Attr.id "wiki-submission-detail-resubmit-error" ]
-                                            [ Html.text (Submission.resubmitPageEditErrorToUserText err) ]
-
-                                    _ ->
-                                        Html.text ""
-                                ]
+                                 else
+                                    "new-markdown-readonly-textarea"
+                                )
+                            ]
+                            [ Html.text "Proposed" ]
+                        , newMarkdownField
+                        , Html.div
+                            [ Attr.id "new-preview"
+                            , TW.cls "min-h-0 min-w-0"
+                            ]
+                            [ comparePreview "new-preview-inner" newMarkdownForPreview ]
+                        ]
+                    ]
+                , withdrawDeleteRow
+                , actionFeedback
                 ]
 
 
@@ -7349,6 +8734,7 @@ viewMySubmissionsBody wikiSlug remote =
                     , headerAlign = UI.TableAlignTop
                     , headers =
                         [ UI.tableHeaderText "Submission"
+                        , UI.tableHeaderText "Status"
                         , UI.tableHeaderText "Kind"
                         , UI.tableHeaderText "Page"
                         ]
@@ -7372,6 +8758,12 @@ viewMySubmissionsBody wikiSlug remote =
                                                 , Attr.attribute "data-submission-id" idStr
                                                 ]
                                                 [ Html.text idStr ]
+                                            ]
+                                        , UI.tableTd UI.TableAlignTop
+                                            []
+                                            [ Html.span
+                                                [ Attr.attribute "data-submission-status" item.statusLabel ]
+                                                [ Html.text item.statusLabel ]
                                             ]
                                         , UI.tableTd UI.TableAlignTop [] [ Html.text item.kindLabel ]
                                         , UI.tableTd UI.TableAlignTop
@@ -8211,8 +9603,7 @@ viewSubmissionDetailRoute model wikiSlug submissionId =
                         [ viewSubmissionDetailBody
                             wikiSlug
                             (publishedSlugExistsFromWikiDetails wikiDetails)
-                            submissionId
-                            model.pageEditSubmitDraft
+                            model.submissionDetailEditDraft
                             (Store.get_ ( wikiSlug, submissionId ) model.store.submissionDetails)
                         ]
 
@@ -8271,8 +9662,191 @@ viewBacklinks wikiSlug backlinks =
         ]
 
 
-viewMissingPublishedPage : Wiki.Slug -> Page.Slug -> Maybe Wiki.Slug -> Html Msg
-viewMissingPublishedPage wikiSlug pageSlug maybeContributorWiki =
+maybeMySubmissionForMissingPublishedPage :
+    Page.Slug
+    -> RemoteData () (Result Submission.MyPendingSubmissionsError (List Submission.MyPendingSubmissionListItem))
+    -> Maybe { id : Submission.Id, status : Submission.Status }
+maybeMySubmissionForMissingPublishedPage pageSlug remote =
+    case remote of
+        Success (Ok items) ->
+            items
+                |> List.filter (\item -> item.maybePageSlug == Just pageSlug)
+                |> List.head
+                |> Maybe.map (\item -> { id = item.id, status = item.status })
+
+        NotAsked ->
+            Nothing
+
+        Loading ->
+            Nothing
+
+        Failure _ ->
+            Nothing
+
+        Success (Err _) ->
+            Nothing
+
+
+missingPublishedPageNoticeLines : Submission.Status -> ( String, String )
+missingPublishedPageNoticeLines status =
+    case status of
+        Submission.Draft ->
+            ( "You have a saved draft for this page."
+            , "It is not on the public index until you submit it for review and a reviewer approves it."
+            )
+
+        Submission.Pending ->
+            ( "You submitted this page for review."
+            , "It is not on the public index yet; it becomes visible after a reviewer approves it."
+            )
+
+        Submission.NeedsRevision ->
+            ( "You submitted this page for review."
+            , "It is not on the public index yet; it becomes visible after a reviewer approves it."
+            )
+
+        Submission.Rejected ->
+            ( "You have a submission for this page that was rejected."
+            , "Open it from My submissions to revise or delete it."
+            )
+
+        Submission.Approved ->
+            ( "", "" )
+
+
+viewMissingPublishedPage :
+    Wiki.Slug
+    -> Page.Slug
+    -> Maybe Wiki.Slug
+    -> RemoteData () (Result Submission.MyPendingSubmissionsError (List Submission.MyPendingSubmissionListItem))
+    -> Html Msg
+viewMissingPublishedPage wikiSlug pageSlug maybeContributorWiki myPendingRemote =
+    let
+        maybeMyRow : Maybe { id : Submission.Id, status : Submission.Status }
+        maybeMyRow =
+            case maybeContributorWiki of
+                Just sessionWiki ->
+                    if sessionWiki == wikiSlug then
+                        maybeMySubmissionForMissingPublishedPage pageSlug myPendingRemote
+
+                    else
+                        Nothing
+
+                Nothing ->
+                    Nothing
+
+        pendingSection : Html Msg
+        pendingSection =
+            case maybeContributorWiki of
+                Just sessionWiki ->
+                    if sessionWiki /= wikiSlug then
+                        Html.text ""
+
+                    else
+                        case myPendingRemote of
+                            Loading ->
+                                Html.p
+                                    [ Attr.id "wiki-missing-published-pending-loading" ]
+                                    [ Html.text "Loading your submission status…" ]
+
+                            Success (Ok _) ->
+                                case maybeMyRow of
+                                    Just row ->
+                                        let
+                                            idStr : String
+                                            idStr =
+                                                Submission.idToString row.id
+
+                                            ( line1, line2 ) =
+                                                missingPublishedPageNoticeLines row.status
+                                        in
+                                        Html.div
+                                            [ Attr.id "wiki-missing-published-pending-notice"
+                                            , Attr.attribute "data-pending-submission-id" idStr
+                                            , Attr.attribute "data-missing-page-submission-status" (Submission.statusLabelUserText row.status)
+                                            ]
+                                            (List.concat
+                                                [ if String.isEmpty line1 then
+                                                    []
+
+                                                  else
+                                                    [ Html.p [] [ Html.text line1 ] ]
+                                                , if String.isEmpty line2 then
+                                                    []
+
+                                                  else
+                                                    [ Html.p [] [ Html.text line2 ] ]
+                                                , [ Html.p []
+                                                        [ Html.a
+                                                            [ Attr.id "wiki-missing-published-open-submission-link"
+                                                            , Attr.href (Wiki.submissionDetailUrlPath wikiSlug idStr)
+                                                            ]
+                                                            [ Html.text "Open submission" ]
+                                                        , Html.text " · "
+                                                        , Html.a
+                                                            [ Attr.id "wiki-missing-published-my-submissions-link"
+                                                            , Attr.href (Wiki.mySubmissionsUrlPath wikiSlug)
+                                                            ]
+                                                            [ Html.text "My submissions" ]
+                                                        ]
+                                                  ]
+                                                ]
+                                            )
+
+                                    Nothing ->
+                                        Html.text ""
+
+                            Success (Err _) ->
+                                Html.text ""
+
+                            Failure _ ->
+                                Html.text ""
+
+                            NotAsked ->
+                                Html.text ""
+
+                Nothing ->
+                    Html.text ""
+
+        contributorCreateOrLogin : Html Msg
+        contributorCreateOrLogin =
+            case maybeContributorWiki of
+                Just sessionWiki ->
+                    if sessionWiki == wikiSlug then
+                        if maybeMyRow /= Nothing then
+                            Html.text ""
+
+                        else
+                            Html.p []
+                                [ Html.a
+                                    [ Attr.id "wiki-missing-published-create-link"
+                                    , Attr.href (Wiki.submitNewPageUrlPathWithSuggestedSlug wikiSlug pageSlug)
+                                    ]
+                                    [ Html.text "Create this page" ]
+                                ]
+
+                    else
+                        Html.p []
+                            [ Html.text "Log in on this wiki to create it. "
+                            , Html.a
+                                [ Attr.id "wiki-missing-published-login-link"
+                                , Attr.href (Wiki.loginUrlPath wikiSlug)
+                                ]
+                                [ Html.text "Log in" ]
+                            ]
+
+                Nothing ->
+                    Html.p []
+                        [ Html.a
+                            [ Attr.id "wiki-missing-published-login-link"
+                            , Attr.href
+                                (Wiki.loginUrlPathWithRedirect wikiSlug
+                                    (Wiki.submitNewPageUrlPathWithSuggestedSlug wikiSlug pageSlug)
+                                )
+                            ]
+                            [ Html.text "Log in to create this page" ]
+                        ]
+    in
     Html.div
         [ Attr.id "wiki-missing-published-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
@@ -8280,38 +9854,8 @@ viewMissingPublishedPage wikiSlug pageSlug maybeContributorWiki =
         ]
         [ Html.p []
             [ Html.text ("The page \"" ++ pageSlug ++ "\" does not exist yet.") ]
-        , case maybeContributorWiki of
-            Just sessionWiki ->
-                if sessionWiki == wikiSlug then
-                    Html.p []
-                        [ Html.a
-                            [ Attr.id "wiki-missing-published-create-link"
-                            , Attr.href (Wiki.submitNewPageUrlPathWithSuggestedSlug wikiSlug pageSlug)
-                            ]
-                            [ Html.text "Create this page" ]
-                        ]
-
-                else
-                    Html.p []
-                        [ Html.text "Log in on this wiki to create it. "
-                        , Html.a
-                            [ Attr.id "wiki-missing-published-login-link"
-                            , Attr.href (Wiki.loginUrlPath wikiSlug)
-                            ]
-                            [ Html.text "Log in" ]
-                        ]
-
-            Nothing ->
-                Html.p []
-                    [ Html.a
-                        [ Attr.id "wiki-missing-published-login-link"
-                        , Attr.href
-                            (Wiki.loginUrlPathWithRedirect wikiSlug
-                                (Wiki.submitNewPageUrlPathWithSuggestedSlug wikiSlug pageSlug)
-                            )
-                        ]
-                        [ Html.text "Log in to create this page" ]
-                    ]
+        , pendingSection
+        , contributorCreateOrLogin
         ]
 
 
@@ -8365,6 +9909,12 @@ viewPublishedPageRoute model wikiSlug pageSlug =
 
                                  else
                                     Nothing
+                                )
+                                (if Dict.member wikiSlug model.contributorWikiSessions then
+                                    Store.get_ wikiSlug model.store.myPendingSubmissions
+
+                                 else
+                                    NotAsked
                                 )
 
                         RemoteData.Success pageDetails ->

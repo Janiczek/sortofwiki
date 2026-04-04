@@ -338,6 +338,9 @@ encodeSubmissionStatus : Submission.Status -> Encode.Value
 encodeSubmissionStatus status =
     Encode.string
         (case status of
+            Submission.Draft ->
+                "draft"
+
             Submission.Pending ->
                 "pending"
 
@@ -401,6 +404,9 @@ decodeSubmissionStatus =
         |> Decode.andThen
             (\s ->
                 case s of
+                    "draft" ->
+                        Decode.succeed Submission.Draft
+
                     "pending" ->
                         Decode.succeed Submission.Pending
 

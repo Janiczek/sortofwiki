@@ -16,8 +16,9 @@ module Types exposing
     , RegisterDraft
     , RejectSubmissionPayload
     , RequestSubmissionChangesPayload
-    , ResubmitPageEditPayload
     , ReviewApproveDraft
+    , SubmissionDetailEditDraft
+    , emptySubmissionDetailEditDraft
     , ReviewDecision(..)
     , ReviewRejectDraft
     , ReviewRequestChangesDraft
@@ -87,12 +88,6 @@ type alias SubmitNewPagePayload =
     }
 
 
-type alias ResubmitPageEditPayload =
-    { submissionId : String
-    , rawMarkdown : String
-    }
-
-
 type alias RejectSubmissionPayload =
     { submissionId : String
     , reasonText : String
@@ -125,7 +120,12 @@ type ToBackend
     | SubmitNewPage Wiki.Slug SubmitNewPagePayload
     | SubmitPageEdit Wiki.Slug Page.Slug String
     | SubmitPageDelete Wiki.Slug Page.Slug String
-    | ResubmitPageEdit Wiki.Slug ResubmitPageEditPayload
+    | SaveNewPageDraft Wiki.Slug { maybeSubmissionId : Maybe String, rawPageSlug : String, rawMarkdown : String }
+    | SavePageEditDraft Wiki.Slug { maybeSubmissionId : Maybe String, pageSlug : Page.Slug, rawMarkdown : String }
+    | SavePageDeleteDraft Wiki.Slug { maybeSubmissionId : Maybe String, pageSlug : Page.Slug, rawReason : String }
+    | SubmitDraftForReview Wiki.Slug String
+    | WithdrawSubmission Wiki.Slug String
+    | DeleteMySubmission Wiki.Slug String
     | ApproveSubmission Wiki.Slug String
     | RejectSubmission Wiki.Slug RejectSubmissionPayload
     | RequestSubmissionChanges Wiki.Slug RequestSubmissionChangesPayload
@@ -164,7 +164,12 @@ type ToFrontend
     | SubmitNewPageResponse Wiki.Slug (Result Submission.SubmitNewPageError Submission.NewPageSubmitSuccess)
     | SubmitPageEditResponse Wiki.Slug (Result Submission.SubmitPageEditError Submission.EditSubmitSuccess)
     | SubmitPageDeleteResponse Wiki.Slug (Result Submission.SubmitPageDeleteError Submission.DeleteSubmitSuccess)
-    | ResubmitPageEditResponse Wiki.Slug String (Result Submission.ResubmitPageEditError ())
+    | SaveNewPageDraftResponse Wiki.Slug (Result Submission.SaveNewPageDraftError Submission.Id)
+    | SavePageEditDraftResponse Wiki.Slug (Result Submission.SavePageEditDraftError Submission.Id)
+    | SavePageDeleteDraftResponse Wiki.Slug (Result Submission.SavePageDeleteDraftError Submission.Id)
+    | SubmitDraftForReviewResponse Wiki.Slug String (Result Submission.SubmitDraftForReviewError ())
+    | WithdrawSubmissionResponse Wiki.Slug String (Result Submission.WithdrawSubmissionError ())
+    | DeleteMySubmissionResponse Wiki.Slug String (Result Submission.DeleteMySubmissionError ())
     | ApproveSubmissionResponse Wiki.Slug String (Result Submission.ApproveSubmissionError ())
     | RejectSubmissionResponse Wiki.Slug String (Result Submission.RejectSubmissionError ())
     | RequestSubmissionChangesResponse Wiki.Slug String (Result Submission.RequestChangesSubmissionError ())
@@ -251,23 +256,34 @@ type alias NewPageSubmitDraft =
     { pageSlug : String
     , pageSlugLockedFromQuery : Bool
     , markdownBody : String
+    , maybeSavedDraftId : Maybe String
     , inFlight : Bool
+    , saveDraftInFlight : Bool
+    , pendingSubmitAfterSave : Bool
     , lastResult : Maybe (Result Submission.SubmitNewPageError Submission.NewPageSubmitSuccess)
+    , lastSaveDraftResult : Maybe (Result Submission.SaveNewPageDraftError Submission.Id)
     }
 
 
 type alias PageEditSubmitDraft =
     { markdownBody : String
+    , maybeSavedDraftId : Maybe String
     , inFlight : Bool
+    , saveDraftInFlight : Bool
+    , pendingSubmitAfterSave : Bool
     , lastResult : Maybe (Result Submission.SubmitPageEditError Submission.EditSubmitSuccess)
-    , lastResubmitResult : Maybe (Result Submission.ResubmitPageEditError Submission.EditSubmitSuccess)
+    , lastSaveDraftResult : Maybe (Result Submission.SavePageEditDraftError Submission.Id)
     }
 
 
 type alias PageDeleteSubmitDraft =
     { reasonText : String
+    , maybeSavedDraftId : Maybe String
     , inFlight : Bool
+    , saveDraftInFlight : Bool
+    , pendingSubmitAfterSave : Bool
     , lastResult : Maybe (Result Submission.SubmitPageDeleteError Submission.DeleteSubmitSuccess)
+    , lastSaveDraftResult : Maybe (Result Submission.SavePageDeleteDraftError Submission.Id)
     }
 
 
@@ -299,6 +315,33 @@ type alias ReviewRequestChangesDraft =
     }
 
 
+{-| Local editor state on contributor submission detail (draft edits + action in-flight).
+-}
+type alias SubmissionDetailEditDraft =
+    { markdownBody : String
+    , newPageSlug : String
+    , saveDraftInFlight : Bool
+    , submitForReviewInFlight : Bool
+    , withdrawInFlight : Bool
+    , deleteInFlight : Bool
+    , pendingSubmitAfterSave : Bool
+    , lastError : Maybe String
+    }
+
+
+emptySubmissionDetailEditDraft : SubmissionDetailEditDraft
+emptySubmissionDetailEditDraft =
+    { markdownBody = ""
+    , newPageSlug = ""
+    , saveDraftInFlight = False
+    , submitForReviewInFlight = False
+    , withdrawInFlight = False
+    , deleteInFlight = False
+    , pendingSubmitAfterSave = False
+    , lastError = Nothing
+    }
+
+
 type alias FrontendModel =
     { key : Effect.Browser.Navigation.Key
     , colorThemePreference : ColorThemePreference
@@ -316,6 +359,7 @@ type alias FrontendModel =
     , reviewDecision : ReviewDecision
     , reviewRejectDraft : ReviewRejectDraft
     , reviewRequestChangesDraft : ReviewRequestChangesDraft
+    , submissionDetailEditDraft : SubmissionDetailEditDraft
     , adminPromoteError : Maybe String
     , adminDemoteError : Maybe String
     , adminGrantAdminError : Maybe String
@@ -365,8 +409,15 @@ type FrontendMsg
     | PageEditSubmitFormSubmitted
     | PageDeleteSubmitReasonChanged String
     | PageDeleteSubmitFormSubmitted
-    | SubmissionConflictResubmitMarkdownChanged String
-    | SubmissionConflictResubmitSubmitted
+    | NewPageSaveDraftClicked
+    | PageEditSaveDraftClicked
+    | PageDeleteSaveDraftClicked
+    | SubmissionDetailNewMarkdownChanged String
+    | SubmissionDetailNewPageSlugChanged String
+    | SubmissionDetailSaveDraftClicked
+    | SubmissionDetailSubmitForReviewClicked
+    | SubmissionDetailWithdrawClicked
+    | SubmissionDetailDeleteClicked
     | ReviewDecisionChanged ReviewDecision
     | ReviewDecisionSubmitted
     | ReviewRejectReasonChanged String

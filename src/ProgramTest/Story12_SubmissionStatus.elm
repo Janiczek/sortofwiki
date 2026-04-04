@@ -52,6 +52,22 @@ endToEndTests =
                     (ProgramTest.Query.withinId "wiki-submission-detail-kind-summary"
                         (ProgramTest.Query.expectHasText "New page: Story12Page")
                     )
+                , client.checkView 100
+                    (ProgramTest.Query.withinId "wiki-submission-detail-next-steps"
+                        (ProgramTest.Query.expectHasText "trusted contributor")
+                    )
+                , client.checkView 100
+                    (ProgramTest.Query.withinId "original-markdown-readonly-textarea"
+                        (ProgramTest.Query.expectHasReadonly)
+                    )
+                , client.checkView 100
+                    (ProgramTest.Query.withinId "new-markdown-readonly-textarea"
+                        (ProgramTest.Query.expectHasReadonly)
+                    )
+                , client.checkView 100
+                    (ProgramTest.Query.withinId "wiki-submission-detail-withdraw"
+                        (ProgramTest.Query.expectHasText "Withdraw (edit)")
+                    )
                 ]
         }
     , ProgramTest.Start.start

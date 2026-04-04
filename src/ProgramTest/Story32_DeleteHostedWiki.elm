@@ -3,6 +3,7 @@ module ProgramTest.Story32_DeleteHostedWiki exposing (endToEndTests)
 import Effect.Browser.Dom
 import Env
 import Expect
+import Json.Encode
 import ProgramTest.Config
 import ProgramTest.Query
 import ProgramTest.Start
@@ -30,7 +31,7 @@ endToEndTests =
                 , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-name") "Story 32 Wiki"
                 , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-initial-admin-username") "story32admin"
                 , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-initial-admin-password") "password12"
-                , client.click 100 (Effect.Browser.Dom.id "host-admin-create-wiki-submit")
+                , client.custom 100 (Effect.Browser.Dom.id "host-admin-create-wiki-form") "submit" (Json.Encode.object [])
                 , client.checkView 400
                     (ProgramTest.Query.withinHostAdminWikiRow "Story32Wiki"
                         (ProgramTest.Query.expectHasText "Story 32 Wiki")

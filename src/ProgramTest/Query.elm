@@ -18,6 +18,7 @@ module ProgramTest.Query exposing
     , expectHasText
     , expectHasTexts
     , expectHasWikiSlug
+    , expectHostAdminCreateWikiSlugInputUsesHtmlConstraints
     , expectLink
     , expectNoBacklinks
     , expectPageShowsWikiSlug
@@ -49,6 +50,7 @@ import Expect exposing (Expectation)
 import Html.Attributes
 import Test.Html.Query
 import Test.Html.Selector
+import Submission
 import Wiki
 
 
@@ -219,6 +221,21 @@ expectHasDataAttributes pairs single =
 expectHasInputValue : String -> Test.Html.Query.Single msg -> Expectation
 expectHasInputValue value single =
     Test.Html.Query.has [ Test.Html.Selector.attribute (Html.Attributes.value value) ] single
+
+
+{-| Create-wiki slug field: native constraint validation (`pattern`, `maxlength`, `required`, `title`).
+-}
+expectHostAdminCreateWikiSlugInputUsesHtmlConstraints : Test.Html.Query.Single msg -> Expectation
+expectHostAdminCreateWikiSlugInputUsesHtmlConstraints root =
+    withinId "host-admin-create-wiki-slug"
+        (expectDescendantMatchesEvery
+            [ Test.Html.Selector.attribute (Html.Attributes.pattern Submission.pageSlugHtmlPattern)
+            , Test.Html.Selector.attribute (Html.Attributes.maxlength Submission.pageSlugHtmlMaxLength)
+            , Test.Html.Selector.attribute (Html.Attributes.required True)
+            , Test.Html.Selector.attribute (Html.Attributes.title Submission.pageSlugConstraintTitle)
+            ]
+        )
+        root
 
 
 expectHasReadonly : Test.Html.Query.Single msg -> Expectation

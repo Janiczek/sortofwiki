@@ -1,12 +1,16 @@
 module BackendDataExportTest exposing (suite)
 
 import BackendDataExport
-import Dict
+import Dict exposing (Dict)
 import Expect
 import ProgramTest.Config
 import Set
+import Submission exposing (Submission)
 import Test exposing (Test)
 import Types exposing (BackendModel)
+import Wiki exposing (Wiki)
+import WikiAuditLog
+import WikiContributors
 import WikiUser
 
 
@@ -74,18 +78,22 @@ suite =
 
                             Ok snap ->
                                 let
+                                    demoWikis : Dict Wiki.Slug Wiki
                                     demoWikis =
                                         fixtureModel.wikis
                                             |> Dict.filter (\slug _ -> slug == "Demo")
 
+                                    demoSubs : Dict String Submission
                                     demoSubs =
                                         fixtureModel.submissions
                                             |> Dict.filter (\_ sub -> sub.wikiSlug == "Demo")
 
+                                    demoContributors : Dict String (Dict String WikiContributors.StoredContributor)
                                     demoContributors =
                                         fixtureModel.contributors
                                             |> Dict.filter (\slug _ -> slug == "Demo")
 
+                                    demoAuditRows : List WikiAuditLog.AuditEvent
                                     demoAuditRows =
                                         fixtureModel.wikiAuditEvents
                                             |> Dict.get "Demo"

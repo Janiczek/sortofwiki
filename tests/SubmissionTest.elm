@@ -5,9 +5,17 @@ import Dict
 import Expect
 import Fuzz
 import Page
+import Regex
 import Submission
 import Test exposing (Test)
 import Wiki
+
+
+pageSlugHtmlPatternRegex : Regex.Regex
+pageSlugHtmlPatternRegex =
+    "^(" ++ Submission.pageSlugHtmlPattern ++ ")$"
+        |> Regex.fromString
+        |> Maybe.withDefault Regex.never
 
 
 suite : Test
@@ -28,6 +36,15 @@ suite =
                         Ok slug ->
                             Submission.validateNewPageFields rawSlug "x"
                                 |> Expect.equal (Ok { pageSlug = slug, markdown = "x" })
+            , Test.fuzz Fuzz.string "pageSlugHtmlPattern accepts every validatePageSlug Ok input" <|
+                \raw ->
+                    case Submission.validatePageSlug raw of
+                        Ok _ ->
+                            Regex.contains pageSlugHtmlPatternRegex raw
+                                |> Expect.equal True
+
+                        Err _ ->
+                            Expect.pass
             ]
         , Test.describe "validateNewPageFields"
             [ Test.test "rejects empty slug" <|
@@ -88,6 +105,25 @@ suite =
                                     , markdown = "m"
                                     }
                             , status = Submission.Pending
+                            , reviewerNote = Nothing
+                            }
+                    in
+                    Submission.pendingNewPageSlugInUse "Demo" "wanted" (Dict.singleton "sub_1" sub)
+                        |> Expect.equal True
+            , Test.test "true when draft new page matches slug" <|
+                \() ->
+                    let
+                        sub : Submission.Submission
+                        sub =
+                            { id = Submission.idFromCounter 1
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "u"
+                            , kind =
+                                Submission.NewPage
+                                    { pageSlug = "wanted"
+                                    , markdown = ""
+                                    }
+                            , status = Submission.Draft
                             , reviewerNote = Nothing
                             }
                     in
@@ -318,6 +354,10 @@ suite =
                 \() ->
                     Submission.statusLabelUserText Submission.NeedsRevision
                         |> Expect.equal "Needs revision"
+            , Test.test "Draft" <|
+                \() ->
+                    Submission.statusLabelUserText Submission.Draft
+                        |> Expect.equal "Draft"
             ]
         , Test.describe "kindSummaryUserText"
             [ Test.test "NewPage" <|
@@ -374,8 +414,13 @@ suite =
                             { id = Submission.idFromCounter 1
                             , status = Submission.Pending
                             , kindSummary = "New page: x"
+                            , contributionKind = Submission.ContributorKindNewPage
                             , reviewerNote = Nothing
                             , conflictContext = Nothing
+                            , compareOriginalMarkdown = "(No published page yet.)"
+                            , compareNewMarkdown = "m"
+                            , maybeNewPageSlug = Just "x"
+                            , maybeEditPageSlug = Nothing
                             }
             , Test.test "maps reviewer note through reviewerNoteForDisplay" <|
                 \() ->
@@ -396,6 +441,7 @@ suite =
                             { id = Submission.idFromCounter 2
                             , status = Submission.Rejected
                             , kindSummary = "Edit page: home"
+                            , contributionKind = Submission.ContributorKindEditPage
                             , reviewerNote = Just "not suitable"
                             , conflictContext =
                                 Just
@@ -406,6 +452,10 @@ suite =
                                     , currentMarkdown = "old"
                                     , currentRevision = 1
                                     }
+                            , compareOriginalMarkdown = "old"
+                            , compareNewMarkdown = "m"
+                            , maybeNewPageSlug = Nothing
+                            , maybeEditPageSlug = Just "home"
                             }
             ]
         , Test.describe "pendingSubmissionsForWiki"
@@ -592,6 +642,8 @@ suite =
                     Submission.myPendingSubmissionListItemFromSubmission sub
                         |> Expect.equal
                             { id = Submission.idFromCounter 5
+                            , status = Submission.Pending
+                            , statusLabel = "Pending review"
                             , kindLabel = "New page: MyPage"
                             , maybePageSlug = Just "MyPage"
                             }
@@ -669,8 +721,8 @@ suite =
                         }
                         |> Expect.equal False
             ]
-        , Test.describe "resubmitNeedsRevisionEdit"
-            [ Test.test "resets to pending and updates base/proposed fields" <|
+        , Test.describe "withdrawSubmissionToDraft"
+            [ Test.test "Pending to Draft" <|
                 \() ->
                     let
                         sub : Submission.Submission
@@ -679,24 +731,78 @@ suite =
                             , wikiSlug = "Demo"
                             , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
-                                Submission.EditPage { pageSlug = "home", baseMarkdown = "old", baseRevision = 1, proposedMarkdown = "mine" }
-                            , status = Submission.NeedsRevision
-                            , reviewerNote = Just "fix conflict"
+                                Submission.NewPage { pageSlug = "Pg", markdown = "m" }
+                            , status = Submission.Pending
+                            , reviewerNote = Nothing
                             }
                     in
-                    Submission.resubmitNeedsRevisionEdit
-                        { markdown = "resolved"
-                        , currentMarkdown = "current"
-                        , currentRevision = 2
-                        }
-                        sub
-                        |> Result.map
-                            (\next ->
-                                ( next.status
-                                , next.reviewerNote
-                                )
+                    Submission.withdrawSubmissionToDraft sub
+                        |> Result.map .status
+                        |> Expect.equal (Ok Submission.Draft)
+            , Test.test "rejects Draft" <|
+                \() ->
+                    let
+                        sub : Submission.Submission
+                        sub =
+                            { id = Submission.idFromCounter 1
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "u"
+                            , kind =
+                                Submission.NewPage { pageSlug = "Pg", markdown = "m" }
+                            , status = Submission.Draft
+                            , reviewerNote = Nothing
+                            }
+                    in
+                    Submission.withdrawSubmissionToDraft sub
+                        |> Expect.equal (Err Submission.WithdrawSubmissionNotPendingOrNeedsRevision)
+            ]
+        , Test.describe "promoteDraftToPending"
+            [ Test.test "rebases edit draft on current published wiki" <|
+                \() ->
+                    let
+                        wiki : Wiki.Wiki
+                        wiki =
+                            Wiki.wikiWithPages "Demo"
+                                "Demo"
+                                (Dict.singleton "home" (Page.withPublished "home" "current-live"))
+
+                        author : ContributorAccount.Id
+                        author =
+                            ContributorAccount.newAccountId "Demo" "u"
+
+                        sub : Submission.Submission
+                        sub =
+                            { id = Submission.idFromCounter 1
+                            , wikiSlug = "Demo"
+                            , authorId = author
+                            , kind =
+                                Submission.EditPage
+                                    { pageSlug = "home"
+                                    , baseMarkdown = "stale-base"
+                                    , baseRevision = 1
+                                    , proposedMarkdown = "  my-edit \n"
+                                    }
+                            , status = Submission.Draft
+                            , reviewerNote = Just "old note"
+                            }
+                    in
+                    Submission.promoteDraftToPending wiki Dict.empty sub
+                        |> Expect.equal
+                            (Ok
+                                { id = Submission.idFromCounter 1
+                                , wikiSlug = "Demo"
+                                , authorId = author
+                                , status = Submission.Pending
+                                , reviewerNote = Nothing
+                                , kind =
+                                    Submission.EditPage
+                                        { pageSlug = "home"
+                                        , baseMarkdown = "current-live"
+                                        , baseRevision = 1
+                                        , proposedMarkdown = "my-edit"
+                                        }
+                                }
                             )
-                        |> Expect.equal (Ok ( Submission.Pending, Nothing ))
             ]
         , Test.describe "pageSlugFromKind"
             [ Test.test "NewPage" <|
