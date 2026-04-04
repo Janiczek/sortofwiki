@@ -1,5 +1,6 @@
 module ProgramTest.Story08_Login exposing (endToEndTests)
 
+import Dict
 import Effect.Browser.Dom
 import ProgramTest.Config
 import ProgramTest.Actions
@@ -110,12 +111,11 @@ endToEndTests =
                             )
                       , client.checkModel 100
                             (\model ->
-                                case model.contributorWikiSession of
-                                    Nothing ->
-                                        Ok ()
+                                if Dict.isEmpty model.contributorWikiSessions then
+                                    Ok ()
 
-                                    Just _ ->
-                                        Err "expected contributor session cleared after logout"
+                                else
+                                    Err "expected contributor sessions cleared after logout"
                             )
                       ]
                     ]

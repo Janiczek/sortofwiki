@@ -1,11 +1,15 @@
 module WikiUser exposing
-    ( Binding(..)
+    ( SessionContributorOnWiki(..)
     , SessionTable
+    , WikiBindings
     , bindContributor
     , contributorIdForWiki
     , dropBindingsForWiki
     , emptySessions
     , remapSessionsForWikiSlugRename
+    , sessionContributorOnWiki
+    , unbindContributor
+    , unionSessionOverlayPreferred
     )
 
 import ContributorAccount
@@ -13,14 +17,22 @@ import Dict exposing (Dict)
 import Wiki
 
 
-{-| Session is logged into one wiki as one contributor account (MVP).
+{-| Per Lamdera session: contributor account ids keyed by wiki slug (multiple wikis at once).
 -}
-type Binding
-    = Binding Wiki.Slug ContributorAccount.Id
+type alias WikiBindings =
+    Dict Wiki.Slug ContributorAccount.Id
 
 
 type alias SessionTable =
-    Dict String Binding
+    Dict String WikiBindings
+
+
+{-| Resolve whether the client is logged into `wikiSlug` specifically.
+-}
+type SessionContributorOnWiki
+    = SessionNotLoggedIn
+    | SessionWrongWiki
+    | SessionHasAccount ContributorAccount.Id
 
 
 emptySessions : SessionTable
@@ -29,49 +41,111 @@ emptySessions =
 
 
 bindContributor : String -> Wiki.Slug -> ContributorAccount.Id -> SessionTable -> SessionTable
-bindContributor sessionKey wikiSlug accountId =
-    Dict.insert sessionKey (Binding wikiSlug accountId)
+bindContributor sessionKey wikiSlug accountId sessions =
+    let
+        inner : WikiBindings
+        inner =
+            sessions
+                |> Dict.get sessionKey
+                |> Maybe.withDefault Dict.empty
+                |> Dict.insert wikiSlug accountId
+    in
+    Dict.insert sessionKey inner sessions
+
+
+unbindContributor : String -> Wiki.Slug -> SessionTable -> SessionTable
+unbindContributor sessionKey wikiSlug sessions =
+    case Dict.get sessionKey sessions of
+        Nothing ->
+            sessions
+
+        Just inner ->
+            let
+                nextInner : WikiBindings
+                nextInner =
+                    Dict.remove wikiSlug inner
+            in
+            if Dict.isEmpty nextInner then
+                Dict.remove sessionKey sessions
+
+            else
+                Dict.insert sessionKey nextInner sessions
 
 
 contributorIdForWiki : String -> Wiki.Slug -> SessionTable -> Maybe ContributorAccount.Id
 contributorIdForWiki sessionKey wikiSlug sessions =
+    sessions
+        |> Dict.get sessionKey
+        |> Maybe.andThen (Dict.get wikiSlug)
+
+
+sessionContributorOnWiki : String -> Wiki.Slug -> SessionTable -> SessionContributorOnWiki
+sessionContributorOnWiki sessionKey wikiSlug sessions =
     case Dict.get sessionKey sessions of
         Nothing ->
-            Nothing
+            SessionNotLoggedIn
 
-        Just (Binding boundWiki accountId) ->
-            if boundWiki == wikiSlug then
-                Just accountId
+        Just inner ->
+            if Dict.isEmpty inner then
+                SessionNotLoggedIn
 
             else
-                Nothing
+                case Dict.get wikiSlug inner of
+                    Nothing ->
+                        SessionWrongWiki
+
+                    Just accountId ->
+                        SessionHasAccount accountId
+
+
+{-| Merge session tables: for each session key, inner maps are combined; `overlay` wins on the same wiki slug.
+-}
+unionSessionOverlayPreferred : SessionTable -> SessionTable -> SessionTable
+unionSessionOverlayPreferred overlay base =
+    Dict.foldl
+        (\sessionKey overlayInner acc ->
+            Dict.update sessionKey
+                (\maybeBaseInner ->
+                    overlayInner
+                        |> Dict.union (maybeBaseInner |> Maybe.withDefault Dict.empty)
+                        |> Just
+                )
+                acc
+        )
+        base
+        overlay
 
 
 {-| Remove sessions bound to a wiki (e.g. after the wiki is deleted).
 -}
 dropBindingsForWiki : Wiki.Slug -> SessionTable -> SessionTable
 dropBindingsForWiki wikiSlug sessions =
-    Dict.filter
-        (\_ binding ->
-            case binding of
-                Binding slug _ ->
-                    slug /= wikiSlug
-        )
-        sessions
+    sessions
+        |> Dict.toList
+        |> List.map
+            (\( sk, inner ) ->
+                ( sk, Dict.remove wikiSlug inner )
+            )
+        |> List.filter (\( _, inner ) -> not (Dict.isEmpty inner))
+        |> Dict.fromList
 
 
-{-| Contributor sessions and account ids reference the wiki slug; keep them consistent after a rename.
+{-| Contributor sessions reference the wiki slug; keep them consistent after a rename.
 -}
 remapSessionsForWikiSlugRename : Wiki.Slug -> Wiki.Slug -> SessionTable -> SessionTable
 remapSessionsForWikiSlugRename oldSlug newSlug sessions =
     Dict.map
-        (\_ binding ->
-            case binding of
-                Binding slug accId ->
-                    if slug == oldSlug then
-                        Binding newSlug (ContributorAccount.remapIdForWikiSlug oldSlug newSlug accId)
+        (\_ inner ->
+            inner
+                |> Dict.toList
+                |> List.map
+                    (\( slug, accId ) ->
+                        if slug == oldSlug then
+                            ( newSlug, ContributorAccount.remapIdForWikiSlug oldSlug newSlug accId )
 
-                    else
-                        binding
+                        else
+                            ( slug, accId )
+                    )
+                |> Dict.fromList
         )
         sessions

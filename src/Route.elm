@@ -1,7 +1,10 @@
 module Route exposing
-    ( Route(..)
+    ( NavAccessContext
+    , Route(..)
+    , canAccess
     , fromUrl
     , isWikiList
+    , navUrlPath
     , notFoundPath
     , storeActions
     )
@@ -12,6 +15,183 @@ import Store exposing (Action(..))
 import Url exposing (Url)
 import Wiki
 import WikiAuditLog
+import WikiRole exposing (WikiRole)
+
+
+{-| Who may see which sidebar links: host-admin session, active wiki, and contributor role on that wiki.
+-}
+type alias NavAccessContext =
+    { hostAdminAuthenticated : Bool
+    , activeWikiSlug : Wiki.Slug
+    , contributorOnActiveWiki : Maybe WikiRole
+    }
+
+
+{-| URL path for sidebar links (`href`). Covers every `Route` variant for exhaustiveness.
+-}
+navUrlPath : Route -> String
+navUrlPath route =
+    case route of
+        WikiList ->
+            Wiki.wikiListUrlPath
+
+        HostAdmin Nothing ->
+            "/admin"
+
+        HostAdmin (Just returnPath) ->
+            Wiki.hostAdminLoginUrlPathWithRedirect returnPath
+
+        HostAdminWikis ->
+            Wiki.hostAdminWikisUrlPath
+
+        HostAdminWikiNew ->
+            Wiki.hostAdminNewWikiUrlPath
+
+        HostAdminWikiDetail slug ->
+            Wiki.hostAdminWikiDetailUrlPath slug
+
+        HostAdminAudit ->
+            Wiki.hostAdminAuditUrlPath
+
+        HostAdminBackup ->
+            Wiki.hostAdminBackupUrlPath
+
+        WikiHome wikiSlug ->
+            Wiki.wikiHomeUrlPath wikiSlug
+
+        WikiPage wikiSlug pageSlug ->
+            Wiki.publishedPageUrlPath wikiSlug pageSlug
+
+        WikiLogin wikiSlug maybeRedirect ->
+            case maybeRedirect of
+                Nothing ->
+                    Wiki.loginUrlPath wikiSlug
+
+                Just returnPath ->
+                    Wiki.loginUrlPathWithRedirect wikiSlug returnPath
+
+        WikiRegister wikiSlug ->
+            Wiki.registerUrlPath wikiSlug
+
+        WikiSubmitNew wikiSlug ->
+            Wiki.submitNewPageUrlPath wikiSlug
+
+        WikiSubmitEdit wikiSlug pageSlug ->
+            Wiki.submitEditUrlPath wikiSlug pageSlug
+
+        WikiSubmitDelete wikiSlug pageSlug ->
+            Wiki.submitDeleteUrlPath wikiSlug pageSlug
+
+        WikiSubmissionDetail wikiSlug submissionId ->
+            Wiki.submissionDetailUrlPath wikiSlug submissionId
+
+        WikiMySubmissions wikiSlug ->
+            Wiki.mySubmissionsUrlPath wikiSlug
+
+        WikiReview wikiSlug ->
+            Wiki.reviewQueueUrlPath wikiSlug
+
+        WikiReviewDetail wikiSlug submissionId ->
+            Wiki.reviewDetailUrlPath wikiSlug submissionId
+
+        WikiAdminUsers wikiSlug ->
+            Wiki.adminUsersUrlPath wikiSlug
+
+        WikiAdminAudit wikiSlug ->
+            Wiki.adminAuditUrlPath wikiSlug
+
+        NotFound u ->
+            u.path
+
+
+{-| Whether `ctx` may see a navigational link to `route` in the sidebar (not full server authorization).
+-}
+canAccess : NavAccessContext -> Route -> Bool
+canAccess ctx route =
+    let
+        slugOk : Wiki.Slug -> Bool
+        slugOk wikiSlug =
+            wikiSlug == ctx.activeWikiSlug
+
+        contributorOk : Bool
+        contributorOk =
+            ctx.contributorOnActiveWiki /= Nothing
+
+        trustedOk : Bool
+        trustedOk =
+            ctx.contributorOnActiveWiki
+                |> Maybe.map WikiRole.isTrustedModerator
+                |> Maybe.withDefault False
+
+        wikiAdminOk : Bool
+        wikiAdminOk =
+            ctx.contributorOnActiveWiki
+                |> Maybe.map WikiRole.canAccessWikiAdminUsers
+                |> Maybe.withDefault False
+    in
+    case route of
+        WikiList ->
+            True
+
+        HostAdmin _ ->
+            True
+
+        HostAdminWikis ->
+            ctx.hostAdminAuthenticated
+
+        HostAdminWikiNew ->
+            ctx.hostAdminAuthenticated
+
+        HostAdminWikiDetail _ ->
+            ctx.hostAdminAuthenticated
+
+        HostAdminAudit ->
+            ctx.hostAdminAuthenticated
+
+        HostAdminBackup ->
+            ctx.hostAdminAuthenticated
+
+        WikiHome wikiSlug ->
+            slugOk wikiSlug
+
+        WikiPage wikiSlug _ ->
+            slugOk wikiSlug
+
+        WikiLogin wikiSlug _ ->
+            slugOk wikiSlug
+
+        WikiRegister wikiSlug ->
+            slugOk wikiSlug
+
+        WikiSubmitNew wikiSlug ->
+            slugOk wikiSlug && contributorOk
+
+        WikiSubmitEdit wikiSlug _ ->
+            slugOk wikiSlug && contributorOk
+
+        WikiSubmitDelete wikiSlug _ ->
+            slugOk wikiSlug && contributorOk
+
+        WikiSubmissionDetail wikiSlug _ ->
+            slugOk wikiSlug && contributorOk
+
+        WikiMySubmissions wikiSlug ->
+            slugOk wikiSlug && contributorOk
+
+        WikiReview wikiSlug ->
+            slugOk wikiSlug && trustedOk
+
+        WikiReviewDetail wikiSlug _ ->
+            slugOk wikiSlug && trustedOk
+
+        WikiAdminUsers wikiSlug ->
+            slugOk wikiSlug && wikiAdminOk
+
+        WikiAdminAudit wikiSlug ->
+            slugOk wikiSlug && wikiAdminOk
+
+        NotFound _ ->
+            False
 
 
 {-| Resolved client route from the URL path.

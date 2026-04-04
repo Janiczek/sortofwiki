@@ -32,8 +32,9 @@ trustedpubOnDemo =
     in
     { m
         | contributorSessions =
-            Dict.insert sessionKey
-                (WikiUser.Binding "Demo" (ContributorAccount.newAccountId "Demo" "trustedpub"))
+            WikiUser.bindContributor sessionKey
+                "Demo"
+                (ContributorAccount.newAccountId "Demo" "trustedpub")
                 m.contributorSessions
     }
 

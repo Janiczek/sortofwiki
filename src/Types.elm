@@ -29,6 +29,7 @@ module Types exposing
 
 import ColorTheme exposing (ColorTheme, ColorThemePreference)
 import ContributorAccount
+import ContributorWikiSession exposing (ContributorWikiSession)
 import Dict exposing (Dict)
 import Effect.Browser
 import Effect.Browser.Navigation
@@ -120,7 +121,7 @@ type ToBackend
     | RequestSubmissionDetails Wiki.Slug String
     | RegisterContributor Wiki.Slug RegisterContributorPayload
     | LoginContributor Wiki.Slug LoginContributorPayload
-    | LogoutContributor
+    | LogoutContributor Wiki.Slug
     | SubmitNewPage Wiki.Slug SubmitNewPagePayload
     | SubmitPageEdit Wiki.Slug Page.Slug String
     | SubmitPageDelete Wiki.Slug Page.Slug String
@@ -159,7 +160,7 @@ type ToFrontend
     | SubmissionDetailsResponse Wiki.Slug String (Result Submission.DetailsError Submission.ContributorView)
     | RegisterContributorResponse Wiki.Slug (Result ContributorAccount.RegisterContributorError WikiRole.WikiRole)
     | LoginContributorResponse Wiki.Slug (Result ContributorAccount.LoginContributorError WikiRole.WikiRole)
-    | LogoutContributorResponse
+    | LogoutContributorResponse Wiki.Slug
     | SubmitNewPageResponse Wiki.Slug (Result Submission.SubmitNewPageError Submission.NewPageSubmitSuccess)
     | SubmitPageEditResponse Wiki.Slug (Result Submission.SubmitPageEditError Submission.EditSubmitSuccess)
     | SubmitPageDeleteResponse Wiki.Slug (Result Submission.SubmitPageDeleteError Submission.DeleteSubmitSuccess)
@@ -305,9 +306,7 @@ type alias FrontendModel =
     , route : Route
     , navigationFragment : Maybe String
     , store : Store
-    , contributorWikiSession : Maybe Wiki.Slug
-    , contributorWikiRole : Maybe WikiRole.WikiRole
-    , contributorDisplayUsername : Maybe String
+    , contributorWikiSessions : Dict Wiki.Slug ContributorWikiSession
     , registerDraft : RegisterDraft
     , loginDraft : LoginDraft
     , newPageSubmitDraft : NewPageSubmitDraft
@@ -358,7 +357,7 @@ type FrontendMsg
     | LoginFormUsernameChanged String
     | LoginFormPasswordChanged String
     | LoginFormSubmitted
-    | ContributorLogoutClicked
+    | ContributorLogoutWiki Wiki.Slug
     | NewPageSubmitMarkdownChanged String
     | NewPageSubmitSlugChanged String
     | NewPageSubmitFormSubmitted
@@ -379,7 +378,6 @@ type FrontendMsg
     | WikiAdminAuditFilterActorChanged String
     | WikiAdminAuditFilterPageChanged String
     | WikiAdminAuditFilterTypeTagToggled WikiAuditLog.AuditEventKindFilterTag Bool
-    | WikiAdminAuditFilterApplyClicked
     | HostAdminLoginPasswordChanged String
     | HostAdminLoginSubmitted
     | HostAdminCreateWikiSlugChanged String
@@ -399,7 +397,6 @@ type FrontendMsg
     | HostAdminAuditFilterActorChanged String
     | HostAdminAuditFilterPageChanged String
     | HostAdminAuditFilterTypeTagToggled WikiAuditLog.AuditEventKindFilterTag Bool
-    | HostAdminAuditFilterApplyClicked
     | HostAdminDataExportClicked
     | HostAdminDataImportPickRequested
     | HostAdminDataImportFileSelected Effect.File.File

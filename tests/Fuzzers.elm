@@ -1,5 +1,6 @@
 module Fuzzers exposing
-    ( page
+    ( navAccessContext
+    , page
     , pageSlug
     , wikiCatalogEntry
     , wikiRole
@@ -8,6 +9,7 @@ module Fuzzers exposing
 
 import Fuzz exposing (Fuzzer)
 import Page
+import Route
 import Wiki
 import WikiRole
 
@@ -48,6 +50,20 @@ wikiRole =
 wikiSlug : Fuzzer Wiki.Slug
 wikiSlug =
     nonEmptyString
+
+
+navAccessContext : Fuzzer Route.NavAccessContext
+navAccessContext =
+    Fuzz.map3
+        (\hostOk slug maybeRole ->
+            { hostAdminAuthenticated = hostOk
+            , activeWikiSlug = slug
+            , contributorOnActiveWiki = maybeRole
+            }
+        )
+        Fuzz.bool
+        wikiSlug
+        (Fuzz.maybe wikiRole)
 
 
 pageSlug : Fuzzer Page.Slug

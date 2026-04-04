@@ -44,6 +44,7 @@ import ProgramTest.Story49_MissingPageNavAndWikiLinks as Story49
 import ProgramTest.Story50_MySubmissionsList as Story50
 import ProgramTest.Story51_HostAdminAuditLog as Story51
 import ProgramTest.Story52_HostAdminWikiBackup as Story52
+import ProgramTest.Story53_MultiWikiContributorSessions as Story53
 import Types exposing (ToBackend, ToFrontend)
 
 
@@ -94,6 +95,7 @@ main =
     , Story50.endToEndTests
     , Story51.endToEndTests
     , Story52.endToEndTests
+    , Story53.endToEndTests
     ]
         |> List.concat
         |> Effect.Test.viewer

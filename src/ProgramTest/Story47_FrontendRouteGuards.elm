@@ -43,11 +43,11 @@ endToEndTests =
                 ]
         }
     , ProgramTest.Start.start
-        { name = "47 — login with redirect navigates to return path after success"
+        { name = "47 — login with redirect lands on return path (review), not default wiki home"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story47-login-redirect"
         , path =
-            Wiki.loginUrlPathWithRedirect "Demo" "/w/Demo"
+            Wiki.loginUrlPathWithRedirect "Demo" "/w/Demo/review"
         , connectClientMs = Nothing
         , clientSteps =
             \client ->
@@ -57,8 +57,16 @@ endToEndTests =
                         , password = "password12"
                         }
                         client
-                    , [ client.checkView 400
-                            (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
+                    , [ client.checkModel 500
+                            (ProgramTest.Model.expectRoute (Route.WikiReview "Demo")
+                                "expected post-login URL to honor redirect=/w/Demo/review (WikiReview), not WikiHome"
+                            )
+                      , client.checkView 500
+                            (ProgramTest.Query.withinId "wiki-review-queue-page"
+                                (ProgramTest.Query.withinId "wiki-review-queue-empty"
+                                    (ProgramTest.Query.expectHasText "No pending submissions.")
+                                )
+                            )
                       ]
                     ]
         }

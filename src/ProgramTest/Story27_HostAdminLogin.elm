@@ -2,6 +2,7 @@ module ProgramTest.Story27_HostAdminLogin exposing (endToEndTests)
 
 import Effect.Browser.Dom
 import Env
+import ProgramTest.Actions
 import ProgramTest.Config
 import ProgramTest.Query
 import ProgramTest.Start
@@ -18,42 +19,42 @@ endToEndTests =
         , connectClientMs = Just 200
         , clientSteps =
             \client ->
-                [ client.checkView 100
+                client.checkView 100
                     (ProgramTest.Query.expectAll
                         [ ProgramTest.Query.headingIs "SortOfWiki"
                         , ProgramTest.Query.subheadingIs "Admin login"
                         ]
                     )
-                , client.clickLink 100 Wiki.hostAdminWikisUrlPath
-                , client.checkView 200
-                    (ProgramTest.Query.expectAll
-                        [ ProgramTest.Query.headingIs "SortOfWiki"
-                        , ProgramTest.Query.subheadingIs "Admin login"
-                        ]
-                    )
-                , client.input 100 (Effect.Browser.Dom.id "host-admin-login-password") "wrong-password"
-                , client.click 100 (Effect.Browser.Dom.id "host-admin-login-submit")
-                , client.checkView 200
-                    (ProgramTest.Query.withinId "host-admin-login-error"
-                        (ProgramTest.Query.expectHasText "Invalid password.")
-                    )
-                , client.input 100 (Effect.Browser.Dom.id "host-admin-login-password") Env.hostAdminPassword
-                , client.click 100 (Effect.Browser.Dom.id "host-admin-login-submit")
-                , client.checkView 300
-                    (ProgramTest.Query.withinId "host-admin-wikis-list"
-                        ProgramTest.Query.expectEmpty
-                    )
-                , client.checkView 400
-                    (ProgramTest.Query.expectHasNotId "host-admin-login-form")
-                , client.checkView 100
-                    (ProgramTest.Query.withinAriaLabel "Site"
-                        (ProgramTest.Query.expectHasTexts
-                            [ "Host admin"
-                            , "Hosted wikis"
-                            , "Add wiki"
-                            ]
-                        )
-                    )
-                ]
+                    :: ProgramTest.Actions.navigateToPath Wiki.hostAdminWikisUrlPath client
+                    ++ [ client.checkView 200
+                            (ProgramTest.Query.expectAll
+                                [ ProgramTest.Query.headingIs "SortOfWiki"
+                                , ProgramTest.Query.subheadingIs "Admin login"
+                                ]
+                            )
+                       , client.input 100 (Effect.Browser.Dom.id "host-admin-login-password") "wrong-password"
+                       , client.click 100 (Effect.Browser.Dom.id "host-admin-login-submit")
+                       , client.checkView 200
+                            (ProgramTest.Query.withinId "host-admin-login-error"
+                                (ProgramTest.Query.expectHasText "Invalid password.")
+                            )
+                       , client.input 100 (Effect.Browser.Dom.id "host-admin-login-password") Env.hostAdminPassword
+                       , client.click 100 (Effect.Browser.Dom.id "host-admin-login-submit")
+                       , client.checkView 300
+                            (ProgramTest.Query.withinId "host-admin-wikis-list"
+                                ProgramTest.Query.expectEmpty
+                            )
+                       , client.checkView 400
+                            (ProgramTest.Query.expectHasNotId "host-admin-login-form")
+                       , client.checkView 100
+                            (ProgramTest.Query.withinAriaLabel "Site"
+                                (ProgramTest.Query.expectHasTexts
+                                    [ "Host admin"
+                                    , "Hosted wikis"
+                                    , "Add wiki"
+                                    ]
+                                )
+                            )
+                       ]
         }
     ]

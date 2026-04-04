@@ -38,40 +38,32 @@ moderationFixture =
     ProgramTest.Config.replayInitStepsOntoModel ProgramTest.Config.demoWikiModerationSteps
 
 
-withContributorSession : WikiUser.Binding -> Backend.Model -> Backend.Model
-withContributorSession binding model =
+withContributorSession : String -> ContributorAccount.Id -> Backend.Model -> Backend.Model
+withContributorSession wikiSlug accountId model =
     { model
         | contributorSessions =
-            Dict.insert sessionKey binding model.contributorSessions
+            WikiUser.bindContributor sessionKey wikiSlug accountId model.contributorSessions
     }
 
 
 statusdemoOnDemo : Backend.Model
 statusdemoOnDemo =
-    withContributorSession
-        (WikiUser.Binding "Demo" (ContributorAccount.newAccountId "Demo" "statusdemo"))
-        pagesFixture
+    withContributorSession "Demo" (ContributorAccount.newAccountId "Demo" "statusdemo") pagesFixture
 
 
 trustedpubOnDemo : Backend.Model
 trustedpubOnDemo =
-    withContributorSession
-        (WikiUser.Binding "Demo" (ContributorAccount.newAccountId "Demo" "trustedpub"))
-        pagesFixture
+    withContributorSession "Demo" (ContributorAccount.newAccountId "Demo" "trustedpub") pagesFixture
 
 
 statusdemoOnDemoModeration : Backend.Model
 statusdemoOnDemoModeration =
-    withContributorSession
-        (WikiUser.Binding "Demo" (ContributorAccount.newAccountId "Demo" "statusdemo"))
-        moderationFixture
+    withContributorSession "Demo" (ContributorAccount.newAccountId "Demo" "statusdemo") moderationFixture
 
 
 trustedpubOnDemoModeration : Backend.Model
 trustedpubOnDemoModeration =
-    withContributorSession
-        (WikiUser.Binding "Demo" (ContributorAccount.newAccountId "Demo" "trustedpub"))
-        moderationFixture
+    withContributorSession "Demo" (ContributorAccount.newAccountId "Demo" "trustedpub") moderationFixture
 
 
 {-| Demo wiki `active = False` (hosted wiki deactivated); contributor sessions unchanged.
@@ -222,21 +214,49 @@ suite =
             , Test.describe "logout"
                 [ Test.test "LogoutContributor with no session leaves contributorSessions empty" <|
                     \() ->
-                        expectUnchanged initialModel LogoutContributor
-                , Test.test "LogoutContributor clears bound contributor session" <|
+                        expectUnchanged initialModel (LogoutContributor "Demo")
+                , Test.test "LogoutContributor clears bound contributor session for that wiki" <|
                     \() ->
                         let
                             ( after, _ ) =
                                 Backend.updateFromFrontendWithTime
                                     (Effect.Lamdera.sessionIdFromString sessionKey)
                                     (Effect.Lamdera.clientIdFromString clientKey)
-                                    LogoutContributor
+                                    (LogoutContributor "Demo")
                                     (Time.millisToPosix 0)
                                     statusdemoOnDemo
                         in
                         after.contributorSessions
                             |> Dict.get sessionKey
                             |> Expect.equal Nothing
+                , Test.test "LogoutContributor removes only the given wiki when multiple are bound" <|
+                    \() ->
+                        let
+                            demoId : ContributorAccount.Id
+                            demoId =
+                                ContributorAccount.newAccountId "Demo" "statusdemo"
+
+                            elmId : ContributorAccount.Id
+                            elmId =
+                                ContributorAccount.newAccountId "ElmTips" "elmtipsadmin"
+
+                            multi : Backend.Model
+                            multi =
+                                pagesFixture
+                                    |> withContributorSession "Demo" demoId
+                                    |> withContributorSession "ElmTips" elmId
+
+                            ( after, _ ) =
+                                Backend.updateFromFrontendWithTime
+                                    (Effect.Lamdera.sessionIdFromString sessionKey)
+                                    (Effect.Lamdera.clientIdFromString clientKey)
+                                    (LogoutContributor "Demo")
+                                    (Time.millisToPosix 0)
+                                    multi
+                        in
+                        after.contributorSessions
+                            |> Dict.get sessionKey
+                            |> Expect.equal (Just (Dict.singleton "ElmTips" elmId))
                 ]
             ]
         ]

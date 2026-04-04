@@ -57,7 +57,6 @@ endToEndTests =
                                 )
                             )
                       , client.click 100 (Effect.Browser.Dom.id "wiki-admin-audit-filter-type-granted_wiki_admin")
-                      , client.click 100 (Effect.Browser.Dom.id "wiki-admin-audit-filter-apply")
                       , client.checkView 600
                             (ProgramTest.Query.withinId "wiki-admin-audit-tbody"
                                 (ProgramTest.Query.expectTagOccurrenceCount "tr" (\c -> c |> Expect.equal 1))

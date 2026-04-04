@@ -19,55 +19,68 @@
   body {
     margin: 0;
     min-height: 100vh;
-    background-color: #0a0e0c;
+    background-color: #0c0d0a;
   }
 
   /* Theme tokens live on .app-root so Tailwind-style `class="dark"` on the same node switches palette. */
   .app-root {
     font-size: 1rem;
-    --bg: #f6faef;
-    --fg: #161d12;
-    --fg-muted: #3d4f2e;
-    --link: #314d1f;
-    --link-hover: #223515;
-    --border: #809066;
-    --border-dash: #8f9d73;
-    --chrome-bg: #edf3df;
-    --btn-bg: #435f2c;
-    --btn-fg: #fbfdf8;
-    --btn-border: #2a3d1a;
+    --bg: #f8faec;
+    --fg: #181c10;
+    --fg-muted: #414d29;
+    --link: #34501c;
+    --link-hover: #243713;
+    --border: #879161;
+    --border-dash: #929d6c;
+    --chrome-bg: #eff2db;
+    --btn-bg: #465e28;
+    --btn-fg: #fcfdf6;
+    --btn-border: #2d3c17;
     --danger: #6b1010;
     --danger-bg: #fce8e8;
     /* Filled danger control: same deep red in both roots (dark root keeps --danger as light pink for inline text) */
     --danger-btn-bg: #6b1010;
     --danger-btn-fg: #ffffff;
-    --code-bg: #e6edd9;
-    --focus-ring: #537236;
+    --code-bg: #e9ecd3;
+    --focus-ring: #587232;
     --input-bg: #ffffff;
-    --table-stripe: rgba(237, 243, 223, 0.5);
+    --table-stripe: rgba(239, 242, 219, 0.5);
+    /* Audit filter chips (badge-style toggles; distinct from primary buttons) */
+    --chip-off-bg: var(--input-bg);
+    --chip-off-fg: var(--fg-muted);
+    --chip-off-border: var(--border);
+    --chip-on-bg: #5c7a34;
+    --chip-on-fg: #fcfdf6;
+    --chip-on-border: #3a4f20;
   }
 
   .app-root.dark {
-    --bg: #141a11;
-    --fg: #eef5e7;
-    --fg-muted: #aec09a;
-    --link: #9fce74;
-    --link-hover: #c2e39f;
-    --border: #637a49;
-    --border-dash: #758d59;
-    --chrome-bg: #1e2917;
+    --bg: #16190f;
+    --fg: #f0f4e5;
+    --fg-muted: #b2bd92;
+    --link: #a3cf6e;
+    --link-hover: #c5e398;
+    --border: #667944;
+    --border-dash: #788b54;
+    --chrome-bg: #202815;
     /* Filled control: muted surface (not saturated mint) so actions read calm on dark UI */
-    --btn-bg: #2f3f24;
-    --btn-fg: #f1f7ea;
-    --btn-border: #60774b;
+    --btn-bg: #313e22;
+    --btn-fg: #f3f5e8;
+    --btn-border: #637647;
     --danger: #ffb4b4;
     --danger-bg: #2c1418;
     --danger-btn-bg: #6b1010;
     --danger-btn-fg: #ffffff;
-    --code-bg: #24301c;
-    --focus-ring: #9fce74;
-    --input-bg: #1a2414;
-    --table-stripe: rgba(46, 60, 34, 0.58);
+    --code-bg: #262f19;
+    --focus-ring: #a3cf6e;
+    --input-bg: #1c2312;
+    --table-stripe: rgba(48, 57, 32, 0.58);
+    --chip-off-bg: var(--chrome-bg);
+    --chip-off-fg: var(--fg-muted);
+    --chip-off-border: var(--border);
+    --chip-on-bg: #3d5228;
+    --chip-on-fg: #f3f5e8;
+    --chip-on-border: #5a7238;
   }
 
 </style>

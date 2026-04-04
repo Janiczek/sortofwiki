@@ -42,7 +42,7 @@ suite =
                         Expect.all
                             [ \() -> restored.wikis |> Expect.equal fixtureModel.wikis
                             , \() -> restored.contributors |> Expect.equal fixtureModel.contributors
-                            , \() -> restored.contributorSessions |> Expect.equal fixtureModel.contributorSessions
+                            , \() -> restored.contributorSessions |> Expect.equal WikiUser.emptySessions
                             , \() -> restored.submissions |> Expect.equal fixtureModel.submissions
                             , \() -> restored.wikiAuditEvents |> Expect.equal fixtureModel.wikiAuditEvents
                             , \() -> restored.hostSessions |> Expect.equal Set.empty
@@ -86,15 +86,6 @@ suite =
                                         fixtureModel.contributors
                                             |> Dict.filter (\slug _ -> slug == "Demo")
 
-                                    demoSessions =
-                                        fixtureModel.contributorSessions
-                                            |> Dict.filter
-                                                (\_ binding ->
-                                                    case binding of
-                                                        WikiUser.Binding slug _ ->
-                                                            slug == "Demo"
-                                                )
-
                                     demoAuditRows =
                                         fixtureModel.wikiAuditEvents
                                             |> Dict.get "Demo"
@@ -104,7 +95,7 @@ suite =
                                     [ \() -> snap.wikis |> Expect.equal demoWikis
                                     , \() -> snap.submissions |> Expect.equal demoSubs
                                     , \() -> snap.contributors |> Expect.equal demoContributors
-                                    , \() -> snap.contributorSessions |> Expect.equal demoSessions
+                                    , \() -> snap.contributorSessions |> Expect.equal WikiUser.emptySessions
                                     , \() ->
                                         snap.wikiAuditEvents
                                             |> Expect.equal (Dict.singleton "Demo" demoAuditRows)

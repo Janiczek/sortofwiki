@@ -10,6 +10,7 @@ import Browser
 import Browser.Navigation
 import ColorTheme
 import ContributorAccount
+import ContributorWikiSession exposing (ContributorWikiSession)
 import Dict exposing (Dict)
 import Effect.Browser exposing (UrlRequest)
 import Effect.Browser.Dom
@@ -35,6 +36,7 @@ import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
 import RouteAccess
 import SecureRedirect
+import SideNavMenu
 import Store exposing (Store)
 import Submission
 import SubmissionReviewDetail
@@ -47,7 +49,7 @@ import Url exposing (Url)
 import Wiki
 import WikiAdminUsers
 import WikiAuditLog
-import WikiRole
+import WikiRole exposing (WikiRole)
 
 
 type alias Model =
@@ -665,14 +667,7 @@ batchScrollAfterUrlChange fragment ( m, c ) =
 
 anonGatedWikiRoute : Model -> Url -> Route -> ( Route, Maybe String )
 anonGatedWikiRoute model url parsed =
-    case
-        RouteAccess.contributorForcedRedirect
-            { contributorWikiSession = model.contributorWikiSession
-            , contributorWikiRole = model.contributorWikiRole
-            }
-            url
-            parsed
-    of
+    case RouteAccess.contributorForcedRedirect model.contributorWikiSessions url parsed of
         Just ( wikiSlug, ret ) ->
             ( Route.WikiLogin wikiSlug (Just ret)
             , Just (Wiki.loginUrlPathWithRedirect wikiSlug ret)
@@ -682,23 +677,18 @@ anonGatedWikiRoute model url parsed =
             ( parsed, Nothing )
 
 
-postLogoutNavigationCmd : Model -> Command FrontendOnly ToBackend Msg
-postLogoutNavigationCmd model =
-    case model.contributorWikiSession of
+postLogoutNavigationCmd : Wiki.Slug -> Model -> Command FrontendOnly ToBackend Msg
+postLogoutNavigationCmd loggedOutWiki model =
+    case RouteAccess.contributorRestrictedReturnPath model.route of
+        Just ( w, retPath ) ->
+            if w == loggedOutWiki then
+                Effect.Browser.Navigation.replaceUrl model.key (Wiki.loginUrlPathWithRedirect loggedOutWiki retPath)
+
+            else
+                Command.none
+
         Nothing ->
             Command.none
-
-        Just wikiSlug ->
-            case RouteAccess.contributorRestrictedReturnPath model.route of
-                Just ( w, retPath ) ->
-                    if w == wikiSlug then
-                        Effect.Browser.Navigation.replaceUrl model.key (Wiki.loginUrlPathWithRedirect wikiSlug retPath)
-
-                    else
-                        Command.none
-
-                Nothing ->
-                    Command.none
 
 
 gatedWikiRoute : Model -> Url -> ( Route, Maybe String )
@@ -710,7 +700,7 @@ gatedWikiRoute model url =
     in
     case parsed of
         Route.WikiLogin wikiSlug _ ->
-            if model.contributorWikiSession == Just wikiSlug then
+            if contributorLoggedInOnWikiSlug wikiSlug model then
                 ( Route.WikiHome wikiSlug, Just (Wiki.wikiHomeUrlPath wikiSlug) )
 
             else
@@ -720,24 +710,17 @@ gatedWikiRoute model url =
             anonGatedWikiRoute model url parsed
 
 
+contributorLoggedInOnWikiSlug : Wiki.Slug -> Model -> Bool
+contributorLoggedInOnWikiSlug wikiSlug model =
+    Dict.member wikiSlug model.contributorWikiSessions
+
+
 wikiSessionTrustedOnWiki : Wiki.Slug -> Model -> Bool
 wikiSessionTrustedOnWiki wikiSlug model =
-    model.contributorWikiSession
-        == Just wikiSlug
-        && (model.contributorWikiRole
-                |> Maybe.map WikiRole.isTrustedModerator
-                |> Maybe.withDefault False
-           )
-
-
-wikiSessionWikiAdminOnWiki : Wiki.Slug -> Model -> Bool
-wikiSessionWikiAdminOnWiki wikiSlug model =
-    model.contributorWikiSession
-        == Just wikiSlug
-        && (model.contributorWikiRole
-                |> Maybe.map WikiRole.canAccessWikiAdminUsers
-                |> Maybe.withDefault False
-           )
+    model.contributorWikiSessions
+        |> Dict.get wikiSlug
+        |> Maybe.map (.role >> WikiRole.isTrustedModerator)
+        |> Maybe.withDefault False
 
 
 {-| True when the platform host-admin session is known to be valid (from login or any
@@ -779,51 +762,30 @@ hostAdminSectionNavVisible model =
             False
 
 
-anonHostAdminLoginSiteNavExtrasVisible : Model -> Bool
-anonHostAdminLoginSiteNavExtrasVisible model =
-    case model.route of
-        Route.HostAdmin _ ->
-            not (hostAdminAuthenticated model)
+sideNavLinkLi : SideNavMenu.Link -> Html Msg
+sideNavLinkLi link =
+    case link.linkRoute of
+        Route.HostAdmin Nothing ->
+            Html.li []
+                [ Html.a
+                    [ Attr.href (Route.navUrlPath link.linkRoute)
+                    , TW.cls UI.sideNavPublicAdminLinkClass
+                    ]
+                    [ Html.text link.linkLabel ]
+                ]
 
         _ ->
-            False
+            Html.li []
+                [ Html.a [ Attr.href (Route.navUrlPath link.linkRoute) ]
+                    [ Html.text link.linkLabel ]
+                ]
 
 
-appChromeMainNavItems : Model -> List (Html Msg)
-appChromeMainNavItems model =
-    if hostAdminAuthenticated model && hostAdminSectionNavVisible model then
-        []
-
-    else
-        let
-            preLoginHostAdminExtras : List (Html Msg)
-            preLoginHostAdminExtras =
-                if hostAdminSectionNavVisible model || anonHostAdminLoginSiteNavExtrasVisible model then
-                    [ Html.li [] [ Html.a [ Attr.href Wiki.hostAdminWikisUrlPath ] [ Html.text "Hosted wikis" ] ]
-                    , Html.li [] [ Html.a [ Attr.href Wiki.hostAdminNewWikiUrlPath ] [ Html.text "Add wiki" ] ]
-                    , Html.li [] [ Html.a [ Attr.href Wiki.hostAdminBackupUrlPath ] [ Html.text "Backup and restore" ] ]
-                    , Html.li [] [ Html.a [ Attr.href Wiki.hostAdminAuditUrlPath ] [ Html.text "Audit log" ] ]
-                    ]
-
-                else
-                    []
-        in
-        List.concat
-            [ [ if hostAdminAuthenticated model then
-                    Html.li []
-                        [ Html.a [ Attr.href Wiki.hostAdminWikisUrlPath ] [ Html.text "Admin" ] ]
-
-                else
-                    Html.li []
-                        [ Html.a
-                            [ Attr.href "/admin"
-                            , TW.cls UI.sideNavPublicAdminLinkClass
-                            ]
-                            [ Html.text "Admin" ]
-                        ]
-              ]
-            , preLoginHostAdminExtras
-            ]
+sideNavSectionFromMenu : SideNavMenu.Section -> SideNavSection Msg
+sideNavSectionFromMenu section =
+    { heading = section.sectionTitle
+    , items = List.map sideNavLinkLi section.links
+    }
 
 
 type alias SideNavSection msg =
@@ -855,67 +817,13 @@ viewSideNav ariaLabel sections =
         ]
 
 
-appChromeHostAdminSection : Model -> List (SideNavSection Msg)
-appChromeHostAdminSection model =
-    if hostAdminAuthenticated model && hostAdminSectionNavVisible model then
-        [ { heading = "Host admin"
-          , items =
-                [ Html.li [] [ Html.a [ Attr.href Wiki.hostAdminWikisUrlPath ] [ Html.text "Hosted wikis" ] ]
-                , Html.li [] [ Html.a [ Attr.href Wiki.hostAdminNewWikiUrlPath ] [ Html.text "Add wiki" ] ]
-                , Html.li [] [ Html.a [ Attr.href Wiki.hostAdminBackupUrlPath ] [ Html.text "Backup and restore" ] ]
-                , Html.li [] [ Html.a [ Attr.href Wiki.hostAdminAuditUrlPath ] [ Html.text "Audit log" ] ]
-                ]
-          }
-        ]
-
-    else
-        []
-
-
 viewSortOfWikiSideNavSections : Model -> List (SideNavSection Msg)
 viewSortOfWikiSideNavSections model =
-    let
-        sortOfWikiItems : List (Html Msg)
-        sortOfWikiItems =
-            appChromeMainNavItems model
-    in
-    List.concat
-        [ if List.isEmpty sortOfWikiItems then
-            []
-
-          else
-            [ { heading = "SortOfWiki"
-              , items = sortOfWikiItems
-              }
-            ]
-        , appChromeHostAdminSection model
-        ]
-
-
-wikiNavReviewLis : Wiki.Slug -> Model -> List (Html Msg)
-wikiNavReviewLis wikiSlug model =
-    if wikiSessionTrustedOnWiki wikiSlug model then
-        [ Html.li []
-            [ Html.a [ Attr.href (Wiki.reviewQueueUrlPath wikiSlug) ] [ Html.text "Review" ] ]
-        ]
-
-    else
-        []
-
-
-wikiNavWikiAdminLis : Wiki.Slug -> Model -> List (Html Msg)
-wikiNavWikiAdminLis wikiSlug model =
-    if wikiSessionWikiAdminOnWiki wikiSlug model then
-        [ Html.li []
-            [ Html.a [ Attr.href (Wiki.adminUsersUrlPath wikiSlug) ]
-                [ Html.text "Admin" ]
-            ]
-        , Html.li []
-            [ Html.a [ Attr.href (Wiki.adminAuditUrlPath wikiSlug) ] [ Html.text "Audit log" ] ]
-        ]
-
-    else
-        []
+    SideNavMenu.globalChromeSections
+        { hostAdminAuthenticated = hostAdminAuthenticated model
+        , showHostAdminTools = hostAdminSectionNavVisible model
+        }
+        |> List.map sideNavSectionFromMenu
 
 
 init :
@@ -931,9 +839,7 @@ init url key =
             , systemColorTheme = ColorTheme.Dark
             , route = Route.WikiList
             , store = Store.empty
-            , contributorWikiSession = Nothing
-            , contributorWikiRole = Nothing
-            , contributorDisplayUsername = Nothing
+            , contributorWikiSessions = Dict.empty
             , registerDraft = emptyRegisterDraft
             , loginDraft = emptyLoginDraft
             , newPageSubmitDraft = emptyNewPageSubmitDraft
@@ -988,9 +894,7 @@ init url key =
             , systemColorTheme = ColorTheme.Dark
             , route = route
             , store = Store.empty
-            , contributorWikiSession = Nothing
-            , contributorWikiRole = Nothing
-            , contributorDisplayUsername = Nothing
+            , contributorWikiSessions = Dict.empty
             , registerDraft = emptyRegisterDraft
             , loginDraft = emptyLoginDraft
             , newPageSubmitDraft = newPageSubmitDraftForRoute route url
@@ -1066,6 +970,238 @@ storeInModel ( model, mCmd ) ( store, sCmd ) =
     ( { model | store = store }
     , Command.batch [ mCmd, sCmd ]
     )
+
+
+routeUsesAuditLogFillLayout : Route -> Bool
+routeUsesAuditLogFillLayout route =
+    case route of
+        Route.WikiList ->
+            False
+
+        Route.HostAdmin _ ->
+            False
+
+        Route.HostAdminWikis ->
+            False
+
+        Route.HostAdminWikiNew ->
+            False
+
+        Route.HostAdminWikiDetail _ ->
+            False
+
+        Route.HostAdminAudit ->
+            True
+
+        Route.HostAdminBackup ->
+            False
+
+        Route.WikiHome _ ->
+            False
+
+        Route.WikiPage _ _ ->
+            False
+
+        Route.WikiLogin _ _ ->
+            False
+
+        Route.WikiRegister _ ->
+            False
+
+        Route.WikiSubmitNew _ ->
+            False
+
+        Route.WikiSubmitEdit _ _ ->
+            False
+
+        Route.WikiSubmitDelete _ _ ->
+            False
+
+        Route.WikiSubmissionDetail _ _ ->
+            False
+
+        Route.WikiMySubmissions _ ->
+            False
+
+        Route.WikiReview _ ->
+            False
+
+        Route.WikiReviewDetail _ _ ->
+            False
+
+        Route.WikiAdminUsers _ ->
+            False
+
+        Route.WikiAdminAudit _ ->
+            True
+
+        Route.NotFound _ ->
+            False
+
+
+applyWikiAdminAuditFilterFromModel : Model -> ( Model, Command FrontendOnly ToBackend Msg )
+applyWikiAdminAuditFilterFromModel model =
+    case model.route of
+        Route.WikiAdminAudit wikiSlug ->
+            let
+                applied : WikiAuditLog.AuditLogFilter
+                applied =
+                    { actorUsernameSubstring = model.wikiAdminAuditFilterActorDraft
+                    , pageSlugSubstring = model.wikiAdminAuditFilterPageDraft
+                    , eventKindTags = model.wikiAdminAuditFilterSelectedKindTags
+                    }
+
+                withApplied : Model
+                withApplied =
+                    { model | wikiAdminAuditAppliedFilter = applied }
+            in
+            storeInModel ( withApplied, Command.none )
+                (Store.perform storeConfig (Store.RefreshWikiAuditLog wikiSlug applied) withApplied.store)
+
+        Route.WikiList ->
+            ( model, Command.none )
+
+        Route.HostAdmin _ ->
+            ( model, Command.none )
+
+        Route.HostAdminWikis ->
+            ( model, Command.none )
+
+        Route.HostAdminWikiNew ->
+            ( model, Command.none )
+
+        Route.HostAdminWikiDetail _ ->
+            ( model, Command.none )
+
+        Route.HostAdminAudit ->
+            ( model, Command.none )
+
+        Route.HostAdminBackup ->
+            ( model, Command.none )
+
+        Route.WikiHome _ ->
+            ( model, Command.none )
+
+        Route.WikiPage _ _ ->
+            ( model, Command.none )
+
+        Route.WikiLogin _ _ ->
+            ( model, Command.none )
+
+        Route.WikiRegister _ ->
+            ( model, Command.none )
+
+        Route.WikiSubmitNew _ ->
+            ( model, Command.none )
+
+        Route.WikiSubmitEdit _ _ ->
+            ( model, Command.none )
+
+        Route.WikiSubmitDelete _ _ ->
+            ( model, Command.none )
+
+        Route.WikiSubmissionDetail _ _ ->
+            ( model, Command.none )
+
+        Route.WikiMySubmissions _ ->
+            ( model, Command.none )
+
+        Route.WikiReview _ ->
+            ( model, Command.none )
+
+        Route.WikiReviewDetail _ _ ->
+            ( model, Command.none )
+
+        Route.WikiAdminUsers _ ->
+            ( model, Command.none )
+
+        Route.NotFound _ ->
+            ( model, Command.none )
+
+
+applyHostAdminAuditFilterFromModel : Model -> ( Model, Command FrontendOnly ToBackend Msg )
+applyHostAdminAuditFilterFromModel model =
+    case model.route of
+        Route.HostAdminAudit ->
+            let
+                applied : WikiAuditLog.HostAuditLogFilter
+                applied =
+                    { wikiSlugSubstring = model.hostAdminAuditFilterWikiDraft
+                    , actorUsernameSubstring = model.hostAdminAuditFilterActorDraft
+                    , pageSlugSubstring = model.hostAdminAuditFilterPageDraft
+                    , eventKindTags = model.hostAdminAuditFilterSelectedKindTags
+                    }
+            in
+            if WikiAuditLog.hostAuditLogFilterCacheKey applied == WikiAuditLog.hostAuditLogFilterCacheKey model.hostAdminAuditAppliedFilter then
+                ( model, Command.none )
+
+            else
+                ( { model
+                    | hostAdminAuditAppliedFilter = applied
+                    , hostAdminAuditLog = RemoteData.Loading
+                  }
+                , Effect.Lamdera.sendToBackend (RequestHostAuditLog applied)
+                )
+
+        Route.WikiList ->
+            ( model, Command.none )
+
+        Route.HostAdmin _ ->
+            ( model, Command.none )
+
+        Route.HostAdminWikis ->
+            ( model, Command.none )
+
+        Route.HostAdminWikiNew ->
+            ( model, Command.none )
+
+        Route.HostAdminWikiDetail _ ->
+            ( model, Command.none )
+
+        Route.HostAdminBackup ->
+            ( model, Command.none )
+
+        Route.WikiHome _ ->
+            ( model, Command.none )
+
+        Route.WikiPage _ _ ->
+            ( model, Command.none )
+
+        Route.WikiLogin _ _ ->
+            ( model, Command.none )
+
+        Route.WikiRegister _ ->
+            ( model, Command.none )
+
+        Route.WikiSubmitNew _ ->
+            ( model, Command.none )
+
+        Route.WikiSubmitEdit _ _ ->
+            ( model, Command.none )
+
+        Route.WikiSubmitDelete _ _ ->
+            ( model, Command.none )
+
+        Route.WikiSubmissionDetail _ _ ->
+            ( model, Command.none )
+
+        Route.WikiMySubmissions _ ->
+            ( model, Command.none )
+
+        Route.WikiReview _ ->
+            ( model, Command.none )
+
+        Route.WikiReviewDetail _ _ ->
+            ( model, Command.none )
+
+        Route.WikiAdminUsers _ ->
+            ( model, Command.none )
+
+        Route.WikiAdminAudit _ ->
+            ( model, Command.none )
+
+        Route.NotFound _ ->
+            ( model, Command.none )
 
 
 {-| Story 14: after trusted direct publish, drop cached wiki index and page payloads so the next fetch sees server state.
@@ -1388,8 +1524,8 @@ update msg model =
         UrlFragmentScrollDone ->
             ( model, Command.none )
 
-        ContributorLogoutClicked ->
-            ( model, Effect.Lamdera.sendToBackend LogoutContributor )
+        ContributorLogoutWiki wikiSlug ->
+            ( model, Effect.Lamdera.sendToBackend (LogoutContributor wikiSlug) )
 
         RegisterFormUsernameChanged value ->
             let
@@ -2374,14 +2510,10 @@ update msg model =
                     ( model, Command.none )
 
         WikiAdminAuditFilterActorChanged value ->
-            ( { model | wikiAdminAuditFilterActorDraft = value }
-            , Command.none
-            )
+            applyWikiAdminAuditFilterFromModel { model | wikiAdminAuditFilterActorDraft = value }
 
         WikiAdminAuditFilterPageChanged value ->
-            ( { model | wikiAdminAuditFilterPageDraft = value }
-            , Command.none
-            )
+            applyWikiAdminAuditFilterFromModel { model | wikiAdminAuditFilterPageDraft = value }
 
         WikiAdminAuditFilterTypeTagToggled tag checked ->
             let
@@ -2397,109 +2529,16 @@ update msg model =
                     else
                         List.filter (\t -> t /= tag) model.wikiAdminAuditFilterSelectedKindTags
             in
-            ( { model | wikiAdminAuditFilterSelectedKindTags = nextTags }
-            , Command.none
-            )
-
-        WikiAdminAuditFilterApplyClicked ->
-            case model.route of
-                Route.WikiAdminAudit wikiSlug ->
-                    let
-                        applied : WikiAuditLog.AuditLogFilter
-                        applied =
-                            { actorUsernameSubstring = model.wikiAdminAuditFilterActorDraft
-                            , pageSlugSubstring = model.wikiAdminAuditFilterPageDraft
-                            , eventKindTags = model.wikiAdminAuditFilterSelectedKindTags
-                            }
-
-                        withApplied : Model
-                        withApplied =
-                            { model | wikiAdminAuditAppliedFilter = applied }
-
-                        store : Store
-                        store =
-                            withApplied.store
-
-                        performed : ( Store, Command FrontendOnly ToBackend Msg )
-                        performed =
-                            Store.perform storeConfig (Store.RefreshWikiAuditLog wikiSlug applied) store
-                    in
-                    storeInModel ( withApplied, Command.none ) performed
-
-                Route.WikiList ->
-                    ( model, Command.none )
-
-                Route.WikiHome _ ->
-                    ( model, Command.none )
-
-                Route.WikiPage _ _ ->
-                    ( model, Command.none )
-
-                Route.WikiLogin _ _ ->
-                    ( model, Command.none )
-
-                Route.WikiRegister _ ->
-                    ( model, Command.none )
-
-                Route.WikiSubmitNew _ ->
-                    ( model, Command.none )
-
-                Route.WikiSubmitEdit _ _ ->
-                    ( model, Command.none )
-
-                Route.WikiSubmitDelete _ _ ->
-                    ( model, Command.none )
-
-                Route.WikiSubmissionDetail _ _ ->
-                    ( model, Command.none )
-
-                Route.WikiMySubmissions _ ->
-                    ( model, Command.none )
-
-                Route.WikiReview _ ->
-                    ( model, Command.none )
-
-                Route.WikiReviewDetail _ _ ->
-                    ( model, Command.none )
-
-                Route.WikiAdminUsers _ ->
-                    ( model, Command.none )
-
-                Route.HostAdminAudit ->
-                    ( model, Command.none )
-
-                Route.HostAdmin _ ->
-                    ( model, Command.none )
-
-                Route.HostAdminWikis ->
-                    ( model, Command.none )
-
-                Route.HostAdminBackup ->
-                    ( model, Command.none )
-
-                Route.HostAdminWikiNew ->
-                    ( model, Command.none )
-
-                Route.HostAdminWikiDetail _ ->
-                    ( model, Command.none )
-
-                Route.NotFound _ ->
-                    ( model, Command.none )
+            applyWikiAdminAuditFilterFromModel { model | wikiAdminAuditFilterSelectedKindTags = nextTags }
 
         HostAdminAuditFilterWikiChanged value ->
-            ( { model | hostAdminAuditFilterWikiDraft = value }
-            , Command.none
-            )
+            applyHostAdminAuditFilterFromModel { model | hostAdminAuditFilterWikiDraft = value }
 
         HostAdminAuditFilterActorChanged value ->
-            ( { model | hostAdminAuditFilterActorDraft = value }
-            , Command.none
-            )
+            applyHostAdminAuditFilterFromModel { model | hostAdminAuditFilterActorDraft = value }
 
         HostAdminAuditFilterPageChanged value ->
-            ( { model | hostAdminAuditFilterPageDraft = value }
-            , Command.none
-            )
+            applyHostAdminAuditFilterFromModel { model | hostAdminAuditFilterPageDraft = value }
 
         HostAdminAuditFilterTypeTagToggled tag checked ->
             let
@@ -2515,88 +2554,7 @@ update msg model =
                     else
                         List.filter (\t -> t /= tag) model.hostAdminAuditFilterSelectedKindTags
             in
-            ( { model | hostAdminAuditFilterSelectedKindTags = nextTags }
-            , Command.none
-            )
-
-        HostAdminAuditFilterApplyClicked ->
-            case model.route of
-                Route.HostAdminAudit ->
-                    let
-                        applied : WikiAuditLog.HostAuditLogFilter
-                        applied =
-                            { wikiSlugSubstring = model.hostAdminAuditFilterWikiDraft
-                            , actorUsernameSubstring = model.hostAdminAuditFilterActorDraft
-                            , pageSlugSubstring = model.hostAdminAuditFilterPageDraft
-                            , eventKindTags = model.hostAdminAuditFilterSelectedKindTags
-                            }
-                    in
-                    ( { model
-                        | hostAdminAuditAppliedFilter = applied
-                        , hostAdminAuditLog = RemoteData.Loading
-                      }
-                    , Effect.Lamdera.sendToBackend (RequestHostAuditLog applied)
-                    )
-
-                Route.WikiList ->
-                    ( model, Command.none )
-
-                Route.WikiHome _ ->
-                    ( model, Command.none )
-
-                Route.WikiPage _ _ ->
-                    ( model, Command.none )
-
-                Route.WikiLogin _ _ ->
-                    ( model, Command.none )
-
-                Route.WikiRegister _ ->
-                    ( model, Command.none )
-
-                Route.WikiSubmitNew _ ->
-                    ( model, Command.none )
-
-                Route.WikiSubmitEdit _ _ ->
-                    ( model, Command.none )
-
-                Route.WikiSubmitDelete _ _ ->
-                    ( model, Command.none )
-
-                Route.WikiSubmissionDetail _ _ ->
-                    ( model, Command.none )
-
-                Route.WikiMySubmissions _ ->
-                    ( model, Command.none )
-
-                Route.WikiReview _ ->
-                    ( model, Command.none )
-
-                Route.WikiReviewDetail _ _ ->
-                    ( model, Command.none )
-
-                Route.WikiAdminUsers _ ->
-                    ( model, Command.none )
-
-                Route.WikiAdminAudit _ ->
-                    ( model, Command.none )
-
-                Route.HostAdmin _ ->
-                    ( model, Command.none )
-
-                Route.HostAdminWikis ->
-                    ( model, Command.none )
-
-                Route.HostAdminBackup ->
-                    ( model, Command.none )
-
-                Route.HostAdminWikiNew ->
-                    ( model, Command.none )
-
-                Route.HostAdminWikiDetail _ ->
-                    ( model, Command.none )
-
-                Route.NotFound _ ->
-                    ( model, Command.none )
+            applyHostAdminAuditFilterFromModel { model | hostAdminAuditFilterSelectedKindTags = nextTags }
 
         HostAdminDataExportClicked ->
             case model.route of
@@ -3349,35 +3307,32 @@ updateFromBackend msg model =
                             Dict.insert wikiSlug (RemoteData.succeed result) store.wikiUsers
                     }
 
-                nextContributorWikiRole : Maybe WikiRole.WikiRole
-                nextContributorWikiRole =
+                nextContributorWikiSessions : Dict Wiki.Slug ContributorWikiSession
+                nextContributorWikiSessions =
                     case result of
                         Ok users ->
-                            if model.contributorWikiSession == Just wikiSlug then
-                                model.contributorDisplayUsername
-                                    |> Maybe.andThen
-                                        (\uname ->
-                                            users
-                                                |> List.filter (\u -> u.username == uname)
-                                                |> List.head
-                                                |> Maybe.map .role
-                                        )
-                                    |> (\found ->
-                                            case found of
-                                                Just r ->
-                                                    Just r
+                            case Dict.get wikiSlug model.contributorWikiSessions of
+                                Just cw ->
+                                    users
+                                        |> List.filter (\u -> u.username == cw.displayUsername)
+                                        |> List.head
+                                        |> Maybe.map .role
+                                        |> (\maybeNewRole ->
+                                                case maybeNewRole of
+                                                    Just r ->
+                                                        Dict.insert wikiSlug { cw | role = r } model.contributorWikiSessions
 
-                                                Nothing ->
-                                                    model.contributorWikiRole
-                                       )
+                                                    Nothing ->
+                                                        model.contributorWikiSessions
+                                           )
 
-                            else
-                                model.contributorWikiRole
+                                Nothing ->
+                                    model.contributorWikiSessions
 
                         Err _ ->
-                            model.contributorWikiRole
+                            model.contributorWikiSessions
             in
-            ( { model | store = nextStore, contributorWikiRole = nextContributorWikiRole }
+            ( { model | store = nextStore, contributorWikiSessions = nextContributorWikiSessions }
             , Command.none
             )
                 |> runRouteStoreActions
@@ -3541,44 +3496,22 @@ updateFromBackend msg model =
                     else
                         d
 
-                nextContributorWiki : Maybe Wiki.Slug
-                nextContributorWiki =
-                    if d.inFlight then
-                        case result of
-                            Ok _ ->
-                                Just wikiSlug
-
-                            Err _ ->
-                                model.contributorWikiSession
-
-                    else
-                        model.contributorWikiSession
-
-                nextContributorWikiRole : Maybe WikiRole.WikiRole
-                nextContributorWikiRole =
+                nextContributorWikiSessions : Dict Wiki.Slug ContributorWikiSession
+                nextContributorWikiSessions =
                     if d.inFlight then
                         case result of
                             Ok role ->
-                                Just role
+                                Dict.insert wikiSlug
+                                    { role = role
+                                    , displayUsername = ContributorAccount.normalizeUsername d.username
+                                    }
+                                    model.contributorWikiSessions
 
                             Err _ ->
-                                model.contributorWikiRole
+                                model.contributorWikiSessions
 
                     else
-                        model.contributorWikiRole
-
-                nextContributorDisplayUsername : Maybe String
-                nextContributorDisplayUsername =
-                    if d.inFlight then
-                        case result of
-                            Ok _ ->
-                                Just (ContributorAccount.normalizeUsername d.username)
-
-                            Err _ ->
-                                model.contributorDisplayUsername
-
-                    else
-                        model.contributorDisplayUsername
+                        model.contributorWikiSessions
 
                 nextStore : Store
                 nextStore =
@@ -3606,9 +3539,7 @@ updateFromBackend msg model =
                 nextModel =
                     { model
                         | registerDraft = nextDraft
-                        , contributorWikiSession = nextContributorWiki
-                        , contributorWikiRole = nextContributorWikiRole
-                        , contributorDisplayUsername = nextContributorDisplayUsername
+                        , contributorWikiSessions = nextContributorWikiSessions
                         , store = nextStore
                     }
 
@@ -3653,44 +3584,22 @@ updateFromBackend msg model =
                     else
                         d
 
-                nextContributorWiki : Maybe Wiki.Slug
-                nextContributorWiki =
-                    if d.inFlight then
-                        case result of
-                            Ok _ ->
-                                Just wikiSlug
-
-                            Err _ ->
-                                model.contributorWikiSession
-
-                    else
-                        model.contributorWikiSession
-
-                nextContributorWikiRole : Maybe WikiRole.WikiRole
-                nextContributorWikiRole =
+                nextContributorWikiSessions : Dict Wiki.Slug ContributorWikiSession
+                nextContributorWikiSessions =
                     if d.inFlight then
                         case result of
                             Ok role ->
-                                Just role
+                                Dict.insert wikiSlug
+                                    { role = role
+                                    , displayUsername = ContributorAccount.normalizeUsername d.username
+                                    }
+                                    model.contributorWikiSessions
 
                             Err _ ->
-                                model.contributorWikiRole
+                                model.contributorWikiSessions
 
                     else
-                        model.contributorWikiRole
-
-                nextContributorDisplayUsername : Maybe String
-                nextContributorDisplayUsername =
-                    if d.inFlight then
-                        case result of
-                            Ok _ ->
-                                Just (ContributorAccount.normalizeUsername d.username)
-
-                            Err _ ->
-                                model.contributorDisplayUsername
-
-                    else
-                        model.contributorDisplayUsername
+                        model.contributorWikiSessions
 
                 nextStore : Store
                 nextStore =
@@ -3718,9 +3627,7 @@ updateFromBackend msg model =
                 nextModel =
                     { model
                         | loginDraft = nextDraft
-                        , contributorWikiSession = nextContributorWiki
-                        , contributorWikiRole = nextContributorWikiRole
-                        , contributorDisplayUsername = nextContributorDisplayUsername
+                        , contributorWikiSessions = nextContributorWikiSessions
                         , store = nextStore
                     }
 
@@ -3739,15 +3646,11 @@ updateFromBackend msg model =
             ( nextModel, afterLoginCmd )
                 |> runRouteStoreActions
 
-        LogoutContributorResponse ->
+        LogoutContributorResponse loggedOutWiki ->
             let
                 navCmd : Command FrontendOnly ToBackend Msg
                 navCmd =
-                    postLogoutNavigationCmd model
-
-                maybeWiki : Maybe Wiki.Slug
-                maybeWiki =
-                    model.contributorWikiSession
+                    postLogoutNavigationCmd loggedOutWiki model
 
                 store0 : Store
                 store0 =
@@ -3755,21 +3658,14 @@ updateFromBackend msg model =
 
                 nextStore : Store
                 nextStore =
-                    case maybeWiki of
-                        Just wikiSlug ->
-                            { store0
-                                | wikiUsers = Dict.remove wikiSlug store0.wikiUsers
-                                , wikiAuditLogs = Dict.remove wikiSlug store0.wikiAuditLogs
-                                , myPendingSubmissions = Dict.remove wikiSlug store0.myPendingSubmissions
-                            }
-
-                        Nothing ->
-                            store0
+                    { store0
+                        | wikiUsers = Dict.remove loggedOutWiki store0.wikiUsers
+                        , wikiAuditLogs = Dict.remove loggedOutWiki store0.wikiAuditLogs
+                        , myPendingSubmissions = Dict.remove loggedOutWiki store0.myPendingSubmissions
+                    }
             in
             ( { model
-                | contributorWikiSession = Nothing
-                , contributorWikiRole = Nothing
-                , contributorDisplayUsername = Nothing
+                | contributorWikiSessions = Dict.remove loggedOutWiki model.contributorWikiSessions
                 , store = nextStore
               }
             , navCmd
@@ -4680,9 +4576,7 @@ updateFromBackend msg model =
                         | hostAdminImportInFlight = False
                         , hostAdminBackupNotice = Just "Import completed. Reloading lists…"
                         , store = Store.empty
-                        , contributorWikiSession = Nothing
-                        , contributorWikiRole = Nothing
-                        , contributorDisplayUsername = Nothing
+                        , contributorWikiSessions = Dict.empty
                         , hostAdminWikis = RemoteData.Loading
                       }
                     , Command.batch
@@ -5031,49 +4925,39 @@ viewAppChromeSideNav model =
 wikiScopeSideNavItems : Wiki.Slug -> Model -> List (Html Msg)
 wikiScopeSideNavItems wikiSlug model =
     let
-        authItems : List (Html Msg)
-        authItems =
-            case model.contributorWikiSession of
-                Just sessionWiki ->
-                    if sessionWiki /= wikiSlug then
-                        [ Html.li [] [ Html.a [ Attr.href (Wiki.loginUrlPath wikiSlug) ] [ Html.text "Log in" ] ]
-                        , Html.li [] [ Html.a [ Attr.href (Wiki.registerUrlPath wikiSlug) ] [ Html.text "Register" ] ]
-                        ]
+        maybeCw : Maybe ContributorWikiSession
+        maybeCw =
+            Dict.get wikiSlug model.contributorWikiSessions
 
-                    else
-                        [ Html.li []
-                            [ Html.span []
-                                [ Html.text
-                                    ("Logged in"
-                                        ++ (model.contributorDisplayUsername
-                                                |> Maybe.map (\u -> " as " ++ u)
-                                                |> Maybe.withDefault ""
-                                           )
-                                    )
-                                ]
-                            ]
-                        , Html.li []
-                            [ Html.button
-                                [ Attr.type_ "button"
-                                , Attr.id "wiki-logout-button"
-                                , TW.cls "text-left underline"
-                                , Events.onClick ContributorLogoutClicked
-                                ]
-                                [ Html.text "Log out" ]
-                            ]
-                        , Html.li [] [ Html.a [ Attr.href (Wiki.submitNewPageUrlPath wikiSlug) ] [ Html.text "Create page" ] ]
-                        , Html.li [] [ Html.a [ Attr.href (Wiki.mySubmissionsUrlPath wikiSlug) ] [ Html.text "My submissions" ] ]
+        maybeRole : Maybe WikiRole
+        maybeRole =
+            Maybe.map .role maybeCw
+
+        authChrome : List (Html Msg)
+        authChrome =
+            case maybeCw of
+                Just cw ->
+                    [ Html.li []
+                        [ Html.span []
+                            [ Html.text ("Logged in as " ++ cw.displayUsername) ]
                         ]
+                    , Html.li []
+                        [ Html.button
+                            [ Attr.type_ "button"
+                            , Attr.id "wiki-logout-button"
+                            , TW.cls "text-left underline"
+                            , Events.onClick (ContributorLogoutWiki wikiSlug)
+                            ]
+                            [ Html.text "Log out" ]
+                        ]
+                    ]
 
                 Nothing ->
-                    [ Html.li [] [ Html.a [ Attr.href (Wiki.loginUrlPath wikiSlug) ] [ Html.text "Log in" ] ]
-                    , Html.li [] [ Html.a [ Attr.href (Wiki.registerUrlPath wikiSlug) ] [ Html.text "Register" ] ]
-                    ]
+                    []
     in
     List.concat
-        [ authItems
-        , wikiNavReviewLis wikiSlug model
-        , wikiNavWikiAdminLis wikiSlug model
+        [ authChrome
+        , SideNavMenu.wikiNavLinks wikiSlug maybeRole |> List.map sideNavLinkLi
         ]
 
 
@@ -5479,7 +5363,7 @@ viewHostAdminBackupPanel model =
         [ Html.h2 [ TW.cls "text-lg font-semibold mb-2" ] [ Html.text "Backup and restore" ]
         , Html.p [ TW.cls "text-sm mb-3" ]
             [ Html.text
-                "Export all wiki data as JSON, or import a file from a previous export. Import replaces all server-side data except your current host admin sign-in. Contributor sessions from the file are stored but usually will not match live browser session keys until contributors sign in again."
+                "Export all wiki data as JSON, or import a file from a previous export. Import replaces all server-side data except your current host admin sign-in. Contributor sign-ins are not included in the backup; contributors must sign in again after import."
             ]
         , notice
         , Html.div [ TW.cls "flex flex-wrap gap-2" ]
@@ -5636,7 +5520,7 @@ viewHostAdminAuditBody remote =
                     [ Html.text "No audit events yet." ]
 
             else
-                UI.table UI.TableFullMax72
+                UI.table UI.TableFull
                     [ Attr.id "host-admin-audit-list" ]
                     { theadAttrs = []
                     , headerRowAttrs = []
@@ -5667,81 +5551,89 @@ viewHostAdminAuditBody remote =
                     }
 
 
-viewHostAdminAuditKindCheckbox : Model -> ( WikiAuditLog.AuditEventKindFilterTag, String ) -> Html Msg
-viewHostAdminAuditKindCheckbox model ( tag, labelText ) =
+viewHostAdminAuditKindChip : Model -> ( WikiAuditLog.AuditEventKindFilterTag, String ) -> Html Msg
+viewHostAdminAuditKindChip model ( tag, labelText ) =
     let
         isOn : Bool
         isOn =
             List.member tag model.hostAdminAuditFilterSelectedKindTags
     in
-    Html.label []
-        [ Html.input
-            [ Attr.type_ "checkbox"
-            , Attr.id ("host-admin-audit-filter-type-" ++ WikiAuditLog.eventKindFilterTagToString tag)
-            , Attr.checked isOn
-            , Events.onClick (HostAdminAuditFilterTypeTagToggled tag (not isOn))
-            , Events.onCheck (HostAdminAuditFilterTypeTagToggled tag)
-            ]
-            []
-        , Html.text (" " ++ labelText)
-        ]
+    UI.togglableChip
+        [ Attr.id ("host-admin-audit-filter-type-" ++ WikiAuditLog.eventKindFilterTagToString tag) ]
+        { pressed = isOn
+        , onClick = HostAdminAuditFilterTypeTagToggled tag (not isOn)
+        , label = labelText
+        }
 
 
 viewHostAdminAuditFilters : Model -> Html Msg
 viewHostAdminAuditFilters model =
     Html.div
-        [ Attr.attribute "data-context" "host-admin-audit-filters" ]
-        [ Html.div []
-            [ Html.label []
-                [ Html.text "Wiki slug contains "
+        [ Attr.attribute "data-context" "host-admin-audit-filters"
+        , TW.cls "shrink-0 rounded-md border border-[var(--border)] bg-[var(--chrome-bg)] p-3"
+        ]
+        [ Html.div
+            [ TW.cls "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" ]
+            [ Html.div [ TW.cls "min-w-0" ]
+                [ Html.label
+                    [ Attr.for "host-admin-audit-filter-wiki"
+                    , TW.cls "block text-[0.82rem] font-medium text-[var(--fg-muted)]"
+                    ]
+                    [ Html.text "Wiki slug contains" ]
                 , Html.input
                     [ Attr.id "host-admin-audit-filter-wiki"
                     , Attr.type_ "text"
                     , Attr.value model.hostAdminAuditFilterWikiDraft
                     , Events.onInput HostAdminAuditFilterWikiChanged
-                    , TW.cls UI.formTextInputClass
+                    , TW.cls (UI.formTextInputClass ++ " mt-0 w-full max-w-full")
                     ]
                     []
                 ]
-            ]
-        , Html.div []
-            [ Html.label []
-                [ Html.text "Actor contains "
+            , Html.div [ TW.cls "min-w-0" ]
+                [ Html.label
+                    [ Attr.for "host-admin-audit-filter-actor"
+                    , TW.cls "block text-[0.82rem] font-medium text-[var(--fg-muted)]"
+                    ]
+                    [ Html.text "Actor contains" ]
                 , Html.input
                     [ Attr.id "host-admin-audit-filter-actor"
                     , Attr.type_ "text"
                     , Attr.value model.hostAdminAuditFilterActorDraft
                     , Events.onInput HostAdminAuditFilterActorChanged
-                    , TW.cls UI.formTextInputClass
+                    , TW.cls (UI.formTextInputClass ++ " mt-0 w-full max-w-full")
                     ]
                     []
                 ]
-            ]
-        , Html.div []
-            [ Html.label []
-                [ Html.text "Page slug contains "
+            , Html.div [ TW.cls "min-w-0" ]
+                [ Html.label
+                    [ Attr.for "host-admin-audit-filter-page"
+                    , TW.cls "block text-[0.82rem] font-medium text-[var(--fg-muted)]"
+                    ]
+                    [ Html.text "Page slug contains" ]
                 , Html.input
                     [ Attr.id "host-admin-audit-filter-page"
                     , Attr.type_ "text"
                     , Attr.value model.hostAdminAuditFilterPageDraft
                     , Events.onInput HostAdminAuditFilterPageChanged
-                    , TW.cls UI.formTextInputClass
+                    , TW.cls (UI.formTextInputClass ++ " mt-0 w-full max-w-full")
                     ]
                     []
                 ]
             ]
-        , Html.fieldset
-            [ Attr.id "host-admin-audit-filter-type" ]
-            (Html.legend [] [ Html.text "Event types (none selected = all)" ]
-                :: List.map (viewHostAdminAuditKindCheckbox model) WikiAuditLog.eventKindFilterTagOptions
-            )
-        , Html.div []
-            [ UI.button
-                [ Attr.id "host-admin-audit-filter-apply"
-                , Attr.type_ "button"
-                , Events.onClick HostAdminAuditFilterApplyClicked
+        , Html.div
+            [ Attr.id "host-admin-audit-filter-type"
+            , Attr.attribute "role" "group"
+            , Attr.attribute "aria-labelledby" "host-admin-audit-filter-type-legend"
+            , TW.cls "mt-3 border-t border-dashed border-[var(--border-dash)] pt-3"
+            ]
+            [ Html.p
+                [ Attr.id "host-admin-audit-filter-type-legend"
+                , TW.cls "m-0 mb-2 text-[0.82rem] text-[var(--fg-muted)]"
                 ]
-                [ Html.text "Apply filters" ]
+                [ Html.text "Event types — none selected means all" ]
+            , Html.div
+                [ TW.cls "flex flex-wrap gap-2" ]
+                (List.map (viewHostAdminAuditKindChip model) WikiAuditLog.eventKindFilterTagOptions)
             ]
         ]
 
@@ -5749,9 +5641,15 @@ viewHostAdminAuditFilters model =
 viewHostAdminAudit : Model -> Html Msg
 viewHostAdminAudit model =
     Html.div
-        [ Attr.id "host-admin-audit-page" ]
+        [ Attr.id "host-admin-audit-page"
+        , TW.cls "flex min-h-0 flex-1 flex-col gap-3"
+        ]
         [ viewHostAdminAuditFilters model
-        , viewHostAdminAuditBody model.hostAdminAuditLog
+        , Html.div
+            [ Attr.id "host-admin-audit-table-region"
+            , TW.cls "flex min-h-0 min-w-0 flex-1 flex-col overflow-auto"
+            ]
+            [ viewHostAdminAuditBody model.hostAdminAuditLog ]
         ]
 
 
@@ -6957,7 +6855,7 @@ viewSubmitEditRoute model wikiSlug pageSlug =
                         RemoteData.Success pageDetails ->
                             viewSubmitEditLoaded wikiSlug
                                 pageSlug
-                                (model.contributorWikiSession == Just wikiSlug && not (wikiSessionTrustedOnWiki wikiSlug model))
+                                (contributorLoggedInOnWikiSlug wikiSlug model && not (wikiSessionTrustedOnWiki wikiSlug model))
                                 (publishedSlugExistsFromWikiDetails wikiDetails)
                                 pageDetails
                                 model.pageEditSubmitDraft
@@ -7754,16 +7652,9 @@ viewWikiAdminUsersRevokeAdminFeedback maybeText =
 
 wikiAdminUsersSelfUsernameOnPage : Model -> Wiki.Slug -> Maybe String
 wikiAdminUsersSelfUsernameOnPage model wikiSlug =
-    case model.contributorWikiSession of
-        Just sessionWiki ->
-            if sessionWiki == wikiSlug then
-                model.contributorDisplayUsername
-
-            else
-                Nothing
-
-        Nothing ->
-            Nothing
+    model.contributorWikiSessions
+        |> Dict.get wikiSlug
+        |> Maybe.map .displayUsername
 
 
 viewWikiAdminUsersRoute : Model -> Wiki.Slug -> Html Msg
@@ -7829,7 +7720,7 @@ viewWikiAdminAuditBody wikiSlug remote =
                     [ Html.text "No audit events yet." ]
 
             else
-                UI.table UI.TableFullMax72
+                UI.table UI.TableFull
                     [ Attr.id "wiki-admin-audit-list" ]
                     { theadAttrs = []
                     , headerRowAttrs = []
@@ -7865,65 +7756,73 @@ viewWikiAdminAuditBody wikiSlug remote =
 viewWikiAdminAuditFilters : Model -> Html Msg
 viewWikiAdminAuditFilters model =
     Html.div
-        [ Attr.attribute "data-context" "wiki-admin-audit-filters" ]
-        [ Html.div []
-            [ Html.label []
-                [ Html.text "Actor contains "
+        [ Attr.attribute "data-context" "wiki-admin-audit-filters"
+        , TW.cls "shrink-0 rounded-md border border-[var(--border)] bg-[var(--chrome-bg)] p-3"
+        ]
+        [ Html.div
+            [ TW.cls "grid grid-cols-1 gap-3 sm:grid-cols-2" ]
+            [ Html.div [ TW.cls "min-w-0" ]
+                [ Html.label
+                    [ Attr.for "wiki-admin-audit-filter-actor"
+                    , TW.cls "block text-[0.82rem] font-medium text-[var(--fg-muted)]"
+                    ]
+                    [ Html.text "Actor contains" ]
                 , Html.input
                     [ Attr.id "wiki-admin-audit-filter-actor"
                     , Attr.type_ "text"
                     , Attr.value model.wikiAdminAuditFilterActorDraft
                     , Events.onInput WikiAdminAuditFilterActorChanged
-                    , TW.cls UI.formTextInputClass
+                    , TW.cls (UI.formTextInputClass ++ " mt-0 w-full max-w-full")
                     ]
                     []
                 ]
-            ]
-        , Html.div []
-            [ Html.label []
-                [ Html.text "Page slug contains "
+            , Html.div [ TW.cls "min-w-0" ]
+                [ Html.label
+                    [ Attr.for "wiki-admin-audit-filter-page"
+                    , TW.cls "block text-[0.82rem] font-medium text-[var(--fg-muted)]"
+                    ]
+                    [ Html.text "Page slug contains" ]
                 , Html.input
                     [ Attr.id "wiki-admin-audit-filter-page"
                     , Attr.type_ "text"
                     , Attr.value model.wikiAdminAuditFilterPageDraft
                     , Events.onInput WikiAdminAuditFilterPageChanged
-                    , TW.cls UI.formTextInputClass
+                    , TW.cls (UI.formTextInputClass ++ " mt-0 w-full max-w-full")
                     ]
                     []
                 ]
             ]
-        , Html.fieldset
-            [ Attr.id "wiki-admin-audit-filter-type" ]
-            (Html.legend [] [ Html.text "Event types (none selected = all)" ]
-                :: List.map (viewWikiAdminAuditKindCheckbox model) WikiAuditLog.eventKindFilterTagOptions
-            )
-        , UI.button
-            [ Attr.id "wiki-admin-audit-filter-apply"
-            , Attr.type_ "button"
-            , Events.onClick WikiAdminAuditFilterApplyClicked
+        , Html.div
+            [ Attr.id "wiki-admin-audit-filter-type"
+            , Attr.attribute "role" "group"
+            , Attr.attribute "aria-labelledby" "wiki-admin-audit-filter-type-legend"
+            , TW.cls "mt-3 border-t border-dashed border-[var(--border-dash)] pt-3"
             ]
-            [ Html.text "Apply filters" ]
+            [ Html.p
+                [ Attr.id "wiki-admin-audit-filter-type-legend"
+                , TW.cls "m-0 mb-2 text-[0.82rem] text-[var(--fg-muted)]"
+                ]
+                [ Html.text "Event types — none selected means all" ]
+            , Html.div
+                [ TW.cls "flex flex-wrap gap-2" ]
+                (List.map (viewWikiAdminAuditKindChip model) WikiAuditLog.eventKindFilterTagOptions)
+            ]
         ]
 
 
-viewWikiAdminAuditKindCheckbox : Model -> ( WikiAuditLog.AuditEventKindFilterTag, String ) -> Html Msg
-viewWikiAdminAuditKindCheckbox model ( tag, labelText ) =
+viewWikiAdminAuditKindChip : Model -> ( WikiAuditLog.AuditEventKindFilterTag, String ) -> Html Msg
+viewWikiAdminAuditKindChip model ( tag, labelText ) =
     let
         isOn : Bool
         isOn =
             List.member tag model.wikiAdminAuditFilterSelectedKindTags
     in
-    Html.label []
-        [ Html.input
-            [ Attr.type_ "checkbox"
-            , Attr.id ("wiki-admin-audit-filter-type-" ++ WikiAuditLog.eventKindFilterTagToString tag)
-            , Attr.checked isOn
-            , Events.onClick (WikiAdminAuditFilterTypeTagToggled tag (not isOn))
-            , Events.onCheck (WikiAdminAuditFilterTypeTagToggled tag)
-            ]
-            []
-        , Html.text (" " ++ labelText)
-        ]
+    UI.togglableChip
+        [ Attr.id ("wiki-admin-audit-filter-type-" ++ WikiAuditLog.eventKindFilterTagToString tag) ]
+        { pressed = isOn
+        , onClick = WikiAdminAuditFilterTypeTagToggled tag (not isOn)
+        , label = labelText
+        }
 
 
 viewWikiAdminAuditLoaded : Wiki.Slug -> Model -> Html Msg
@@ -7931,9 +7830,14 @@ viewWikiAdminAuditLoaded wikiSlug model =
     Html.div
         [ Attr.id "wiki-admin-audit-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
+        , TW.cls "flex min-h-0 flex-1 flex-col gap-3"
         ]
         [ viewWikiAdminAuditFilters model
-        , viewWikiAdminAuditBody wikiSlug (Store.getWikiAuditLog wikiSlug model.wikiAdminAuditAppliedFilter model.store)
+        , Html.div
+            [ Attr.id "wiki-admin-audit-table-region"
+            , TW.cls "flex min-h-0 min-w-0 flex-1 flex-col overflow-auto"
+            ]
+            [ viewWikiAdminAuditBody wikiSlug (Store.getWikiAuditLog wikiSlug model.wikiAdminAuditAppliedFilter model.store) ]
         ]
 
 
@@ -8454,7 +8358,14 @@ viewPublishedPageRoute model wikiSlug pageSlug =
                             viewWikiHomeLoading
 
                         RemoteData.Failure _ ->
-                            viewMissingPublishedPage wikiSlug pageSlug model.contributorWikiSession
+                            viewMissingPublishedPage wikiSlug
+                                pageSlug
+                                (if Dict.member wikiSlug model.contributorWikiSessions then
+                                    Just wikiSlug
+
+                                 else
+                                    Nothing
+                                )
 
                         RemoteData.Success pageDetails ->
                             viewPublishedPage wikiSlug pageSlug pageDetails (publishedSlugExistsFromWikiDetails wikiDetails)
@@ -8618,7 +8529,7 @@ publishedPageEditLink model =
                 )
             of
                 ( Success _, Success _, Success _ ) ->
-                    if model.contributorWikiSession == Just wikiSlug then
+                    if contributorLoggedInOnWikiSlug wikiSlug model then
                         Just (contributorPublishedPageActions wikiSlug pageSlug)
 
                     else
@@ -8692,6 +8603,24 @@ view model =
             ]
                 |> List.filterMap identity
 
+        mainColumnClass : String
+        mainColumnClass =
+            if routeUsesAuditLogFillLayout model.route then
+                UI.layoutMainColumnClassAuditFill hasRightColumn
+
+            else
+                UI.layoutMainColumnClass hasRightColumn
+
+        mainColumnBody : Html Msg
+        mainColumnBody =
+            if routeUsesAuditLogFillLayout model.route then
+                Html.div
+                    [ TW.cls "flex min-h-0 min-w-0 flex-1 flex-col" ]
+                    [ viewBody model ]
+
+            else
+                viewBody model
+
         mainColumns : List (Html Msg)
         mainColumns =
             List.concat
@@ -8699,9 +8628,9 @@ view model =
                         [ viewRouteSideNav model ]
                   , Html.main_
                         [ Attr.id UI.appMainScrollRegionId
-                        , TW.cls (UI.layoutMainColumnClass hasRightColumn)
+                        , TW.cls mainColumnClass
                         ]
-                        [ viewBody model ]
+                        [ mainColumnBody ]
                   ]
                 , if List.isEmpty rightColumnSections then
                     []

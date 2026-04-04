@@ -1,5 +1,7 @@
-module RouteAccess exposing (ContributorSession, contributorForcedRedirect, contributorRestrictedReturnPath)
+module RouteAccess exposing (contributorForcedRedirect, contributorRestrictedReturnPath)
 
+import ContributorWikiSession exposing (ContributorWikiSession)
+import Dict exposing (Dict)
 import Route exposing (Route)
 import SecureRedirect
 import Url exposing (Url)
@@ -7,17 +9,11 @@ import Wiki
 import WikiRole
 
 
-type alias ContributorSession =
-    { contributorWikiSession : Maybe Wiki.Slug
-    , contributorWikiRole : Maybe WikiRole.WikiRole
-    }
-
-
 {-| When anonymous (or logged in on another wiki), restricted wiki routes redirect to login with return path.
 Logged-in contributors without sufficient role still reach the route so the server can respond (stories 22, 33).
 -}
-contributorForcedRedirect : ContributorSession -> Url -> Route -> Maybe ( Wiki.Slug, String )
-contributorForcedRedirect sess url route =
+contributorForcedRedirect : Dict Wiki.Slug ContributorWikiSession -> Url -> Route -> Maybe ( Wiki.Slug, String )
+contributorForcedRedirect sessions url route =
     let
         returnPath : String
         returnPath =
@@ -25,23 +21,21 @@ contributorForcedRedirect sess url route =
 
         loggedInHere : Wiki.Slug -> Bool
         loggedInHere wikiSlug =
-            sess.contributorWikiSession == Just wikiSlug
+            Dict.member wikiSlug sessions
 
         trustedHere : Wiki.Slug -> Bool
         trustedHere wikiSlug =
-            loggedInHere wikiSlug
-                && (sess.contributorWikiRole
-                        |> Maybe.map WikiRole.isTrustedModerator
-                        |> Maybe.withDefault False
-                   )
+            sessions
+                |> Dict.get wikiSlug
+                |> Maybe.map (.role >> WikiRole.isTrustedModerator)
+                |> Maybe.withDefault False
 
         adminHere : Wiki.Slug -> Bool
         adminHere wikiSlug =
-            loggedInHere wikiSlug
-                && (sess.contributorWikiRole
-                        |> Maybe.map WikiRole.canAccessWikiAdminUsers
-                        |> Maybe.withDefault False
-                   )
+            sessions
+                |> Dict.get wikiSlug
+                |> Maybe.map (.role >> WikiRole.canAccessWikiAdminUsers)
+                |> Maybe.withDefault False
     in
     case route of
         Route.WikiReview wikiSlug ->

@@ -1,6 +1,8 @@
 module RouteAccessTest exposing (suite)
 
 import Expect
+import ContributorWikiSession exposing (ContributorWikiSession)
+import Dict
 import Route
 import RouteAccess
 import Test exposing (Test)
@@ -9,25 +11,25 @@ import Wiki
 import WikiRole
 
 
-anon : RouteAccess.ContributorSession
+anon : Dict.Dict Wiki.Slug ContributorWikiSession
 anon =
-    { contributorWikiSession = Nothing
-    , contributorWikiRole = Nothing
-    }
+    Dict.empty
 
 
-contribDemo : RouteAccess.ContributorSession
+contribDemo : Dict.Dict Wiki.Slug ContributorWikiSession
 contribDemo =
-    { contributorWikiSession = Just "Demo"
-    , contributorWikiRole = Just WikiRole.UntrustedContributor
-    }
+    Dict.singleton "Demo"
+        { role = WikiRole.UntrustedContributor
+        , displayUsername = "u"
+        }
 
 
-trustedDemo : RouteAccess.ContributorSession
+trustedDemo : Dict.Dict Wiki.Slug ContributorWikiSession
 trustedDemo =
-    { contributorWikiSession = Just "Demo"
-    , contributorWikiRole = Just WikiRole.TrustedContributor
-    }
+    Dict.singleton "Demo"
+        { role = WikiRole.TrustedContributor
+        , displayUsername = "u"
+        }
 
 
 suite : Test

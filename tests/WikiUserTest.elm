@@ -40,6 +40,47 @@ suite =
                     in
                     WikiUser.contributorIdForWiki "sess" "other" sessions
                         |> Expect.equal Nothing
+            , Test.test "resolves per-wiki when one Lamdera session has several wikis" <|
+                \() ->
+                    let
+                        accDemo : ContributorAccount.Id
+                        accDemo =
+                            ContributorAccount.newAccountId "Demo" "a"
+
+                        accOther : ContributorAccount.Id
+                        accOther =
+                            ContributorAccount.newAccountId "Other" "b"
+
+                        sessions : WikiUser.SessionTable
+                        sessions =
+                            WikiUser.emptySessions
+                                |> WikiUser.bindContributor "sess" "Demo" accDemo
+                                |> WikiUser.bindContributor "sess" "Other" accOther
+                    in
+                    Expect.all
+                        [ \() ->
+                            WikiUser.contributorIdForWiki "sess" "Demo" sessions
+                                |> Expect.equal (Just accDemo)
+                        , \() ->
+                            WikiUser.contributorIdForWiki "sess" "Other" sessions
+                                |> Expect.equal (Just accOther)
+                        ]
+                        ()
+            ]
+        , Test.describe "sessionContributorOnWiki"
+            [ Test.test "SessionWrongWiki when bound to other wikis only" <|
+                \() ->
+                    let
+                        acc : ContributorAccount.Id
+                        acc =
+                            ContributorAccount.newAccountId "demo" "alice"
+
+                        sessions : WikiUser.SessionTable
+                        sessions =
+                            WikiUser.bindContributor "sess" "demo" acc WikiUser.emptySessions
+                    in
+                    WikiUser.sessionContributorOnWiki "sess" "other" sessions
+                        |> Expect.equal WikiUser.SessionWrongWiki
             ]
         , Test.describe "dropBindingsForWiki"
             [ Test.test "removes sessions for that wiki only" <|

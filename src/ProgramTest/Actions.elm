@@ -1,6 +1,7 @@
 module ProgramTest.Actions exposing
     ( createPage
     , loginToWiki
+    , navigateToPath
     , navigateToWikiSubmitEdit
     , submitWikiEditForm
     , submitWikiLoginForm
@@ -37,6 +38,18 @@ programTestUrl path query =
     , query = query
     , fragment = Nothing
     }
+
+
+{-| Simulate `UrlChanged` to a path (no query string), e.g. typing a URL or following a bookmark when no sidebar link exists.
+-}
+navigateToPath :
+    String
+    -> Effect.Test.FrontendActions ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model
+    -> List (Effect.Test.Action ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model)
+navigateToPath path client =
+    [ client.update 100
+        (UrlChanged (programTestUrl path Nothing))
+    ]
 
 
 {-| First ATX heading text (`# ...`) if present; otherwise `pageSlug`.

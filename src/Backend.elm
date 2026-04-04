@@ -204,15 +204,15 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                     sessionKey =
                         Effect.Lamdera.sessionIdToString sessionId
                 in
-                case Dict.get sessionKey model.contributorSessions of
-                    Nothing ->
+                case WikiUser.sessionContributorOnWiki sessionKey wikiSlug model.contributorSessions of
+                    WikiUser.SessionNotLoggedIn ->
                         respond (Err Submission.ReviewQueueNotLoggedIn)
 
-                    Just (WikiUser.Binding boundWiki accountId) ->
-                        if boundWiki /= wikiSlug then
-                            respond (Err Submission.ReviewQueueWrongWikiSession)
+                    WikiUser.SessionWrongWiki ->
+                        respond (Err Submission.ReviewQueueWrongWikiSession)
 
-                        else if not (WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors) then
+                    WikiUser.SessionHasAccount accountId ->
+                        if not (WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors) then
                             respond (Err Submission.ReviewQueueForbidden)
 
                         else
@@ -246,20 +246,19 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                     sessionKey =
                         Effect.Lamdera.sessionIdToString sessionId
                 in
-                case Dict.get sessionKey model.contributorSessions of
-                    Nothing ->
+                case WikiUser.sessionContributorOnWiki sessionKey wikiSlug model.contributorSessions of
+                    WikiUser.SessionNotLoggedIn ->
                         respond (Err Submission.MyPendingSubmissionsNotLoggedIn)
 
-                    Just (WikiUser.Binding boundWiki accountId) ->
-                        if boundWiki /= wikiSlug then
-                            respond (Err Submission.MyPendingSubmissionsWrongWikiSession)
+                    WikiUser.SessionWrongWiki ->
+                        respond (Err Submission.MyPendingSubmissionsWrongWikiSession)
 
-                        else
-                            model.submissions
-                                |> Submission.mySubmissionsForAuthorOnWiki wikiSlug accountId
-                                |> List.map Submission.myPendingSubmissionListItemFromSubmission
-                                |> Ok
-                                |> respond
+                    WikiUser.SessionHasAccount accountId ->
+                        model.submissions
+                            |> Submission.mySubmissionsForAuthorOnWiki wikiSlug accountId
+                            |> List.map Submission.myPendingSubmissionListItemFromSubmission
+                            |> Ok
+                            |> respond
 
         RequestWikiUsers wikiSlug ->
             let
@@ -284,15 +283,15 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                             sessionKey =
                                 Effect.Lamdera.sessionIdToString sessionId
                         in
-                        case Dict.get sessionKey model.contributorSessions of
-                            Nothing ->
+                        case WikiUser.sessionContributorOnWiki sessionKey wikiSlug model.contributorSessions of
+                            WikiUser.SessionNotLoggedIn ->
                                 respond (Err WikiAdminUsers.NotLoggedIn)
 
-                            Just (WikiUser.Binding boundWiki accountId) ->
-                                if boundWiki /= wikiSlug then
-                                    respond (Err WikiAdminUsers.WrongWikiSession)
+                            WikiUser.SessionWrongWiki ->
+                                respond (Err WikiAdminUsers.WrongWikiSession)
 
-                                else if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
+                            WikiUser.SessionHasAccount accountId ->
+                                if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
                                     respond (Err WikiAdminUsers.Forbidden)
 
                                 else
@@ -323,15 +322,15 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                             sessionKey =
                                 Effect.Lamdera.sessionIdToString sessionId
                         in
-                        case Dict.get sessionKey model.contributorSessions of
-                            Nothing ->
+                        case WikiUser.sessionContributorOnWiki sessionKey wikiSlug model.contributorSessions of
+                            WikiUser.SessionNotLoggedIn ->
                                 respond (Err WikiAuditLog.NotLoggedIn)
 
-                            Just (WikiUser.Binding boundWiki accountId) ->
-                                if boundWiki /= wikiSlug then
-                                    respond (Err WikiAuditLog.WrongWikiSession)
+                            WikiUser.SessionWrongWiki ->
+                                respond (Err WikiAuditLog.WrongWikiSession)
 
-                                else if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
+                            WikiUser.SessionHasAccount accountId ->
+                                if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
                                     respond (Err WikiAuditLog.Forbidden)
 
                                 else
@@ -367,15 +366,15 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                             sessionKey =
                                 Effect.Lamdera.sessionIdToString sessionId
                         in
-                        case Dict.get sessionKey model.contributorSessions of
-                            Nothing ->
+                        case WikiUser.sessionContributorOnWiki sessionKey wikiSlug model.contributorSessions of
+                            WikiUser.SessionNotLoggedIn ->
                                 respond (Err WikiAdminUsers.PromoteNotLoggedIn)
 
-                            Just (WikiUser.Binding boundWiki accountId) ->
-                                if boundWiki /= wikiSlug then
-                                    respond (Err WikiAdminUsers.PromoteWrongWikiSession)
+                            WikiUser.SessionWrongWiki ->
+                                respond (Err WikiAdminUsers.PromoteWrongWikiSession)
 
-                                else if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
+                            WikiUser.SessionHasAccount accountId ->
+                                if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
                                     respond (Err WikiAdminUsers.PromoteForbidden)
 
                                 else
@@ -431,15 +430,15 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                             sessionKey =
                                 Effect.Lamdera.sessionIdToString sessionId
                         in
-                        case Dict.get sessionKey model.contributorSessions of
-                            Nothing ->
+                        case WikiUser.sessionContributorOnWiki sessionKey wikiSlug model.contributorSessions of
+                            WikiUser.SessionNotLoggedIn ->
                                 respond (Err WikiAdminUsers.DemoteNotLoggedIn)
 
-                            Just (WikiUser.Binding boundWiki accountId) ->
-                                if boundWiki /= wikiSlug then
-                                    respond (Err WikiAdminUsers.DemoteWrongWikiSession)
+                            WikiUser.SessionWrongWiki ->
+                                respond (Err WikiAdminUsers.DemoteWrongWikiSession)
 
-                                else if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
+                            WikiUser.SessionHasAccount accountId ->
+                                if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
                                     respond (Err WikiAdminUsers.DemoteForbidden)
 
                                 else
@@ -495,15 +494,15 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                             sessionKey =
                                 Effect.Lamdera.sessionIdToString sessionId
                         in
-                        case Dict.get sessionKey model.contributorSessions of
-                            Nothing ->
+                        case WikiUser.sessionContributorOnWiki sessionKey wikiSlug model.contributorSessions of
+                            WikiUser.SessionNotLoggedIn ->
                                 respond (Err WikiAdminUsers.GrantTrustedNotLoggedIn)
 
-                            Just (WikiUser.Binding boundWiki accountId) ->
-                                if boundWiki /= wikiSlug then
-                                    respond (Err WikiAdminUsers.GrantTrustedWrongWikiSession)
+                            WikiUser.SessionWrongWiki ->
+                                respond (Err WikiAdminUsers.GrantTrustedWrongWikiSession)
 
-                                else if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
+                            WikiUser.SessionHasAccount accountId ->
+                                if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
                                     respond (Err WikiAdminUsers.GrantTrustedForbidden)
 
                                 else
@@ -559,15 +558,15 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                             sessionKey =
                                 Effect.Lamdera.sessionIdToString sessionId
                         in
-                        case Dict.get sessionKey model.contributorSessions of
-                            Nothing ->
+                        case WikiUser.sessionContributorOnWiki sessionKey wikiSlug model.contributorSessions of
+                            WikiUser.SessionNotLoggedIn ->
                                 respond (Err WikiAdminUsers.RevokeAdminNotLoggedIn)
 
-                            Just (WikiUser.Binding boundWiki accountId) ->
-                                if boundWiki /= wikiSlug then
-                                    respond (Err WikiAdminUsers.RevokeAdminWrongWikiSession)
+                            WikiUser.SessionWrongWiki ->
+                                respond (Err WikiAdminUsers.RevokeAdminWrongWikiSession)
 
-                                else if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
+                            WikiUser.SessionHasAccount accountId ->
+                                if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
                                     respond (Err WikiAdminUsers.RevokeAdminForbidden)
 
                                 else
@@ -613,15 +612,15 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                         (ReviewSubmissionDetailResponse wikiSlug submissionId res)
                     )
             in
-            case Dict.get sessionKey model.contributorSessions of
-                Nothing ->
+            case WikiUser.sessionContributorOnWiki sessionKey wikiSlug model.contributorSessions of
+                WikiUser.SessionNotLoggedIn ->
                     respond (Err SubmissionReviewDetail.ReviewSubmissionDetailNotLoggedIn)
 
-                Just (WikiUser.Binding boundWiki accountId) ->
-                    if boundWiki /= wikiSlug then
-                        respond (Err SubmissionReviewDetail.ReviewSubmissionDetailWrongWikiSession)
+                WikiUser.SessionWrongWiki ->
+                    respond (Err SubmissionReviewDetail.ReviewSubmissionDetailWrongWikiSession)
 
-                    else if not (WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors) then
+                WikiUser.SessionHasAccount accountId ->
+                    if not (WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors) then
                         respond (Err SubmissionReviewDetail.ReviewSubmissionDetailForbidden)
 
                     else
@@ -659,42 +658,41 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                         (SubmissionDetailsResponse wikiSlug submissionId res)
                     )
             in
-            case Dict.get sessionKey model.contributorSessions of
-                Nothing ->
+            case WikiUser.sessionContributorOnWiki sessionKey wikiSlug model.contributorSessions of
+                WikiUser.SessionNotLoggedIn ->
                     respond (Err Submission.DetailsNotLoggedIn)
 
-                Just (WikiUser.Binding boundWiki accountId) ->
-                    if boundWiki /= wikiSlug then
-                        respond (Err Submission.DetailsWrongWikiSession)
+                WikiUser.SessionWrongWiki ->
+                    respond (Err Submission.DetailsWrongWikiSession)
 
-                    else
-                        let
-                            submissionBranch : ( Model, Command BackendOnly ToFrontend Msg )
-                            submissionBranch =
-                                case Dict.get submissionId model.submissions of
-                                    Nothing ->
+                WikiUser.SessionHasAccount accountId ->
+                    let
+                        submissionBranch : ( Model, Command BackendOnly ToFrontend Msg )
+                        submissionBranch =
+                            case Dict.get submissionId model.submissions of
+                                Nothing ->
+                                    respond (Err Submission.DetailsNotFound)
+
+                                Just sub ->
+                                    if sub.wikiSlug /= wikiSlug then
                                         respond (Err Submission.DetailsNotFound)
 
-                                    Just sub ->
-                                        if sub.wikiSlug /= wikiSlug then
-                                            respond (Err Submission.DetailsNotFound)
+                                    else if sub.authorId /= accountId then
+                                        respond (Err Submission.DetailsForbidden)
 
-                                        else if sub.authorId /= accountId then
-                                            respond (Err Submission.DetailsForbidden)
+                                    else
+                                        respond (Ok (Submission.contributorViewFromSubmission (Dict.get wikiSlug model.wikis) sub))
+                    in
+                    case Dict.get wikiSlug model.wikis of
+                        Just w ->
+                            if not w.active then
+                                respond (Err Submission.DetailsWikiInactive)
 
-                                        else
-                                            respond (Ok (Submission.contributorViewFromSubmission (Dict.get wikiSlug model.wikis) sub))
-                        in
-                        case Dict.get wikiSlug model.wikis of
-                            Just w ->
-                                if not w.active then
-                                    respond (Err Submission.DetailsWikiInactive)
-
-                                else
-                                    submissionBranch
-
-                            Nothing ->
+                            else
                                 submissionBranch
+
+                        Nothing ->
+                            submissionBranch
 
         RegisterContributor wikiSlug cred ->
             case WikiContributors.attemptRegister wikiSlug cred.username cred.password model.wikis model.contributors of
@@ -750,7 +748,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                         (LoginContributorResponse wikiSlug (Ok role))
                     )
 
-        LogoutContributor ->
+        LogoutContributor wikiSlug ->
             let
                 sessionKey : String
                 sessionKey =
@@ -758,10 +756,10 @@ updateFromFrontendWithTime sessionId clientId msg now model =
 
                 nextSessions : WikiUser.SessionTable
                 nextSessions =
-                    Dict.remove sessionKey model.contributorSessions
+                    WikiUser.unbindContributor sessionKey wikiSlug model.contributorSessions
             in
             ( { model | contributorSessions = nextSessions }
-            , Effect.Lamdera.sendToFrontend clientId LogoutContributorResponse
+            , Effect.Lamdera.sendToFrontend clientId (LogoutContributorResponse wikiSlug)
             )
 
         SubmitNewPage wikiSlug body ->
@@ -777,36 +775,35 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                         (SubmitNewPageResponse wikiSlug (Err err))
                     )
             in
-            case Dict.get sessionKey model.contributorSessions of
-                Nothing ->
+            case WikiUser.sessionContributorOnWiki sessionKey wikiSlug model.contributorSessions of
+                WikiUser.SessionNotLoggedIn ->
                     respondErr Submission.NotLoggedIn
 
-                Just (WikiUser.Binding boundWiki accountId) ->
-                    if boundWiki /= wikiSlug then
-                        respondErr Submission.WrongWikiSession
+                WikiUser.SessionWrongWiki ->
+                    respondErr Submission.WrongWikiSession
 
-                    else
-                        case Dict.get wikiSlug model.wikis of
-                            Nothing ->
-                                respondErr Submission.WikiNotFound
+                WikiUser.SessionHasAccount accountId ->
+                    case Dict.get wikiSlug model.wikis of
+                        Nothing ->
+                            respondErr Submission.WikiNotFound
 
-                            Just wiki ->
-                                if not wiki.active then
-                                    respondErr Submission.WikiInactive
+                        Just wiki ->
+                            if not wiki.active then
+                                respondErr Submission.WikiInactive
 
-                                else
-                                    case Submission.validateNewPageFields body.rawPageSlug body.rawMarkdown of
-                                        Err ve ->
-                                            respondErr (Submission.Validation ve)
+                            else
+                                case Submission.validateNewPageFields body.rawPageSlug body.rawMarkdown of
+                                    Err ve ->
+                                        respondErr (Submission.Validation ve)
 
-                                        Ok payload ->
-                                            if Dict.member payload.pageSlug wiki.pages then
-                                                respondErr Submission.SlugAlreadyInUse
+                                    Ok payload ->
+                                        if Dict.member payload.pageSlug wiki.pages then
+                                            respondErr Submission.SlugAlreadyInUse
 
-                                            else if Submission.pendingNewPageSlugInUse wikiSlug payload.pageSlug model.submissions then
-                                                respondErr Submission.SlugAlreadyInUse
+                                        else if Submission.pendingNewPageSlugInUse wikiSlug payload.pageSlug model.submissions then
+                                            respondErr Submission.SlugAlreadyInUse
 
-                                            else if WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors then
+                                        else if WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors then
                                                 let
                                                     nextWiki : Wiki
                                                     nextWiki =
@@ -876,36 +873,35 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                         (SubmitPageEditResponse wikiSlug (Err err))
                     )
             in
-            case Dict.get sessionKey model.contributorSessions of
-                Nothing ->
+            case WikiUser.sessionContributorOnWiki sessionKey wikiSlug model.contributorSessions of
+                WikiUser.SessionNotLoggedIn ->
                     respondErr Submission.EditNotLoggedIn
 
-                Just (WikiUser.Binding boundWiki accountId) ->
-                    if boundWiki /= wikiSlug then
-                        respondErr Submission.EditWrongWikiSession
+                WikiUser.SessionWrongWiki ->
+                    respondErr Submission.EditWrongWikiSession
 
-                    else
-                        case Dict.get wikiSlug model.wikis of
-                            Nothing ->
-                                respondErr Submission.EditWikiNotFound
+                WikiUser.SessionHasAccount accountId ->
+                    case Dict.get wikiSlug model.wikis of
+                        Nothing ->
+                            respondErr Submission.EditWikiNotFound
 
-                            Just wiki ->
-                                if not wiki.active then
-                                    respondErr Submission.EditWikiInactive
+                        Just wiki ->
+                            if not wiki.active then
+                                respondErr Submission.EditWikiInactive
 
-                                else
-                                    case Submission.validateEditMarkdown rawMarkdown of
-                                        Err ve ->
-                                            respondErr (Submission.EditValidation ve)
+                            else
+                                case Submission.validateEditMarkdown rawMarkdown of
+                                    Err ve ->
+                                        respondErr (Submission.EditValidation ve)
 
-                                        Ok markdown ->
-                                            if not (Submission.wikiHasPublishedPage pageSlug wiki) then
-                                                respondErr Submission.EditTargetPageNotPublished
+                                    Ok markdown ->
+                                        if not (Submission.wikiHasPublishedPage pageSlug wiki) then
+                                            respondErr Submission.EditTargetPageNotPublished
 
-                                            else if Submission.pendingEditForAuthorOnPageInUse wikiSlug accountId pageSlug model.submissions then
-                                                respondErr Submission.EditAlreadyPendingForAuthor
+                                        else if Submission.pendingEditForAuthorOnPageInUse wikiSlug accountId pageSlug model.submissions then
+                                            respondErr Submission.EditAlreadyPendingForAuthor
 
-                                            else if WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors then
+                                        else if WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors then
                                                 let
                                                     nextWiki : Wiki
                                                     nextWiki =
@@ -986,33 +982,32 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                         (SubmitPageDeleteResponse wikiSlug (Err err))
                     )
             in
-            case Dict.get sessionKey model.contributorSessions of
-                Nothing ->
+            case WikiUser.sessionContributorOnWiki sessionKey wikiSlug model.contributorSessions of
+                WikiUser.SessionNotLoggedIn ->
                     respondErr Submission.DeleteNotLoggedIn
 
-                Just (WikiUser.Binding boundWiki accountId) ->
-                    if boundWiki /= wikiSlug then
-                        respondErr Submission.DeleteWrongWikiSession
+                WikiUser.SessionWrongWiki ->
+                    respondErr Submission.DeleteWrongWikiSession
 
-                    else
-                        case Dict.get wikiSlug model.wikis of
-                            Nothing ->
-                                respondErr Submission.DeleteWikiNotFound
+                WikiUser.SessionHasAccount accountId ->
+                    case Dict.get wikiSlug model.wikis of
+                        Nothing ->
+                            respondErr Submission.DeleteWikiNotFound
 
-                            Just wiki ->
-                                if not wiki.active then
-                                    respondErr Submission.DeleteWikiInactive
+                        Just wiki ->
+                            if not wiki.active then
+                                respondErr Submission.DeleteWikiInactive
 
-                                else
-                                    case Submission.validateDeleteReason rawReason of
-                                        Err ve ->
-                                            respondErr (Submission.DeleteValidation ve)
+                            else
+                                case Submission.validateDeleteReason rawReason of
+                                    Err ve ->
+                                        respondErr (Submission.DeleteValidation ve)
 
-                                        Ok maybeReason ->
-                                            if not (Submission.wikiHasPublishedPage pageSlug wiki) then
-                                                respondErr Submission.DeleteTargetPageNotPublished
+                                    Ok maybeReason ->
+                                        if not (Submission.wikiHasPublishedPage pageSlug wiki) then
+                                            respondErr Submission.DeleteTargetPageNotPublished
 
-                                            else if WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors then
+                                        else if WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors then
                                                 let
                                                     nextWiki : Wiki
                                                     nextWiki =
@@ -1086,77 +1081,76 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                         (ResubmitPageEditResponse wikiSlug submissionId (Err err))
                     )
             in
-            case Dict.get sessionKey model.contributorSessions of
-                Nothing ->
+            case WikiUser.sessionContributorOnWiki sessionKey wikiSlug model.contributorSessions of
+                WikiUser.SessionNotLoggedIn ->
                     respondErr Submission.ResubmitEditNotLoggedIn
 
-                Just (WikiUser.Binding boundWiki accountId) ->
-                    if boundWiki /= wikiSlug then
-                        respondErr Submission.ResubmitEditWrongWikiSession
+                WikiUser.SessionWrongWiki ->
+                    respondErr Submission.ResubmitEditWrongWikiSession
 
-                    else
-                        case Dict.get wikiSlug model.wikis of
-                            Nothing ->
-                                respondErr Submission.ResubmitEditWikiNotFound
+                WikiUser.SessionHasAccount accountId ->
+                    case Dict.get wikiSlug model.wikis of
+                        Nothing ->
+                            respondErr Submission.ResubmitEditWikiNotFound
 
-                            Just wiki ->
-                                if not wiki.active then
-                                    respondErr Submission.ResubmitEditWikiInactive
+                        Just wiki ->
+                            if not wiki.active then
+                                respondErr Submission.ResubmitEditWikiInactive
 
-                                else
-                                    case Dict.get submissionId model.submissions of
-                                        Nothing ->
+                            else
+                                case Dict.get submissionId model.submissions of
+                                    Nothing ->
+                                        respondErr Submission.ResubmitEditSubmissionNotFound
+
+                                    Just sub ->
+                                        if sub.wikiSlug /= wikiSlug then
                                             respondErr Submission.ResubmitEditSubmissionNotFound
 
-                                        Just sub ->
-                                            if sub.wikiSlug /= wikiSlug then
-                                                respondErr Submission.ResubmitEditSubmissionNotFound
+                                        else if sub.authorId /= accountId then
+                                            respondErr Submission.ResubmitEditForbidden
 
-                                            else if sub.authorId /= accountId then
-                                                respondErr Submission.ResubmitEditForbidden
+                                        else
+                                            case sub.kind of
+                                                Submission.EditPage body ->
+                                                    if not (Submission.wikiHasPublishedPage body.pageSlug wiki) then
+                                                        respondErr Submission.ResubmitEditTargetPageNotPublished
 
-                                            else
-                                                case sub.kind of
-                                                    Submission.EditPage body ->
-                                                        if not (Submission.wikiHasPublishedPage body.pageSlug wiki) then
-                                                            respondErr Submission.ResubmitEditTargetPageNotPublished
+                                                    else
+                                                        let
+                                                            currentMarkdown : String
+                                                            currentMarkdown =
+                                                                SubmissionReviewDetail.publishedMarkdownForSlug wiki body.pageSlug
 
-                                                        else
-                                                            let
-                                                                currentMarkdown : String
-                                                                currentMarkdown =
-                                                                    SubmissionReviewDetail.publishedMarkdownForSlug wiki body.pageSlug
+                                                            currentRevision : Int
+                                                            currentRevision =
+                                                                Submission.currentPublishedRevision wiki body.pageSlug
+                                                                    |> Maybe.withDefault 0
+                                                        in
+                                                        case
+                                                            Submission.resubmitNeedsRevisionEdit
+                                                                { markdown = edit.rawMarkdown
+                                                                , currentMarkdown = currentMarkdown
+                                                                , currentRevision = currentRevision
+                                                                }
+                                                                sub
+                                                        of
+                                                            Err err ->
+                                                                respondErr err
 
-                                                                currentRevision : Int
-                                                                currentRevision =
-                                                                    Submission.currentPublishedRevision wiki body.pageSlug
-                                                                        |> Maybe.withDefault 0
-                                                            in
-                                                            case
-                                                                Submission.resubmitNeedsRevisionEdit
-                                                                    { markdown = edit.rawMarkdown
-                                                                    , currentMarkdown = currentMarkdown
-                                                                    , currentRevision = currentRevision
-                                                                    }
-                                                                    sub
-                                                            of
-                                                                Err err ->
-                                                                    respondErr err
+                                                            Ok nextSub ->
+                                                                ( { model
+                                                                    | submissions =
+                                                                        Dict.insert submissionId nextSub model.submissions
+                                                                  }
+                                                                , Effect.Lamdera.sendToFrontend clientId
+                                                                    (ResubmitPageEditResponse wikiSlug submissionId (Ok ()))
+                                                                )
 
-                                                                Ok nextSub ->
-                                                                    ( { model
-                                                                        | submissions =
-                                                                            Dict.insert submissionId nextSub model.submissions
-                                                                      }
-                                                                    , Effect.Lamdera.sendToFrontend clientId
-                                                                        (ResubmitPageEditResponse wikiSlug submissionId (Ok ()))
-                                                                    )
+                                                Submission.NewPage _ ->
+                                                    respondErr Submission.ResubmitEditNotEditKind
 
-                                                    Submission.NewPage _ ->
-                                                        respondErr Submission.ResubmitEditNotEditKind
-
-                                                    Submission.DeletePage _ ->
-                                                        respondErr Submission.ResubmitEditNotEditKind
+                                                Submission.DeletePage _ ->
+                                                    respondErr Submission.ResubmitEditNotEditKind
 
         ApproveSubmission wikiSlug submissionId ->
             let
@@ -1171,15 +1165,15 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                         (ApproveSubmissionResponse wikiSlug submissionId (Err err))
                     )
             in
-            case Dict.get sessionKey model.contributorSessions of
-                Nothing ->
+            case WikiUser.sessionContributorOnWiki sessionKey wikiSlug model.contributorSessions of
+                WikiUser.SessionNotLoggedIn ->
                     respondErr Submission.ApproveNotLoggedIn
 
-                Just (WikiUser.Binding boundWiki accountId) ->
-                    if boundWiki /= wikiSlug then
-                        respondErr Submission.ApproveWrongWikiSession
+                WikiUser.SessionWrongWiki ->
+                    respondErr Submission.ApproveWrongWikiSession
 
-                    else if not (WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors) then
+                WikiUser.SessionHasAccount accountId ->
+                    if not (WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors) then
                         respondErr Submission.ApproveForbidden
 
                     else
@@ -1291,15 +1285,15 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                         (RejectSubmissionResponse wikiSlug submissionId (Err err))
                     )
             in
-            case Dict.get sessionKey model.contributorSessions of
-                Nothing ->
+            case WikiUser.sessionContributorOnWiki sessionKey wikiSlug model.contributorSessions of
+                WikiUser.SessionNotLoggedIn ->
                     respondErr Submission.RejectNotLoggedIn
 
-                Just (WikiUser.Binding boundWiki accountId) ->
-                    if boundWiki /= wikiSlug then
-                        respondErr Submission.RejectWrongWikiSession
+                WikiUser.SessionWrongWiki ->
+                    respondErr Submission.RejectWrongWikiSession
 
-                    else if not (WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors) then
+                WikiUser.SessionHasAccount accountId ->
+                    if not (WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors) then
                         respondErr Submission.RejectForbidden
 
                     else
@@ -1372,15 +1366,15 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                         (RequestSubmissionChangesResponse wikiSlug submissionId (Err err))
                     )
             in
-            case Dict.get sessionKey model.contributorSessions of
-                Nothing ->
+            case WikiUser.sessionContributorOnWiki sessionKey wikiSlug model.contributorSessions of
+                WikiUser.SessionNotLoggedIn ->
                     respondErr Submission.RequestChangesNotLoggedIn
 
-                Just (WikiUser.Binding boundWiki accountId) ->
-                    if boundWiki /= wikiSlug then
-                        respondErr Submission.RequestChangesWrongWikiSession
+                WikiUser.SessionWrongWiki ->
+                    respondErr Submission.RequestChangesWrongWikiSession
 
-                    else if not (WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors) then
+                WikiUser.SessionHasAccount accountId ->
+                    if not (WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors) then
                         respondErr Submission.RequestChangesForbidden
 
                     else

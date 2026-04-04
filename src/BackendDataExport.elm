@@ -114,7 +114,7 @@ encodeModelToJsonString model =
             , ( "version", Encode.int currentVersion )
             , ( "wikis", encodeWikis model.wikis )
             , ( "contributors", encodeContributors model.contributors )
-            , ( "contributorSessions", encodeContributorSessions model.contributorSessions )
+            , ( "contributorSessions", Encode.object [] )
             , ( "submissions", encodeSubmissions model.submissions )
             , ( "wikiAuditEvents", encodeWikiAuditEvents model.wikiAuditEvents )
             ]
@@ -185,7 +185,7 @@ snapshotDecoder =
                                     Decode.map5 SnapshotFields
                                         (Decode.field "wikis" decodeWikis)
                                         (Decode.field "contributors" decodeContributors)
-                                        (Decode.field "contributorSessions" decodeContributorSessions)
+                                        decodeContributorSessionsImportIgnored
                                         (Decode.field "submissions" decodeSubmissions)
                                         (Decode.field "wikiAuditEvents" decodeWikiAuditEvents)
                             )
@@ -306,37 +306,12 @@ decodeStoredContributor =
         (Decode.field "role" WikiRole.backupTagDecoder)
 
 
-encodeContributorSessions : WikiUser.SessionTable -> Encode.Value
-encodeContributorSessions table =
-    table
-        |> Dict.toList
-        |> List.map
-            (\( sessionKey, binding ) ->
-                ( sessionKey, encodeBinding binding )
-            )
-        |> Encode.object
-
-
-encodeBinding : WikiUser.Binding -> Encode.Value
-encodeBinding binding =
-    case binding of
-        WikiUser.Binding wikiSlug accountId ->
-            Encode.object
-                [ ( "wikiSlug", Encode.string wikiSlug )
-                , ( "accountId", Encode.string (ContributorAccount.idToString accountId) )
-                ]
-
-
-decodeContributorSessions : Decoder WikiUser.SessionTable
-decodeContributorSessions =
-    Decode.dict decodeBinding
-
-
-decodeBinding : Decoder WikiUser.Binding
-decodeBinding =
-    Decode.map2 WikiUser.Binding
-        (Decode.field "wikiSlug" Decode.string)
-        (Decode.field "accountId" ContributorAccount.idDecoder)
+decodeContributorSessionsImportIgnored : Decoder WikiUser.SessionTable
+decodeContributorSessionsImportIgnored =
+    Decode.oneOf
+        [ Decode.field "contributorSessions" Decode.value |> Decode.map (\_ -> WikiUser.emptySessions)
+        , Decode.succeed WikiUser.emptySessions
+        ]
 
 
 encodeSubmissions : Dict String Submission.Submission -> Encode.Value
@@ -660,7 +635,7 @@ encodeWikiSnapshotValue declaredSlug snap =
         , ( "wikiSlug", Encode.string declaredSlug )
         , ( "wikis", encodeWikis snap.wikis )
         , ( "contributors", encodeContributors snap.contributors )
-        , ( "contributorSessions", encodeContributorSessions snap.contributorSessions )
+        , ( "contributorSessions", Encode.object [] )
         , ( "submissions", encodeSubmissions snap.submissions )
         , ( "wikiAuditEvents", encodeWikiAuditEvents snap.wikiAuditEvents )
         ]
@@ -680,16 +655,6 @@ extractWikiSnapshotFields wikiSlug model =
                         |> Dict.get wikiSlug
                         |> Maybe.withDefault Dict.empty
 
-                sessionsSlice : WikiUser.SessionTable
-                sessionsSlice =
-                    model.contributorSessions
-                        |> Dict.filter
-                            (\_ binding ->
-                                case binding of
-                                    WikiUser.Binding slug _ ->
-                                        slug == wikiSlug
-                            )
-
                 submissionsSlice : Dict String Submission.Submission
                 submissionsSlice =
                     model.submissions
@@ -704,7 +669,7 @@ extractWikiSnapshotFields wikiSlug model =
             Just
                 { wikis = Dict.singleton wikiSlug wiki
                 , contributors = Dict.singleton wikiSlug byUser
-                , contributorSessions = sessionsSlice
+                , contributorSessions = WikiUser.emptySessions
                 , submissions = submissionsSlice
                 , wikiAuditEvents = Dict.singleton wikiSlug auditRows
                 }
@@ -764,7 +729,7 @@ wikiSnapshotFieldsDecoder expectedSlug =
                                         (Decode.map5 SnapshotFields
                                             (Decode.field "wikis" decodeWikis)
                                             (Decode.field "contributors" decodeContributors)
-                                            (Decode.field "contributorSessions" decodeContributorSessions)
+                                            decodeContributorSessionsImportIgnored
                                             (Decode.field "submissions" decodeSubmissions)
                                             (Decode.field "wikiAuditEvents" decodeWikiAuditEvents)
                                         )
@@ -836,23 +801,7 @@ validateWikiSnapshotForSlug expectedSlug snap =
                                 Err "A submission in the file references the wrong wiki slug."
 
                             else
-                                let
-                                    sessionsOk : Bool
-                                    sessionsOk =
-                                        snap.contributorSessions
-                                            |> Dict.values
-                                            |> List.all
-                                                (\binding ->
-                                                    case binding of
-                                                        WikiUser.Binding slug _ ->
-                                                            slug == expectedSlug
-                                                )
-                                in
-                                if not sessionsOk then
-                                    Err "A contributor session in the file references the wrong wiki slug."
-
-                                else
-                                    Ok ()
+                                Ok ()
 
             _ ->
                 Err "Wiki export must contain exactly one wiki."
@@ -908,7 +857,7 @@ applyWikiSnapshotMerge wikiSlug snap model =
                             | wikis = Dict.insert wikiSlug wiki model.wikis
                             , contributors = Dict.insert wikiSlug contributorsForWiki model.contributors
                             , contributorSessions =
-                                Dict.union snap.contributorSessions
+                                WikiUser.unionSessionOverlayPreferred snap.contributorSessions
                                     (WikiUser.dropBindingsForWiki wikiSlug model.contributorSessions)
                             , submissions = mergedSubmissions
                             , nextSubmissionCounter = nextCounter

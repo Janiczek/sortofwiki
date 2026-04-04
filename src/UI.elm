@@ -34,6 +34,7 @@ module UI exposing
     , layoutHolyGrailClass
     , layoutLeftNavAsideClass
     , layoutMainColumnClass
+    , layoutMainColumnClassAuditFill
     , markdownBlockQuoteClass
     , markdownCodeBlockCodeClass
     , markdownCodeBlockPreClass
@@ -67,6 +68,7 @@ module UI exposing
     , tableHeaderText
     , tableTd
     , themeToggleButtonClass
+    , togglableChip
     , trStriped
     , wikiCatalogCardClass
     , wikiCatalogCardSlugEmClass
@@ -77,6 +79,8 @@ module UI exposing
     )
 
 import Html exposing (Attribute, Html)
+import Html.Attributes as Attr
+import Html.Events as Events
 import TW
 
 
@@ -149,6 +153,40 @@ dangerButton attrs children =
     Html.button (TW.cls buttonDangerClass :: attrs) children
 
 
+{-| Badge-style toggle (e.g. filter chips). Inactive = muted surface; active = green chip tokens in `head.html`.
+-}
+togglableChip : List (Attribute msg) -> { pressed : Bool, onClick : msg, label : String } -> Html msg
+togglableChip extraAttrs { pressed, onClick, label } =
+    let
+        stateClass : String
+        stateClass =
+            if pressed then
+                "bg-[var(--chip-on-bg)] text-[var(--chip-on-fg)] border-[var(--chip-on-border)] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
+
+            else
+                "bg-[var(--chip-off-bg)] text-[var(--chip-off-fg)] border-[var(--chip-off-border)] hover:bg-[var(--chrome-bg)]"
+    in
+    Html.button
+        (TW.cls
+            ("[font-family:inherit] inline-flex items-center rounded-md text-[0.8125rem] leading-snug px-[0.55rem] py-[0.28rem] border font-medium "
+                ++ "transition-[background-color,border-color,color] duration-100 cursor-pointer "
+                ++ "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-offset-2 "
+                ++ stateClass
+            )
+            :: Attr.type_ "button"
+            :: Attr.attribute "aria-pressed"
+                (if pressed then
+                    "true"
+
+                 else
+                    "false"
+                )
+            :: Events.onClick onClick
+            :: extraAttrs
+        )
+        [ Html.text label ]
+
+
 sidebarContainerClass : String
 sidebarContainerClass =
     "min-h-0 self-stretch overflow-y-auto overscroll-contain flex flex-col gap-y-[0.9rem] leading-[1.35] text-[var(--fg-muted)] bg-transparent border-0 text-[1rem] py-[0.85rem] pl-[0.85rem] pr-0 font-serif max-[56rem]:px-0"
@@ -196,6 +234,11 @@ tableFullWidthMax72Class =
     "w-full max-w-[72rem] " ++ tableBaseClass
 
 
+tableFullWidthClass : String
+tableFullWidthClass =
+    "w-full " ++ tableBaseClass
+
+
 tableHeaderCellClass : String
 tableHeaderCellClass =
     "px-[0.35rem] py-[0.15rem] border border-[var(--border)] text-left align-top bg-[var(--chrome-bg)] font-semibold border-b border-[var(--border)]"
@@ -230,6 +273,7 @@ tableStripedRowClass =
 type TableWidth
     = TableAuto
     | TableFullMax72
+    | TableFull
 
 
 {-| Chooses top- vs middle-aligned table cell classes for `table` header cells and for `tableTd`.
@@ -264,6 +308,9 @@ tableWidthClass width =
 
         TableFullMax72 ->
             tableFullWidthMax72Class
+
+        TableFull ->
+            tableFullWidthClass
 
 
 headerClassForVerticalAlign : TableCellVerticalAlign -> String
@@ -623,3 +670,14 @@ layoutMainColumnClass hasRightColumn =
 
     else
         "min-h-0 min-w-0 overflow-y-auto overscroll-contain py-[0.85rem] pl-[0.85rem] pr-0 border-r-0 max-[56rem]:px-0"
+
+
+{-| Main column when the route owns internal scrolling (audit log: filters fixed, table scrolls). Replaces outer `overflow-y-auto` with `overflow-hidden flex flex-col`.
+-}
+layoutMainColumnClassAuditFill : Bool -> String
+layoutMainColumnClassAuditFill hasRightColumn =
+    if hasRightColumn then
+        "min-h-0 min-w-0 flex flex-col overflow-hidden overscroll-contain px-[0.85rem] py-[0.85rem] border-r border-dashed border-[var(--border-dash)] max-[56rem]:border-r-0 max-[56rem]:px-0"
+
+    else
+        "min-h-0 min-w-0 flex flex-col overflow-hidden overscroll-contain py-[0.85rem] pl-[0.85rem] pr-0 border-r-0 max-[56rem]:px-0"
