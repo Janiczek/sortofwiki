@@ -2,6 +2,7 @@ module ProgramTest.Fixtures exposing
     ( demoAboutPublished
     , demoGuidesPublished
     , demoHomePublished
+    , demoKitchenSinkMarkdownPublished
     , demoMarkdownPlaygroundPublished
     )
 
@@ -75,4 +76,88 @@ viewGreeting name =
 ## Escaping and entities
 
 Use \\*asterisks\\* literally and show an ampersand entity: &amp;.
+"""
+
+
+{-| Published page for program-test Story 55: `$$` → `inline-equation`, `$$$` → `block-equation`, plus every Markdown shape the parser + `PageMarkdown` renderer support.
+-}
+demoKitchenSinkMarkdownPublished : String
+demoKitchenSinkMarkdownPublished =
+    """# Kitchen sink
+
+Seeded Markdown: headings, inline styles, links, lists, block quote, fenced code, rule, table, tasks, wiki links, autolink, math delimiters, escapes.
+
+## Math (custom elements)
+
+Inline equation $$progtestStory55Inline$$ in a sentence.
+
+$$$progtestStory55Block$$$
+
+## Headings
+
+### Third level
+
+#### Fourth level
+
+##### Fifth level
+
+###### Sixth level
+
+## Inline formatting
+
+**Bold**, *italic*, `inline code`, and ~~strikethrough~~.
+
+## Links
+
+- [External link](https://example.com/kitchen-sink)
+- Wiki by slug: [[Guides]]
+- Wiki with label: [[About|About this wiki]]
+- Autolink: <https://example.net>
+- Missing page (red in UI): [[Story55MissingPage]]
+
+## Task list
+
+- [ ] Open task
+- [x] Done task
+
+## Lists
+
+- Bullet one
+- Bullet two
+  - Nested bullet
+
+1. Ordered one
+2. Ordered two
+   - Nested under ordered
+
+## Table
+
+| Header A | Header B |
+|----------|----------|
+| Cell **1** | Cell *2* |
+
+## Blockquote
+
+> Quoted line one.
+>
+> Quoted line two.
+
+## Fenced code
+
+```elm
+type Msg = Tick
+```
+
+## Thematic break
+
+---
+
+## Hard line break
+
+Line one  
+Line two
+
+## Escaping and entities
+
+Use \\*asterisks\\* literally and an entity: &amp;.
 """

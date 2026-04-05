@@ -64,6 +64,7 @@ module UI exposing
     , sidebarHeading
     , sidebarLink
     , sidebarNavSectionBodyClass
+    , sidebarTocEntryLink
     , table
     , tableCellClass
     , tableHeaderText
@@ -193,9 +194,18 @@ sidebarContainerClass =
     "min-h-0 self-stretch overflow-y-auto overscroll-contain flex flex-col gap-y-[0.9rem] leading-[1.35] text-[var(--fg-muted)] bg-transparent border-0 text-[1rem] py-[0.85rem] pl-[0.85rem] pr-0 font-serif"
 
 
+{-| Matches letter-spacing on sidebar section titles (`sidebarHeading`); reuse for ToC lines and markdown headings.
+-}
+sidebarSubheadingTrackingClass : String
+sidebarSubheadingTrackingClass =
+    "tracking-[0.04em]"
+
+
 sidebarHeadingClass : String
 sidebarHeadingClass =
-    "m-0 mb-[0.35rem] text-[0.82rem] font-semibold tracking-[0.04em] text-[var(--fg-muted)]"
+    "m-0 mb-[0.35rem] text-[0.82rem] font-semibold "
+        ++ sidebarSubheadingTrackingClass
+        ++ " text-[var(--fg-muted)]"
 
 
 sidebarHeading : String -> Html msg
@@ -218,6 +228,13 @@ sidebarLinkClass =
 sidebarLink : List (Attribute msg) -> List (Html msg) -> Html msg
 sidebarLink attrs children =
     Html.a (TW.cls sidebarLinkClass :: attrs) children
+
+
+{-| Right-rail list links under section headings (ToC, backlinks): same as `sidebarLink`. Section titles use `sidebarHeading` for letter-spacing, not these links.
+-}
+sidebarTocEntryLink : List (Attribute msg) -> List (Html msg) -> Html msg
+sidebarTocEntryLink =
+    sidebarLink
 
 
 tableBaseClass : String
@@ -550,32 +567,44 @@ markdownContainerClass =
 
 markdownHeading1Class : String
 markdownHeading1Class =
-    "mt-[1rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[1.3rem]"
+    "mt-[1rem] mb-[0.25rem] font-semibold "
+        ++ sidebarSubheadingTrackingClass
+        ++ " text-[var(--fg)] text-[1.3rem]"
 
 
 markdownHeading2Class : String
 markdownHeading2Class =
-    "mt-[1rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[1.12rem]"
+    "mt-[1rem] mb-[0.25rem] font-semibold "
+        ++ sidebarSubheadingTrackingClass
+        ++ " text-[var(--fg)] text-[1.12rem]"
 
 
 markdownHeading3Class : String
 markdownHeading3Class =
-    "mt-[1rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[1.02rem]"
+    "mt-[1rem] mb-[0.25rem] font-semibold "
+        ++ sidebarSubheadingTrackingClass
+        ++ " text-[var(--fg)] text-[1.02rem]"
 
 
 markdownHeading4Class : String
 markdownHeading4Class =
-    "mt-[1rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[0.98rem]"
+    "mt-[1rem] mb-[0.25rem] font-semibold "
+        ++ sidebarSubheadingTrackingClass
+        ++ " text-[var(--fg)] text-[0.98rem]"
 
 
 markdownHeading5Class : String
 markdownHeading5Class =
-    "mt-[1rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[0.98rem]"
+    "mt-[1rem] mb-[0.25rem] font-semibold "
+        ++ sidebarSubheadingTrackingClass
+        ++ " text-[var(--fg)] text-[0.98rem]"
 
 
 markdownHeading6Class : String
 markdownHeading6Class =
-    "mt-[1rem] mb-[0.25rem] font-semibold text-[var(--fg)] text-[0.98rem]"
+    "mt-[1rem] mb-[0.25rem] font-semibold "
+        ++ sidebarSubheadingTrackingClass
+        ++ " text-[var(--fg)] text-[0.98rem]"
 
 
 markdownParagraphClass : String

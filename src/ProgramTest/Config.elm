@@ -176,6 +176,7 @@ demoWikiPagesSeedSteps =
     , initStep "pt-init-demo_trusted_publisher-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "Guides", rawMarkdown = Fixtures.demoGuidesPublished })
     , initStep "pt-init-demo_trusted_publisher-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "About", rawMarkdown = Fixtures.demoAboutPublished })
     , initStep "pt-init-demo_trusted_publisher-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "MarkdownPlayground", rawMarkdown = Fixtures.demoMarkdownPlaygroundPublished })
+    , initStep "pt-init-demo_trusted_publisher-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "KitchenSink", rawMarkdown = Fixtures.demoKitchenSinkMarkdownPublished })
     , initStep "pt-init-elmtips-admin" "pt-c6" (LoginContributor "ElmTips" { username = "elmtipsadmin", password = "password12" })
     , initStep "pt-init-elmtips-admin" "pt-c6" (SubmitNewPage "ElmTips" { rawPageSlug = "Home", rawMarkdown = "Tips and notes about Elm." })
     ]

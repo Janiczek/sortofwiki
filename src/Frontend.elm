@@ -9931,7 +9931,7 @@ viewBacklinks wikiSlug backlinks =
                         |> List.map
                             (\slug ->
                                 Html.li [ TW.cls "m-0 leading-[1.3]" ]
-                                    [ UI.sidebarLink
+                                    [ UI.sidebarTocEntryLink
                                         [ Attr.href (Wiki.publishedPageUrlPath wikiSlug slug)
                                         , Attr.attribute "data-backlink-page-slug" slug
                                         ]

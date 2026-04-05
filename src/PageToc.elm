@@ -74,7 +74,7 @@ view tocEntries =
                             (\e ->
                                 Html.li
                                     [ TW.cls ("m-0 " ++ entryIndentClass minHeadingInt e.level) ]
-                                    [ UI.sidebarLink
+                                    [ UI.sidebarTocEntryLink
                                         [ Attr.href ("#" ++ e.slug) ]
                                         [ Html.text e.label ]
                                     ]
