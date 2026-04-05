@@ -9,12 +9,12 @@ module Wiki exposing
     , catalogEntry
     , catalogUrlPath
     , frontendDetails
+    , hostAdminAuditUrlPath
+    , hostAdminBackupUrlPath
     , hostAdminLoginUrlPathWithRedirect
     , hostAdminNewWikiUrlPath
     , hostAdminWikiDetailUrlPath
     , hostAdminWikisUrlPath
-    , hostAdminBackupUrlPath
-    , hostAdminAuditUrlPath
     , loginUrlPath
     , loginUrlPathWithRedirect
     , mySubmissionsUrlPath

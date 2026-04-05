@@ -17,15 +17,15 @@ module Types exposing
     , RejectSubmissionPayload
     , RequestSubmissionChangesPayload
     , ReviewApproveDraft
-    , SubmissionDetailEditDraft
-    , emptySubmissionDetailEditDraft
     , ReviewDecision(..)
     , ReviewRejectDraft
     , ReviewRequestChangesDraft
+    , SubmissionDetailEditDraft
     , SubmitNewPagePayload
     , ToBackend(..)
     , ToFrontend(..)
     , UpdateHostedWikiMetadataPayload
+    , emptySubmissionDetailEditDraft
     )
 
 import ColorTheme exposing (ColorTheme, ColorThemePreference)

@@ -2,8 +2,8 @@ module ProgramTest.Story08_Login exposing (endToEndTests)
 
 import Dict
 import Effect.Browser.Dom
-import ProgramTest.Config
 import ProgramTest.Actions
+import ProgramTest.Config
 import ProgramTest.Model
 import ProgramTest.Query
 import ProgramTest.Start

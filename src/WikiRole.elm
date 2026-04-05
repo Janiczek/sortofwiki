@@ -16,8 +16,6 @@ import Json.Decode as Decode
 
 {-| Per-wiki contributor capability tier (stories 14, 20).
 -}
-
-
 type WikiRole
     = UntrustedContributor
     | TrustedContributor

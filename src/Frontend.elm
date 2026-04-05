@@ -6021,7 +6021,15 @@ viewWikiHome wikiSlug summary details =
           else
             Html.p [] [ Html.text summary.summary ]
         , Html.h2 [] [ Html.text "Pages" ]
-        , viewWikiPublishedSlugList "wiki-home-page-slugs" wikiSlug details.pageSlugs
+        , if List.isEmpty details.pageSlugs then
+            Html.p
+                [ Attr.id "wiki-home-no-pages"
+                , Attr.attribute "data-context" "wiki-home-no-pages"
+                ]
+                [ Html.text "No pages yet" ]
+
+          else
+            viewWikiPublishedSlugList "wiki-home-page-slugs" wikiSlug details.pageSlugs
         ]
 
 
@@ -6520,6 +6528,21 @@ viewHostAdminWikis model =
                     [ Html.p [] [ Html.text "Redirecting to host admin sign-in…" ] ]
 
             RemoteData.Success (Ok summaries) ->
+                let
+                    rows : List (Html Msg)
+                    rows =
+                        if List.isEmpty summaries then
+                            [ UI.trStriped
+                                [ Attr.attribute "data-context" "host-admin-wikis-empty" ]
+                                [ UI.tableTd UI.TableAlignMiddle
+                                    [ Attr.colspan 4 ]
+                                    [ Html.text "No wikis present" ]
+                                ]
+                            ]
+
+                        else
+                            List.map (viewHostAdminWikiRow model) summaries
+                in
                 UI.table UI.TableAuto
                     []
                     { theadAttrs = []
@@ -6532,7 +6555,7 @@ viewHostAdminWikis model =
                         , UI.tableHeaderText "Backup"
                         ]
                     , tbodyAttrs = [ Attr.id "host-admin-wikis-list" ]
-                    , rows = List.map (viewHostAdminWikiRow model) summaries
+                    , rows = rows
                     }
         ]
 

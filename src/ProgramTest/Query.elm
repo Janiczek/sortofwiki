@@ -48,9 +48,9 @@ module ProgramTest.Query exposing
 
 import Expect exposing (Expectation)
 import Html.Attributes
+import Submission
 import Test.Html.Query
 import Test.Html.Selector
-import Submission
 import Wiki
 
 

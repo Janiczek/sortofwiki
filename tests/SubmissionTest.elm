@@ -13,7 +13,9 @@ import Wiki
 
 pageSlugHtmlPatternRegex : Regex.Regex
 pageSlugHtmlPatternRegex =
-    "^(" ++ Submission.pageSlugHtmlPattern ++ ")$"
+    "^("
+        ++ Submission.pageSlugHtmlPattern
+        ++ ")$"
         |> Regex.fromString
         |> Maybe.withDefault Regex.never
 

@@ -4,8 +4,8 @@ import Effect.Browser.Dom
 import Env
 import HostAdmin
 import Json.Encode
-import ProgramTest.Config
 import ProgramTest.Actions
+import ProgramTest.Config
 import ProgramTest.Query
 import ProgramTest.Start
 import Submission
@@ -34,7 +34,7 @@ invalidWikiSlugUserMessage =
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
     [ ProgramTest.Start.start
-        { name = "29 — host admin create hosted wiki /admin/wikis/new"
+        { name = "Create a wiki"
         , config = ProgramTest.Config.emptyConfig
         , sessionId = "session-story29-create-wiki"
         , path = "/admin"
@@ -46,7 +46,7 @@ endToEndTests =
                       , client.click 100 (Effect.Browser.Dom.id "host-admin-login-submit")
                       , client.checkView 300
                             (ProgramTest.Query.withinId "host-admin-wikis-list"
-                                ProgramTest.Query.expectEmpty
+                                (ProgramTest.Query.expectHasText "No wikis present")
                             )
                       , client.clickLink 100 Wiki.hostAdminNewWikiUrlPath
                       , client.checkView 200
@@ -76,12 +76,17 @@ endToEndTests =
                         }
                         client
                     , [ client.checkView 400
-                            (ProgramTest.Query.expectPageShowsWikiSlug "wiki-home-page" "Story29Wiki")
+                            (ProgramTest.Query.expectAll
+                                [ ProgramTest.Query.expectPageShowsWikiSlug "wiki-home-page" "Story29Wiki"
+                                , ProgramTest.Query.withinId "wiki-home-page"
+                                    (ProgramTest.Query.expectHasText "No pages yet")
+                                ]
+                            )
                       ]
                     ]
         }
     , ProgramTest.Start.start
-        { name = "29 — create hosted wiki rejects non-PascalCase slug"
+        { name = "Create a wiki - reject non-PascalCase slug"
         , config = ProgramTest.Config.emptyConfig
         , sessionId = "session-story29-create-wiki-invalid-slug"
         , path = "/admin"
@@ -92,7 +97,7 @@ endToEndTests =
                 , client.click 100 (Effect.Browser.Dom.id "host-admin-login-submit")
                 , client.checkView 300
                     (ProgramTest.Query.withinId "host-admin-wikis-list"
-                        ProgramTest.Query.expectEmpty
+                        (ProgramTest.Query.expectHasText "No wikis present")
                     )
                 , client.clickLink 100 Wiki.hostAdminNewWikiUrlPath
                 , client.checkView 200

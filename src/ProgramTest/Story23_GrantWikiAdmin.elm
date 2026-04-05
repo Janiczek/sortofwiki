@@ -1,8 +1,8 @@
 module ProgramTest.Story23_GrantWikiAdmin exposing (endToEndTests)
 
 import Effect.Browser.Dom
-import ProgramTest.Config
 import ProgramTest.Actions
+import ProgramTest.Config
 import ProgramTest.Query
 import ProgramTest.Start
 import Wiki
@@ -40,8 +40,10 @@ endToEndTests =
                               , client.click 100
                                     (Effect.Browser.Dom.id "wiki-admin-grant-admin-grantadmin_trusted")
                               , client.checkView 600
-                                    (ProgramTest.Query.withinDataAttribute "data-admin-user" "grantadmin_trusted"
-                                        (ProgramTest.Query.withinDataAttribute "data-user-role" "Admin"
+                                    (ProgramTest.Query.withinDataAttribute "data-admin-user"
+                                        "grantadmin_trusted"
+                                        (ProgramTest.Query.withinDataAttribute "data-user-role"
+                                            "Admin"
                                             (ProgramTest.Query.expectHasText "Admin")
                                         )
                                     )

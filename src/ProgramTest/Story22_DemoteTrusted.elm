@@ -1,8 +1,8 @@
 module ProgramTest.Story22_DemoteTrusted exposing (endToEndTests)
 
 import Effect.Browser.Dom
-import ProgramTest.Config
 import ProgramTest.Actions
+import ProgramTest.Config
 import ProgramTest.Query
 import ProgramTest.Start
 import Submission
@@ -54,8 +54,10 @@ endToEndTests =
                               , client.click 100
                                     (Effect.Browser.Dom.id "wiki-admin-demote-trusted-trustedpub")
                               , client.checkView 600
-                                    (ProgramTest.Query.withinDataAttribute "data-admin-user" "trustedpub"
-                                        (ProgramTest.Query.withinDataAttribute "data-user-role" "Contributor"
+                                    (ProgramTest.Query.withinDataAttribute "data-admin-user"
+                                        "trustedpub"
+                                        (ProgramTest.Query.withinDataAttribute "data-user-role"
+                                            "Contributor"
                                             (ProgramTest.Query.expectHasText "Contributor")
                                         )
                                     )

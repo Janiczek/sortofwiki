@@ -1,7 +1,7 @@
 module ProgramTest.Story13_ReviewerNotes exposing (endToEndTests)
 
-import ProgramTest.Config
 import ProgramTest.Actions
+import ProgramTest.Config
 import ProgramTest.Query
 import ProgramTest.Start
 import Wiki

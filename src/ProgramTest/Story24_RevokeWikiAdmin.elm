@@ -4,8 +4,8 @@ import Backend
 import Dict
 import Effect.Browser.Dom
 import Effect.Test
-import ProgramTest.Config
 import ProgramTest.Actions
+import ProgramTest.Config
 import ProgramTest.Query
 import ProgramTest.Start
 import Wiki
@@ -58,22 +58,27 @@ endToEndTests =
                                     (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
                               , client.clickLink 100 (Wiki.adminUsersUrlPath "Demo")
                               , client.checkView 400
-                                    (ProgramTest.Query.withinDataAttribute "data-admin-user" "wikidemo"
+                                    (ProgramTest.Query.withinDataAttribute "data-admin-user"
+                                        "wikidemo"
                                         (ProgramTest.Query.expectDoesNotHaveDataContext "wiki-admin-revoke-admin")
                                     )
                               , client.click 100
                                     (Effect.Browser.Dom.id "wiki-admin-grant-admin-grantadmin_trusted")
                               , client.checkView 600
-                                    (ProgramTest.Query.withinDataAttribute "data-admin-user" "grantadmin_trusted"
-                                        (ProgramTest.Query.withinDataAttribute "data-user-role" "Admin"
+                                    (ProgramTest.Query.withinDataAttribute "data-admin-user"
+                                        "grantadmin_trusted"
+                                        (ProgramTest.Query.withinDataAttribute "data-user-role"
+                                            "Admin"
                                             (ProgramTest.Query.expectHasText "Admin")
                                         )
                                     )
                               , client.click 100
                                     (Effect.Browser.Dom.id "wiki-admin-revoke-admin-grantadmin_trusted")
                               , client.checkView 600
-                                    (ProgramTest.Query.withinDataAttribute "data-admin-user" "grantadmin_trusted"
-                                        (ProgramTest.Query.withinDataAttribute "data-user-role" "Trusted"
+                                    (ProgramTest.Query.withinDataAttribute "data-admin-user"
+                                        "grantadmin_trusted"
+                                        (ProgramTest.Query.withinDataAttribute "data-user-role"
+                                            "Trusted"
                                             (ProgramTest.Query.expectHasText "Trusted")
                                         )
                                     )

@@ -1,8 +1,8 @@
 module ProgramTest.Story12_SubmissionStatus exposing (endToEndTests)
 
 import Effect.Browser.Dom
-import ProgramTest.Config
 import ProgramTest.Actions
+import ProgramTest.Config
 import ProgramTest.Query
 import ProgramTest.Start
 import Types exposing (FrontendMsg(..))
@@ -58,11 +58,11 @@ endToEndTests =
                     )
                 , client.checkView 100
                     (ProgramTest.Query.withinId "original-markdown-readonly-textarea"
-                        (ProgramTest.Query.expectHasReadonly)
+                        ProgramTest.Query.expectHasReadonly
                     )
                 , client.checkView 100
                     (ProgramTest.Query.withinId "new-markdown-readonly-textarea"
-                        (ProgramTest.Query.expectHasReadonly)
+                        ProgramTest.Query.expectHasReadonly
                     )
                 , client.checkView 100
                     (ProgramTest.Query.withinId "wiki-submission-detail-withdraw"

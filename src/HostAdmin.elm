@@ -3,20 +3,18 @@ module HostAdmin exposing
     , DataExportError(..)
     , DataImportError(..)
     , DeleteHostedWikiError(..)
-    , WikiDataExportError(..)
-    , WikiDataImportError(..)
     , HostWikiDetailError(..)
     , LoginError(..)
     , ProtectedError(..)
     , UpdateHostedWikiMetadataError(..)
+    , WikiDataExportError(..)
+    , WikiDataImportError(..)
     , WikiLifecycleError(..)
     , WikiNameError(..)
     , WikiSummaryError(..)
     , createHostedWikiErrorToUserText
     , dataExportErrorToUserText
     , dataImportErrorToUserText
-    , wikiDataExportErrorToUserText
-    , wikiDataImportErrorToUserText
     , deleteHostedWikiConfirmationMatches
     , deleteHostedWikiErrorToUserText
     , hostWikiDetailErrorToUserText
@@ -26,6 +24,8 @@ module HostAdmin exposing
     , validateHostedWikiMetadataSlug
     , validateHostedWikiName
     , validateHostedWikiSummary
+    , wikiDataExportErrorToUserText
+    , wikiDataImportErrorToUserText
     , wikiLifecycleErrorToUserText
     , wikiNameMaxLength
     , wikiSummaryMaxLength

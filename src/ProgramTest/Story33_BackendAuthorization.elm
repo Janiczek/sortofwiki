@@ -4,8 +4,8 @@ import Backend
 import Dict
 import Effect.Test
 import HostAdmin
-import ProgramTest.Config
 import ProgramTest.Actions
+import ProgramTest.Config
 import ProgramTest.Query
 import ProgramTest.Start
 import RemoteData

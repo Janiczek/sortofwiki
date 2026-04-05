@@ -1,8 +1,8 @@
 module ProgramTest.Story11_PageDeleteSubmission exposing (endToEndTests)
 
 import Effect.Browser.Dom
-import ProgramTest.Config
 import ProgramTest.Actions
+import ProgramTest.Config
 import ProgramTest.Query
 import ProgramTest.Start
 import Wiki

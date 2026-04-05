@@ -1,7 +1,7 @@
 module ProgramTest.Story15_ReviewQueue exposing (endToEndTests)
 
-import ProgramTest.Config
 import ProgramTest.Actions
+import ProgramTest.Config
 import ProgramTest.Query
 import ProgramTest.Start
 import Wiki
@@ -29,7 +29,8 @@ endToEndTests =
                       , client.clickLink 100 (Wiki.reviewQueueUrlPath "Demo")
                       , client.checkView 400
                             (ProgramTest.Query.withinId "wiki-review-queue-page"
-                                (ProgramTest.Query.withinDataAttribute "data-submission-id" "sub_1"
+                                (ProgramTest.Query.withinDataAttribute "data-submission-id"
+                                    "sub_1"
                                     (ProgramTest.Query.expectHasText "statusdemo")
                                 )
                             )

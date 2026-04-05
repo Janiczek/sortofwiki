@@ -1,8 +1,8 @@
 module ProgramTest.Story21_PromoteTrusted exposing (endToEndTests)
 
 import Effect.Browser.Dom
-import ProgramTest.Config
 import ProgramTest.Actions
+import ProgramTest.Config
 import ProgramTest.Query
 import ProgramTest.Start
 import Wiki
@@ -40,8 +40,10 @@ endToEndTests =
                               , client.click 100
                                     (Effect.Browser.Dom.id "wiki-admin-promote-trusted-statusdemo")
                               , client.checkView 600
-                                    (ProgramTest.Query.withinDataAttribute "data-admin-user" "statusdemo"
-                                        (ProgramTest.Query.withinDataAttribute "data-user-role" "Trusted"
+                                    (ProgramTest.Query.withinDataAttribute "data-admin-user"
+                                        "statusdemo"
+                                        (ProgramTest.Query.withinDataAttribute "data-user-role"
+                                            "Trusted"
                                             (ProgramTest.Query.expectHasText "Trusted")
                                         )
                                     )
@@ -66,7 +68,8 @@ endToEndTests =
                               , client.clickLink 100 (Wiki.reviewQueueUrlPath "Demo")
                               , client.checkView 500
                                     (ProgramTest.Query.withinId "wiki-review-queue-page"
-                                        (ProgramTest.Query.withinDataAttribute "data-submission-id" "sub_1"
+                                        (ProgramTest.Query.withinDataAttribute "data-submission-id"
+                                            "sub_1"
                                             (ProgramTest.Query.expectHasText "statusdemo")
                                         )
                                     )

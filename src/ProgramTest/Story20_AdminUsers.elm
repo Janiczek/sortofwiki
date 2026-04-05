@@ -1,7 +1,7 @@
 module ProgramTest.Story20_AdminUsers exposing (endToEndTests)
 
-import ProgramTest.Config
 import ProgramTest.Actions
+import ProgramTest.Config
 import ProgramTest.Query
 import ProgramTest.Start
 import Wiki
@@ -31,11 +31,14 @@ endToEndTests =
                             (ProgramTest.Query.expectPageShowsWikiSlug "wiki-admin-users-page" "Demo")
                       , client.checkView 100
                             (ProgramTest.Query.expectAll
-                                [ ProgramTest.Query.withinDataAttribute "data-admin-user" "statusdemo"
+                                [ ProgramTest.Query.withinDataAttribute "data-admin-user"
+                                    "statusdemo"
                                     (ProgramTest.Query.expectHasText "statusdemo")
-                                , ProgramTest.Query.withinDataAttribute "data-admin-user" "trustedpub"
+                                , ProgramTest.Query.withinDataAttribute "data-admin-user"
+                                    "trustedpub"
                                     (ProgramTest.Query.expectHasText "trustedpub")
-                                , ProgramTest.Query.withinDataAttribute "data-admin-user" "wikidemo"
+                                , ProgramTest.Query.withinDataAttribute "data-admin-user"
+                                    "wikidemo"
                                     (ProgramTest.Query.expectHasText "wikidemo")
                                 ]
                             )

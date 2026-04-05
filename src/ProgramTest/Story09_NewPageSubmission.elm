@@ -125,7 +125,8 @@ endToEndTests =
                 , client.clickLink 100 (Wiki.mySubmissionsUrlPath "Demo")
                 , client.checkView 400
                     (ProgramTest.Query.withinId "wiki-my-submissions-page"
-                        (ProgramTest.Query.withinDataAttribute "data-my-submissions-item" "sub_1"
+                        (ProgramTest.Query.withinDataAttribute "data-my-submissions-item"
+                            "sub_1"
                             (ProgramTest.Query.expectAll
                                 [ ProgramTest.Query.expectHasText "sub_1"
                                 , ProgramTest.Query.expectHasText "Pending review"
@@ -164,7 +165,8 @@ endToEndTests =
                     (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
                 , client.clickLink 100 (Wiki.mySubmissionsUrlPath "Demo")
                 , client.checkView 400
-                    (ProgramTest.Query.withinDataAttribute "data-my-submissions-item" "sub_1"
+                    (ProgramTest.Query.withinDataAttribute "data-my-submissions-item"
+                        "sub_1"
                         (ProgramTest.Query.expectHasText "Draft")
                     )
                 ]

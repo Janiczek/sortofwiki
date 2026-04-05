@@ -3,8 +3,8 @@ module ProgramTest.Story47_FrontendRouteGuards exposing (endToEndTests)
 import Dict
 import Effect.Browser.Dom
 import Env
-import ProgramTest.Config
 import ProgramTest.Actions
+import ProgramTest.Config
 import ProgramTest.Model
 import ProgramTest.Query
 import ProgramTest.Start

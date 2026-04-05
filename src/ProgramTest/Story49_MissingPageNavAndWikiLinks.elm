@@ -42,7 +42,8 @@ endToEndTests =
         , clientSteps =
             \client ->
                 [ client.checkView 100
-                    (ProgramTest.Query.withinTagAndHref "a" "/w/Demo/p/Story49MissingPage"
+                    (ProgramTest.Query.withinTagAndHref "a"
+                        "/w/Demo/p/Story49MissingPage"
                         (ProgramTest.Query.expectHasClass "text-red-600")
                     )
                 ]

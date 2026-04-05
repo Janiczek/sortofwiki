@@ -1,8 +1,8 @@
 module ProgramTest.Story50_MySubmissionsList exposing (endToEndTests)
 
 import Effect.Browser.Dom
-import ProgramTest.Config
 import ProgramTest.Actions
+import ProgramTest.Config
 import ProgramTest.Query
 import ProgramTest.Start
 import Wiki
@@ -37,17 +37,19 @@ endToEndTests =
                       , client.checkView 100
                             (ProgramTest.Query.expectAll
                                 [ ProgramTest.Query.withinId "wiki-my-submissions-page"
-                                    (ProgramTest.Query.withinDataAttribute "data-my-submissions-item" "sub_2"
+                                    (ProgramTest.Query.withinDataAttribute "data-my-submissions-item"
+                                        "sub_2"
                                         (ProgramTest.Query.expectHasText "sub_2")
                                     )
                                 , ProgramTest.Query.withinId "wiki-my-submissions-page"
-                                    (ProgramTest.Query.withinDataAttribute "data-my-submissions-item" "sub_1"
+                                    (ProgramTest.Query.withinDataAttribute "data-my-submissions-item"
+                                        "sub_1"
                                         (ProgramTest.Query.expectHasText "sub_1")
                                     )
                                 ]
                             )
                       ]
-                ]
+                    ]
         }
     , ProgramTest.Start.start
         { name = "50 — new contributor sees empty my submissions list"

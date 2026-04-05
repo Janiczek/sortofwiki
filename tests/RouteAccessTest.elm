@@ -1,8 +1,8 @@
 module RouteAccessTest exposing (suite)
 
-import Expect
 import ContributorWikiSession exposing (ContributorWikiSession)
 import Dict
+import Expect
 import Route
 import RouteAccess
 import Test exposing (Test)

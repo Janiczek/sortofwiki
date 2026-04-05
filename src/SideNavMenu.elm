@@ -54,13 +54,13 @@ globalChromeSections input =
                     ]
           in
           if List.isEmpty sortOfWikiLinks then
-                []
+            []
 
           else
-                [ { sectionTitle = "SortOfWiki"
-                  , links = sortOfWikiLinks
-                  }
-                ]
+            [ { sectionTitle = "SortOfWiki"
+              , links = sortOfWikiLinks
+              }
+            ]
         , if input.hostAdminAuthenticated && input.showHostAdminTools then
             [ { sectionTitle = "Host admin"
               , links =

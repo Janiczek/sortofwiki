@@ -42,7 +42,7 @@ endToEndTests =
                        , client.click 100 (Effect.Browser.Dom.id "host-admin-login-submit")
                        , client.checkView 300
                             (ProgramTest.Query.withinId "host-admin-wikis-list"
-                                ProgramTest.Query.expectEmpty
+                                (ProgramTest.Query.expectHasText "No wikis present")
                             )
                        , client.checkView 400
                             (ProgramTest.Query.expectHasNotId "host-admin-login-form")
