@@ -11,7 +11,7 @@ import Wiki
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
     [ ProgramTest.Start.start
-        { name = "50 — contributor sees My submissions link and pending rows (statusdemo)"
+        { name = "50 — contributor sees My submissions link and pending rows (demo_contributor)"
         , config = ProgramTest.Config.demoWikiWithModerationSeeds
         , sessionId = "session-story50-my-submissions"
         , path = "/"
@@ -21,7 +21,7 @@ endToEndTests =
                 List.concat
                     [ ProgramTest.Actions.loginToWiki
                         { wikiSlug = "Demo"
-                        , username = "statusdemo"
+                        , username = "demo_contributor"
                         , password = "password12"
                         }
                         client
@@ -59,16 +59,19 @@ endToEndTests =
         , connectClientMs = Nothing
         , clientSteps =
             \client ->
-                [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story50emptyuser"
-                , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
-                , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
-                , client.checkView 400
-                    (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
-                , client.clickLink 100 (Wiki.mySubmissionsUrlPath "Demo")
-                , client.checkView 400
-                    (ProgramTest.Query.withinId "wiki-my-submissions-empty"
-                        (ProgramTest.Query.expectHasText "No submissions to show here yet.")
-                    )
-                ]
+                List.concat
+                    [ [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story50emptyuser"
+                      , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
+                      ]
+                    , ProgramTest.Actions.triggerFormSubmit "wiki-register-form" client
+                    , [ client.checkView 400
+                            (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
+                      , client.clickLink 100 (Wiki.mySubmissionsUrlPath "Demo")
+                      , client.checkView 400
+                            (ProgramTest.Query.withinId "wiki-my-submissions-empty"
+                                (ProgramTest.Query.expectHasText "No submissions to show here yet.")
+                            )
+                      ]
+                    ]
         }
     ]

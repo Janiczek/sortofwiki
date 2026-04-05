@@ -63,12 +63,13 @@ endToEndTests =
                         List.concat
                             [ [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story48a"
                               , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
-                              , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
                               ]
+                            , ProgramTest.Actions.triggerFormSubmit "wiki-register-form" client
                             , navigateToSubmitEditGuides client
                             , [ client.input 100 (Effect.Browser.Dom.id "wiki-submit-edit-markdown") editA
-                              , client.click 100 (Effect.Browser.Dom.id "wiki-submit-edit-submit")
-                              , client.checkView 300
+                              ]
+                            , ProgramTest.Actions.triggerFormSubmit "wiki-submit-edit-form" client
+                            , [ client.checkView 300
                                     (ProgramTest.Query.withinId "wiki-submit-edit-success"
                                         (ProgramTest.Query.expectHasSubmissionId "sub_1")
                                     )
@@ -84,20 +85,22 @@ endToEndTests =
                         List.concat
                             [ [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story48b"
                               , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
-                              , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
                               ]
+                            , ProgramTest.Actions.triggerFormSubmit "wiki-register-form" client
                             , navigateToSubmitEditGuides client
                             , [ client.input 100 (Effect.Browser.Dom.id "wiki-submit-edit-markdown") editB
-                              , client.click 100 (Effect.Browser.Dom.id "wiki-submit-edit-submit")
-                              , client.checkView 300
+                              ]
+                            , ProgramTest.Actions.triggerFormSubmit "wiki-submit-edit-form" client
+                            , [ client.checkView 300
                                     (ProgramTest.Query.withinId "wiki-submit-edit-success"
                                         (ProgramTest.Query.expectHasSubmissionId "sub_2")
                                     )
                               ]
                             , navigateToSubmitEditGuides client
                             , [ client.input 100 (Effect.Browser.Dom.id "wiki-submit-edit-markdown") "# duplicate pending attempt"
-                              , client.click 100 (Effect.Browser.Dom.id "wiki-submit-edit-submit")
-                              , client.checkView 300
+                              ]
+                            , ProgramTest.Actions.triggerFormSubmit "wiki-submit-edit-form" client
+                            , [ client.checkView 300
                                     (ProgramTest.Query.withinId "wiki-submit-edit-error-text"
                                         (ProgramTest.Query.expectHasText "already have a pending edit for this page")
                                     )
@@ -113,7 +116,7 @@ endToEndTests =
                         List.concat
                             [ ProgramTest.Actions.loginToWiki
                                 { wikiSlug = "Demo"
-                                , username = "trustedpub"
+                                , username = "demo_trusted_publisher"
                                 , password = "password12"
                                 }
                                 client
@@ -189,7 +192,7 @@ endToEndTests =
                         List.concat
                             [ ProgramTest.Actions.loginToWiki
                                 { wikiSlug = "Demo"
-                                , username = "trustedpub"
+                                , username = "demo_trusted_publisher"
                                 , password = "password12"
                                 }
                                 client

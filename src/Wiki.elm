@@ -55,7 +55,7 @@ type alias Wiki =
     }
 
 
-{-| Public catalog / host-admin row derived from a wiki (story 30: includes blurb and slug policy).
+{-| Public catalog / host-admin row derived from a wiki (includes blurb and slug policy).
 -}
 type alias CatalogEntry =
     { slug : Slug
@@ -79,7 +79,7 @@ catalogEntry w =
     }
 
 
-{-| Public homepage catalog: active wikis only (story 31).
+{-| Public homepage catalog: active wikis only.
 -}
 publicCatalogDict : Dict Slug Wiki -> Dict Slug CatalogEntry
 publicCatalogDict wikis =
@@ -193,7 +193,7 @@ registerUrlPath wikiSlug =
     "/w/" ++ wikiSlug ++ "/register"
 
 
-{-| Submit a new page draft for review (story 9). Path: `/w/:wikiSlug/submit/new`.
+{-| Submit a new page draft for review. Path: `/w/:wikiSlug/submit/new`.
 -}
 submitNewPageUrlPath : Slug -> String
 submitNewPageUrlPath wikiSlug =
@@ -208,28 +208,28 @@ submitNewPageUrlPathWithSuggestedSlug wikiSlug pageSlug =
         ++ UrlBuilder.toQuery [ UrlBuilder.string "page" pageSlug ]
 
 
-{-| Propose an edit to a published page (story 10). Path: `/w/:wikiSlug/edit/:pageSlug`.
+{-| Propose an edit to a published page. Path: `/w/:wikiSlug/edit/:pageSlug`.
 -}
 submitEditUrlPath : Slug -> Page.Slug -> String
 submitEditUrlPath wikiSlug pageSlug =
     "/w/" ++ wikiSlug ++ "/edit/" ++ pageSlug
 
 
-{-| Request deletion of a published page for moderation (story 11). Path: `/w/:wikiSlug/submit/delete/:pageSlug`.
+{-| Request deletion of a published page for moderation. Path: `/w/:wikiSlug/submit/delete/:pageSlug`.
 -}
 submitDeleteUrlPath : Slug -> Page.Slug -> String
 submitDeleteUrlPath wikiSlug pageSlug =
     "/w/" ++ wikiSlug ++ "/submit/delete/" ++ pageSlug
 
 
-{-| Wiki admin user directory (story 20). Path: `/w/:wikiSlug/admin/users`.
+{-| Wiki admin user directory. Path: `/w/:wikiSlug/admin/users`.
 -}
 adminUsersUrlPath : Slug -> String
 adminUsersUrlPath wikiSlug =
     "/w/" ++ wikiSlug ++ "/admin/users"
 
 
-{-| Wiki admin audit log (story 25). Path: `/w/:wikiSlug/admin/audit`.
+{-| Wiki admin audit log. Path: `/w/:wikiSlug/admin/audit`.
 -}
 adminAuditUrlPath : Slug -> String
 adminAuditUrlPath wikiSlug =
@@ -243,35 +243,35 @@ mySubmissionsUrlPath wikiSlug =
     "/w/" ++ wikiSlug ++ "/submissions"
 
 
-{-| Trusted contributor review queue (story 15). Path: `/w/:wikiSlug/review`.
+{-| Trusted contributor review queue. Path: `/w/:wikiSlug/review`.
 -}
 reviewQueueUrlPath : Slug -> String
 reviewQueueUrlPath wikiSlug =
     "/w/" ++ wikiSlug ++ "/review"
 
 
-{-| Review decision screen for one submission (story 16+). Path: `/w/:wikiSlug/review/:submissionId`.
+{-| Review decision screen for one submission. Path: `/w/:wikiSlug/review/:submissionId`.
 -}
 reviewDetailUrlPath : Slug -> String -> String
 reviewDetailUrlPath wikiSlug submissionId =
     "/w/" ++ wikiSlug ++ "/review/" ++ submissionId
 
 
-{-| Contributor submission detail (stub until story 12). Path matches the opinionated URL map in `spec/user-stories.md`.
+{-| Contributor submission detail. Path: `/w/:wikiSlug/submit/:submissionId`.
 -}
 submissionDetailUrlPath : Slug -> String -> String
 submissionDetailUrlPath wikiSlug submissionId =
     "/w/" ++ wikiSlug ++ "/submit/" ++ submissionId
 
 
-{-| Create hosted wiki (story 29). Path: `/admin/wikis/new`.
+{-| Create hosted wiki. Path: `/admin/wikis/new`.
 -}
 hostAdminNewWikiUrlPath : String
 hostAdminNewWikiUrlPath =
     "/admin/wikis/new"
 
 
-{-| Host-admin wiki list (story 28). Path: `/admin/wikis`.
+{-| Host-admin wiki list. Path: `/admin/wikis`.
 -}
 hostAdminWikisUrlPath : String
 hostAdminWikisUrlPath =
@@ -292,7 +292,7 @@ hostAdminAuditUrlPath =
     "/admin/audit"
 
 
-{-| Platform host-admin wiki detail (story 30). Path: `/admin/wikis/:wikiSlug`.
+{-| Platform host-admin wiki detail. Path: `/admin/wikis/:wikiSlug`.
 -}
 hostAdminWikiDetailUrlPath : Slug -> String
 hostAdminWikiDetailUrlPath wikiSlug =
@@ -306,7 +306,7 @@ publishedPageUrlPath wikiSlug pageSlug =
     "/w/" ++ wikiSlug ++ "/p/" ++ pageSlug
 
 
-{-| Trusted direct publish (story 14) and approval of a new-page submission (story 17).
+{-| Trusted direct publish and approval of a new-page submission.
 -}
 publishNewPageOnWiki : { pageSlug : Page.Slug, markdown : String } -> Wiki -> Wiki
 publishNewPageOnWiki payload wiki =

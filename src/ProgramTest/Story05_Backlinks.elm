@@ -62,7 +62,7 @@ endToEndTests =
                 List.concat
                     [ ProgramTest.Actions.loginToWiki
                         { wikiSlug = wikiSlug
-                        , username = "wikidemo"
+                        , username = "demo_wiki_admin"
                         , password = "password12"
                         }
                         client
@@ -92,7 +92,7 @@ endToEndTests =
                                         )
                             )
                       ]
-                    , ProgramTest.Actions.submitWikiEditForm "# Linker\n\nNo wiki link here." client
+                    , ProgramTest.Actions.submitWikiEditForm wikiSlug linkerPageSlug "# Linker\n\nNo wiki link here." client
                     , [ client.update 100 (UrlChanged publishedTargetUrl)
                       , client.checkView 300 ProgramTest.Query.expectNoBacklinks
                       ]

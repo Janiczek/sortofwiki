@@ -211,6 +211,178 @@ suite =
                     Submission.pendingNewPageSlugInUse "Demo" "wanted" (Dict.singleton "sub_1" sub)
                         |> Expect.equal False
             ]
+        , Test.describe "pendingNewPageSlugBlocksTrustedPublish"
+            [ Test.test "false on empty dict" <|
+                \() ->
+                    Submission.pendingNewPageSlugBlocksTrustedPublish (ContributorAccount.newAccountId "Demo" "me") "Demo" "x" Dict.empty
+                        |> Expect.equal False
+            , Test.test "false when only the author's draft reserves the slug" <|
+                \() ->
+                    let
+                        me : ContributorAccount.Id
+                        me =
+                            ContributorAccount.newAccountId "Demo" "me"
+
+                        sub : Submission.Submission
+                        sub =
+                            { id = Submission.idFromCounter 1
+                            , wikiSlug = "Demo"
+                            , authorId = me
+                            , kind =
+                                Submission.NewPage
+                                    { pageSlug = "wanted"
+                                    , markdown = ""
+                                    }
+                            , status = Submission.Draft
+                            , reviewerNote = Nothing
+                            }
+                    in
+                    Submission.pendingNewPageSlugBlocksTrustedPublish me "Demo" "wanted" (Dict.singleton "sub_1" sub)
+                        |> Expect.equal False
+            , Test.test "true when another author's draft reserves the slug" <|
+                \() ->
+                    let
+                        me : ContributorAccount.Id
+                        me =
+                            ContributorAccount.newAccountId "Demo" "me"
+
+                        sub : Submission.Submission
+                        sub =
+                            { id = Submission.idFromCounter 1
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "other"
+                            , kind =
+                                Submission.NewPage
+                                    { pageSlug = "wanted"
+                                    , markdown = ""
+                                    }
+                            , status = Submission.Draft
+                            , reviewerNote = Nothing
+                            }
+                    in
+                    Submission.pendingNewPageSlugBlocksTrustedPublish me "Demo" "wanted" (Dict.singleton "sub_1" sub)
+                        |> Expect.equal True
+            , Test.test "true when pending new page reserves the slug (same author)" <|
+                \() ->
+                    let
+                        me : ContributorAccount.Id
+                        me =
+                            ContributorAccount.newAccountId "Demo" "me"
+
+                        sub : Submission.Submission
+                        sub =
+                            { id = Submission.idFromCounter 1
+                            , wikiSlug = "Demo"
+                            , authorId = me
+                            , kind =
+                                Submission.NewPage
+                                    { pageSlug = "wanted"
+                                    , markdown = "m"
+                                    }
+                            , status = Submission.Pending
+                            , reviewerNote = Nothing
+                            }
+                    in
+                    Submission.pendingNewPageSlugBlocksTrustedPublish me "Demo" "wanted" (Dict.singleton "sub_1" sub)
+                        |> Expect.equal True
+            , Test.fuzz Fuzz.string "author's draft for slug never blocks that author alone" <|
+                \suffix ->
+                    let
+                        slug : String
+                        slug =
+                            "Pg" ++ suffix
+
+                        me : ContributorAccount.Id
+                        me =
+                            ContributorAccount.newAccountId "Demo" "me"
+
+                        sub : Submission.Submission
+                        sub =
+                            { id = Submission.idFromCounter 1
+                            , wikiSlug = "Demo"
+                            , authorId = me
+                            , kind =
+                                Submission.NewPage
+                                    { pageSlug = slug
+                                    , markdown = ""
+                                    }
+                            , status = Submission.Draft
+                            , reviewerNote = Nothing
+                            }
+                    in
+                    Submission.pendingNewPageSlugBlocksTrustedPublish me "Demo" slug (Dict.singleton "sub_1" sub)
+                        |> Expect.equal False
+            ]
+        , Test.describe "removeAuthorDraftNewPageSubmissionsForSlug"
+            [ Test.test "removes matching author draft new-page row" <|
+                \() ->
+                    let
+                        me : ContributorAccount.Id
+                        me =
+                            ContributorAccount.newAccountId "Demo" "me"
+
+                        draft : Submission.Submission
+                        draft =
+                            { id = Submission.idFromCounter 1
+                            , wikiSlug = "Demo"
+                            , authorId = me
+                            , kind =
+                                Submission.NewPage
+                                    { pageSlug = "wanted"
+                                    , markdown = ""
+                                    }
+                            , status = Submission.Draft
+                            , reviewerNote = Nothing
+                            }
+
+                        other : Submission.Submission
+                        other =
+                            { id = Submission.idFromCounter 2
+                            , wikiSlug = "Demo"
+                            , authorId = ContributorAccount.newAccountId "Demo" "x"
+                            , kind =
+                                Submission.NewPage
+                                    { pageSlug = "wanted"
+                                    , markdown = ""
+                                    }
+                            , status = Submission.Draft
+                            , reviewerNote = Nothing
+                            }
+                    in
+                    Dict.fromList [ ( "sub_1", draft ), ( "sub_2", other ) ]
+                        |> Submission.removeAuthorDraftNewPageSubmissionsForSlug me "Demo" "wanted"
+                        |> Dict.keys
+                        |> Expect.equal [ "sub_2" ]
+            , Test.fuzz Fuzz.string "does not remove when slug differs" <|
+                \slugA ->
+                    let
+                        slugB : String
+                        slugB =
+                            slugA ++ "_other"
+
+                        me : ContributorAccount.Id
+                        me =
+                            ContributorAccount.newAccountId "Demo" "me"
+
+                        draft : Submission.Submission
+                        draft =
+                            { id = Submission.idFromCounter 1
+                            , wikiSlug = "Demo"
+                            , authorId = me
+                            , kind =
+                                Submission.NewPage
+                                    { pageSlug = slugA
+                                    , markdown = ""
+                                    }
+                            , status = Submission.Draft
+                            , reviewerNote = Nothing
+                            }
+                    in
+                    Dict.singleton "sub_1" draft
+                        |> Submission.removeAuthorDraftNewPageSubmissionsForSlug me "Demo" slugB
+                        |> Dict.size
+                        |> Expect.equal 1
+            ]
         , Test.describe "validateDeleteReason"
             [ Test.test "empty string is Nothing" <|
                 \() ->
@@ -245,6 +417,28 @@ suite =
                     else
                         Submission.validateDeleteReason s
                             |> Expect.equal (Ok (Just (String.trim s)))
+            ]
+        , Test.describe "validateDeleteReasonRequired"
+            [ Test.test "empty string is rejected" <|
+                \() ->
+                    Submission.validateDeleteReasonRequired ""
+                        |> Expect.equal (Err Submission.ReasonRequired)
+            , Test.test "whitespace-only is rejected" <|
+                \() ->
+                    Submission.validateDeleteReasonRequired "  \n\t "
+                        |> Expect.equal (Err Submission.ReasonRequired)
+            , Test.test "trims non-empty reason" <|
+                \() ->
+                    Submission.validateDeleteReasonRequired "  obsolete  "
+                        |> Expect.equal (Ok "obsolete")
+            , Test.test "rejects reason longer than 2000 chars" <|
+                \() ->
+                    Submission.validateDeleteReasonRequired (String.repeat 2001 "x")
+                        |> Expect.equal (Err Submission.ReasonTooLong)
+            , Test.test "accepts reason of exactly 2000 chars" <|
+                \() ->
+                    Submission.validateDeleteReasonRequired (String.repeat 2000 "y")
+                        |> Expect.equal (Ok (String.repeat 2000 "y"))
             ]
         , Test.describe "validateEditMarkdown"
             [ Test.test "rejects empty body" <|
@@ -543,7 +737,7 @@ suite =
                     let
                         author : ContributorAccount.Id
                         author =
-                            ContributorAccount.newAccountId "Demo" "statusdemo"
+                            ContributorAccount.newAccountId "Demo" "demo_contributor"
 
                         otherAuthor : ContributorAccount.Id
                         otherAuthor =
@@ -802,6 +996,77 @@ suite =
                                         , baseMarkdown = "current-live"
                                         , baseRevision = 1
                                         , proposedMarkdown = "my-edit"
+                                        }
+                                }
+                            )
+            , Test.test "DeletePage draft requires non-empty reason" <|
+                \() ->
+                    let
+                        wiki : Wiki.Wiki
+                        wiki =
+                            Wiki.wikiWithPages "Demo"
+                                "Demo"
+                                (Dict.singleton "home" (Page.withPublished "home" "live"))
+
+                        author : ContributorAccount.Id
+                        author =
+                            ContributorAccount.newAccountId "Demo" "u"
+
+                        sub : Submission.Submission
+                        sub =
+                            { id = Submission.idFromCounter 2
+                            , wikiSlug = "Demo"
+                            , authorId = author
+                            , kind =
+                                Submission.DeletePage
+                                    { pageSlug = "home"
+                                    , reason = Nothing
+                                    }
+                            , status = Submission.Draft
+                            , reviewerNote = Nothing
+                            }
+                    in
+                    Submission.promoteDraftToPending wiki Dict.empty sub
+                        |> Expect.equal (Err (Submission.SubmitDraftForReviewDeleteReasonInvalid Submission.ReasonRequired))
+            , Test.test "DeletePage draft promotes with trimmed reason" <|
+                \() ->
+                    let
+                        wiki : Wiki.Wiki
+                        wiki =
+                            Wiki.wikiWithPages "Demo"
+                                "Demo"
+                                (Dict.singleton "home" (Page.withPublished "home" "live"))
+
+                        author : ContributorAccount.Id
+                        author =
+                            ContributorAccount.newAccountId "Demo" "u"
+
+                        sub : Submission.Submission
+                        sub =
+                            { id = Submission.idFromCounter 3
+                            , wikiSlug = "Demo"
+                            , authorId = author
+                            , kind =
+                                Submission.DeletePage
+                                    { pageSlug = "home"
+                                    , reason = Just "  bye  "
+                                    }
+                            , status = Submission.Draft
+                            , reviewerNote = Nothing
+                            }
+                    in
+                    Submission.promoteDraftToPending wiki Dict.empty sub
+                        |> Expect.equal
+                            (Ok
+                                { id = Submission.idFromCounter 3
+                                , wikiSlug = "Demo"
+                                , authorId = author
+                                , status = Submission.Pending
+                                , reviewerNote = Nothing
+                                , kind =
+                                    Submission.DeletePage
+                                        { pageSlug = "home"
+                                        , reason = Just "bye"
                                         }
                                 }
                             )

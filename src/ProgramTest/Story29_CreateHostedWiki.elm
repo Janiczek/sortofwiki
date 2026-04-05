@@ -43,8 +43,9 @@ endToEndTests =
             \client ->
                 List.concat
                     [ [ client.input 100 (Effect.Browser.Dom.id "host-admin-login-password") Env.hostAdminPassword
-                      , client.click 100 (Effect.Browser.Dom.id "host-admin-login-submit")
-                      , client.checkView 300
+                      ]
+                    , ProgramTest.Actions.triggerFormSubmit "host-admin-login-form" client
+                    , [ client.checkView 300
                             (ProgramTest.Query.withinId "host-admin-wikis-list"
                                 (ProgramTest.Query.expectHasText "No wikis present")
                             )
@@ -93,30 +94,33 @@ endToEndTests =
         , connectClientMs = Just 200
         , clientSteps =
             \client ->
-                [ client.input 100 (Effect.Browser.Dom.id "host-admin-login-password") Env.hostAdminPassword
-                , client.click 100 (Effect.Browser.Dom.id "host-admin-login-submit")
-                , client.checkView 300
-                    (ProgramTest.Query.withinId "host-admin-wikis-list"
-                        (ProgramTest.Query.expectHasText "No wikis present")
-                    )
-                , client.clickLink 100 Wiki.hostAdminNewWikiUrlPath
-                , client.checkView 200
-                    (ProgramTest.Query.withinId "host-admin-create-wiki-page"
-                        ProgramTest.Query.expectEmpty
-                    )
-                , client.checkView 200
-                    (ProgramTest.Query.withinId "host-admin-create-wiki-page"
-                        ProgramTest.Query.expectHostAdminCreateWikiSlugInputUsesHtmlConstraints
-                    )
-                , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-slug") "notPascalCase"
-                , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-name") "Story 29 Invalid Slug"
-                , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-initial-admin-username") "story29badslug"
-                , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-initial-admin-password") "password12"
-                , client.custom 100 (Effect.Browser.Dom.id "host-admin-create-wiki-form") "submit" (Json.Encode.object [])
-                , client.checkView 400
-                    (ProgramTest.Query.withinId "host-admin-create-wiki-error"
-                        (ProgramTest.Query.expectHasText invalidWikiSlugUserMessage)
-                    )
-                ]
+                List.concat
+                    [ [ client.input 100 (Effect.Browser.Dom.id "host-admin-login-password") Env.hostAdminPassword
+                      ]
+                    , ProgramTest.Actions.triggerFormSubmit "host-admin-login-form" client
+                    , [ client.checkView 300
+                            (ProgramTest.Query.withinId "host-admin-wikis-list"
+                                (ProgramTest.Query.expectHasText "No wikis present")
+                            )
+                      , client.clickLink 100 Wiki.hostAdminNewWikiUrlPath
+                      , client.checkView 200
+                            (ProgramTest.Query.withinId "host-admin-create-wiki-page"
+                                ProgramTest.Query.expectEmpty
+                            )
+                      , client.checkView 200
+                            (ProgramTest.Query.withinId "host-admin-create-wiki-page"
+                                ProgramTest.Query.expectHostAdminCreateWikiSlugInputUsesHtmlConstraints
+                            )
+                      , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-slug") "notPascalCase"
+                      , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-name") "Story 29 Invalid Slug"
+                      , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-initial-admin-username") "story29badslug"
+                      , client.input 100 (Effect.Browser.Dom.id "host-admin-create-wiki-initial-admin-password") "password12"
+                      , client.custom 100 (Effect.Browser.Dom.id "host-admin-create-wiki-form") "submit" (Json.Encode.object [])
+                      , client.checkView 400
+                            (ProgramTest.Query.withinId "host-admin-create-wiki-error"
+                                (ProgramTest.Query.expectHasText invalidWikiSlugUserMessage)
+                            )
+                      ]
+                    ]
         }
     ]

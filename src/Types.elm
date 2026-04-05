@@ -119,7 +119,8 @@ type ToBackend
     | LogoutContributor Wiki.Slug
     | SubmitNewPage Wiki.Slug SubmitNewPagePayload
     | SubmitPageEdit Wiki.Slug Page.Slug String
-    | SubmitPageDelete Wiki.Slug Page.Slug String
+    | RequestPublishedPageDeletion Wiki.Slug Page.Slug String
+    | DeletePublishedPageImmediately Wiki.Slug Page.Slug String
     | SaveNewPageDraft Wiki.Slug { maybeSubmissionId : Maybe String, rawPageSlug : String, rawMarkdown : String }
     | SavePageEditDraft Wiki.Slug { maybeSubmissionId : Maybe String, pageSlug : Page.Slug, rawMarkdown : String }
     | SavePageDeleteDraft Wiki.Slug { maybeSubmissionId : Maybe String, pageSlug : Page.Slug, rawReason : String }
@@ -163,7 +164,8 @@ type ToFrontend
     | LogoutContributorResponse Wiki.Slug
     | SubmitNewPageResponse Wiki.Slug (Result Submission.SubmitNewPageError Submission.NewPageSubmitSuccess)
     | SubmitPageEditResponse Wiki.Slug (Result Submission.SubmitPageEditError Submission.EditSubmitSuccess)
-    | SubmitPageDeleteResponse Wiki.Slug (Result Submission.SubmitPageDeleteError Submission.DeleteSubmitSuccess)
+    | RequestPublishedPageDeletionResponse Wiki.Slug (Result Submission.RequestPublishedPageDeletionError Submission.Id)
+    | DeletePublishedPageImmediatelyResponse Wiki.Slug (Result Submission.DeletePublishedPageImmediatelyError ())
     | SaveNewPageDraftResponse Wiki.Slug (Result Submission.SaveNewPageDraftError Submission.Id)
     | SavePageEditDraftResponse Wiki.Slug (Result Submission.SavePageEditDraftError Submission.Id)
     | SavePageDeleteDraftResponse Wiki.Slug (Result Submission.SavePageDeleteDraftError Submission.Id)
@@ -282,7 +284,7 @@ type alias PageDeleteSubmitDraft =
     , inFlight : Bool
     , saveDraftInFlight : Bool
     , pendingSubmitAfterSave : Bool
-    , lastResult : Maybe (Result Submission.SubmitPageDeleteError Submission.DeleteSubmitSuccess)
+    , lastResult : Maybe (Result Submission.PageDeleteFormError Submission.PageDeleteFormSuccess)
     , lastSaveDraftResult : Maybe (Result Submission.SavePageDeleteDraftError Submission.Id)
     }
 
@@ -293,7 +295,7 @@ type alias ReviewApproveDraft =
     }
 
 
-{-| Selected moderation outcome on the review detail form (story 16–19).
+{-| Selected moderation outcome on the review detail form (approve, request changes, or reject).
 -}
 type ReviewDecision
     = ReviewDecisionApprove
@@ -408,7 +410,8 @@ type FrontendMsg
     | PageEditSubmitMarkdownChanged String
     | PageEditSubmitFormSubmitted
     | PageDeleteSubmitReasonChanged String
-    | PageDeleteSubmitFormSubmitted
+    | PageDeleteRequestDeletionSubmitted
+    | PageDeletePublishedImmediatelySubmitted
     | NewPageSaveDraftClicked
     | PageEditSaveDraftClicked
     | PageDeleteSaveDraftClicked

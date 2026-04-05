@@ -149,7 +149,7 @@ demoWikiCatalogOnlySteps =
         [ hostAdminCreateWikiSteps
             { slug = "Demo"
             , name = "Demo Wiki"
-            , wikiAdminUsername = "wikidemo"
+            , wikiAdminUsername = "demo_wiki_admin"
             , wikiAdminPassword = "password12"
             }
         , hostAdminCreateWikiSteps
@@ -165,17 +165,17 @@ demoWikiCatalogOnlySteps =
 -}
 demoWikiPagesSeedSteps : List InitStep
 demoWikiPagesSeedSteps =
-    [ initStep "pt-init-reg-statusdemo" "pt-c1" (RegisterContributor "Demo" { username = "statusdemo", password = "password12" })
-    , initStep "pt-init-reg-trustedpub" "pt-c2" (RegisterContributor "Demo" { username = "trustedpub", password = "password12" })
+    [ initStep "pt-init-reg-demo_contributor" "pt-c1" (RegisterContributor "Demo" { username = "demo_contributor", password = "password12" })
+    , initStep "pt-init-reg-demo_trusted_publisher" "pt-c2" (RegisterContributor "Demo" { username = "demo_trusted_publisher", password = "password12" })
     , initStep "pt-init-reg-grantadmin" "pt-c3" (RegisterContributor "Demo" { username = "grantadmin_trusted", password = "password12" })
-    , initStep "pt-init-wikidemo-login" "pt-c4" (LoginContributor "Demo" { username = "wikidemo", password = "password12" })
-    , initStep "pt-init-wikidemo-login" "pt-c4" (PromoteContributorToTrusted "Demo" "trustedpub")
-    , initStep "pt-init-wikidemo-login" "pt-c4" (PromoteContributorToTrusted "Demo" "grantadmin_trusted")
-    , initStep "pt-init-trustedpub-pub" "pt-c5" (LoginContributor "Demo" { username = "trustedpub", password = "password12" })
-    , initStep "pt-init-trustedpub-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "Home", rawMarkdown = Fixtures.demoHomePublished })
-    , initStep "pt-init-trustedpub-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "Guides", rawMarkdown = Fixtures.demoGuidesPublished })
-    , initStep "pt-init-trustedpub-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "About", rawMarkdown = Fixtures.demoAboutPublished })
-    , initStep "pt-init-trustedpub-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "MarkdownPlayground", rawMarkdown = Fixtures.demoMarkdownPlaygroundPublished })
+    , initStep "pt-init-demo_wiki_admin-login" "pt-c4" (LoginContributor "Demo" { username = "demo_wiki_admin", password = "password12" })
+    , initStep "pt-init-demo_wiki_admin-login" "pt-c4" (PromoteContributorToTrusted "Demo" "demo_trusted_publisher")
+    , initStep "pt-init-demo_wiki_admin-login" "pt-c4" (PromoteContributorToTrusted "Demo" "grantadmin_trusted")
+    , initStep "pt-init-demo_trusted_publisher-pub" "pt-c5" (LoginContributor "Demo" { username = "demo_trusted_publisher", password = "password12" })
+    , initStep "pt-init-demo_trusted_publisher-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "Home", rawMarkdown = Fixtures.demoHomePublished })
+    , initStep "pt-init-demo_trusted_publisher-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "Guides", rawMarkdown = Fixtures.demoGuidesPublished })
+    , initStep "pt-init-demo_trusted_publisher-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "About", rawMarkdown = Fixtures.demoAboutPublished })
+    , initStep "pt-init-demo_trusted_publisher-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "MarkdownPlayground", rawMarkdown = Fixtures.demoMarkdownPlaygroundPublished })
     , initStep "pt-init-elmtips-admin" "pt-c6" (LoginContributor "ElmTips" { username = "elmtipsadmin", password = "password12" })
     , initStep "pt-init-elmtips-admin" "pt-c6" (SubmitNewPage "ElmTips" { rawPageSlug = "Home", rawMarkdown = "Tips and notes about Elm." })
     ]
@@ -214,7 +214,7 @@ emptyConfig =
 
 story13RejectReason : String
 story13RejectReason =
-    "Seeded reviewer note (story 13): expand the outline and add sources before resubmitting."
+    "Seeded reviewer note: expand the outline and add sources before resubmitting."
 
 
 {-| Demo + elm-tips + pages + `sub_1` / `sub_2` pending new-page submissions (no reject/approve yet).
@@ -223,13 +223,13 @@ demoWikiPagesPlusTwoPendingSubmissionsSteps : List InitStep
 demoWikiPagesPlusTwoPendingSubmissionsSteps =
     List.concat
         [ demoWikiPagesSteps
-        , [ initStep "pt-mod2-statusdemo" "pt-m2a" (LoginContributor "Demo" { username = "statusdemo", password = "password12" })
-          , initStep "pt-mod2-statusdemo"
+        , [ initStep "pt-mod2-demo_contributor" "pt-m2a" (LoginContributor "Demo" { username = "demo_contributor", password = "password12" })
+          , initStep "pt-mod2-demo_contributor"
                 "pt-m2a"
-                (SubmitNewPage "Demo" { rawPageSlug = "QueueDemoPage", rawMarkdown = "Seeded pending submission for the trusted review queue (story 15)." })
-          , initStep "pt-mod2-statusdemo"
+                (SubmitNewPage "Demo" { rawPageSlug = "QueueDemoPage", rawMarkdown = "Seeded pending submission for the trusted review queue." })
+          , initStep "pt-mod2-demo_contributor"
                 "pt-m2a"
-                (SubmitNewPage "Demo" { rawPageSlug = "RequestChangesDemoPage", rawMarkdown = "Seeded pending submission for request-changes (story 19)." })
+                (SubmitNewPage "Demo" { rawPageSlug = "RequestChangesDemoPage", rawMarkdown = "Seeded pending submission for request-changes." })
           ]
         ]
 
@@ -238,28 +238,30 @@ demoWikiModerationSteps : List InitStep
 demoWikiModerationSteps =
     List.concat
         [ demoWikiPagesSteps
-        , [ initStep "pt-mod-statusdemo" "pt-m1" (LoginContributor "Demo" { username = "statusdemo", password = "password12" })
-          , initStep "pt-mod-statusdemo"
+        , [ initStep "pt-mod-demo_contributor" "pt-m1" (LoginContributor "Demo" { username = "demo_contributor", password = "password12" })
+          , initStep "pt-mod-demo_contributor"
                 "pt-m1"
-                (SubmitNewPage "Demo" { rawPageSlug = "QueueDemoPage", rawMarkdown = "Seeded pending submission for the trusted review queue (story 15)." })
-          , initStep "pt-mod-statusdemo"
+                (SubmitNewPage "Demo" { rawPageSlug = "QueueDemoPage", rawMarkdown = "Seeded pending submission for the trusted review queue." })
+          , initStep "pt-mod-demo_contributor"
                 "pt-m1"
-                (SubmitNewPage "Demo" { rawPageSlug = "RequestChangesDemoPage", rawMarkdown = "Seeded pending submission for request-changes (story 19)." })
-          , initStep "pt-mod-statusdemo"
+                (SubmitNewPage "Demo" { rawPageSlug = "RequestChangesDemoPage", rawMarkdown = "Seeded pending submission for request-changes." })
+          , initStep "pt-mod-demo_contributor"
                 "pt-m1"
                 (SubmitNewPage "Demo" { rawPageSlug = "SeedRejected", rawMarkdown = "Seeded submission (rejected)." })
-          , initStep "pt-mod-trustedpub" "pt-m2" (LoginContributor "Demo" { username = "trustedpub", password = "password12" })
-          , initStep "pt-mod-trustedpub" "pt-m2" (RejectSubmission "Demo" { submissionId = "sub_3", reasonText = story13RejectReason })
-          , initStep "pt-mod-statusdemo" "pt-m3" (LoginContributor "Demo" { username = "statusdemo", password = "password12" })
-          , initStep "pt-mod-statusdemo"
+          , initStep "pt-mod-demo_trusted_publisher" "pt-m2" (LoginContributor "Demo" { username = "demo_trusted_publisher", password = "password12" })
+          , initStep "pt-mod-demo_trusted_publisher" "pt-m2" (RejectSubmission "Demo" { submissionId = "sub_3", reasonText = story13RejectReason })
+          , initStep "pt-mod-demo_contributor" "pt-m3" (LoginContributor "Demo" { username = "demo_contributor", password = "password12" })
+          , initStep "pt-mod-demo_contributor"
                 "pt-m3"
                 (SubmitPageEdit "Demo" "About" "Seeded submission (approved).")
-          , initStep "pt-mod-trustedpub" "pt-m4" (LoginContributor "Demo" { username = "trustedpub", password = "password12" })
-          , initStep "pt-mod-trustedpub" "pt-m4" (ApproveSubmission "Demo" "sub_4")
-          , initStep "pt-mod-statusdemo" "pt-m5" (LoginContributor "Demo" { username = "statusdemo", password = "password12" })
-          , initStep "pt-mod-statusdemo" "pt-m5" (SubmitPageDelete "Demo" "Guides" "")
-          , initStep "pt-mod-trustedpub" "pt-m6" (LoginContributor "Demo" { username = "trustedpub", password = "password12" })
-          , initStep "pt-mod-trustedpub"
+          , initStep "pt-mod-demo_trusted_publisher" "pt-m4" (LoginContributor "Demo" { username = "demo_trusted_publisher", password = "password12" })
+          , initStep "pt-mod-demo_trusted_publisher" "pt-m4" (ApproveSubmission "Demo" "sub_4")
+          , initStep "pt-mod-demo_contributor" "pt-m5" (LoginContributor "Demo" { username = "demo_contributor", password = "password12" })
+          , initStep "pt-mod-demo_contributor"
+                "pt-m5"
+                (RequestPublishedPageDeletion "Demo" "Guides" "Seeded delete request: page is redundant.")
+          , initStep "pt-mod-demo_trusted_publisher" "pt-m6" (LoginContributor "Demo" { username = "demo_trusted_publisher", password = "password12" })
+          , initStep "pt-mod-demo_trusted_publisher"
                 "pt-m6"
                 (RequestSubmissionChanges "Demo"
                     { submissionId = "sub_5"

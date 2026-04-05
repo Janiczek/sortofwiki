@@ -1,4 +1,8 @@
-module RouteAccess exposing (contributorForcedRedirect, contributorRestrictedReturnPath)
+module RouteAccess exposing
+    ( ContributorRouteRedirect(..)
+    , contributorForcedRedirect
+    , contributorRestrictedReturnPath
+    )
 
 import ContributorWikiSession exposing (ContributorWikiSession)
 import Dict exposing (Dict)
@@ -9,10 +13,17 @@ import Wiki
 import WikiRole
 
 
-{-| When anonymous (or logged in on another wiki), restricted wiki routes redirect to login with return path.
-Logged-in contributors without sufficient role still reach the route so the server can respond (stories 22, 33).
+{-| Client-side adjustment before rendering a contributor-gated wiki route.
 -}
-contributorForcedRedirect : Dict Wiki.Slug ContributorWikiSession -> Url -> Route -> Maybe ( Wiki.Slug, String )
+type ContributorRouteRedirect
+    = ToContributorLogin Wiki.Slug String
+    | AwayFromMySubmissions Wiki.Slug
+
+
+{-| When anonymous (or logged in on another wiki), restricted wiki routes redirect to login with return path.
+Logged-in contributors without sufficient role still reach the route so the server can respond with an error instead of a client-only redirect — except `WikiMySubmissions`, where trusted/admin are sent to wiki home.
+-}
+contributorForcedRedirect : Dict Wiki.Slug ContributorWikiSession -> Url -> Route -> Maybe ContributorRouteRedirect
 contributorForcedRedirect sessions url route =
     let
         returnPath : String
@@ -36,6 +47,13 @@ contributorForcedRedirect sessions url route =
                 |> Dict.get wikiSlug
                 |> Maybe.map (.role >> WikiRole.canAccessWikiAdminUsers)
                 |> Maybe.withDefault False
+
+        mySubmissionsHere : Wiki.Slug -> Bool
+        mySubmissionsHere wikiSlug =
+            sessions
+                |> Dict.get wikiSlug
+                |> Maybe.map (.role >> WikiRole.hasMySubmissionsAccess)
+                |> Maybe.withDefault False
     in
     case route of
         Route.WikiReview wikiSlug ->
@@ -46,7 +64,7 @@ contributorForcedRedirect sessions url route =
                 Nothing
 
             else
-                Just ( wikiSlug, returnPath )
+                Just (ToContributorLogin wikiSlug returnPath)
 
         Route.WikiReviewDetail wikiSlug _ ->
             if trustedHere wikiSlug then
@@ -56,7 +74,7 @@ contributorForcedRedirect sessions url route =
                 Nothing
 
             else
-                Just ( wikiSlug, returnPath )
+                Just (ToContributorLogin wikiSlug returnPath)
 
         Route.WikiAdminUsers wikiSlug ->
             if adminHere wikiSlug then
@@ -66,7 +84,7 @@ contributorForcedRedirect sessions url route =
                 Nothing
 
             else
-                Just ( wikiSlug, returnPath )
+                Just (ToContributorLogin wikiSlug returnPath)
 
         Route.WikiAdminAudit wikiSlug ->
             if adminHere wikiSlug then
@@ -76,42 +94,45 @@ contributorForcedRedirect sessions url route =
                 Nothing
 
             else
-                Just ( wikiSlug, returnPath )
+                Just (ToContributorLogin wikiSlug returnPath)
 
         Route.WikiSubmitNew wikiSlug ->
             if loggedInHere wikiSlug then
                 Nothing
 
             else
-                Just ( wikiSlug, returnPath )
+                Just (ToContributorLogin wikiSlug returnPath)
 
         Route.WikiSubmitEdit wikiSlug _ ->
             if loggedInHere wikiSlug then
                 Nothing
 
             else
-                Just ( wikiSlug, returnPath )
+                Just (ToContributorLogin wikiSlug returnPath)
 
         Route.WikiSubmitDelete wikiSlug _ ->
             if loggedInHere wikiSlug then
                 Nothing
 
             else
-                Just ( wikiSlug, returnPath )
+                Just (ToContributorLogin wikiSlug returnPath)
 
         Route.WikiSubmissionDetail wikiSlug _ ->
             if loggedInHere wikiSlug then
                 Nothing
 
             else
-                Just ( wikiSlug, returnPath )
+                Just (ToContributorLogin wikiSlug returnPath)
 
         Route.WikiMySubmissions wikiSlug ->
-            if loggedInHere wikiSlug then
+            if mySubmissionsHere wikiSlug then
                 Nothing
 
+            else if loggedInHere wikiSlug then
+                Just (AwayFromMySubmissions wikiSlug)
+
             else
-                Just ( wikiSlug, returnPath )
+                Just (ToContributorLogin wikiSlug returnPath)
 
         Route.WikiList ->
             Nothing

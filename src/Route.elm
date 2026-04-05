@@ -176,7 +176,14 @@ canAccess ctx route =
             slugOk wikiSlug && contributorOk
 
         WikiMySubmissions wikiSlug ->
-            slugOk wikiSlug && contributorOk
+            let
+                mySubmissionsOk : Bool
+                mySubmissionsOk =
+                    ctx.contributorOnActiveWiki
+                        |> Maybe.map WikiRole.hasMySubmissionsAccess
+                        |> Maybe.withDefault False
+            in
+            slugOk wikiSlug && mySubmissionsOk
 
         WikiReview wikiSlug ->
             slugOk wikiSlug && trustedOk
@@ -332,7 +339,7 @@ fromUrl url =
                     else
                         WikiMySubmissions wikiSlug
 
-                -- /w/:wiki/edit/:page (story 10); /w/:wiki/submit/new (story 9); /w/:wiki/submit/delete/:page (story 11); /w/:wiki/submit/:id (story 12)
+                -- /w/:wiki/edit/:page; /w/:wiki/submit/new; /w/:wiki/submit/delete/:page; /w/:wiki/submit/:id
                 [ "w", wikiSlug, "submit", "new" ] ->
                     if wikiSlug == "" then
                         NotFound url

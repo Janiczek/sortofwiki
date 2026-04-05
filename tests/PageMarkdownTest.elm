@@ -72,6 +72,26 @@ suite =
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "code" ]
                         |> Test.Html.Query.has [ Test.Html.Selector.text "[[home]]" ]
+            , Test.test "renders $$...$$ as inline-equation custom element" <|
+                \() ->
+                    Page.frontendDetails "Inline $$x^2 + y^2$$ math." []
+                        |> PageMarkdown.view wiki allPagesExist
+                        |> Test.Html.Query.fromHtml
+                        |> Test.Html.Query.find
+                            [ Test.Html.Selector.tag "inline-equation"
+                            , Test.Html.Selector.attribute (Html.Attributes.attribute "data-equation" "x^2 + y^2")
+                            ]
+                        |> Test.Html.Query.has []
+            , Test.test "renders $$$...$$$ as block-equation custom element" <|
+                \() ->
+                    Page.frontendDetails "Before\n\n$$$x^2 + y^2$$$\n\nAfter" []
+                        |> PageMarkdown.view wiki allPagesExist
+                        |> Test.Html.Query.fromHtml
+                        |> Test.Html.Query.find
+                            [ Test.Html.Selector.tag "block-equation"
+                            , Test.Html.Selector.attribute (Html.Attributes.attribute "data-equation" "x^2 + y^2")
+                            ]
+                        |> Test.Html.Query.has []
             , Test.fuzz (Fuzz.map String.fromInt (Fuzz.intRange 0 999999)) "heading line with numeric title renders as h2 text" <|
                 \title ->
                     Page.frontendDetails ("## " ++ title ++ "\n") []
@@ -102,7 +122,7 @@ suite =
                         |> Test.Html.Query.has
                             [ Test.Html.Selector.text "ghost"
                             , Test.Html.Selector.attribute (Html.Attributes.href "/w/Demo/p/ghost")
-                            , Test.Html.Selector.class "text-red-600"
+                            , Test.Html.Selector.class "!text-red-600"
                             ]
             ]
         , Test.describe "viewPreview"

@@ -38,8 +38,9 @@ endToEndTests =
                     [ [ client.checkView 100 (ProgramTest.Query.expectPageShowsWikiSlug "wiki-register-page" "Demo")
                       , client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story08user"
                       , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
-                      , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
-                      , client.checkView 400
+                      ]
+                    , ProgramTest.Actions.triggerFormSubmit "wiki-register-form" client
+                    , [ client.checkView 400
                             (ProgramTest.Query.expectAll
                                 [ ProgramTest.Query.expectWikiHomePageShowsSlug "Demo"
                                 , ProgramTest.Query.withinId "wiki-logout-button"
@@ -69,7 +70,7 @@ endToEndTests =
             \client ->
                 List.concat
                     [ ProgramTest.Actions.submitWikiLoginForm
-                        { username = "trustedpub"
+                        { username = "demo_trusted_publisher"
                         , password = "password12"
                         }
                         client
@@ -96,7 +97,7 @@ endToEndTests =
                 List.concat
                     [ ProgramTest.Actions.loginToWiki
                         { wikiSlug = "Demo"
-                        , username = "trustedpub"
+                        , username = "demo_trusted_publisher"
                         , password = "password12"
                         }
                         client
@@ -117,6 +118,26 @@ endToEndTests =
                                 else
                                     Err "expected contributor sessions cleared after logout"
                             )
+                      ]
+                    ]
+        }
+    , ProgramTest.Start.start
+        { name = "Wiki login via form submit (Enter path)"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , sessionId = "session-story08-login-form-submit"
+        , path = "/w/Demo/login"
+        , connectClientMs = Nothing
+        , clientSteps =
+            \client ->
+                List.concat
+                    [ [ client.checkView 100 (ProgramTest.Query.expectWikiLoginPageShowsSlug "Demo")
+                      ]
+                    , ProgramTest.Actions.submitWikiLoginForm
+                        { username = "demo_trusted_publisher"
+                        , password = "password12"
+                        }
+                        client
+                    , [ client.checkView 400 (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
                       ]
                     ]
         }

@@ -42,8 +42,9 @@ endToEndTests =
                 List.concat
                     [ [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story10user"
                       , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
-                      , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
-                      , client.checkView 400
+                      ]
+                    , ProgramTest.Actions.triggerFormSubmit "wiki-register-form" client
+                    , [ client.checkView 400
                             (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
                       , client.click 100 (Effect.Browser.Dom.id "wiki-logout-button")
                       , client.clickLink 100 (Wiki.loginUrlPath "Demo")
@@ -81,8 +82,9 @@ endToEndTests =
                                         )
                             )
                       , client.input 100 (Effect.Browser.Dom.id "wiki-submit-edit-markdown") ("# " ++ proposedEditMarker)
-                      , client.click 100 (Effect.Browser.Dom.id "wiki-submit-edit-submit")
-                      , client.checkView 300
+                      ]
+                    , ProgramTest.Actions.triggerFormSubmit "wiki-submit-edit-form" client
+                    , [ client.checkView 300
                             (ProgramTest.Query.withinId "wiki-submit-edit-success"
                                 (ProgramTest.Query.expectHasSubmissionId "sub_1")
                             )

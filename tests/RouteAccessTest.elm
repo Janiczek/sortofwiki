@@ -19,7 +19,7 @@ anon =
 contribDemo : Dict.Dict Wiki.Slug ContributorWikiSession
 contribDemo =
     Dict.singleton "Demo"
-        { role = WikiRole.UntrustedContributor
+        { role = WikiRole.UntrustedContributor WikiRole.defaultUntrustedContributorCaps
         , displayUsername = "u"
         }
 
@@ -28,6 +28,14 @@ trustedDemo : Dict.Dict Wiki.Slug ContributorWikiSession
 trustedDemo =
     Dict.singleton "Demo"
         { role = WikiRole.TrustedContributor
+        , displayUsername = "u"
+        }
+
+
+adminDemo : Dict.Dict Wiki.Slug ContributorWikiSession
+adminDemo =
+    Dict.singleton "Demo"
+        { role = WikiRole.Admin
         , displayUsername = "u"
         }
 
@@ -41,7 +49,7 @@ suite =
                     case Url.fromString "https://example.com/w/Demo/review" of
                         Just u ->
                             RouteAccess.contributorForcedRedirect anon u (Route.WikiReview "Demo")
-                                |> Expect.equal (Just ( "Demo", "/w/Demo/review" ))
+                                |> Expect.equal (Just (RouteAccess.ToContributorLogin "Demo" "/w/Demo/review"))
 
                         Nothing ->
                             Expect.fail "url"
@@ -68,7 +76,7 @@ suite =
                     case Url.fromString "https://example.com/w/Demo/submit/new" of
                         Just u ->
                             RouteAccess.contributorForcedRedirect anon u (Route.WikiSubmitNew "Demo")
-                                |> Expect.equal (Just ( "Demo", "/w/Demo/submit/new" ))
+                                |> Expect.equal (Just (RouteAccess.ToContributorLogin "Demo" "/w/Demo/submit/new"))
 
                         Nothing ->
                             Expect.fail "url"
@@ -77,16 +85,34 @@ suite =
                     case Url.fromString "https://example.com/w/Demo/submissions" of
                         Just u ->
                             RouteAccess.contributorForcedRedirect anon u (Route.WikiMySubmissions "Demo")
-                                |> Expect.equal (Just ( "Demo", Wiki.mySubmissionsUrlPath "Demo" ))
+                                |> Expect.equal (Just (RouteAccess.ToContributorLogin "Demo" (Wiki.mySubmissionsUrlPath "Demo")))
 
                         Nothing ->
                             Expect.fail "url"
-            , Test.test "logged-in contributor is not redirected from my submissions" <|
+            , Test.test "logged-in untrusted contributor is not redirected from my submissions" <|
                 \() ->
                     case Url.fromString "https://example.com/w/Demo/submissions" of
                         Just u ->
                             RouteAccess.contributorForcedRedirect contribDemo u (Route.WikiMySubmissions "Demo")
                                 |> Expect.equal Nothing
+
+                        Nothing ->
+                            Expect.fail "url"
+            , Test.test "trusted moderator opening my submissions is redirected away from list" <|
+                \() ->
+                    case Url.fromString "https://example.com/w/Demo/submissions" of
+                        Just u ->
+                            RouteAccess.contributorForcedRedirect trustedDemo u (Route.WikiMySubmissions "Demo")
+                                |> Expect.equal (Just (RouteAccess.AwayFromMySubmissions "Demo"))
+
+                        Nothing ->
+                            Expect.fail "url"
+            , Test.test "wiki admin opening my submissions is redirected away from list" <|
+                \() ->
+                    case Url.fromString "https://example.com/w/Demo/submissions" of
+                        Just u ->
+                            RouteAccess.contributorForcedRedirect adminDemo u (Route.WikiMySubmissions "Demo")
+                                |> Expect.equal (Just (RouteAccess.AwayFromMySubmissions "Demo"))
 
                         Nothing ->
                             Expect.fail "url"

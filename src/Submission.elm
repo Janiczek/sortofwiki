@@ -4,8 +4,8 @@ module Submission exposing
     , ContributorView
     , DeleteMySubmissionError(..)
     , DeletePageBody
+    , DeletePublishedPageImmediatelyError(..)
     , DeleteReasonError(..)
-    , DeleteSubmitSuccess(..)
     , DetailsError(..)
     , EditConflictContext
     , EditPageBody
@@ -16,9 +16,13 @@ module Submission exposing
     , MyPendingSubmissionsError(..)
     , NewPageBody
     , NewPageSubmitSuccess(..)
+    , PageDeleteFormError(..)
+    , PageDeleteFormSuccess(..)
+    , PageDeletionPreconditionError(..)
     , RejectReasonError(..)
     , RejectSubmissionError(..)
     , RequestChangesSubmissionError(..)
+    , RequestPublishedPageDeletionError(..)
     , ReviewQueueError(..)
     , ReviewQueueItem
     , SaveNewPageDraftError(..)
@@ -28,13 +32,13 @@ module Submission exposing
     , Submission
     , SubmitDraftForReviewError(..)
     , SubmitNewPageError(..)
-    , SubmitPageDeleteError(..)
     , SubmitPageEditError(..)
     , ValidationError(..)
     , WithdrawSubmissionError(..)
     , applyApprovedSubmission
     , approveSubmissionErrorToUserText
     , contributorViewFromSubmission
+    , deleteReasonErrorToUserText
     , currentPublishedRevision
     , deleteMySubmissionErrorToUserText
     , detailsErrorToUserText
@@ -48,11 +52,13 @@ module Submission exposing
     , myPendingSubmissionListItemFromSubmission
     , myPendingSubmissionsErrorToUserText
     , mySubmissionsForAuthorOnWiki
+    , pageDeleteFormErrorToUserText
     , pageSlugConstraintTitle
     , pageSlugFromKind
     , pageSlugHtmlMaxLength
     , pageSlugHtmlPattern
     , pendingEditForAuthorOnPageInUse
+    , pendingNewPageSlugBlocksTrustedPublish
     , pendingNewPageSlugInUse
     , pendingNewPageSlugInUseExcept
     , pendingSubmissionsForWiki
@@ -61,6 +67,7 @@ module Submission exposing
     , rejectReasonMaxLength
     , rejectSubmissionErrorToUserText
     , remapWikiSlugInSubmissions
+    , removeAuthorDraftNewPageSubmissionsForSlug
     , requestChangesSubmissionErrorToUserText
     , requestPendingSubmissionChanges
     , reviewQueueErrorToUserText
@@ -72,9 +79,9 @@ module Submission exposing
     , statusLabelUserText
     , submitDraftForReviewErrorToUserText
     , submitNewPageErrorToUserText
-    , submitPageDeleteErrorToUserText
     , submitPageEditErrorToUserText
     , validateDeleteReason
+    , validateDeleteReasonRequired
     , validateEditMarkdown
     , validateEditMarkdownDraft
     , validateNewPageDraftFields
@@ -104,7 +111,7 @@ idToString (Id s) =
     s
 
 
-{-| Story 9: sequential opaque ids from backend counter (not derived from payload).
+{-| Sequential opaque ids from backend counter (not derived from payload).
 -}
 idFromCounter : Int -> Id
 idFromCounter n =
@@ -198,8 +205,8 @@ type ContributorSubmissionKind
     | ContributorKindDeletePage
 
 
-{-| Payload for contributor submission detail (story 12).
-Story 13: optional reviewer feedback when status is Rejected or NeedsRevision.
+{-| Payload for contributor submission detail.
+Optional reviewer feedback when status is Rejected or NeedsRevision.
 Compare columns: original vs proposed (or placeholder for new pages / delete reasons).
 -}
 type alias ContributorView =
@@ -319,7 +326,7 @@ contributorViewFromSubmission maybeWiki sub =
     }
 
 
-{-| Trusted-only review queue (story 15).
+{-| Trusted-only review queue.
 -}
 type ReviewQueueError
     = ReviewQueueNotLoggedIn
@@ -344,7 +351,7 @@ reviewQueueErrorToUserText err =
             "This wiki is currently paused."
 
 
-{-| Summary row for moderators (story 15).
+{-| Summary row for moderators.
 -}
 type alias ReviewQueueItem =
     { id : Id
@@ -419,6 +426,7 @@ type MyPendingSubmissionsError
     = MyPendingSubmissionsNotLoggedIn
     | MyPendingSubmissionsWrongWikiSession
     | MyPendingSubmissionsWikiInactive
+    | MyPendingSubmissionsForbiddenTrustedModerator
 
 
 myPendingSubmissionsErrorToUserText : MyPendingSubmissionsError -> String
@@ -432,6 +440,9 @@ myPendingSubmissionsErrorToUserText err =
 
         MyPendingSubmissionsWikiInactive ->
             "This wiki is currently paused."
+
+        MyPendingSubmissionsForbiddenTrustedModerator ->
+            "Trusted moderators and wiki admins publish directly; the My Submissions list is only for standard contributors."
 
 
 type alias MyPendingSubmissionListItem =
@@ -485,7 +496,7 @@ myPendingSubmissionListItemFromSubmission sub =
     }
 
 
-{-| Trusted approval of a pending submission (story 17).
+{-| Trusted approval of a pending submission.
 -}
 type ApproveSubmissionError
     = ApproveNotLoggedIn
@@ -500,7 +511,7 @@ type ApproveSubmissionError
     | ApproveDeleteTargetNotPublished
 
 
-{-| Moderator rejection reason (story 18): trimmed, non-empty, bounded length.
+{-| Moderator rejection reason: trimmed, non-empty, bounded length.
 -}
 type RejectReasonError
     = RejectReasonEmpty
@@ -539,7 +550,7 @@ validateRejectReason raw =
         Ok trimmed
 
 
-{-| Trusted rejection of a pending submission (story 18); wiki content unchanged.
+{-| Trusted rejection of a pending submission; wiki content unchanged.
 -}
 type RejectSubmissionError
     = RejectNotLoggedIn
@@ -600,7 +611,7 @@ rejectPendingSubmission rawReason sub =
                     }
 
 
-{-| Trusted request for revision (story 19); wiki content unchanged.
+{-| Trusted request for revision; wiki content unchanged.
 -}
 type RequestChangesSubmissionError
     = RequestChangesNotLoggedIn
@@ -700,7 +711,7 @@ approveSubmissionErrorToUserText err =
             "The target page does not exist or has no published content yet."
 
 
-{-| Apply wiki mutation and mark submission approved (story 17). `wiki` is the current wiki state for `sub.wikiSlug`.
+{-| Apply wiki mutation and mark submission approved. `wiki` is the current wiki state for `sub.wikiSlug`.
 -}
 applyApprovedSubmission : Wiki.Wiki -> Submission -> Result ApproveSubmissionError { wiki : Wiki.Wiki, submission : Submission }
 applyApprovedSubmission wiki sub =
@@ -820,7 +831,7 @@ type SubmitNewPageError
     | SlugAlreadyInUse
 
 
-{-| Story 14: trusted contributors publish immediately; standard contributors get a pending submission id.
+{-| Trusted contributors publish immediately; standard contributors get a pending submission id.
 -}
 type NewPageSubmitSuccess
     = NewPagePublishedImmediately
@@ -890,7 +901,8 @@ submitPageEditErrorToUserText err =
 
 
 type DeleteReasonError
-    = ReasonTooLong
+    = ReasonRequired
+    | ReasonTooLong
 
 
 deleteReasonMaxLength : Int
@@ -901,6 +913,9 @@ deleteReasonMaxLength =
 deleteReasonErrorToUserText : DeleteReasonError -> String
 deleteReasonErrorToUserText err =
     case err of
+        ReasonRequired ->
+            "A deletion reason is required."
+
         ReasonTooLong ->
             "Reason must be at most 2000 characters."
 
@@ -924,40 +939,138 @@ validateDeleteReason raw =
         Ok (Just trimmed)
 
 
-type SubmitPageDeleteError
-    = DeleteNotLoggedIn
-    | DeleteWrongWikiSession
-    | DeleteWikiNotFound
-    | DeleteWikiInactive
-    | DeleteValidation DeleteReasonError
-    | DeleteTargetPageNotPublished
+{-| Required for trusted immediate page removal; trimmed non-empty string within max length.
+-}
+validateDeleteReasonRequired : String -> Result DeleteReasonError String
+validateDeleteReasonRequired raw =
+    let
+        trimmed : String
+        trimmed =
+            String.trim raw
+    in
+    if String.isEmpty trimmed then
+        Err ReasonRequired
+
+    else if String.length trimmed > deleteReasonMaxLength then
+        Err ReasonTooLong
+
+    else
+        Ok trimmed
 
 
-type DeleteSubmitSuccess
-    = DeletePublishedImmediately
-    | DeleteSubmittedForReview Id
+{-| Shared validation failures before applying a page-deletion intent (request vs immediate).
+-}
+type PageDeletionPreconditionError
+    = PageDeletionNotLoggedIn
+    | PageDeletionWrongWikiSession
+    | PageDeletionWikiNotFound
+    | PageDeletionWikiInactive
+    | PageDeletionValidation DeleteReasonError
+    | PageDeletionTargetNotPublished
 
 
-submitPageDeleteErrorToUserText : SubmitPageDeleteError -> String
-submitPageDeleteErrorToUserText err =
+pageDeletionPreconditionForRequestToUserText : PageDeletionPreconditionError -> String
+pageDeletionPreconditionForRequestToUserText err =
     case err of
-        DeleteNotLoggedIn ->
+        PageDeletionNotLoggedIn ->
             "You must be logged in to request a page deletion."
 
-        DeleteWrongWikiSession ->
+        PageDeletionWrongWikiSession ->
             "Your session is for a different wiki. Log in again on this wiki."
 
-        DeleteWikiNotFound ->
+        PageDeletionWikiNotFound ->
             "This wiki does not exist."
 
-        DeleteWikiInactive ->
+        PageDeletionWikiInactive ->
             "This wiki is currently paused."
 
-        DeleteValidation e ->
+        PageDeletionValidation e ->
             deleteReasonErrorToUserText e
 
-        DeleteTargetPageNotPublished ->
+        PageDeletionTargetNotPublished ->
             "That page does not exist or has no published content yet."
+
+
+pageDeletionPreconditionForImmediateDeleteToUserText : PageDeletionPreconditionError -> String
+pageDeletionPreconditionForImmediateDeleteToUserText err =
+    case err of
+        PageDeletionNotLoggedIn ->
+            "You must be logged in to remove a published page."
+
+        PageDeletionWrongWikiSession ->
+            "Your session is for a different wiki. Log in again on this wiki."
+
+        PageDeletionWikiNotFound ->
+            "This wiki does not exist."
+
+        PageDeletionWikiInactive ->
+            "This wiki is currently paused."
+
+        PageDeletionValidation e ->
+            deleteReasonErrorToUserText e
+
+        PageDeletionTargetNotPublished ->
+            "That page does not exist or has no published content yet."
+
+
+{-| `RequestPublishedPageDeletion` ToBackend: untrusted contributors only (pending delete submission).
+-}
+type RequestPublishedPageDeletionError
+    = RequestPublishedPageDeletionPrecondition PageDeletionPreconditionError
+    | RequestPublishedPageDeletionForbiddenTrustedModerator
+    | RequestPublishedPageDeletionSubmitDraftStepFailed SubmitDraftForReviewError
+
+
+requestPublishedPageDeletionErrorToUserText : RequestPublishedPageDeletionError -> String
+requestPublishedPageDeletionErrorToUserText err =
+    case err of
+        RequestPublishedPageDeletionPrecondition e ->
+            pageDeletionPreconditionForRequestToUserText e
+
+        RequestPublishedPageDeletionForbiddenTrustedModerator ->
+            "Trusted contributors and wiki admins remove pages immediately; use delete, not request deletion."
+
+        RequestPublishedPageDeletionSubmitDraftStepFailed e ->
+            submitDraftForReviewErrorToUserText e
+
+
+{-| `DeletePublishedPageImmediately` ToBackend: trusted contributors and wiki admins only.
+-}
+type DeletePublishedPageImmediatelyError
+    = DeletePublishedPageImmediatelyPrecondition PageDeletionPreconditionError
+    | DeletePublishedPageImmediatelyForbiddenUntrustedContributor
+
+
+deletePublishedPageImmediatelyErrorToUserText : DeletePublishedPageImmediatelyError -> String
+deletePublishedPageImmediatelyErrorToUserText err =
+    case err of
+        DeletePublishedPageImmediatelyPrecondition e ->
+            pageDeletionPreconditionForImmediateDeleteToUserText e
+
+        DeletePublishedPageImmediatelyForbiddenUntrustedContributor ->
+            "Request deletion so a trusted contributor can review; only trusted contributors and wiki admins may remove a page immediately."
+
+
+{-| Form state after either deletion path returns from the backend.
+-}
+type PageDeleteFormError
+    = PageDeleteRequestFailed RequestPublishedPageDeletionError
+    | PageDeleteImmediateFailed DeletePublishedPageImmediatelyError
+
+
+pageDeleteFormErrorToUserText : PageDeleteFormError -> String
+pageDeleteFormErrorToUserText err =
+    case err of
+        PageDeleteRequestFailed e ->
+            requestPublishedPageDeletionErrorToUserText e
+
+        PageDeleteImmediateFailed e ->
+            deletePublishedPageImmediatelyErrorToUserText e
+
+
+type PageDeleteFormSuccess
+    = DeletePublishedImmediately
+    | DeleteSubmittedForReview Id
 
 
 {-| True when the wiki has a page key with published markdown (same rule as public page reads).
@@ -1035,7 +1148,7 @@ normalizePageSlug raw =
         |> String.trim
 
 
-{-| Page slug rules only (trim, length, PascalCase character class). Same rules as hosted wiki slugs (story 29).
+{-| Page slug rules only (trim, length, PascalCase character class). Same rules as hosted wiki slugs.
 -}
 validatePageSlug : String -> Result ValidationError Page.Slug
 validatePageSlug rawSlug =
@@ -1095,6 +1208,40 @@ validateEditMarkdownDraft rawMarkdown =
     Ok (String.trim rawMarkdown)
 
 
+{-| For trusted `SubmitNewPage`: pending new-page (any author) blocks; another contributor's draft
+with that slug blocks; the author's own draft for that slug does not (they are publishing over it).
+-}
+pendingNewPageSlugBlocksTrustedPublish : ContributorAccount.Id -> Wiki.Slug -> Page.Slug -> Dict String Submission -> Bool
+pendingNewPageSlugBlocksTrustedPublish accountId wikiSlug pageSlug submissions =
+    submissions
+        |> Dict.values
+        |> List.any
+            (\sub ->
+                if sub.wikiSlug /= wikiSlug then
+                    False
+
+                else if not (newPageKindUsesSlug pageSlug sub) then
+                    False
+
+                else
+                    case sub.status of
+                        Pending ->
+                            True
+
+                        Draft ->
+                            sub.authorId /= accountId
+
+                        Approved ->
+                            False
+
+                        Rejected ->
+                            False
+
+                        NeedsRevision ->
+                            False
+            )
+
+
 {-| True when a draft or pending new-page submission already uses this slug on the wiki (any author).
 -}
 pendingNewPageSlugInUse : Wiki.Slug -> Page.Slug -> Dict String Submission -> Bool
@@ -1136,6 +1283,35 @@ newPageKindUsesSlug pageSlug sub =
 
         DeletePage _ ->
             False
+
+
+{-| After a trusted author publishes a new page live, drop their draft rows for that slug so
+submissions state stays consistent.
+-}
+removeAuthorDraftNewPageSubmissionsForSlug : ContributorAccount.Id -> Wiki.Slug -> Page.Slug -> Dict String Submission -> Dict String Submission
+removeAuthorDraftNewPageSubmissionsForSlug accountId wikiSlug pageSlug submissions =
+    submissions
+        |> Dict.filter
+            (\_ sub ->
+                not
+                    (sub.wikiSlug
+                        == wikiSlug
+                        && sub.authorId
+                        == accountId
+                        && sub.status
+                        == Draft
+                        && (case sub.kind of
+                                NewPage body ->
+                                    body.pageSlug == pageSlug
+
+                                EditPage _ ->
+                                    False
+
+                                DeletePage _ ->
+                                    False
+                           )
+                    )
+            )
 
 
 {-| Same as `pendingNewPageSlugInUse` but ignores one submission id (e.g. promoting own draft).
@@ -1378,6 +1554,7 @@ type SavePageDeleteDraftError
     | SavePageDeleteDraftForbidden
     | SavePageDeleteDraftWikiNotFound
     | SavePageDeleteDraftWikiInactive
+    | SavePageDeleteDraftForbiddenTrustedModerator
 
 
 savePageDeleteDraftErrorToUserText : SavePageDeleteDraftError -> String
@@ -1406,6 +1583,9 @@ savePageDeleteDraftErrorToUserText err =
 
         SavePageDeleteDraftWikiInactive ->
             "This wiki is currently paused."
+
+        SavePageDeleteDraftForbiddenTrustedModerator ->
+            "Trusted contributors and wiki admins remove pages directly; deletion drafts are not used."
 
 
 type WithdrawSubmissionError
@@ -1477,6 +1657,7 @@ type SubmitDraftForReviewError
     | SubmitDraftForReviewDeleteReasonInvalid DeleteReasonError
     | SubmitDraftForReviewNotFound
     | SubmitDraftForReviewForbidden
+    | SubmitDraftForReviewDeleteForbiddenTrustedModerator
 
 
 submitDraftForReviewErrorToUserText : SubmitDraftForReviewError -> String
@@ -1523,6 +1704,9 @@ submitDraftForReviewErrorToUserText err =
 
         SubmitDraftForReviewForbidden ->
             "You cannot submit this draft."
+
+        SubmitDraftForReviewDeleteForbiddenTrustedModerator ->
+            "Trusted contributors and wiki admins remove pages immediately; submit this deletion for review is not available for your account."
 
 
 {-| Turn a contributor draft into a pending review submission (pure). Rebases edit proposals on current published markdown.
@@ -1595,11 +1779,11 @@ promoteDraftToPending wiki allSubs sub =
                                 }
 
             DeletePage body ->
-                case validateDeleteReason (body.reason |> Maybe.withDefault "") of
+                case validateDeleteReasonRequired (body.reason |> Maybe.withDefault "") of
                     Err e ->
                         Err (SubmitDraftForReviewDeleteReasonInvalid e)
 
-                    Ok maybeReason ->
+                    Ok trimmedReason ->
                         if not (wikiHasPublishedPage body.pageSlug wiki) then
                             Err SubmitDraftForReviewDeleteTargetNotPublished
 
@@ -1611,7 +1795,7 @@ promoteDraftToPending wiki allSubs sub =
                                     , kind =
                                         DeletePage
                                             { pageSlug = body.pageSlug
-                                            , reason = maybeReason
+                                            , reason = Just trimmedReason
                                             }
                                 }
 

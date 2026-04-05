@@ -20,7 +20,7 @@ endToEndTests =
                 List.concat
                     [ ProgramTest.Actions.loginToWiki
                         { wikiSlug = "Demo"
-                        , username = "trustedpub"
+                        , username = "demo_trusted_publisher"
                         , password = "password12"
                         }
                         client
@@ -31,7 +31,7 @@ endToEndTests =
                             (ProgramTest.Query.withinId "wiki-review-queue-page"
                                 (ProgramTest.Query.withinDataAttribute "data-submission-id"
                                     "sub_1"
-                                    (ProgramTest.Query.expectHasText "statusdemo")
+                                    (ProgramTest.Query.expectHasText "demo_contributor")
                                 )
                             )
                       ]

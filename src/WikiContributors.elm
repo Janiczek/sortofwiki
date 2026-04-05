@@ -87,7 +87,7 @@ attemptRegister wikiSlug rawUsername plainPassword wikis registry =
                                     stored =
                                         { id = id
                                         , passwordVerifier = ContributorAccount.verifierFromPassword password
-                                        , role = WikiRole.UntrustedContributor
+                                        , role = WikiRole.UntrustedContributor WikiRole.defaultUntrustedContributorCaps
                                         }
 
                                     nextByWiki : Dict String StoredContributor
@@ -226,10 +226,10 @@ seedContributorAtWiki :
     -> Registry
     -> Result ContributorAccount.RegisterContributorError Registry
 seedContributorAtWiki wikiSlug rawUsername plainPassword wikis registry =
-    seedContributorAtWikiWithRole WikiRole.UntrustedContributor wikiSlug rawUsername plainPassword wikis registry
+    seedContributorAtWikiWithRole (WikiRole.UntrustedContributor WikiRole.defaultUntrustedContributorCaps) wikiSlug rawUsername plainPassword wikis registry
 
 
-{-| Seed a trusted contributor (demo / tests; story 14).
+{-| Seed a trusted contributor (demo / tests).
 -}
 seedTrustedContributorAtWiki :
     Wiki.Slug
@@ -242,7 +242,7 @@ seedTrustedContributorAtWiki wikiSlug rawUsername plainPassword wikis registry =
     seedContributorAtWikiWithRole WikiRole.TrustedContributor wikiSlug rawUsername plainPassword wikis registry
 
 
-{-| Seed a wiki admin (story 20).
+{-| Seed a wiki admin.
 -}
 seedAdminContributorAtWiki :
     Wiki.Slug
@@ -309,7 +309,7 @@ seedContributorAtWikiWithRole role wikiSlug rawUsername plainPassword wikis regi
                             Ok nextRegistry
 
 
-{-| Promote a user by normalized username (story 21). Fails if missing or not a contributor.
+{-| Promote a user by normalized username. Fails if missing or not a contributor.
 -}
 promoteContributorToTrustedAtWiki :
     Wiki.Slug
@@ -346,7 +346,7 @@ promoteContributorToTrustedAtWiki wikiSlug normalizedUsername registry =
                     Ok (Dict.insert wikiSlug nextByWiki registry)
 
 
-{-| Grant wiki admin to a trusted user by normalized username (story 23).
+{-| Grant wiki admin to a trusted user by normalized username.
 -}
 grantTrustedToAdminAtWiki :
     Wiki.Slug
@@ -383,7 +383,7 @@ grantTrustedToAdminAtWiki wikiSlug normalizedUsername registry =
                     Ok (Dict.insert wikiSlug nextByWiki registry)
 
 
-{-| Revoke wiki admin for another user by normalized username (story 24). Fails if missing, not admin, or target is the actor.
+{-| Revoke wiki admin for another user by normalized username. Fails if missing, not admin, or target is the actor.
 -}
 revokeAdminToTrustedAtWiki :
     Wiki.Slug
@@ -425,7 +425,7 @@ revokeAdminToTrustedAtWiki wikiSlug actorAccountId normalizedTargetUsername regi
                         Ok (Dict.insert wikiSlug nextByWiki registry)
 
 
-{-| Demote a user by normalized username (story 22). Fails if missing or not trusted.
+{-| Demote a user by normalized username. Fails if missing or not trusted.
 -}
 demoteTrustedToContributorAtWiki :
     Wiki.Slug

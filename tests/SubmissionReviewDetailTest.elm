@@ -25,11 +25,11 @@ suite =
                         sub =
                             { id = Submission.idFromKey "sub_queue_demo"
                             , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "statusdemo"
+                            , authorId = ContributorAccount.newAccountId "demo" "demo_contributor"
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = "QueueDemoPage"
-                                    , markdown = "Seeded pending submission for the trusted review queue (story 15)."
+                                    , markdown = "Seeded pending submission for the trusted review queue."
                                     }
                             , status = Submission.Pending
                             , reviewerNote = Nothing
@@ -39,7 +39,7 @@ suite =
                         |> Expect.equal
                             (SubmissionReviewDetail.NewPageDiff
                                 { pageSlug = "QueueDemoPage"
-                                , proposedMarkdown = "Seeded pending submission for the trusted review queue (story 15)."
+                                , proposedMarkdown = "Seeded pending submission for the trusted review queue."
                                 }
                             )
             , Test.test "EditPageDiff uses published markdown as before and submission body as after" <|
@@ -57,7 +57,7 @@ suite =
                         sub =
                             { id = Submission.idFromKey "sub_edit_demo"
                             , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "statusdemo"
+                            , authorId = ContributorAccount.newAccountId "demo" "demo_contributor"
                             , kind =
                                 Submission.EditPage
                                     { pageSlug = "home"
@@ -92,7 +92,7 @@ suite =
                         sub =
                             { id = Submission.idFromKey "sub_del_demo"
                             , wikiSlug = "demo"
-                            , authorId = ContributorAccount.newAccountId "demo" "statusdemo"
+                            , authorId = ContributorAccount.newAccountId "demo" "demo_contributor"
                             , kind =
                                 Submission.DeletePage
                                     { pageSlug = "guides"

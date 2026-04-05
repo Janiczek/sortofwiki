@@ -12,7 +12,7 @@ import Submission
 import Wiki
 
 
-{-| Trusted-only: full submission payload for moderation diff (story 16).
+{-| Trusted-only: full submission payload for moderation diff.
 -}
 type SubmissionReviewDetail
     = NewPageDiff

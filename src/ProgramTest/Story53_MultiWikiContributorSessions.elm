@@ -63,7 +63,7 @@ loginToWikiFromHome creds client =
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
     [ ProgramTest.Start.start
-        { name = "53 — same browser session can stay logged in to two wikis"
+        { name = "Same browser session can stay logged in to two wikis"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story53-multi-wiki"
         , path = "/w/Demo"
@@ -73,7 +73,7 @@ endToEndTests =
                 List.concat
                     [ loginToWikiFromHome
                         { wikiSlug = "Demo"
-                        , username = "trustedpub"
+                        , username = "demo_trusted_publisher"
                         , password = "password12"
                         }
                         client
@@ -106,7 +106,7 @@ endToEndTests =
                             (\model ->
                                 case ( Dict.get "Demo" model.contributorWikiSessions, Dict.get "ElmTips" model.contributorWikiSessions ) of
                                     ( Just demoS, Just elmS ) ->
-                                        if demoS.displayUsername == "trustedpub" && elmS.displayUsername == "elmtipsadmin" then
+                                        if demoS.displayUsername == "demo_trusted_publisher" && elmS.displayUsername == "elmtipsadmin" then
                                             Ok ()
 
                                         else
@@ -125,7 +125,7 @@ endToEndTests =
                       , client.update 100 (UrlChanged demoWikiHomeUrl)
                       , client.checkView 400 (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
                       , client.checkView 300
-                            (ProgramTest.Query.expectHasText "Logged in as trustedpub")
+                            (ProgramTest.Query.expectHasText "Logged in as demo_trusted_publisher")
                       ]
                     ]
         }

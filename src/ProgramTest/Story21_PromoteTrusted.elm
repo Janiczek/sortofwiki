@@ -11,7 +11,7 @@ import Wiki
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
     [ ProgramTest.Start.startWith
-        { name = "21 — admin promotes statusdemo to trusted; that user can open review queue"
+        { name = "21 — admin promotes demo_contributor to trusted; that user can open review queue"
         , config = ProgramTest.Config.demoWikiWithModerationSeeds
         , steps =
             [ ProgramTest.Start.connectFrontend
@@ -23,7 +23,7 @@ endToEndTests =
                         List.concat
                             [ ProgramTest.Actions.loginToWiki
                                 { wikiSlug = "Demo"
-                                , username = "wikidemo"
+                                , username = "demo_wiki_admin"
                                 , password = "password12"
                                 }
                                 client
@@ -32,16 +32,16 @@ endToEndTests =
                               , client.clickLink 100 (Wiki.adminUsersUrlPath "Demo")
                               , client.checkView 400
                                     (ProgramTest.Query.withinDataAttributes
-                                        [ ( "data-target-username", "statusdemo" )
+                                        [ ( "data-target-username", "demo_contributor" )
                                         , ( "data-context", "wiki-admin-promote-trusted" )
                                         ]
                                         (ProgramTest.Query.expectHasText "Promote")
                                     )
                               , client.click 100
-                                    (Effect.Browser.Dom.id "wiki-admin-promote-trusted-statusdemo")
+                                    (Effect.Browser.Dom.id "wiki-admin-promote-trusted-demo_contributor")
                               , client.checkView 600
                                     (ProgramTest.Query.withinDataAttribute "data-admin-user"
-                                        "statusdemo"
+                                        "demo_contributor"
                                         (ProgramTest.Query.withinDataAttribute "data-user-role"
                                             "Trusted"
                                             (ProgramTest.Query.expectHasText "Trusted")
@@ -59,7 +59,7 @@ endToEndTests =
                         List.concat
                             [ ProgramTest.Actions.loginToWiki
                                 { wikiSlug = "Demo"
-                                , username = "statusdemo"
+                                , username = "demo_contributor"
                                 , password = "password12"
                                 }
                                 client
@@ -70,7 +70,7 @@ endToEndTests =
                                     (ProgramTest.Query.withinId "wiki-review-queue-page"
                                         (ProgramTest.Query.withinDataAttribute "data-submission-id"
                                             "sub_1"
-                                            (ProgramTest.Query.expectHasText "statusdemo")
+                                            (ProgramTest.Query.expectHasText "demo_contributor")
                                         )
                                     )
                               ]

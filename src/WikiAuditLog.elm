@@ -30,7 +30,7 @@ import Time
 import Wiki
 
 
-{-| Single append-only audit row for a wiki (story 25).
+{-| Single append-only audit row for a wiki.
 -}
 type alias AuditEvent =
     { at : Time.Posix
@@ -49,10 +49,10 @@ type AuditEventKind
     | RevokedWikiAdmin { targetUsername : String }
     | TrustedPublishedNewPage { pageSlug : String }
     | TrustedPublishedPageEdit { pageSlug : String }
-    | TrustedPublishedPageDelete { pageSlug : String }
+    | TrustedPublishedPageDelete { pageSlug : String, reason : String }
 
 
-{-| Selectable audit event categories for filtering (story 26).
+{-| Selectable audit event categories for filtering.
 -}
 type AuditEventKindFilterTag
     = ApprovedSubmissionKind
@@ -232,7 +232,7 @@ kindMatchesAnySelectedTag tags kind =
             List.any (kindMatchesFilterTag kind) tags
 
 
-{-| Pure predicate for audit filtering (story 26).
+{-| Pure predicate for audit filtering.
 -}
 eventMatchesFilter : AuditLogFilter -> AuditEvent -> Bool
 eventMatchesFilter f ev =
@@ -570,8 +570,15 @@ eventKindUserText kind =
         TrustedPublishedPageEdit { pageSlug } ->
             "Trusted publish: edited page " ++ pageSlug
 
-        TrustedPublishedPageDelete { pageSlug } ->
-            "Trusted publish: deleted page " ++ pageSlug
+        TrustedPublishedPageDelete { pageSlug, reason } ->
+            "Trusted publish: deleted page "
+                ++ pageSlug
+                ++ (if String.isEmpty (String.trim reason) then
+                        ""
+
+                    else
+                        " — " ++ String.trim reason
+                   )
 
 
 formatEventRowText : AuditEvent -> String

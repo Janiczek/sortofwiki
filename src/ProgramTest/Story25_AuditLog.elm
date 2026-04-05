@@ -21,7 +21,7 @@ endToEndTests =
                 List.concat
                     [ ProgramTest.Actions.loginToWiki
                         { wikiSlug = "Demo"
-                        , username = "wikidemo"
+                        , username = "demo_wiki_admin"
                         , password = "password12"
                         }
                         client
@@ -41,7 +41,7 @@ endToEndTests =
                       , client.checkView 600
                             (ProgramTest.Query.withinId "wiki-admin-audit-list"
                                 (ProgramTest.Query.expectHasTexts
-                                    [ "wikidemo"
+                                    [ "demo_wiki_admin"
                                     , "Granted wiki admin to grantadmin_trusted"
                                     ]
                                 )

@@ -23,7 +23,7 @@ type Error
     | WikiInactive
 
 
-{-| Promote-to-trusted failures (story 21).
+{-| Promote-to-trusted failures.
 -}
 type PromoteContributorError
     = PromoteNotLoggedIn
@@ -35,7 +35,7 @@ type PromoteContributorError
     | PromoteTargetNotContributor
 
 
-{-| Demote-to-contributor failures (story 22).
+{-| Demote-to-contributor failures.
 -}
 type DemoteTrustedError
     = DemoteNotLoggedIn
@@ -47,7 +47,7 @@ type DemoteTrustedError
     | DemoteTargetNotTrusted
 
 
-{-| Grant-admin failures (story 23); `ToBackend` uses `GrantWikiAdmin`.
+{-| Grant-admin failures; `ToBackend` uses `GrantWikiAdmin`.
 -}
 type GrantTrustedToAdminError
     = GrantTrustedNotLoggedIn
@@ -59,7 +59,7 @@ type GrantTrustedToAdminError
     | GrantTrustedTargetNotTrusted
 
 
-{-| Revoke wiki admin failures (story 24); `ToBackend` uses `RevokeWikiAdmin`.
+{-| Revoke wiki admin failures; `ToBackend` uses `RevokeWikiAdmin`.
 -}
 type RevokeAdminError
     = RevokeAdminNotLoggedIn

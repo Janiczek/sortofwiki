@@ -56,11 +56,16 @@ suite =
                     WikiAuditLog.TrustedPublishedPageEdit { pageSlug = "home" }
                         |> WikiAuditLog.eventKindUserText
                         |> Expect.equal "Trusted publish: edited page home"
-            , Test.test "TrustedPublishedPageDelete" <|
+            , Test.test "TrustedPublishedPageDelete without reason text (legacy)" <|
                 \() ->
-                    WikiAuditLog.TrustedPublishedPageDelete { pageSlug = "gone" }
+                    WikiAuditLog.TrustedPublishedPageDelete { pageSlug = "gone", reason = "" }
                         |> WikiAuditLog.eventKindUserText
                         |> Expect.equal "Trusted publish: deleted page gone"
+            , Test.test "TrustedPublishedPageDelete includes trimmed reason" <|
+                \() ->
+                    WikiAuditLog.TrustedPublishedPageDelete { pageSlug = "gone", reason = "  obsolete  " }
+                        |> WikiAuditLog.eventKindUserText
+                        |> Expect.equal "Trusted publish: deleted page gone — obsolete"
             ]
         , Test.describe "formatEventRowText"
             [ Test.test "includes UTC YYYY-MM-DD HH:mm:ss.sss, actor, and kind text" <|

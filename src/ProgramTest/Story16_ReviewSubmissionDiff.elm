@@ -20,7 +20,7 @@ endToEndTests =
                 List.concat
                     [ ProgramTest.Actions.loginToWiki
                         { wikiSlug = "Demo"
-                        , username = "trustedpub"
+                        , username = "demo_trusted_publisher"
                         , password = "password12"
                         }
                         client
@@ -35,7 +35,7 @@ endToEndTests =
                                 , "wiki-review-diff-new"
                                 ]
                                 (ProgramTest.Query.expectHasInputValue
-                                    "Seeded pending submission for the trusted review queue (story 15)."
+                                    "Seeded pending submission for the trusted review queue."
                                 )
                             )
                       ]

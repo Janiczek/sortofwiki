@@ -10,7 +10,7 @@ import Wiki
 
 rejectReasonText : String
 rejectReasonText =
-    "Story 18: harmful or low-quality — blocked by trusted reviewer."
+    "Harmful or low-quality — blocked by trusted reviewer."
 
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
@@ -28,7 +28,7 @@ endToEndTests =
                         List.concat
                             [ ProgramTest.Actions.loginToWiki
                                 { wikiSlug = "Demo"
-                                , username = "trustedpub"
+                                , username = "demo_trusted_publisher"
                                 , password = "password12"
                                 }
                                 client
@@ -55,7 +55,7 @@ endToEndTests =
                         List.concat
                             [ ProgramTest.Actions.loginToWiki
                                 { wikiSlug = "Demo"
-                                , username = "statusdemo"
+                                , username = "demo_contributor"
                                 , password = "password12"
                                 }
                                 client

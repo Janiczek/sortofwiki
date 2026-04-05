@@ -13,7 +13,7 @@ import Frontend
 import Types exposing (ToBackend, ToFrontend)
 
 
-{-| `Effect.Test.Config` specialised to this app (same as all `ProgramTest.Story*` tests).
+{-| `Effect.Test.Config` specialised to this app (shared by all program tests under `src/ProgramTest/`).
 -}
 type alias Config =
     Effect.Test.Config ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model

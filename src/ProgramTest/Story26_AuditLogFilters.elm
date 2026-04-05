@@ -22,7 +22,7 @@ endToEndTests =
                 List.concat
                     [ ProgramTest.Actions.loginToWiki
                         { wikiSlug = "Demo"
-                        , username = "wikidemo"
+                        , username = "demo_wiki_admin"
                         , password = "password12"
                         }
                         client
@@ -30,13 +30,13 @@ endToEndTests =
                             (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
                       , client.clickLink 100 (Wiki.adminUsersUrlPath "Demo")
                       , client.checkView 400
-                            (ProgramTest.Query.withinId "wiki-admin-promote-trusted-statusdemo"
+                            (ProgramTest.Query.withinId "wiki-admin-promote-trusted-demo_contributor"
                                 (ProgramTest.Query.expectHasText "Promote")
                             )
-                      , client.click 100 (Effect.Browser.Dom.id "wiki-admin-promote-trusted-statusdemo")
+                      , client.click 100 (Effect.Browser.Dom.id "wiki-admin-promote-trusted-demo_contributor")
                       , client.checkView 600
                             (ProgramTest.Query.withinId "wiki-admin-users-page"
-                                (ProgramTest.Query.expectHasText "statusdemo")
+                                (ProgramTest.Query.expectHasText "demo_contributor")
                             )
                       , client.click 100 (Effect.Browser.Dom.id "wiki-admin-grant-admin-grantadmin_trusted")
                       , client.checkView 600

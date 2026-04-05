@@ -537,10 +537,11 @@ encodeAuditKind kind =
                 , ( "pageSlug", Encode.string pageSlug )
                 ]
 
-        WikiAuditLog.TrustedPublishedPageDelete { pageSlug } ->
+        WikiAuditLog.TrustedPublishedPageDelete { pageSlug, reason } ->
             Encode.object
                 [ ( "tag", Encode.string "trusted_published_page_delete" )
                 , ( "pageSlug", Encode.string pageSlug )
+                , ( "reason", Encode.string reason )
                 ]
 
 
@@ -615,8 +616,14 @@ decodeAuditKindFromTag tag =
                 (Decode.field "pageSlug" Decode.string)
 
         "trusted_published_page_delete" ->
-            Decode.map (\p -> WikiAuditLog.TrustedPublishedPageDelete { pageSlug = p })
+            Decode.map2
+                (\p r -> WikiAuditLog.TrustedPublishedPageDelete { pageSlug = p, reason = r })
                 (Decode.field "pageSlug" Decode.string)
+                (Decode.oneOf
+                    [ Decode.field "reason" Decode.string
+                    , Decode.succeed ""
+                    ]
+                )
 
         _ ->
             Decode.fail ("unknown audit event tag: " ++ tag)

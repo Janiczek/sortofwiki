@@ -55,7 +55,7 @@ endToEndTests =
                         List.concat
                             [ ProgramTest.Actions.loginToWiki
                                 { wikiSlug = "Demo"
-                                , username = "statusdemo"
+                                , username = "demo_contributor"
                                 , password = "password12"
                                 }
                                 client

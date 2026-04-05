@@ -8,6 +8,7 @@ import Store
 import Test exposing (Test)
 import Url
 import WikiAuditLog
+import WikiRole
 
 
 suite : Test
@@ -341,6 +342,46 @@ suite =
                             |> Url.fromString
                             |> Maybe.map Route.fromUrl
                             |> Expect.equal (Just (Route.HostAdmin (Just "/admin/wikis/new")))
+              , Test.describe "canAccess WikiMySubmissions"
+                    [ Test.test "true for untrusted contributor on active wiki" <|
+                        \() ->
+                            Route.canAccess
+                                { hostAdminAuthenticated = False
+                                , activeWikiSlug = "Demo"
+                                , contributorOnActiveWiki =
+                                    Just (WikiRole.UntrustedContributor WikiRole.defaultUntrustedContributorCaps)
+                                }
+                                (Route.WikiMySubmissions "Demo")
+                                |> Expect.equal True
+                    , Test.test "false for trusted contributor on active wiki" <|
+                        \() ->
+                            Route.canAccess
+                                { hostAdminAuthenticated = False
+                                , activeWikiSlug = "Demo"
+                                , contributorOnActiveWiki = Just WikiRole.TrustedContributor
+                                }
+                                (Route.WikiMySubmissions "Demo")
+                                |> Expect.equal False
+                    , Test.test "false for wiki admin on active wiki" <|
+                        \() ->
+                            Route.canAccess
+                                { hostAdminAuthenticated = False
+                                , activeWikiSlug = "Demo"
+                                , contributorOnActiveWiki = Just WikiRole.Admin
+                                }
+                                (Route.WikiMySubmissions "Demo")
+                                |> Expect.equal False
+                    , Test.test "false when wiki slug does not match active wiki" <|
+                        \() ->
+                            Route.canAccess
+                                { hostAdminAuthenticated = False
+                                , activeWikiSlug = "ElmTips"
+                                , contributorOnActiveWiki =
+                                    Just (WikiRole.UntrustedContributor WikiRole.defaultUntrustedContributorCaps)
+                                }
+                                (Route.WikiMySubmissions "Demo")
+                                |> Expect.equal False
+                    ]
               ]
             ]
         )

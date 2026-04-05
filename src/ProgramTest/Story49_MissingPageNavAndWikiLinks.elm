@@ -1,6 +1,7 @@
 module ProgramTest.Story49_MissingPageNavAndWikiLinks exposing (endToEndTests)
 
 import Effect.Browser.Dom
+import ProgramTest.Actions
 import ProgramTest.Config
 import ProgramTest.Query
 import ProgramTest.Start
@@ -44,7 +45,7 @@ endToEndTests =
                 [ client.checkView 100
                     (ProgramTest.Query.withinTagAndHref "a"
                         "/w/Demo/p/Story49MissingPage"
-                        (ProgramTest.Query.expectHasClass "text-red-600")
+                        (ProgramTest.Query.expectHasClass "!text-red-600")
                     )
                 ]
         }
@@ -56,22 +57,25 @@ endToEndTests =
         , connectClientMs = Nothing
         , clientSteps =
             \client ->
-                [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story49prefilluser"
-                , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
-                , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
-                , client.checkView 400
-                    (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
-                , client.update 100 (UrlChanged prefillMissingPublishedPageUrl)
-                , client.clickLink 100 (Wiki.submitNewPageUrlPathWithSuggestedSlug "Demo" "Story49PrefillSlug")
-                , client.checkView 100
-                    (ProgramTest.Query.withinId "slug-input"
-                        (ProgramTest.Query.expectAll
-                            [ ProgramTest.Query.expectHasInputValue "Story49PrefillSlug"
-                            , ProgramTest.Query.expectHasReadonly
-                            ]
-                        )
-                    )
-                ]
+                List.concat
+                    [ [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story49prefilluser"
+                      , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
+                      ]
+                    , ProgramTest.Actions.triggerFormSubmit "wiki-register-form" client
+                    , [ client.checkView 400
+                            (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
+                      , client.update 100 (UrlChanged prefillMissingPublishedPageUrl)
+                      , client.clickLink 100 (Wiki.submitNewPageUrlPathWithSuggestedSlug "Demo" "Story49PrefillSlug")
+                      , client.checkView 100
+                            (ProgramTest.Query.withinId "slug-input"
+                                (ProgramTest.Query.expectAll
+                                    [ ProgramTest.Query.expectHasInputValue "Story49PrefillSlug"
+                                    , ProgramTest.Query.expectHasReadonly
+                                    ]
+                                )
+                            )
+                      ]
+                    ]
         }
     , ProgramTest.Start.start
         { name = "49 — submit/new without ?page= leaves page slug editable"
@@ -81,17 +85,20 @@ endToEndTests =
         , connectClientMs = Nothing
         , clientSteps =
             \client ->
-                [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story49editableslug"
-                , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
-                , client.click 100 (Effect.Browser.Dom.id "wiki-register-submit")
-                , client.checkView 400
-                    (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
-                , client.update 100 (UrlChanged submitNewNoQueryUrl)
-                , client.checkView 100
-                    (ProgramTest.Query.withinId "slug-input"
-                        ProgramTest.Query.expectDoesNotHaveReadonly
-                    )
-                ]
+                List.concat
+                    [ [ client.input 100 (Effect.Browser.Dom.id "wiki-register-username") "story49editableslug"
+                      , client.input 100 (Effect.Browser.Dom.id "wiki-register-password") "password12"
+                      ]
+                    , ProgramTest.Actions.triggerFormSubmit "wiki-register-form" client
+                    , [ client.checkView 400
+                            (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
+                      , client.update 100 (UrlChanged submitNewNoQueryUrl)
+                      , client.checkView 100
+                            (ProgramTest.Query.withinId "slug-input"
+                                ProgramTest.Query.expectDoesNotHaveReadonly
+                            )
+                      ]
+                    ]
         }
     , ProgramTest.Start.start
         { name = "49 — missing-page create link targets submit/new with page hint"

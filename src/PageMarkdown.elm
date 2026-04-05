@@ -3,6 +3,7 @@ module PageMarkdown exposing (view, viewPreview)
 import Html exposing (Html)
 import Html.Attributes as Attr
 import Markdown.Block as Block
+import Markdown.Html
 import Markdown.Renderer as MarkdownRenderer
 import Page
 import TW
@@ -18,20 +19,27 @@ Use a distinct `containerId` when several previews appear on one page.
 -}
 viewPreview : String -> Wiki.Slug -> (Page.Slug -> Bool) -> String -> Html msg
 viewPreview containerId wikiSlug publishedSlugExists markdownSource =
+    let
+        body : List (Html msg)
+        body =
+            case
+                WikiPageMarkdownParse.blocksWithHeadingSlugs wikiSlug publishedSlugExists markdownSource
+                    |> Result.andThen (MarkdownRenderer.renderWithMeta htmlRendererWithHeadingIds)
+            of
+                Ok elements ->
+                    elements
+
+                Err _ ->
+                    [ Html.p [] [ Html.text "Could not render this page as Markdown." ] ]
+    in
     Html.div
         [ Attr.id containerId
         , TW.cls UI.markdownContainerClass
         ]
-        (case
-            WikiPageMarkdownParse.blocksWithHeadingSlugs wikiSlug publishedSlugExists markdownSource
-                |> Result.andThen (MarkdownRenderer.renderWithMeta htmlRendererWithHeadingIds)
-         of
-            Ok elements ->
-                elements
-
-            Err _ ->
-                [ Html.p [] [ Html.text "Could not render this page as Markdown." ] ]
-        )
+        [ Html.div
+            [ TW.cls "min-w-0" ]
+            body
+        ]
 
 
 {-| Same as `viewPreview` with id `page-markdown` (published page body).
@@ -131,6 +139,13 @@ htmlRendererWithHeadingIds maybeSlug =
             \{ body } ->
                 Html.pre [ TW.cls UI.markdownCodeBlockPreClass ]
                     [ Html.code [ TW.cls UI.markdownCodeBlockCodeClass ] [ Html.text body ] ]
+        , html =
+            Markdown.Html.oneOf
+                [ Markdown.Html.tag "inline-equation" inlineEquationHtml
+                    |> Markdown.Html.withAttribute "data-equation"
+                , Markdown.Html.tag "block-equation" blockEquationHtml
+                    |> Markdown.Html.withAttribute "data-equation"
+                ]
         , thematicBreak =
             Html.hr [ TW.cls UI.markdownThematicBreakClass ] []
     }
@@ -189,3 +204,17 @@ markdownListItemHtml listItem =
                         , Html.text " "
                         , Html.span [] children
                         ]
+
+
+inlineEquationHtml : String -> List (Html msg) -> Html msg
+inlineEquationHtml equation _ =
+    Html.node "inline-equation"
+        [ Attr.attribute "data-equation" equation ]
+        []
+
+
+blockEquationHtml : String -> List (Html msg) -> Html msg
+blockEquationHtml equation _ =
+    Html.node "block-equation"
+        [ Attr.attribute "data-equation" equation ]
+        []

@@ -23,8 +23,8 @@ clientKey =
     "moderation-audit-test-client"
 
 
-trustedpubOnDemo : Backend.Model
-trustedpubOnDemo =
+demoTrustedPublisherOnDemo : Backend.Model
+demoTrustedPublisherOnDemo =
     let
         m : Backend.Model
         m =
@@ -34,7 +34,7 @@ trustedpubOnDemo =
         | contributorSessions =
             WikiUser.bindContributor sessionKey
                 "Demo"
-                (ContributorAccount.newAccountId "Demo" "trustedpub")
+                (ContributorAccount.newAccountId "Demo" "demo_trusted_publisher")
                 m.contributorSessions
     }
 
@@ -61,7 +61,7 @@ lastDemoEvent model =
 expectActorTrustedModerator : WikiAuditLog.AuditEvent -> Expect.Expectation
 expectActorTrustedModerator ev =
     ev.actorUsername
-        |> Expect.equal "trustedpub"
+        |> Expect.equal "demo_trusted_publisher"
 
 
 suite : Test
@@ -73,7 +73,7 @@ suite =
                     let
                         after : Backend.Model
                         after =
-                            updateTrusted (Time.millisToPosix 0) (ApproveSubmission "Demo" "sub_1") trustedpubOnDemo
+                            updateTrusted (Time.millisToPosix 0) (ApproveSubmission "Demo" "sub_1") demoTrustedPublisherOnDemo
                     in
                     case lastDemoEvent after of
                         Nothing ->
@@ -123,7 +123,7 @@ suite =
                         after =
                             updateTrusted (Time.millisToPosix 0)
                                 (RejectSubmission "Demo" { submissionId = "sub_1", reasonText = "blocked" })
-                                trustedpubOnDemo
+                                demoTrustedPublisherOnDemo
                     in
                     case lastDemoEvent after of
                         Nothing ->
@@ -173,7 +173,7 @@ suite =
                         after =
                             updateTrusted (Time.millisToPosix 0)
                                 (RequestSubmissionChanges "Demo" { submissionId = "sub_2", guidanceText = "revise" })
-                                trustedpubOnDemo
+                                demoTrustedPublisherOnDemo
                     in
                     case lastDemoEvent after of
                         Nothing ->
@@ -221,7 +221,7 @@ suite =
                     let
                         afterApprove : Backend.Model
                         afterApprove =
-                            updateTrusted (Time.millisToPosix 1000) (ApproveSubmission "Demo" "sub_1") trustedpubOnDemo
+                            updateTrusted (Time.millisToPosix 1000) (ApproveSubmission "Demo" "sub_1") demoTrustedPublisherOnDemo
 
                         afterBoth : Backend.Model
                         afterBoth =

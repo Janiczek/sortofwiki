@@ -10,12 +10,12 @@ import Wiki
 
 rejectReasonStory34 : String
 rejectReasonStory34 =
-    "Story 34: reject path must appear in wiki admin audit."
+    "Rejected after review: content does not meet the quality bar for publication."
 
 
 requestChangesNoteStory34 : String
 requestChangesNoteStory34 =
-    "Story 34: request-changes path must appear in wiki admin audit."
+    "Please add citations and clarify the introduction before resubmitting."
 
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
@@ -33,7 +33,7 @@ endToEndTests =
                         List.concat
                             [ ProgramTest.Actions.loginToWiki
                                 { wikiSlug = "Demo"
-                                , username = "trustedpub"
+                                , username = "demo_trusted_publisher"
                                 , password = "password12"
                                 }
                                 client
@@ -58,7 +58,7 @@ endToEndTests =
                         List.concat
                             [ ProgramTest.Actions.loginToWiki
                                 { wikiSlug = "Demo"
-                                , username = "wikidemo"
+                                , username = "demo_wiki_admin"
                                 , password = "password12"
                                 }
                                 client
@@ -68,7 +68,7 @@ endToEndTests =
                               , client.checkView 600
                                     (ProgramTest.Query.withinId "wiki-admin-audit-list"
                                         (ProgramTest.Query.expectHasTexts
-                                            [ "trustedpub"
+                                            [ "demo_trusted_publisher"
                                             , "Approved submission"
                                             ]
                                         )
@@ -91,7 +91,7 @@ endToEndTests =
                         List.concat
                             [ ProgramTest.Actions.loginToWiki
                                 { wikiSlug = "Demo"
-                                , username = "trustedpub"
+                                , username = "demo_trusted_publisher"
                                 , password = "password12"
                                 }
                                 client
@@ -118,7 +118,7 @@ endToEndTests =
                         List.concat
                             [ ProgramTest.Actions.loginToWiki
                                 { wikiSlug = "Demo"
-                                , username = "wikidemo"
+                                , username = "demo_wiki_admin"
                                 , password = "password12"
                                 }
                                 client
@@ -128,7 +128,7 @@ endToEndTests =
                               , client.checkView 600
                                     (ProgramTest.Query.withinId "wiki-admin-audit-list"
                                         (ProgramTest.Query.expectHasTexts
-                                            [ "trustedpub"
+                                            [ "demo_trusted_publisher"
                                             , "Rejected submission"
                                             ]
                                         )
@@ -151,7 +151,7 @@ endToEndTests =
                         List.concat
                             [ ProgramTest.Actions.loginToWiki
                                 { wikiSlug = "Demo"
-                                , username = "trustedpub"
+                                , username = "demo_trusted_publisher"
                                 , password = "password12"
                                 }
                                 client
@@ -178,7 +178,7 @@ endToEndTests =
                         List.concat
                             [ ProgramTest.Actions.loginToWiki
                                 { wikiSlug = "Demo"
-                                , username = "wikidemo"
+                                , username = "demo_wiki_admin"
                                 , password = "password12"
                                 }
                                 client
@@ -188,7 +188,7 @@ endToEndTests =
                               , client.checkView 600
                                     (ProgramTest.Query.withinId "wiki-admin-audit-list"
                                         (ProgramTest.Query.expectHasTexts
-                                            [ "trustedpub"
+                                            [ "demo_trusted_publisher"
                                             , "Requested changes"
                                             ]
                                         )

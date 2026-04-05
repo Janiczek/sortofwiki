@@ -7,9 +7,7 @@ module Page exposing
     , incrementPublishedRevision
     , pendingOnly
     , publishedMarkdownForLinks
-    , publishedPageTitle
     , publishedRevision
-    , titleHintFromMarkdown
     , withPublished
     , withPublishedAndPending
     )
@@ -105,64 +103,3 @@ frontendDetails markdownSource backlinks =
             |> Set.fromList
             |> Set.toList
     }
-
-
-{-| If the source begins with an ATX H1 line (`# Title`), returns the title text.
-Used for page chrome when the published body repeats the same heading.
--}
-titleHintFromMarkdown : String -> Maybe String
-titleHintFromMarkdown raw =
-    raw
-        |> String.trim
-        |> String.lines
-        |> List.head
-        |> Maybe.andThen parseAtxH1Line
-
-
-parseAtxH1Line : String -> Maybe String
-parseAtxH1Line line =
-    let
-        trimmed : String
-        trimmed =
-            String.trim line
-    in
-    if String.startsWith "#" trimmed then
-        trimmed
-            |> String.dropLeft 1
-            |> String.trim
-            |> stripClosingAtxHashes
-            |> (\t ->
-                    if String.isEmpty t then
-                        Nothing
-
-                    else
-                        Just t
-               )
-
-    else
-        Nothing
-
-
-stripClosingAtxHashes : String -> String
-stripClosingAtxHashes s0 =
-    let
-        s : String
-        s =
-            String.trimRight s0
-    in
-    if String.endsWith "#" s && s /= "#" then
-        s
-            |> String.dropRight 1
-            |> String.trimRight
-            |> stripClosingAtxHashes
-
-    else
-        s
-
-
-{-| Display title for a published page: first markdown H1 if present, else the page slug.
--}
-publishedPageTitle : Slug -> FrontendDetails -> String
-publishedPageTitle slug details =
-    titleHintFromMarkdown details.markdownSource
-        |> Maybe.withDefault slug

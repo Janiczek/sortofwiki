@@ -61,7 +61,7 @@ applyHostedWikiSlugRename oldSlug newSlug nextWiki model =
     }
 
 
-{-| Append one audit row at `now` (stories 25, 34).
+{-| Append one audit row at `now`.
 Uses the acting account id (moderator / admin), not submission authors.
 -}
 recordAudit : Time.Posix -> Wiki.Slug -> ContributorAccount.Id -> WikiAuditLog.AuditEventKind -> Model -> Model
@@ -101,9 +101,9 @@ update msg model =
 
 {-| Client messages from Lamdera.
 
-**Authorization (story 33):** privileged handlers consult `contributorSessions` and `hostSessions`
+**Authorization:** privileged handlers consult `contributorSessions` and `hostSessions`
 (and wiki binding) before changing state. Regression coverage: `tests/BackendAuthorizationTest.elm`
-(per-message `Err` and no mutation where applicable) and `ProgramTest.Story33_BackendAuthorization`.
+(per-message `Err` and no mutation where applicable; see program tests for backend authorization).
 
 **Public:** `RequestWikiCatalog`, `RequestWikiFrontendDetails`, `RequestPageFrontendDetails`.
 **Credential setup:** `RegisterContributor`, `LoginContributor`, `LogoutContributor`, `HostAdminLogin`.
@@ -255,11 +255,15 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                         respond (Err Submission.MyPendingSubmissionsWrongWikiSession)
 
                     WikiUser.SessionHasAccount accountId ->
-                        model.submissions
-                            |> Submission.mySubmissionsForAuthorOnWiki wikiSlug accountId
-                            |> List.map Submission.myPendingSubmissionListItemFromSubmission
-                            |> Ok
-                            |> respond
+                        if WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors then
+                            respond (Err Submission.MyPendingSubmissionsForbiddenTrustedModerator)
+
+                        else
+                            model.submissions
+                                |> Submission.mySubmissionsForAuthorOnWiki wikiSlug accountId
+                                |> List.map Submission.myPendingSubmissionListItemFromSubmission
+                                |> Ok
+                                |> respond
 
         RequestWikiUsers wikiSlug ->
             let
@@ -722,7 +726,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                         , contributorSessions = nextSessions
                       }
                     , Effect.Lamdera.sendToFrontend clientId
-                        (RegisterContributorResponse wikiSlug (Ok WikiRole.UntrustedContributor))
+                        (RegisterContributorResponse wikiSlug (Ok (WikiRole.UntrustedContributor WikiRole.defaultUntrustedContributorCaps)))
                     )
 
         LoginContributor wikiSlug cred ->
@@ -746,7 +750,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                         role : WikiRole.WikiRole
                         role =
                             WikiContributors.roleForAccount wikiSlug accountId model.contributors
-                                |> Maybe.withDefault WikiRole.UntrustedContributor
+                                |> Maybe.withDefault (WikiRole.UntrustedContributor WikiRole.defaultUntrustedContributorCaps)
                     in
                     ( { model | contributorSessions = nextSessions }
                     , Effect.Lamdera.sendToFrontend clientId
@@ -805,33 +809,42 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                         if Dict.member payload.pageSlug wiki.pages then
                                             respondErr Submission.SlugAlreadyInUse
 
+                                        else if WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors then
+                                            if Submission.pendingNewPageSlugBlocksTrustedPublish accountId wikiSlug payload.pageSlug model.submissions then
+                                                respondErr Submission.SlugAlreadyInUse
+
+                                            else
+                                                let
+                                                    submissionsAfterDraftCleanup : Dict String Submission.Submission
+                                                    submissionsAfterDraftCleanup =
+                                                        Submission.removeAuthorDraftNewPageSubmissionsForSlug accountId wikiSlug payload.pageSlug model.submissions
+
+                                                    nextWiki : Wiki
+                                                    nextWiki =
+                                                        Wiki.publishNewPageOnWiki payload wiki
+
+                                                    nextModel0 : Model
+                                                    nextModel0 =
+                                                        { model
+                                                            | wikis = Dict.insert wikiSlug nextWiki model.wikis
+                                                            , submissions = submissionsAfterDraftCleanup
+                                                        }
+
+                                                    nextModel : Model
+                                                    nextModel =
+                                                        recordAudit now
+                                                            wikiSlug
+                                                            accountId
+                                                            (WikiAuditLog.TrustedPublishedNewPage { pageSlug = payload.pageSlug })
+                                                            nextModel0
+                                                in
+                                                ( nextModel
+                                                , Effect.Lamdera.sendToFrontend clientId
+                                                    (SubmitNewPageResponse wikiSlug (Ok Submission.NewPagePublishedImmediately))
+                                                )
+
                                         else if Submission.pendingNewPageSlugInUse wikiSlug payload.pageSlug model.submissions then
                                             respondErr Submission.SlugAlreadyInUse
-
-                                        else if WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors then
-                                            let
-                                                nextWiki : Wiki
-                                                nextWiki =
-                                                    Wiki.publishNewPageOnWiki payload wiki
-
-                                                nextModel0 : Model
-                                                nextModel0 =
-                                                    { model
-                                                        | wikis = Dict.insert wikiSlug nextWiki model.wikis
-                                                    }
-
-                                                nextModel : Model
-                                                nextModel =
-                                                    recordAudit now
-                                                        wikiSlug
-                                                        accountId
-                                                        (WikiAuditLog.TrustedPublishedNewPage { pageSlug = payload.pageSlug })
-                                                        nextModel0
-                                            in
-                                            ( nextModel
-                                            , Effect.Lamdera.sendToFrontend clientId
-                                                (SubmitNewPageResponse wikiSlug (Ok Submission.NewPagePublishedImmediately))
-                                            )
 
                                         else
                                             let
@@ -976,101 +989,151 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                 (SubmitPageEditResponse wikiSlug (Ok (Submission.EditSubmittedForReview submissionId)))
                                             )
 
-        SubmitPageDelete wikiSlug pageSlug rawReason ->
+        RequestPublishedPageDeletion wikiSlug pageSlug rawReason ->
             let
                 sessionKey : String
                 sessionKey =
                     Effect.Lamdera.sessionIdToString sessionId
 
-                respondErr : Submission.SubmitPageDeleteError -> ( Model, Command BackendOnly ToFrontend Msg )
+                respondErr : Submission.RequestPublishedPageDeletionError -> ( Model, Command BackendOnly ToFrontend Msg )
                 respondErr err =
                     ( model
                     , Effect.Lamdera.sendToFrontend clientId
-                        (SubmitPageDeleteResponse wikiSlug (Err err))
+                        (RequestPublishedPageDeletionResponse wikiSlug (Err err))
                     )
             in
             case WikiUser.sessionContributorOnWiki sessionKey wikiSlug model.contributorSessions of
                 WikiUser.SessionNotLoggedIn ->
-                    respondErr Submission.DeleteNotLoggedIn
+                    respondErr (Submission.RequestPublishedPageDeletionPrecondition Submission.PageDeletionNotLoggedIn)
 
                 WikiUser.SessionWrongWiki ->
-                    respondErr Submission.DeleteWrongWikiSession
+                    respondErr (Submission.RequestPublishedPageDeletionPrecondition Submission.PageDeletionWrongWikiSession)
 
                 WikiUser.SessionHasAccount accountId ->
-                    case Dict.get wikiSlug model.wikis of
-                        Nothing ->
-                            respondErr Submission.DeleteWikiNotFound
+                    if WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors then
+                        respondErr Submission.RequestPublishedPageDeletionForbiddenTrustedModerator
 
-                        Just wiki ->
-                            if not wiki.active then
-                                respondErr Submission.DeleteWikiInactive
+                    else
+                        case Dict.get wikiSlug model.wikis of
+                            Nothing ->
+                                respondErr (Submission.RequestPublishedPageDeletionPrecondition Submission.PageDeletionWikiNotFound)
 
-                            else
-                                case Submission.validateDeleteReason rawReason of
-                                    Err ve ->
-                                        respondErr (Submission.DeleteValidation ve)
+                            Just wiki ->
+                                if not wiki.active then
+                                    respondErr (Submission.RequestPublishedPageDeletionPrecondition Submission.PageDeletionWikiInactive)
 
-                                    Ok maybeReason ->
-                                        if not (Submission.wikiHasPublishedPage pageSlug wiki) then
-                                            respondErr Submission.DeleteTargetPageNotPublished
+                                else
+                                    case Submission.validateDeleteReasonRequired rawReason of
+                                        Err ve ->
+                                            respondErr (Submission.RequestPublishedPageDeletionPrecondition (Submission.PageDeletionValidation ve))
 
-                                        else if WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors then
-                                            let
-                                                nextWiki : Wiki
-                                                nextWiki =
-                                                    Wiki.removePublishedPage pageSlug wiki
+                                        Ok deletionReason ->
+                                            if not (Submission.wikiHasPublishedPage pageSlug wiki) then
+                                                respondErr (Submission.RequestPublishedPageDeletionPrecondition Submission.PageDeletionTargetNotPublished)
 
-                                                nextModel0 : Model
-                                                nextModel0 =
-                                                    { model
-                                                        | wikis = Dict.insert wikiSlug nextWiki model.wikis
-                                                    }
+                                            else
+                                                let
+                                                    submissionId : Submission.Id
+                                                    submissionId =
+                                                        Submission.idFromCounter model.nextSubmissionCounter
 
-                                                nextModel : Model
-                                                nextModel =
-                                                    recordAudit now
-                                                        wikiSlug
-                                                        accountId
-                                                        (WikiAuditLog.TrustedPublishedPageDelete { pageSlug = pageSlug })
-                                                        nextModel0
-                                            in
-                                            ( nextModel
-                                            , Effect.Lamdera.sendToFrontend clientId
-                                                (SubmitPageDeleteResponse wikiSlug (Ok Submission.DeletePublishedImmediately))
-                                            )
+                                                    sub : Submission.Submission
+                                                    sub =
+                                                        { id = submissionId
+                                                        , wikiSlug = wikiSlug
+                                                        , authorId = accountId
+                                                        , kind =
+                                                            Submission.DeletePage
+                                                                { pageSlug = pageSlug
+                                                                , reason = Just deletionReason
+                                                                }
+                                                        , status = Submission.Pending
+                                                        , reviewerNote = Nothing
+                                                        }
 
-                                        else
-                                            let
-                                                submissionId : Submission.Id
-                                                submissionId =
-                                                    Submission.idFromCounter model.nextSubmissionCounter
+                                                    nextModel : Model
+                                                    nextModel =
+                                                        { model
+                                                            | submissions =
+                                                                Dict.insert (Submission.idToString submissionId) sub model.submissions
+                                                            , nextSubmissionCounter = model.nextSubmissionCounter + 1
+                                                        }
+                                                in
+                                                ( nextModel
+                                                , Effect.Lamdera.sendToFrontend clientId
+                                                    (RequestPublishedPageDeletionResponse wikiSlug (Ok submissionId))
+                                                )
 
-                                                sub : Submission.Submission
-                                                sub =
-                                                    { id = submissionId
-                                                    , wikiSlug = wikiSlug
-                                                    , authorId = accountId
-                                                    , kind =
-                                                        Submission.DeletePage
-                                                            { pageSlug = pageSlug
-                                                            , reason = maybeReason
-                                                            }
-                                                    , status = Submission.Pending
-                                                    , reviewerNote = Nothing
-                                                    }
+        DeletePublishedPageImmediately wikiSlug pageSlug rawReason ->
+            let
+                sessionKey : String
+                sessionKey =
+                    Effect.Lamdera.sessionIdToString sessionId
 
-                                                nextModel : Model
-                                                nextModel =
-                                                    { model
-                                                        | submissions =
-                                                            Dict.insert (Submission.idToString submissionId) sub model.submissions
-                                                        , nextSubmissionCounter = model.nextSubmissionCounter + 1
-                                                    }
-                                            in
-                                            ( nextModel
-                                            , Effect.Lamdera.sendToFrontend clientId
-                                                (SubmitPageDeleteResponse wikiSlug (Ok (Submission.DeleteSubmittedForReview submissionId)))
-                                            )
+                respondErr : Submission.DeletePublishedPageImmediatelyError -> ( Model, Command BackendOnly ToFrontend Msg )
+                respondErr err =
+                    ( model
+                    , Effect.Lamdera.sendToFrontend clientId
+                        (DeletePublishedPageImmediatelyResponse wikiSlug (Err err))
+                    )
+            in
+            case WikiUser.sessionContributorOnWiki sessionKey wikiSlug model.contributorSessions of
+                WikiUser.SessionNotLoggedIn ->
+                    respondErr (Submission.DeletePublishedPageImmediatelyPrecondition Submission.PageDeletionNotLoggedIn)
+
+                WikiUser.SessionWrongWiki ->
+                    respondErr (Submission.DeletePublishedPageImmediatelyPrecondition Submission.PageDeletionWrongWikiSession)
+
+                WikiUser.SessionHasAccount accountId ->
+                    if not (WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors) then
+                        respondErr Submission.DeletePublishedPageImmediatelyForbiddenUntrustedContributor
+
+                    else
+                        case Dict.get wikiSlug model.wikis of
+                            Nothing ->
+                                respondErr (Submission.DeletePublishedPageImmediatelyPrecondition Submission.PageDeletionWikiNotFound)
+
+                            Just wiki ->
+                                if not wiki.active then
+                                    respondErr (Submission.DeletePublishedPageImmediatelyPrecondition Submission.PageDeletionWikiInactive)
+
+                                else
+                                    case Submission.validateDeleteReasonRequired rawReason of
+                                        Err ve ->
+                                            respondErr (Submission.DeletePublishedPageImmediatelyPrecondition (Submission.PageDeletionValidation ve))
+
+                                        Ok deletionReason ->
+                                            if not (Submission.wikiHasPublishedPage pageSlug wiki) then
+                                                respondErr (Submission.DeletePublishedPageImmediatelyPrecondition Submission.PageDeletionTargetNotPublished)
+
+                                            else
+                                                let
+                                                    nextWiki : Wiki
+                                                    nextWiki =
+                                                        Wiki.removePublishedPage pageSlug wiki
+
+                                                    nextModel0 : Model
+                                                    nextModel0 =
+                                                        { model
+                                                            | wikis = Dict.insert wikiSlug nextWiki model.wikis
+                                                        }
+
+                                                    nextModel : Model
+                                                    nextModel =
+                                                        recordAudit now
+                                                            wikiSlug
+                                                            accountId
+                                                            (WikiAuditLog.TrustedPublishedPageDelete
+                                                                { pageSlug = pageSlug
+                                                                , reason = deletionReason
+                                                                }
+                                                            )
+                                                            nextModel0
+                                                in
+                                                ( nextModel
+                                                , Effect.Lamdera.sendToFrontend clientId
+                                                    (DeletePublishedPageImmediatelyResponse wikiSlug (Ok ()))
+                                                )
 
         SaveNewPageDraft wikiSlug payload ->
             let
@@ -1356,109 +1419,113 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                     respond (Err Submission.SavePageDeleteDraftWrongWikiSession)
 
                 WikiUser.SessionHasAccount accountId ->
-                    case Dict.get wikiSlug model.wikis of
-                        Nothing ->
-                            respond (Err Submission.SavePageDeleteDraftWikiNotFound)
+                    if WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors then
+                        respond (Err Submission.SavePageDeleteDraftForbiddenTrustedModerator)
 
-                        Just wiki ->
-                            if not wiki.active then
-                                respond (Err Submission.SavePageDeleteDraftWikiInactive)
+                    else
+                        case Dict.get wikiSlug model.wikis of
+                            Nothing ->
+                                respond (Err Submission.SavePageDeleteDraftWikiNotFound)
 
-                            else
-                                case Submission.validateDeleteReason payload.rawReason of
-                                    Err ve ->
-                                        respond (Err (Submission.SavePageDeleteDraftReasonInvalid ve))
+                            Just wiki ->
+                                if not wiki.active then
+                                    respond (Err Submission.SavePageDeleteDraftWikiInactive)
 
-                                    Ok maybeReason ->
-                                        let
-                                            pageSlug : Page.Slug
-                                            pageSlug =
-                                                payload.pageSlug
-                                        in
-                                        if not (Submission.wikiHasPublishedPage pageSlug wiki) then
-                                            respond (Err Submission.SavePageDeleteDraftTargetNotPublished)
+                                else
+                                    case Submission.validateDeleteReasonRequired payload.rawReason of
+                                        Err ve ->
+                                            respond (Err (Submission.SavePageDeleteDraftReasonInvalid ve))
 
-                                        else
-                                            case payload.maybeSubmissionId of
-                                                Nothing ->
-                                                    let
-                                                        submissionId : Submission.Id
-                                                        submissionId =
-                                                            Submission.idFromCounter model.nextSubmissionCounter
+                                        Ok deletionReason ->
+                                            let
+                                                pageSlug : Page.Slug
+                                                pageSlug =
+                                                    payload.pageSlug
+                                            in
+                                            if not (Submission.wikiHasPublishedPage pageSlug wiki) then
+                                                respond (Err Submission.SavePageDeleteDraftTargetNotPublished)
 
-                                                        sub : Submission.Submission
-                                                        sub =
-                                                            { id = submissionId
-                                                            , wikiSlug = wikiSlug
-                                                            , authorId = accountId
-                                                            , kind =
-                                                                Submission.DeletePage
-                                                                    { pageSlug = pageSlug
-                                                                    , reason = maybeReason
-                                                                    }
-                                                            , status = Submission.Draft
-                                                            , reviewerNote = Nothing
-                                                            }
+                                            else
+                                                case payload.maybeSubmissionId of
+                                                    Nothing ->
+                                                        let
+                                                            submissionId : Submission.Id
+                                                            submissionId =
+                                                                Submission.idFromCounter model.nextSubmissionCounter
 
-                                                        nextModel : Model
-                                                        nextModel =
-                                                            { model
-                                                                | submissions =
-                                                                    Dict.insert (Submission.idToString submissionId) sub model.submissions
-                                                                , nextSubmissionCounter = model.nextSubmissionCounter + 1
-                                                            }
-                                                    in
-                                                    ( nextModel
-                                                    , Effect.Lamdera.sendToFrontend clientId
-                                                        (SavePageDeleteDraftResponse wikiSlug (Ok submissionId))
-                                                    )
+                                                            sub : Submission.Submission
+                                                            sub =
+                                                                { id = submissionId
+                                                                , wikiSlug = wikiSlug
+                                                                , authorId = accountId
+                                                                , kind =
+                                                                    Submission.DeletePage
+                                                                        { pageSlug = pageSlug
+                                                                        , reason = Just deletionReason
+                                                                        }
+                                                                , status = Submission.Draft
+                                                                , reviewerNote = Nothing
+                                                                }
 
-                                                Just sid ->
-                                                    case Dict.get sid model.submissions of
-                                                        Nothing ->
-                                                            respond (Err Submission.SavePageDeleteDraftNotFound)
+                                                            nextModel : Model
+                                                            nextModel =
+                                                                { model
+                                                                    | submissions =
+                                                                        Dict.insert (Submission.idToString submissionId) sub model.submissions
+                                                                    , nextSubmissionCounter = model.nextSubmissionCounter + 1
+                                                                }
+                                                        in
+                                                        ( nextModel
+                                                        , Effect.Lamdera.sendToFrontend clientId
+                                                            (SavePageDeleteDraftResponse wikiSlug (Ok submissionId))
+                                                        )
 
-                                                        Just sub ->
-                                                            if sub.wikiSlug /= wikiSlug then
+                                                    Just sid ->
+                                                        case Dict.get sid model.submissions of
+                                                            Nothing ->
                                                                 respond (Err Submission.SavePageDeleteDraftNotFound)
 
-                                                            else if sub.authorId /= accountId then
-                                                                respond (Err Submission.SavePageDeleteDraftForbidden)
+                                                            Just sub ->
+                                                                if sub.wikiSlug /= wikiSlug then
+                                                                    respond (Err Submission.SavePageDeleteDraftNotFound)
 
-                                                            else if sub.status /= Submission.Draft then
-                                                                respond (Err Submission.SavePageDeleteDraftForbidden)
+                                                                else if sub.authorId /= accountId then
+                                                                    respond (Err Submission.SavePageDeleteDraftForbidden)
 
-                                                            else
-                                                                case sub.kind of
-                                                                    Submission.DeletePage body ->
-                                                                        if body.pageSlug /= pageSlug then
+                                                                else if sub.status /= Submission.Draft then
+                                                                    respond (Err Submission.SavePageDeleteDraftForbidden)
+
+                                                                else
+                                                                    case sub.kind of
+                                                                        Submission.DeletePage body ->
+                                                                            if body.pageSlug /= pageSlug then
+                                                                                respond (Err Submission.SavePageDeleteDraftForbidden)
+
+                                                                            else
+                                                                                let
+                                                                                    nextSub : Submission.Submission
+                                                                                    nextSub =
+                                                                                        { sub
+                                                                                            | kind =
+                                                                                                Submission.DeletePage
+                                                                                                    { pageSlug = pageSlug
+                                                                                                    , reason = Just deletionReason
+                                                                                                    }
+                                                                                        }
+                                                                                in
+                                                                                ( { model
+                                                                                    | submissions =
+                                                                                        Dict.insert sid nextSub model.submissions
+                                                                                  }
+                                                                                , Effect.Lamdera.sendToFrontend clientId
+                                                                                    (SavePageDeleteDraftResponse wikiSlug (Ok sub.id))
+                                                                                )
+
+                                                                        Submission.NewPage _ ->
                                                                             respond (Err Submission.SavePageDeleteDraftForbidden)
 
-                                                                        else
-                                                                            let
-                                                                                nextSub : Submission.Submission
-                                                                                nextSub =
-                                                                                    { sub
-                                                                                        | kind =
-                                                                                            Submission.DeletePage
-                                                                                                { pageSlug = pageSlug
-                                                                                                , reason = maybeReason
-                                                                                                }
-                                                                                    }
-                                                                            in
-                                                                            ( { model
-                                                                                | submissions =
-                                                                                    Dict.insert sid nextSub model.submissions
-                                                                              }
-                                                                            , Effect.Lamdera.sendToFrontend clientId
-                                                                                (SavePageDeleteDraftResponse wikiSlug (Ok sub.id))
-                                                                            )
-
-                                                                    Submission.NewPage _ ->
-                                                                        respond (Err Submission.SavePageDeleteDraftForbidden)
-
-                                                                    Submission.EditPage _ ->
-                                                                        respond (Err Submission.SavePageDeleteDraftForbidden)
+                                                                        Submission.EditPage _ ->
+                                                                            respond (Err Submission.SavePageDeleteDraftForbidden)
 
         SubmitDraftForReview wikiSlug submissionIdStr ->
             let
@@ -1502,18 +1569,23 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                             respond (Err Submission.SubmitDraftForReviewForbidden)
 
                                         else
-                                            case Submission.promoteDraftToPending wiki model.submissions sub of
-                                                Err e ->
-                                                    respond (Err e)
+                                            case ( sub.kind, WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors ) of
+                                                ( Submission.DeletePage _, True ) ->
+                                                    respond (Err Submission.SubmitDraftForReviewDeleteForbiddenTrustedModerator)
 
-                                                Ok nextSub ->
-                                                    ( { model
-                                                        | submissions =
-                                                            Dict.insert submissionIdStr nextSub model.submissions
-                                                      }
-                                                    , Effect.Lamdera.sendToFrontend clientId
-                                                        (SubmitDraftForReviewResponse wikiSlug submissionIdStr (Ok ()))
-                                                    )
+                                                _ ->
+                                                    case Submission.promoteDraftToPending wiki model.submissions sub of
+                                                        Err e ->
+                                                            respond (Err e)
+
+                                                        Ok nextSub ->
+                                                            ( { model
+                                                                | submissions =
+                                                                    Dict.insert submissionIdStr nextSub model.submissions
+                                                              }
+                                                            , Effect.Lamdera.sendToFrontend clientId
+                                                                (SubmitDraftForReviewResponse wikiSlug submissionIdStr (Ok ()))
+                                                            )
 
         WithdrawSubmission wikiSlug submissionIdStr ->
             let

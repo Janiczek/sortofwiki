@@ -53,7 +53,7 @@ endToEndTests =
             \client ->
                 List.concat
                     [ ProgramTest.Actions.submitWikiLoginForm
-                        { username = "trustedpub"
+                        { username = "demo_trusted_publisher"
                         , password = "password12"
                         }
                         client
@@ -116,13 +116,16 @@ endToEndTests =
                 , connectClientMs = Just 203
                 , steps =
                     \client ->
-                        [ client.input 100 (Effect.Browser.Dom.id "host-admin-login-password") Env.hostAdminPassword
-                        , client.click 100 (Effect.Browser.Dom.id "host-admin-login-submit")
-                        , client.checkView 300
-                            (ProgramTest.Query.withinId "host-admin-wikis-list"
-                                ProgramTest.Query.expectEmpty
-                            )
-                        ]
+                        List.concat
+                            [ [ client.input 100 (Effect.Browser.Dom.id "host-admin-login-password") Env.hostAdminPassword
+                              ]
+                            , ProgramTest.Actions.triggerFormSubmit "host-admin-login-form" client
+                            , [ client.checkView 300
+                                    (ProgramTest.Query.withinId "host-admin-wikis-list"
+                                        ProgramTest.Query.expectEmpty
+                                    )
+                              ]
+                            ]
                 }
             , ProgramTest.Start.connectFrontend
                 { sessionId = "session-story47-host-wiki-detail-auth"

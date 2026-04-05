@@ -80,6 +80,16 @@
     --chip-on-border: #3a4f20;
   }
 
+  /* Math equation hosts (SVG lives in shadow DOM; only host layout belongs here). */
+  inline-equation {
+    display: inline-block;
+    vertical-align: -0.1ex;
+  }
+  block-equation {
+    display: block;
+    margin: 0.35rem 0;
+    overflow-x: auto;
+  }
   .app-root.dark {
     --bg: #16190f;
     --fg: #f0f4e5;
@@ -111,4 +121,31 @@
 
 </style>
 <script src="/tailwind_browser_4.2.2.min.js"></script>
-<script src="/mathjax_tex-mml-chtml_4.1.1.min.js"></script>
+<script>
+  window.MathJax = {
+    options: {
+      enableMenu: false,
+      /* Combined bundles include a11y; disable enrichment/speech so no SRE worker (no /sre/ on our server). */
+      enableEnrichment: false,
+      enableSpeech: false,
+      enableBraille: false,
+      enableComplexity: false,
+      enableExplorer: false,
+      menuOptions: {
+        settings: {
+          enrich: false,
+          speech: false,
+          braille: false,
+          collapsible: false,
+          assistiveMml: false,
+        },
+      },
+    },
+    svg: { fontCache: 'local' },
+    output: {
+      font: "mathjax-pagella",
+      fontPath: '/mathjax-pagella-font_4.1.1',
+    },
+  };
+</script>
+<script defer src="/mathjax_tex-svg-nofont_4.1.1.min.js"></script>

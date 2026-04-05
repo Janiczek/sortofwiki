@@ -41,7 +41,7 @@ wikiCatalogEntry =
 wikiRole : Fuzzer WikiRole.WikiRole
 wikiRole =
     Fuzz.oneOfValues
-        [ WikiRole.UntrustedContributor
+        [ WikiRole.UntrustedContributor WikiRole.defaultUntrustedContributorCaps
         , WikiRole.TrustedContributor
         , WikiRole.Admin
         ]

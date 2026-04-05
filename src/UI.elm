@@ -7,6 +7,7 @@ module UI exposing
     , appHeaderH1Class
     , appHeaderPrimaryLinkClass
     , appHeaderPrimaryPlainClass
+    , appHeaderSecondaryAfterDividerClass
     , appHeaderSecondaryBracketClass
     , appHeaderSecondaryMetaClass
     , appHeaderSecondaryWikiLabelEmClass
@@ -384,9 +385,14 @@ appHeaderSecondaryMetaClass =
     "text-[var(--fg-muted)] font-normal max-w-full"
 
 
+appHeaderSecondaryAfterDividerClass : String
+appHeaderSecondaryAfterDividerClass =
+    "italic min-w-0"
+
+
 appHeaderSecondaryBracketClass : String
 appHeaderSecondaryBracketClass =
-    "italic text-[var(--fg-muted)] opacity-[0.55] font-normal"
+    "not-italic text-[var(--fg-muted)] opacity-[0.42] font-normal text-[0.88em]"
 
 
 appHeaderSecondaryWikiWrapClass : String
@@ -539,7 +545,7 @@ wikiCatalogCardSummaryClass =
 
 markdownContainerClass : String
 markdownContainerClass =
-    "max-w-[52rem] text-[0.95rem] font-serif"
+    "block max-w-[52rem] text-[0.95rem] font-serif"
 
 
 markdownHeading1Class : String
@@ -589,7 +595,7 @@ markdownLinkClass =
 
 markdownWikiLinkMissingClass : String
 markdownWikiLinkMissingClass =
-    "text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 underline underline-offset-[2px]"
+    "!text-red-600 dark:!text-red-400 hover:!text-red-700 dark:hover:!text-red-300 underline underline-offset-[2px]"
 
 
 markdownUnorderedListClass : String

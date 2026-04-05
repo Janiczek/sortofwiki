@@ -36,13 +36,13 @@ import Submission
 import Wiki
 
 
-{-| Wrong password for host-admin login (story 27).
+{-| Wrong password for host-admin login.
 -}
 type LoginError
     = WrongPassword
 
 
-{-| Client is not in a host-authenticated session (story 27+).
+{-| Client is not in a host-authenticated session.
 -}
 type ProtectedError
     = NotHostAuthenticated
@@ -116,7 +116,7 @@ wikiDataImportErrorToUserText err =
             detail
 
 
-{-| Hosted wiki display name validation (story 29).
+{-| Hosted wiki display name validation.
 -}
 type WikiNameError
     = WikiNameEmpty
@@ -133,21 +133,21 @@ wikiSummaryMaxLength =
     4000
 
 
-{-| Load single wiki for host admin detail (story 30).
+{-| Load single wiki for host admin detail.
 -}
 type HostWikiDetailError
     = HostWikiDetailNotHostAuthenticated
     | HostWikiDetailWikiNotFound
 
 
-{-| Deactivate / reactivate hosted wiki (story 31).
+{-| Deactivate / reactivate hosted wiki.
 -}
 type WikiLifecycleError
     = WikiLifecycleNotHostAuthenticated
     | WikiLifecycleWikiNotFound
 
 
-{-| Irreversible delete with confirmation phrase (story 32).
+{-| Irreversible delete with confirmation phrase.
 -}
 type DeleteHostedWikiError
     = DeleteHostedWikiNotHostAuthenticated
@@ -185,7 +185,7 @@ wikiLifecycleErrorToUserText err =
             "That wiki was not found."
 
 
-{-| Persist metadata from host admin detail form (story 30).
+{-| Persist metadata from host admin detail form.
 -}
 type UpdateHostedWikiMetadataError
     = UpdateMetadataNotHostAuthenticated
@@ -196,7 +196,7 @@ type UpdateHostedWikiMetadataError
     | UpdateMetadataWikiSlugTaken
 
 
-{-| Public wiki blurb length (story 30).
+{-| Public wiki blurb length.
 -}
 type WikiSummaryError
     = WikiSummaryTooLong
@@ -243,7 +243,7 @@ wikiSummaryErrorToUserText err =
                 ++ " characters."
 
 
-{-| Slug field on host wiki detail: unchanged value keeps legacy slugs; a new value uses the same rules as create (story 29).
+{-| Slug field on host wiki detail: unchanged value keeps legacy slugs; a new value uses the same rules as create.
 -}
 validateHostedWikiMetadataSlug : Wiki.Slug -> String -> Result UpdateHostedWikiMetadataError String
 validateHostedWikiMetadataSlug currentSlug raw =
@@ -280,7 +280,7 @@ validateHostedWikiSummary raw =
         Ok text
 
 
-{-| Create hosted wiki failed (story 29).
+{-| Create hosted wiki failed.
 -}
 type CreateHostedWikiError
     = CreateNotHostAuthenticated

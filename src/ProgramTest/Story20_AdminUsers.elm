@@ -20,7 +20,7 @@ endToEndTests =
                 List.concat
                     [ ProgramTest.Actions.loginToWiki
                         { wikiSlug = "Demo"
-                        , username = "wikidemo"
+                        , username = "demo_wiki_admin"
                         , password = "password12"
                         }
                         client
@@ -32,14 +32,14 @@ endToEndTests =
                       , client.checkView 100
                             (ProgramTest.Query.expectAll
                                 [ ProgramTest.Query.withinDataAttribute "data-admin-user"
-                                    "statusdemo"
-                                    (ProgramTest.Query.expectHasText "statusdemo")
+                                    "demo_contributor"
+                                    (ProgramTest.Query.expectHasText "demo_contributor")
                                 , ProgramTest.Query.withinDataAttribute "data-admin-user"
-                                    "trustedpub"
-                                    (ProgramTest.Query.expectHasText "trustedpub")
+                                    "demo_trusted_publisher"
+                                    (ProgramTest.Query.expectHasText "demo_trusted_publisher")
                                 , ProgramTest.Query.withinDataAttribute "data-admin-user"
-                                    "wikidemo"
-                                    (ProgramTest.Query.expectHasText "wikidemo")
+                                    "demo_wiki_admin"
+                                    (ProgramTest.Query.expectHasText "demo_wiki_admin")
                                 ]
                             )
                       ]

@@ -28,7 +28,7 @@ expectGrantadminTrustedOnDemo backendModel =
                         WikiRole.TrustedContributor ->
                             Ok ()
 
-                        WikiRole.UntrustedContributor ->
+                        WikiRole.UntrustedContributor _ ->
                             Err "grantadmin_trusted should be Trusted after revoke"
 
                         WikiRole.Admin ->
@@ -50,7 +50,7 @@ endToEndTests =
                         List.concat
                             [ ProgramTest.Actions.loginToWiki
                                 { wikiSlug = "Demo"
-                                , username = "wikidemo"
+                                , username = "demo_wiki_admin"
                                 , password = "password12"
                                 }
                                 client
@@ -59,7 +59,7 @@ endToEndTests =
                               , client.clickLink 100 (Wiki.adminUsersUrlPath "Demo")
                               , client.checkView 400
                                     (ProgramTest.Query.withinDataAttribute "data-admin-user"
-                                        "wikidemo"
+                                        "demo_wiki_admin"
                                         (ProgramTest.Query.expectDoesNotHaveDataContext "wiki-admin-revoke-admin")
                                     )
                               , client.click 100

@@ -20,6 +20,7 @@ module ProgramTest.Query exposing
     , expectHasWikiSlug
     , expectHostAdminCreateWikiSlugInputUsesHtmlConstraints
     , expectLink
+    , expectNoLinkWithHref
     , expectNoBacklinks
     , expectPageShowsWikiSlug
     , expectTagOccurrenceCount
@@ -286,6 +287,17 @@ expectLink { href, label } single =
         [ Test.Html.Selector.tag "a"
         , Test.Html.Selector.attribute (Html.Attributes.href href)
         , Test.Html.Selector.text label
+        ]
+        single
+
+
+expectNoLinkWithHref : String -> Test.Html.Query.Single msg -> Expectation
+expectNoLinkWithHref href single =
+    Test.Html.Query.hasNot
+        [ Test.Html.Selector.all
+            [ Test.Html.Selector.tag "a"
+            , Test.Html.Selector.attribute (Html.Attributes.href href)
+            ]
         ]
         single
 

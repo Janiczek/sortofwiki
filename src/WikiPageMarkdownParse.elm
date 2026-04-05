@@ -1,5 +1,6 @@
 module WikiPageMarkdownParse exposing (blocksWithHeadingSlugs)
 
+import MarkdownMath
 import Markdown.Block as Block
 import Markdown.Parser as MarkdownParser
 import MarkdownHeadingSlugs
@@ -16,4 +17,5 @@ blocksWithHeadingSlugs wikiSlug publishedSlugExists source =
         |> MarkdownParser.parse
         |> Result.mapError (List.map MarkdownParser.deadEndToString >> String.join "\n")
         |> Result.map (WikiMarkdown.postProcessBlocksWithWikiLinks wikiSlug publishedSlugExists)
+        |> Result.map MarkdownMath.postProcessBlocksWithEquations
         |> Result.map MarkdownHeadingSlugs.gatherHeadingOccurrences

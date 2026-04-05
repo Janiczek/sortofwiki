@@ -96,10 +96,17 @@ wikiNavLinks wikiSlug maybeRole =
                 [ [ { linkLabel = "Create page"
                     , linkRoute = Route.WikiSubmitNew wikiSlug
                     }
-                  , { linkLabel = "My submissions"
-                    , linkRoute = Route.WikiMySubmissions wikiSlug
-                    }
                   ]
+                    |> List.append
+                        (if WikiRole.hasMySubmissionsAccess role then
+                            [ { linkLabel = "My submissions"
+                              , linkRoute = Route.WikiMySubmissions wikiSlug
+                              }
+                            ]
+
+                         else
+                            []
+                        )
                 , if WikiRole.isTrustedModerator role then
                     [ { linkLabel = "Review"
                       , linkRoute = Route.WikiReview wikiSlug

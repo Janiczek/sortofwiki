@@ -123,7 +123,7 @@ suite =
                     case WikiContributors.attemptRegister "Demo" "alice" "password12" wikis WikiContributors.emptyRegistry of
                         Ok ( reg, accountId ) ->
                             WikiContributors.roleForAccount "Demo" accountId reg
-                                |> Expect.equal (Just WikiRole.UntrustedContributor)
+                                |> Expect.equal (Just (WikiRole.UntrustedContributor WikiRole.defaultUntrustedContributorCaps))
 
                         Err _ ->
                             Expect.fail "expected register to succeed"
@@ -584,7 +584,7 @@ suite =
                                         |> Expect.equal Nothing
                                 , \() ->
                                     WikiContributors.roleForAccount "Renamed" newId next
-                                        |> Expect.equal (Just WikiRole.UntrustedContributor)
+                                        |> Expect.equal (Just (WikiRole.UntrustedContributor WikiRole.defaultUntrustedContributorCaps))
                                 , \() ->
                                     WikiContributors.attemptLogin "Renamed" "alice" "password12" wikisAfterRename next
                                         |> Expect.equal (Ok newId)
