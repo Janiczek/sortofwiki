@@ -23,7 +23,7 @@ endToEndTests =
                     [ [ client.checkView 100
                             (ProgramTest.Query.expectAll
                                 [ ProgramTest.Query.headingIs "SortOfWiki"
-                                , ProgramTest.Query.subheadingIs "Admin login"
+                                , ProgramTest.Query.subheadingIs "Admin: Login"
                                 ]
                             )
                       ]
@@ -31,7 +31,7 @@ endToEndTests =
                     , [ client.checkView 200
                             (ProgramTest.Query.expectAll
                                 [ ProgramTest.Query.headingIs "SortOfWiki"
-                                , ProgramTest.Query.subheadingIs "Admin login"
+                                , ProgramTest.Query.subheadingIs "Admin: Login"
                                 ]
                             )
                       , client.input 100 (Effect.Browser.Dom.id "host-admin-login-password") "wrong-password"
@@ -74,7 +74,7 @@ endToEndTests =
                     [ [ client.checkView 100
                             (ProgramTest.Query.expectAll
                                 [ ProgramTest.Query.headingIs "SortOfWiki"
-                                , ProgramTest.Query.subheadingIs "Admin login"
+                                , ProgramTest.Query.subheadingIs "Admin: Login"
                                 ]
                             )
                       ]
@@ -82,7 +82,7 @@ endToEndTests =
                     , [ client.checkView 200
                             (ProgramTest.Query.expectAll
                                 [ ProgramTest.Query.headingIs "SortOfWiki"
-                                , ProgramTest.Query.subheadingIs "Admin login"
+                                , ProgramTest.Query.subheadingIs "Admin: Login"
                                 ]
                             )
                       ]

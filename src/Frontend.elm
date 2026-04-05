@@ -6398,22 +6398,22 @@ appHeaderTitle ({ store, route } as model) =
             sortOfWikiAppHeaderTitle (Just (AppHeaderSecondaryPlain "Wikis"))
 
         Route.HostAdmin _ ->
-            sortOfWikiAppHeaderTitle (Just (AppHeaderSecondaryPlain "Admin login"))
+            sortOfWikiAppHeaderTitle (Just (AppHeaderSecondaryPlain "Admin: Login"))
 
         Route.HostAdminWikis ->
-            sortOfWikiAppHeaderTitle (Just (AppHeaderSecondaryPlain "Host wikis"))
+            sortOfWikiAppHeaderTitle (Just (AppHeaderSecondaryPlain "Admin: Wikis"))
 
         Route.HostAdminWikiNew ->
-            sortOfWikiAppHeaderTitle (Just (AppHeaderSecondaryPlain "Create hosted wiki"))
+            sortOfWikiAppHeaderTitle (Just (AppHeaderSecondaryPlain "Admin: Create wiki"))
 
         Route.HostAdminWikiDetail slug ->
-            sortOfWikiAppHeaderTitle (Just (AppHeaderSecondaryPlain ("Wiki settings: " ++ slug)))
+            sortOfWikiAppHeaderTitle (Just (AppHeaderSecondaryPlain ("Admin: Wiki settings: " ++ slug)))
 
         Route.HostAdminAudit ->
-            sortOfWikiAppHeaderTitle (Just (AppHeaderSecondaryPlain "Platform audit log"))
+            sortOfWikiAppHeaderTitle (Just (AppHeaderSecondaryPlain "Admin: Platform audit log"))
 
         Route.HostAdminBackup ->
-            sortOfWikiAppHeaderTitle (Just (AppHeaderSecondaryPlain "Backup and restore"))
+            sortOfWikiAppHeaderTitle (Just (AppHeaderSecondaryPlain "Admin: Backup"))
 
         Route.WikiHome slug ->
             wikiScopeHeaderTitle store slug <|
@@ -6987,7 +6987,7 @@ viewHostAdminAuditFilters model =
         , TW.cls "shrink-0 rounded-md border border-[var(--border)] bg-[var(--chrome-bg)] p-3"
         ]
         [ Html.div
-            [ TW.cls "grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3" ]
+            [ TW.cls "grid grid-cols-3 gap-3" ]
             [ Html.div [ TW.cls "min-w-0" ]
                 [ Html.label
                     [ Attr.for "host-admin-audit-filter-wiki"
@@ -8003,7 +8003,7 @@ viewSubmitNewLoaded wikiSlug publishedSlugExists showUntrustedContributorDisclai
 
         newPageMarkdownPreviewCellClass : String
         newPageMarkdownPreviewCellClass =
-            "flex min-h-0 min-w-0 flex-col gap-1 lg:h-full"
+            "flex min-h-0 min-w-0 flex-col gap-1 h-full"
     in
     Html.div
         [ Attr.id "wiki-submit-new-page"
@@ -8034,7 +8034,7 @@ viewSubmitNewLoaded wikiSlug publishedSlugExists showUntrustedContributorDisclai
                     []
                 ]
             , Html.div
-                [ TW.cls "grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch" ]
+                [ TW.cls "grid min-w-0 grid-cols-2 gap-4 items-stretch" ]
                 [ Html.div
                     [ TW.cls newPageMarkdownPreviewCellClass ]
                     [ Html.h2
@@ -8209,7 +8209,7 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
 
         submitEditDiffCellShellClass : String
         submitEditDiffCellShellClass =
-            "flex min-h-0 min-w-0 flex-col gap-1 lg:h-full"
+            "flex min-h-0 min-w-0 flex-col gap-1 h-full"
 
         submitEditMarkdownHeadingClass : String
         submitEditMarkdownHeadingClass =
@@ -8254,7 +8254,7 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
                     , Events.onSubmit PageEditSubmitFormSubmitted
                     ]
                     [ Html.div
-                        [ TW.cls "grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2 lg:grid-rows-2 lg:items-stretch" ]
+                        [ TW.cls "grid min-w-0 grid-cols-2 grid-rows-2 gap-4 items-stretch" ]
                         [ Html.div
                             [ TW.cls submitEditDiffCellShellClass ]
                             [ Html.h2
@@ -8790,10 +8790,10 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
                     ]
                 , newPageSlugField
                 , Html.div
-                    [ TW.cls "grid min-w-0 grid-cols-1 gap-x-3 gap-y-1 md:grid-cols-2 md:gap-y-2" ]
+                    [ TW.cls "grid min-w-0 grid-cols-2 gap-x-3 gap-y-2" ]
                     [ Html.label
                         [ Attr.for "original-markdown-readonly-textarea"
-                        , TW.cls "md:col-start-1 md:row-start-1"
+                        , TW.cls "col-start-1 row-start-1"
                         ]
                         [ Html.text "Original" ]
                     , Html.textarea
@@ -8804,13 +8804,13 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
                         , TW.cls
                             (submissionDetailMarkdownTextareaReadonlyClass
                                 ++ submissionDetailMarkdownTextareaDiffCellClass
-                                ++ " min-w-0 md:col-start-1 md:row-start-2"
+                                ++ " min-w-0 col-start-1 row-start-2"
                             )
                         ]
                         []
                     , Html.div
                         [ Attr.id "original-preview"
-                        , TW.cls "min-h-0 min-w-0 md:col-start-1 md:row-start-3"
+                        , TW.cls "min-h-0 min-w-0 col-start-1 row-start-3"
                         ]
                         [ comparePreview "original-preview-inner" detail.compareOriginalMarkdown ]
                     , Html.label
@@ -8821,7 +8821,7 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
                              else
                                 "new-markdown-readonly-textarea"
                             )
-                        , TW.cls "md:col-start-2 md:row-start-1"
+                        , TW.cls "col-start-2 row-start-1"
                         ]
                         [ Html.text
                             (if detail.contributionKind == Submission.ContributorKindDeletePage then
@@ -8832,11 +8832,11 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
                             )
                         ]
                     , Html.div
-                        [ TW.cls "min-w-0 md:col-start-2 md:row-start-2" ]
+                        [ TW.cls "min-w-0 col-start-2 row-start-2" ]
                         [ newMarkdownField ]
                     , Html.div
                         [ Attr.id "new-preview"
-                        , TW.cls "min-h-0 min-w-0 md:col-start-2 md:row-start-3"
+                        , TW.cls "min-h-0 min-w-0 col-start-2 row-start-3"
                         ]
                         [ comparePreview "new-preview-inner" newMarkdownForPreview ]
                     ]
@@ -9444,7 +9444,7 @@ viewWikiAdminAuditFilters model =
         , TW.cls "shrink-0 rounded-md border border-[var(--border)] bg-[var(--chrome-bg)] p-3"
         ]
         [ Html.div
-            [ TW.cls "grid grid-cols-1 gap-3 sm:grid-cols-2" ]
+            [ TW.cls "grid grid-cols-2 gap-3" ]
             [ Html.div [ TW.cls "min-w-0" ]
                 [ Html.label
                     [ Attr.for "wiki-admin-audit-filter-actor"
@@ -9586,18 +9586,18 @@ viewSubmissionReviewDiff wikiSlug publishedSlugExists detail =
         SubmissionReviewDetail.NewPageDiff body ->
             Html.div
                 [ Attr.id "wiki-review-diff-summary"
-                , TW.cls "grid min-w-0 grid-cols-1 gap-x-4 gap-y-1 lg:grid-cols-2 lg:gap-y-2"
+                , TW.cls "grid min-w-0 grid-cols-2 gap-x-4 gap-y-2"
                 ]
                 [ Html.h3
-                    [ TW.cls "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)] lg:col-start-1 lg:row-start-1" ]
+                    [ TW.cls "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)] col-start-1 row-start-1" ]
                     [ Html.text "Proposed markdown" ]
                 , reviewReadonlyTextarea "wiki-review-diff-new" body.proposedMarkdown
-                    (submissionDetailMarkdownTextareaDiffCellClass ++ " min-w-0 lg:col-start-1 lg:row-start-2")
+                    (submissionDetailMarkdownTextareaDiffCellClass ++ " min-w-0 col-start-1 row-start-2")
                 , Html.h3
-                    [ TW.cls "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg-muted)] lg:col-start-2 lg:row-start-1" ]
+                    [ TW.cls "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg-muted)] col-start-2 row-start-1" ]
                     [ Html.text "Preview" ]
                 , Html.div
-                    [ TW.cls "min-h-0 min-w-0 lg:col-start-2 lg:row-start-2" ]
+                    [ TW.cls "min-h-0 min-w-0 col-start-2 row-start-2" ]
                     [ reviewPreviewInDiffCell "wiki-review-diff-new-preview" body.proposedMarkdown ]
                 ]
 
@@ -9613,27 +9613,27 @@ viewSubmissionReviewDiff wikiSlug publishedSlugExists detail =
             in
             Html.div
                 [ Attr.id "wiki-review-diff-summary"
-                , TW.cls "grid min-w-0 grid-cols-1 gap-x-4 gap-y-1 lg:grid-cols-2 lg:gap-y-2"
+                , TW.cls "grid min-w-0 grid-cols-2 gap-x-4 gap-y-2"
                 ]
                 [ Html.h2
-                    [ TW.cls (reviewDiffCellHeadingClass ++ " lg:col-start-1 lg:row-start-1") ]
+                    [ TW.cls (reviewDiffCellHeadingClass ++ " col-start-1 row-start-1") ]
                     [ Html.text "Before (published)" ]
                 , reviewReadonlyTextarea "wiki-review-diff-old" body.beforeMarkdown
-                    (submissionDetailMarkdownTextareaDiffCellClass ++ " min-w-0 lg:col-start-1 lg:row-start-2")
+                    (submissionDetailMarkdownTextareaDiffCellClass ++ " min-w-0 col-start-1 row-start-2")
                 , Html.div
-                    [ TW.cls "flex min-h-0 min-w-0 flex-col gap-1 lg:col-start-1 lg:row-start-3" ]
+                    [ TW.cls "flex min-h-0 min-w-0 flex-col gap-1 col-start-1 row-start-3" ]
                     [ Html.h3
                         [ TW.cls reviewDiffCellPreviewHeadingClass ]
                         [ Html.text "Preview" ]
                     , reviewPreviewInDiffCell "wiki-review-diff-old-preview" body.beforeMarkdown
                     ]
                 , Html.h2
-                    [ TW.cls (reviewDiffCellHeadingClass ++ " lg:col-start-2 lg:row-start-1") ]
+                    [ TW.cls (reviewDiffCellHeadingClass ++ " col-start-2 row-start-1") ]
                     [ Html.text "After (proposed)" ]
                 , reviewReadonlyTextarea "wiki-review-diff-new" body.afterMarkdown
-                    (submissionDetailMarkdownTextareaDiffCellClass ++ " min-w-0 lg:col-start-2 lg:row-start-2")
+                    (submissionDetailMarkdownTextareaDiffCellClass ++ " min-w-0 col-start-2 row-start-2")
                 , Html.div
-                    [ TW.cls "flex min-h-0 min-w-0 flex-col gap-1 lg:col-start-2 lg:row-start-3" ]
+                    [ TW.cls "flex min-h-0 min-w-0 flex-col gap-1 col-start-2 row-start-3" ]
                     [ Html.h3
                         [ TW.cls reviewDiffCellPreviewHeadingClass ]
                         [ Html.text "Preview" ]

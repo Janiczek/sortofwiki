@@ -190,7 +190,7 @@ togglableChip extraAttrs { pressed, onClick, label } =
 
 sidebarContainerClass : String
 sidebarContainerClass =
-    "min-h-0 self-stretch overflow-y-auto overscroll-contain flex flex-col gap-y-[0.9rem] leading-[1.35] text-[var(--fg-muted)] bg-transparent border-0 text-[1rem] py-[0.85rem] pl-[0.85rem] pr-0 font-serif max-[56rem]:px-0"
+    "min-h-0 self-stretch overflow-y-auto overscroll-contain flex flex-col gap-y-[0.9rem] leading-[1.35] text-[var(--fg-muted)] bg-transparent border-0 text-[1rem] py-[0.85rem] pl-[0.85rem] pr-0 font-serif"
 
 
 sidebarHeadingClass : String
@@ -465,7 +465,7 @@ sideNavPublicAdminLinkClass =
 
 wikiCatalogGridClass : String
 wikiCatalogGridClass =
-    "grid w-full max-w-[72rem] grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3"
+    "grid w-full max-w-[72rem] grid-cols-3 gap-3"
 
 
 hostAdminWikiDetailShellClass : String
@@ -475,7 +475,7 @@ hostAdminWikiDetailShellClass =
 
 hostAdminWikiDetailGridClass : String
 hostAdminWikiDetailGridClass =
-    "grid grid-cols-1 gap-3.5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:gap-5 lg:items-start"
+    "grid grid-cols-[minmax(0,1fr)_17rem] gap-5 items-start"
 
 
 hostAdminWikiDetailMainStackClass : String
@@ -652,30 +652,30 @@ backlinksListClass =
 
 sidebarDesktopOnlyClass : String
 sidebarDesktopOnlyClass =
-    "max-[56rem]:hidden"
+    ""
 
 
 layoutLeftNavAsideClass : String
 layoutLeftNavAsideClass =
-    "self-stretch min-h-0 overflow-y-auto overscroll-contain leading-[1.35] text-[var(--fg)] text-[1rem] border-r border-dashed border-[var(--border-dash)] py-[0.85rem] pr-[0.85rem] pl-0 max-[56rem]:border-r-0 max-[56rem]:px-0"
+    "self-stretch min-h-0 overflow-y-auto overscroll-contain leading-[1.35] text-[var(--fg)] text-[1rem] border-r border-dashed border-[var(--border-dash)] py-[0.85rem] pr-[0.85rem] pl-0"
 
 
 layoutHolyGrailClass : Bool -> String
 layoutHolyGrailClass hasRightColumn =
     if hasRightColumn then
-        "grid min-h-0 min-w-0 h-full w-full flex-1 overflow-hidden items-stretch gap-y-[0.65rem] px-[0.5rem] -mx-[0.5rem] max-w-none grid-rows-[minmax(0,1fr)] auto-rows-[minmax(0,1fr)] grid-cols-[minmax(11rem,16rem)_minmax(0,1fr)_minmax(10rem,14rem)] max-[56rem]:grid-cols-1"
+        "grid min-h-0 min-w-0 h-full w-full flex-1 overflow-hidden items-stretch gap-y-[0.65rem] px-[0.5rem] -mx-[0.5rem] max-w-none grid-rows-[minmax(0,1fr)] auto-rows-[minmax(0,1fr)] grid-cols-[minmax(11rem,16rem)_minmax(0,1fr)_minmax(10rem,14rem)]"
 
     else
-        "grid min-h-0 min-w-0 h-full w-full flex-1 overflow-hidden items-stretch gap-y-[0.65rem] px-[0.5rem] -mx-[0.5rem] max-w-none grid-rows-[minmax(0,1fr)] auto-rows-[minmax(0,1fr)] grid-cols-[minmax(11rem,16rem)_minmax(0,1fr)] max-[56rem]:grid-cols-1"
+        "grid min-h-0 min-w-0 h-full w-full flex-1 overflow-hidden items-stretch gap-y-[0.65rem] px-[0.5rem] -mx-[0.5rem] max-w-none grid-rows-[minmax(0,1fr)] auto-rows-[minmax(0,1fr)] grid-cols-[minmax(11rem,16rem)_minmax(0,1fr)]"
 
 
 layoutMainColumnClass : Bool -> String
 layoutMainColumnClass hasRightColumn =
     if hasRightColumn then
-        "min-h-0 min-w-0 overflow-y-auto overscroll-contain px-[0.85rem] py-[0.85rem] border-r border-dashed border-[var(--border-dash)] max-[56rem]:border-r-0 max-[56rem]:px-0"
+        "min-h-0 min-w-0 overflow-y-auto overscroll-contain px-[0.85rem] py-[0.85rem] border-r border-dashed border-[var(--border-dash)]"
 
     else
-        "min-h-0 min-w-0 overflow-y-auto overscroll-contain py-[0.85rem] pl-[0.85rem] pr-0 border-r-0 max-[56rem]:px-0"
+        "min-h-0 min-w-0 overflow-y-auto overscroll-contain py-[0.85rem] pl-[0.85rem] pr-0 border-r-0"
 
 
 {-| Main column when the route owns internal scrolling (audit log: filters fixed, table scrolls). Replaces outer `overflow-y-auto` with `overflow-hidden flex flex-col`.
@@ -683,7 +683,7 @@ layoutMainColumnClass hasRightColumn =
 layoutMainColumnClassAuditFill : Bool -> String
 layoutMainColumnClassAuditFill hasRightColumn =
     if hasRightColumn then
-        "min-h-0 min-w-0 flex flex-col overflow-hidden overscroll-contain px-[0.85rem] py-[0.85rem] border-r border-dashed border-[var(--border-dash)] max-[56rem]:border-r-0 max-[56rem]:px-0"
+        "min-h-0 min-w-0 flex flex-col overflow-hidden overscroll-contain px-[0.85rem] py-[0.85rem] border-r border-dashed border-[var(--border-dash)]"
 
     else
-        "min-h-0 min-w-0 flex flex-col overflow-hidden overscroll-contain py-[0.85rem] pl-[0.85rem] pr-0 border-r-0 max-[56rem]:px-0"
+        "min-h-0 min-w-0 flex flex-col overflow-hidden overscroll-contain py-[0.85rem] pl-[0.85rem] pr-0 border-r-0"
