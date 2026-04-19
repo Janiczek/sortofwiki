@@ -581,7 +581,13 @@ app_ =
 
 subscriptions : Model -> Subscription FrontendOnly Msg
 subscriptions _ =
-    Subscription.fromJs "colorThemeFromJs" Ports.colorThemeFromJs ColorThemeFromJs
+    Subscription.fromJs "colorThemeFromJs" Ports.colorThemeFromJs
+        (\value ->
+            ColorThemeFromJs
+                (Json.Decode.decodeValue ColorTheme.incomingDecoder value
+                    |> Result.toMaybe
+                )
+        )
 
 
 app :
@@ -1450,9 +1456,9 @@ update msg model =
             , Command.sendToJs "colorThemeToJs" Ports.colorThemeToJs (ColorTheme.encodePreferenceToJs nextPreference)
             )
 
-        ColorThemeFromJs value ->
-            case Json.Decode.decodeValue ColorTheme.incomingDecoder value of
-                Ok (ColorTheme.Sync preference systemTheme) ->
+        ColorThemeFromJs maybeIncoming ->
+            case maybeIncoming of
+                Just (ColorTheme.Sync preference systemTheme) ->
                     ( { model
                         | colorThemePreference = preference
                         , systemColorTheme = systemTheme
@@ -1460,12 +1466,12 @@ update msg model =
                     , Command.none
                     )
 
-                Ok (ColorTheme.System systemTheme) ->
+                Just (ColorTheme.System systemTheme) ->
                     ( { model | systemColorTheme = systemTheme }
                     , Command.none
                     )
 
-                Err _ ->
+                Nothing ->
                     ( model, Command.none )
 
         UrlClicked urlRequest ->

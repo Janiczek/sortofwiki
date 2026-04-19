@@ -37,7 +37,6 @@ import Effect.Browser.Navigation
 import Effect.File
 import Effect.Lamdera exposing (ClientId, SessionId)
 import HostAdmin
-import Json.Encode
 import Page
 import RemoteData exposing (RemoteData)
 import Route exposing (Route)
@@ -396,7 +395,7 @@ type FrontendMsg
     | UrlChanged Url
     | UrlFragmentScrollDone
     | ColorThemeToggled
-    | ColorThemeFromJs Json.Encode.Value
+    | ColorThemeFromJs (Maybe ColorTheme.Incoming)
     | RegisterFormUsernameChanged String
     | RegisterFormPasswordChanged String
     | RegisterFormSubmitted
