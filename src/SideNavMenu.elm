@@ -84,59 +84,70 @@ globalChromeSections input =
 -}
 wikiNavLinks : Wiki.Slug -> Maybe WikiRole -> List Link
 wikiNavLinks wikiSlug maybeRole =
-    case maybeRole of
-        Nothing ->
-            [ { linkLabel = "Log in"
-              , linkRoute = Route.WikiLogin wikiSlug Nothing
-              , linkEmphasized = False
-              }
-            , { linkLabel = "Register"
-              , linkRoute = Route.WikiRegister wikiSlug
+    let
+        publicLinks : List Link
+        publicLinks =
+            [ { linkLabel = "TODOs"
+              , linkRoute = Route.WikiTodos wikiSlug
               , linkEmphasized = False
               }
             ]
+    in
+    case maybeRole of
+        Nothing ->
+            publicLinks
+                ++ [ { linkLabel = "Log in"
+                     , linkRoute = Route.WikiLogin wikiSlug Nothing
+                     , linkEmphasized = False
+                     }
+                   , { linkLabel = "Register"
+                     , linkRoute = Route.WikiRegister wikiSlug
+                     , linkEmphasized = False
+                     }
+                   ]
 
         Just role ->
-            List.concat
-                [ [ { linkLabel = "Create page"
-                    , linkRoute = Route.WikiSubmitNew wikiSlug
-                    , linkEmphasized = False
-                    }
-                  ]
-                    |> List.append
-                        (if WikiRole.hasMySubmissionsAccess role then
-                            [ { linkLabel = "My submissions"
-                              , linkRoute = Route.WikiMySubmissions wikiSlug
-                              , linkEmphasized = False
-                              }
-                            ]
+            publicLinks
+                ++ List.concat
+                    [ [ { linkLabel = "Create page"
+                        , linkRoute = Route.WikiSubmitNew wikiSlug
+                        , linkEmphasized = False
+                        }
+                      ]
+                        |> List.append
+                            (if WikiRole.hasMySubmissionsAccess role then
+                                [ { linkLabel = "My submissions"
+                                  , linkRoute = Route.WikiMySubmissions wikiSlug
+                                  , linkEmphasized = False
+                                  }
+                                ]
 
-                         else
-                            []
-                        )
-                , if WikiRole.isTrustedModerator role then
-                    [ { linkLabel = "Review"
-                      , linkRoute = Route.WikiReview wikiSlug
-                      , linkEmphasized = False
-                      }
+                             else
+                                []
+                            )
+                    , if WikiRole.isTrustedModerator role then
+                        [ { linkLabel = "Review"
+                          , linkRoute = Route.WikiReview wikiSlug
+                          , linkEmphasized = False
+                          }
+                        ]
+
+                      else
+                        []
+                    , if WikiRole.canAccessWikiAdminUsers role then
+                        [ { linkLabel = "Admin"
+                          , linkRoute = Route.WikiAdminUsers wikiSlug
+                          , linkEmphasized = False
+                          }
+                        , { linkLabel = "Audit log"
+                          , linkRoute = Route.WikiAdminAudit wikiSlug
+                          , linkEmphasized = False
+                          }
+                        ]
+
+                      else
+                        []
                     ]
-
-                  else
-                    []
-                , if WikiRole.canAccessWikiAdminUsers role then
-                    [ { linkLabel = "Admin"
-                      , linkRoute = Route.WikiAdminUsers wikiSlug
-                      , linkEmphasized = False
-                      }
-                    , { linkLabel = "Audit log"
-                      , linkRoute = Route.WikiAdminAudit wikiSlug
-                      , linkEmphasized = False
-                      }
-                    ]
-
-                  else
-                    []
-                ]
 
 
 allLinks : List Section -> List Link

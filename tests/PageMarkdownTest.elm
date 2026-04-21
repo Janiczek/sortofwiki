@@ -72,6 +72,24 @@ suite =
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "code" ]
                         |> Test.Html.Query.has [ Test.Html.Selector.text "[[home]]" ]
+            , Test.test "renders TODO marker as styled inline text" <|
+                \() ->
+                    Page.frontendDetails "Ship {TODO: write docs} soon." []
+                        |> PageMarkdown.view wiki allPagesExist
+                        |> Test.Html.Query.fromHtml
+                        |> Test.Html.Query.find
+                            [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-todo-text" "write docs") ]
+                        |> Test.Html.Query.has
+                            [ Test.Html.Selector.text "TODO: write docs"
+                            , Test.Html.Selector.class "italic"
+                            ]
+            , Test.test "does not expand TODO marker inside inline code" <|
+                \() ->
+                    Page.frontendDetails "Use `{TODO: write docs}` syntax." []
+                        |> PageMarkdown.view wiki allPagesExist
+                        |> Test.Html.Query.fromHtml
+                        |> Test.Html.Query.find [ Test.Html.Selector.tag "code" ]
+                        |> Test.Html.Query.has [ Test.Html.Selector.text "{TODO: write docs}" ]
             , Test.test "renders $$...$$ as inline-equation custom element" <|
                 \() ->
                     Page.frontendDetails "Inline $$x^2 + y^2$$ math." []

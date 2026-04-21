@@ -40,6 +40,14 @@ suite =
                         |> List.any touchesForbidden
                         |> Expect.equal False
             ]
+        , Test.describe "wikiNavLinks"
+            [ Test.test "anonymous wiki nav includes public TODOs page" <|
+                \() ->
+                    SideNavMenu.wikiNavLinks "Demo" Nothing
+                        |> List.map .linkRoute
+                        |> List.member (Route.WikiTodos "Demo")
+                        |> Expect.equal True
+            ]
         , Test.describe "sidebar link access"
             [ Test.fuzz
                 (Fuzz.map2 Tuple.pair Fuzzers.navAccessContext Fuzz.bool)

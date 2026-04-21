@@ -211,7 +211,14 @@ suite =
                                 )
                     in
                     Wiki.frontendDetails w
-                        |> Expect.equal { pageSlugs = [ "a", "m" ] }
+                        |> Expect.equal
+                            { pageSlugs = [ "a", "m" ]
+                            , publishedPageMarkdownSources =
+                                Dict.fromList
+                                    [ ( "a", "x" )
+                                    , ( "m", "y" )
+                                    ]
+                            }
             , Test.fuzz Fuzzers.pageSlug "pending-only wiki yields empty page list" <|
                 \slug ->
                     let
@@ -220,7 +227,10 @@ suite =
                             Wiki.wikiWithPages "w" "W" (Dict.singleton slug (Page.pendingOnly slug "d"))
                     in
                     Wiki.frontendDetails w
-                        |> Expect.equal { pageSlugs = [] }
+                        |> Expect.equal
+                            { pageSlugs = []
+                            , publishedPageMarkdownSources = Dict.empty
+                            }
             , Test.fuzz (Fuzz.map Dict.fromList (Fuzz.list (Fuzz.pair Fuzzers.pageSlug Fuzzers.page))) "frontendDetails lists exactly published slugs sorted" <|
                 \pages ->
                     let

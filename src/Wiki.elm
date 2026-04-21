@@ -31,6 +31,7 @@ module Wiki exposing
     , submitEditUrlPath
     , submitNewPageUrlPath
     , submitNewPageUrlPathWithSuggestedSlug
+    , todosUrlPath
     , wikiHomeUrlPath
     , wikiListUrlPath
     , wikiWithPages
@@ -67,6 +68,7 @@ type alias CatalogEntry =
 
 type alias FrontendDetails =
     { pageSlugs : List Page.Slug
+    , publishedPageMarkdownSources : Dict Page.Slug String
     }
 
 
@@ -102,12 +104,24 @@ wikiWithPages slug name pages =
 
 frontendDetails : Wiki -> FrontendDetails
 frontendDetails w =
+    let
+        publishedPages : List ( Page.Slug, Page.Page )
+        publishedPages =
+            w.pages
+                |> Dict.toList
+                |> List.filter (\( _, page ) -> Page.hasPublished page)
+    in
     { pageSlugs =
-        w.pages
-            |> Dict.toList
-            |> List.filter (\( _, page ) -> Page.hasPublished page)
+        publishedPages
             |> List.map Tuple.first
             |> List.sort
+    , publishedPageMarkdownSources =
+        publishedPages
+            |> List.map
+                (\( slug, page ) ->
+                    ( slug, Page.publishedMarkdownForLinks page )
+                )
+            |> Dict.fromList
     }
 
 
@@ -154,6 +168,11 @@ wikiListUrlPath =
 wikiHomeUrlPath : Slug -> String
 wikiHomeUrlPath wikiSlug =
     "/w/" ++ wikiSlug
+
+
+todosUrlPath : Slug -> String
+todosUrlPath wikiSlug =
+    "/w/" ++ wikiSlug ++ "/todos"
 
 
 {-| Path segment after origin for the wiki homepage, e.g. `/w/my-wiki`.

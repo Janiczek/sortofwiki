@@ -145,6 +145,8 @@ htmlRendererWithHeadingIds maybeSlug =
                     |> Markdown.Html.withAttribute "data-equation"
                 , Markdown.Html.tag "block-equation" blockEquationHtml
                     |> Markdown.Html.withAttribute "data-equation"
+                , Markdown.Html.tag "sortofwiki-todo" todoHtml
+                    |> Markdown.Html.withAttribute "data-todo"
                 ]
         , thematicBreak =
             Html.hr [ TW.cls UI.markdownThematicBreakClass ] []
@@ -220,3 +222,12 @@ blockEquationHtml equation _ =
     Html.node "block-equation"
         [ Attr.attribute "data-equation" equation ]
         []
+
+
+todoHtml : String -> List (Html msg) -> Html msg
+todoHtml todoText _ =
+    Html.em
+        [ TW.cls UI.markdownTodoClass
+        , Attr.attribute "data-todo-text" todoText
+        ]
+        [ Html.text ("TODO: " ++ todoText) ]

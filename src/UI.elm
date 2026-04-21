@@ -56,6 +56,7 @@ module UI exposing
     , markdownListItemClass
     , markdownOrderedListClass
     , markdownParagraphClass
+    , markdownTodoClass
     , markdownTextareaClass
     , markdownThematicBreakClass
     , markdownUnorderedListClass
@@ -668,6 +669,11 @@ markdownHeading6Class =
 markdownParagraphClass : String
 markdownParagraphClass =
     contentParagraphClass
+
+
+markdownTodoClass : String
+markdownTodoClass =
+    "italic text-red-700 dark:text-red-400"
 
 
 markdownBlockQuoteClass : String

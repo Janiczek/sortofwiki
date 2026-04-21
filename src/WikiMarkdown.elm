@@ -2,6 +2,7 @@ module WikiMarkdown exposing (postProcessBlocksWithWikiLinks)
 
 import Markdown.Block as Block
 import Page
+import TodoSyntax
 import Wiki
 import WikiLinkSyntax
 
@@ -87,8 +88,8 @@ expandInline : Wiki.Slug -> (Page.Slug -> Bool) -> Block.Inline -> List Block.In
 expandInline wikiSlug publishedSlugExists inline =
     case inline of
         Block.Text s ->
-            WikiLinkSyntax.segmentsFromPlainText s
-                |> List.map (segmentToInline wikiSlug publishedSlugExists)
+            TodoSyntax.segmentsFromPlainText s
+                |> List.concatMap (todoSegmentToInlines wikiSlug publishedSlugExists)
                 |> List.filter
                     (\il ->
                         case il of
@@ -124,6 +125,22 @@ expandInline wikiSlug publishedSlugExists inline =
             [ inline ]
 
 
+todoSegmentToInlines : Wiki.Slug -> (Page.Slug -> Bool) -> TodoSyntax.Segment -> List Block.Inline
+todoSegmentToInlines wikiSlug publishedSlugExists segment =
+    case segment of
+        TodoSyntax.Plain text ->
+            WikiLinkSyntax.segmentsFromPlainText text
+                |> List.map (segmentToInline wikiSlug publishedSlugExists)
+
+        TodoSyntax.Todo todoText ->
+            [ Block.HtmlInline
+                (Block.HtmlElement "sortofwiki-todo"
+                    [ todoAttribute todoText ]
+                    []
+                )
+            ]
+
+
 segmentToInline : Wiki.Slug -> (Page.Slug -> Bool) -> WikiLinkSyntax.Segment -> Block.Inline
 segmentToInline wikiSlug publishedSlugExists seg =
     case seg of
@@ -136,3 +153,10 @@ segmentToInline wikiSlug publishedSlugExists seg =
 
             else
                 Block.Link (Wiki.publishedPageUrlPath wikiSlug slug) (Just "sortofwiki:missing") [ Block.Text display ]
+
+
+todoAttribute : String -> Block.HtmlAttribute
+todoAttribute todoText =
+    { name = "data-todo"
+    , value = todoText
+    }

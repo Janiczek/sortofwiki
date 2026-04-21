@@ -47,6 +47,7 @@ import ProgramTest.Story52_HostAdminWikiBackup as Story52
 import ProgramTest.Story53_MultiWikiContributorSessions as Story53
 import ProgramTest.Story54_MySubmissionsRoleGate as Story54
 import ProgramTest.Story55_MarkdownKitchenSink as Story55
+import ProgramTest.Story56_TodosPage as Story56
 import Types exposing (ToBackend, ToFrontend)
 
 
@@ -100,6 +101,7 @@ main =
     , Story53.endToEndTests
     , Story54.endToEndTests
     , Story55.endToEndTests
+    , Story56.endToEndTests
     ]
         |> List.concat
         |> Effect.Test.viewer

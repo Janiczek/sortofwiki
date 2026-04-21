@@ -158,6 +158,9 @@ contributorForcedRedirect sessions url route =
         Route.WikiHome _ ->
             Nothing
 
+        Route.WikiTodos _ ->
+            Nothing
+
         Route.WikiPage _ _ ->
             Nothing
 
@@ -226,6 +229,9 @@ contributorRestrictedReturnPath route =
             Nothing
 
         Route.WikiHome _ ->
+            Nothing
+
+        Route.WikiTodos _ ->
             Nothing
 
         Route.WikiPage _ _ ->

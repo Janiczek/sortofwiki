@@ -30,6 +30,7 @@ import Json.Decode
 import Lamdera
 import Page
 import PageMarkdown
+import PageTodos
 import PageToc
 import Ports
 import RemoteData exposing (RemoteData(..))
@@ -49,6 +50,7 @@ import Url exposing (Url)
 import Wiki
 import WikiAdminUsers
 import WikiAuditLog
+import WikiTodos
 import WikiRole exposing (WikiRole)
 
 
@@ -312,6 +314,9 @@ wikiSideNavSlugIfActive model =
                     Just s
 
                 Route.WikiPage s _ ->
+                    Just s
+
+                Route.WikiTodos s ->
                     Just s
 
                 Route.WikiRegister s ->
@@ -658,6 +663,9 @@ runRouteStoreActions ( model, cmd ) =
                     Command.none
 
                 Route.WikiPage _ _ ->
+                    Command.none
+
+                Route.WikiTodos _ ->
                     Command.none
 
                 Route.WikiRegister _ ->
@@ -1175,6 +1183,9 @@ routeUsesAuditLogFillLayout route =
         Route.WikiPage _ _ ->
             False
 
+        Route.WikiTodos _ ->
+            False
+
         Route.WikiLogin _ _ ->
             False
 
@@ -1256,6 +1267,9 @@ applyWikiAdminAuditFilterFromModel model =
             ( model, Command.none )
 
         Route.WikiPage _ _ ->
+            ( model, Command.none )
+
+        Route.WikiTodos _ ->
             ( model, Command.none )
 
         Route.WikiLogin _ _ ->
@@ -1340,6 +1354,9 @@ applyHostAdminAuditFilterFromModel model =
         Route.WikiPage _ _ ->
             ( model, Command.none )
 
+        Route.WikiTodos _ ->
+            ( model, Command.none )
+
         Route.WikiLogin _ _ ->
             ( model, Command.none )
 
@@ -1394,8 +1411,8 @@ invalidateWikiPublishedCaches wikiSlug store =
 `/submit/new` (which would flash until `WikiFrontendDetailsResponse`). Navigation to the new page
 uses `pushUrl` in the same update.
 -}
-afterTrustedNewPagePublishedImmediately : Wiki.Slug -> Page.Slug -> Store -> Store
-afterTrustedNewPagePublishedImmediately wikiSlug pageSlug store =
+afterTrustedNewPagePublishedImmediately : Wiki.Slug -> { pageSlug : Page.Slug, markdown : String } -> Store -> Store
+afterTrustedNewPagePublishedImmediately wikiSlug payload store =
     let
         publishedPagesNext : Dict ( Wiki.Slug, Page.Slug ) (RemoteData () Page.FrontendDetails)
         publishedPagesNext =
@@ -1410,11 +1427,13 @@ afterTrustedNewPagePublishedImmediately wikiSlug pageSlug store =
                         (Success
                             { details
                                 | pageSlugs =
-                                    if List.member pageSlug details.pageSlugs then
+                                    if List.member payload.pageSlug details.pageSlugs then
                                         details.pageSlugs
 
                                     else
-                                        pageSlug :: details.pageSlugs |> List.sort
+                                        payload.pageSlug :: details.pageSlugs |> List.sort
+                                , publishedPageMarkdownSources =
+                                    Dict.insert payload.pageSlug payload.markdown details.publishedPageMarkdownSources
                             }
                         )
                         store.wikiDetails
@@ -1610,6 +1629,9 @@ update msg model =
                                 Route.WikiPage _ _ ->
                                     RemoteData.NotAsked
 
+                                Route.WikiTodos _ ->
+                                    RemoteData.NotAsked
+
                                 Route.WikiRegister _ ->
                                     RemoteData.NotAsked
 
@@ -1732,6 +1754,9 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
+                Route.WikiTodos _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -1842,6 +1867,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
+                    ( model, Command.none )
+
+                Route.WikiTodos _ ->
                     ( model, Command.none )
 
                 Route.WikiLogin wikiSlug _ ->
@@ -1958,6 +1986,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
+                    ( model, Command.none )
+
+                Route.WikiTodos _ ->
                     ( model, Command.none )
 
                 Route.WikiLogin _ _ ->
@@ -2134,6 +2165,9 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
+                Route.WikiTodos _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -2303,6 +2337,9 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
+                Route.WikiTodos _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -2458,6 +2495,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
+                    ( model, Command.none )
+
+                Route.WikiTodos _ ->
                     ( model, Command.none )
 
                 Route.WikiLogin _ _ ->
@@ -2836,6 +2876,9 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
+                Route.WikiTodos _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -2923,6 +2966,9 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
+                Route.WikiTodos _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -2988,6 +3034,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
+                    ( model, Command.none )
+
+                Route.WikiTodos _ ->
                     ( model, Command.none )
 
                 Route.WikiLogin _ _ ->
@@ -3057,6 +3106,9 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
+                Route.WikiTodos _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -3122,6 +3174,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
+                    ( model, Command.none )
+
+                Route.WikiTodos _ ->
                     ( model, Command.none )
 
                 Route.WikiLogin _ _ ->
@@ -3471,6 +3526,9 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
+                Route.WikiTodos _ ->
+                    ( model, Command.none )
+
                 Route.WikiRegister _ ->
                     ( model, Command.none )
 
@@ -3630,6 +3688,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
+                    ( model, Command.none )
+
+                Route.WikiTodos _ ->
                     ( model, Command.none )
 
                 Route.WikiRegister _ ->
@@ -3812,6 +3873,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
+                    ( model, Command.none )
+
+                Route.WikiTodos _ ->
                     ( model, Command.none )
 
                 Route.WikiRegister _ ->
@@ -4429,7 +4493,7 @@ updateFromBackend msg model =
                         Ok Submission.NewPagePublishedImmediately ->
                             case validatedNewPagePayload of
                                 Just payload ->
-                                    afterTrustedNewPagePublishedImmediately wikiSlug payload.pageSlug store0
+                                    afterTrustedNewPagePublishedImmediately wikiSlug payload store0
 
                                 Nothing ->
                                     invalidateWikiPublishedCaches wikiSlug store0
@@ -6542,6 +6606,11 @@ appHeaderTitle ({ store, route } as model) =
                 \summary ->
                     wikiLoadedHeaderTitle summary Nothing
 
+        Route.WikiTodos slug ->
+            wikiScopeHeaderTitle store slug <|
+                \summary ->
+                    wikiLoadedHeaderTitle summary (Just (AppHeaderSecondaryPlain "TODOs"))
+
         Route.WikiPage wikiSlug pageSlug ->
             wikiScopeHeaderTitle store wikiSlug <|
                 \summary ->
@@ -7585,6 +7654,20 @@ documentTitle ({ store, route } as model) =
             case Store.get slug store.wikiCatalog of
                 RemoteData.Success summary ->
                     summary.name ++ " — SortOfWiki"
+
+                RemoteData.Failure _ ->
+                    "404 — SortOfWiki"
+
+                RemoteData.Loading ->
+                    "Loading - SortOfWiki"
+
+                RemoteData.NotAsked ->
+                    "Loading - SortOfWiki"
+
+        Route.WikiTodos wikiSlug ->
+            case Store.get wikiSlug store.wikiCatalog of
+                RemoteData.Success summary ->
+                    "TODOs — " ++ summary.name ++ " — SortOfWiki"
 
                 RemoteData.Failure _ ->
                     "404 — SortOfWiki"
@@ -10069,6 +10152,33 @@ viewBacklinks wikiSlug backlinks =
         ]
 
 
+viewPageTodos : List String -> Html Msg
+viewPageTodos todoTexts =
+    Html.section
+        [ Attr.id "page-todos"
+        , TW.cls UI.backlinksSectionClass
+        ]
+        [ UI.sidebarHeading "TODOs:"
+        , Html.div [ TW.cls UI.sidebarNavSectionBodyClass ]
+            [ Html.ul
+                [ Attr.id "page-todos-list"
+                , TW.cls UI.backlinksListClass
+                ]
+                (todoTexts
+                    |> List.indexedMap
+                        (\index todoText ->
+                            Html.li
+                                [ Attr.attribute "data-page-todo-index" (String.fromInt index)
+                                , Attr.attribute "data-todo-text" todoText
+                                , TW.cls "m-0 leading-[1.3]"
+                                ]
+                                [ Html.text todoText ]
+                        )
+                )
+            ]
+        ]
+
+
 maybeMySubmissionForMissingPublishedPage :
     Page.Slug
     -> RemoteData () (Result Submission.MyPendingSubmissionsError (List Submission.MyPendingSubmissionListItem))
@@ -10322,6 +10432,141 @@ viewPublishedPageRoute model wikiSlug pageSlug =
                             viewPublishedPage wikiSlug pageSlug pageDetails (publishedSlugExistsFromWikiDetails wikiDetails)
 
 
+viewWikiTodosRoute : Model -> Wiki.Slug -> Html Msg
+viewWikiTodosRoute model wikiSlug =
+    case Store.get_ wikiSlug model.store.wikiDetails of
+        RemoteData.NotAsked ->
+            viewWikiHomeLoading
+
+        RemoteData.Loading ->
+            viewWikiHomeLoading
+
+        RemoteData.Failure _ ->
+            viewNotFound
+
+        RemoteData.Success wikiDetails ->
+            case Store.get wikiSlug model.store.wikiCatalog of
+                RemoteData.NotAsked ->
+                    viewWikiHomeLoading
+
+                RemoteData.Loading ->
+                    viewWikiHomeLoading
+
+                RemoteData.Failure _ ->
+                    viewNotFound
+
+                RemoteData.Success _ ->
+                    viewWikiTodosPage wikiSlug wikiDetails
+
+
+viewWikiTodosPage : Wiki.Slug -> Wiki.FrontendDetails -> Html Msg
+viewWikiTodosPage wikiSlug wikiDetails =
+    let
+        todoSummary : WikiTodos.Summary
+        todoSummary =
+            WikiTodos.summary wikiSlug wikiDetails.publishedPageMarkdownSources
+
+        combinedRows :
+            List
+                { itemText : String
+                , usedInPageSlugs : List Page.Slug
+                , maybeTodoText : Maybe String
+                , maybeMissingPageSlug : Maybe Page.Slug
+                }
+        combinedRows =
+            List.concat
+                [ todoSummary.todos
+                    |> List.map
+                        (\row ->
+                            { itemText = row.todoText
+                            , usedInPageSlugs = [ row.pageSlug ]
+                            , maybeTodoText = Just row.todoText
+                            , maybeMissingPageSlug = Nothing
+                            }
+                        )
+                , todoSummary.missingPages
+                    |> List.map
+                        (\row ->
+                            { itemText = row.missingPageSlug
+                            , usedInPageSlugs = row.linkedFromPageSlugs
+                            , maybeTodoText = Nothing
+                            , maybeMissingPageSlug = Just row.missingPageSlug
+                            }
+                        )
+                ]
+
+        pageLink : Page.Slug -> Html Msg
+        pageLink pageSlug =
+            UI.contentLink
+                [ Attr.href (Wiki.publishedPageUrlPath wikiSlug pageSlug) ]
+                [ Html.text pageSlug ]
+
+        commaSeparatedPageLinks : List Page.Slug -> List (Html Msg)
+        commaSeparatedPageLinks pageSlugs =
+            pageSlugs
+                |> List.map pageLink
+                |> List.intersperse (Html.text ", ")
+    in
+    Html.div
+        [ Attr.id "wiki-todos-page"
+        , Attr.attribute "data-wiki-slug" wikiSlug
+        ]
+        [ UI.contentParagraph []
+            [ Html.text "Collected TODO markers and missing linked pages across published articles." ]
+        , if List.isEmpty combinedRows then
+            UI.contentParagraph
+                [ Attr.id "wiki-todos-empty" ]
+                [ Html.text "No TODOs or missing linked pages found." ]
+
+          else
+            UI.table UI.TableFullMax72
+                [ Attr.id "wiki-todos-table" ]
+                { theadAttrs = []
+                , headerRowAttrs = []
+                , headerAlign = UI.TableAlignTop
+                , headers =
+                    [ UI.tableHeaderText "Item"
+                    , UI.tableHeaderText "Used in"
+                    ]
+                , tbodyAttrs = [ Attr.id "wiki-todos-tbody" ]
+                , rows =
+                    combinedRows
+                        |> List.map
+                            (\row ->
+                                UI.trStriped
+                                    (List.concat
+                                        [ [ Attr.attribute "data-item-text" row.itemText ]
+                                        , row.maybeTodoText
+                                            |> Maybe.map (\todoText -> [ Attr.attribute "data-todo-text" todoText ])
+                                            |> Maybe.withDefault []
+                                        , row.maybeMissingPageSlug
+                                            |> Maybe.map (\missingPageSlug -> [ Attr.attribute "data-missing-page-slug" missingPageSlug ])
+                                            |> Maybe.withDefault []
+                                        ]
+                                    )
+                                    [ UI.tableTd UI.TableAlignTop []
+                                        [ case row.maybeMissingPageSlug of
+                                            Just missingPageSlug ->
+                                                Html.a
+                                                    [ TW.cls UI.markdownWikiLinkMissingClass
+                                                    , Attr.href (Wiki.publishedPageUrlPath wikiSlug missingPageSlug)
+                                                    ]
+                                                    [ Html.text row.itemText ]
+
+                                            Nothing ->
+                                                Html.text row.itemText
+                                        ]
+                                    , UI.tableTd UI.TableAlignTop []
+                                        [ Html.span
+                                            [ Attr.attribute "data-used-in" row.itemText ]
+                                            (commaSeparatedPageLinks row.usedInPageSlugs)
+                                        ]
+                                    ]
+                            )
+                }
+        ]
+
+
 viewBody : Model -> Html Msg
 viewBody model =
     case model.route of
@@ -10348,6 +10593,9 @@ viewBody model =
 
         Route.WikiHome slug ->
             viewWikiHomeRoute model slug
+
+        Route.WikiTodos wikiSlug ->
+            viewWikiTodosRoute model wikiSlug
 
         Route.WikiPage wikiSlug pageSlug ->
             viewPublishedPageRoute model wikiSlug pageSlug
@@ -10407,6 +10655,35 @@ articleTocEntries model =
 
         _ ->
             []
+
+
+publishedPageTodos : Model -> Maybe (Html Msg)
+publishedPageTodos model =
+    case model.route of
+        Route.WikiPage wikiSlug pageSlug ->
+            case
+                ( Store.get_ wikiSlug model.store.wikiDetails
+                , Store.get wikiSlug model.store.wikiCatalog
+                , Store.get_ ( wikiSlug, pageSlug ) model.store.publishedPages
+                )
+            of
+                ( Success _, Success _, Success pageDetails ) ->
+                    let
+                        todoTexts : List String
+                        todoTexts =
+                            PageTodos.todoTexts pageDetails.markdownSource
+                    in
+                    if List.isEmpty todoTexts then
+                        Nothing
+
+                    else
+                        Just (viewPageTodos todoTexts)
+
+                _ ->
+                    Nothing
+
+        _ ->
+            Nothing
 
 
 publishedPageBacklinks : Model -> Maybe (Html Msg)
@@ -10530,6 +10807,10 @@ view model =
         maybeBacklinks =
             publishedPageBacklinks model
 
+        maybeTodos : Maybe (Html Msg)
+        maybeTodos =
+            publishedPageTodos model
+
         maybeEditLink : Maybe (Html Msg)
         maybeEditLink =
             publishedPageEditLink model
@@ -10544,6 +10825,13 @@ view model =
                     False
             )
                 || not (List.isEmpty tocEntries)
+                || (case maybeTodos of
+                        Just _ ->
+                            True
+
+                        Nothing ->
+                            False
+                   )
                 || (case maybeBacklinks of
                         Just _ ->
                             True
@@ -10563,6 +10851,7 @@ view model =
                     (Html.div [ TW.cls UI.sidebarDesktopOnlyClass ]
                         [ PageToc.view tocEntries ]
                     )
+            , maybeTodos
             , maybeBacklinks
             ]
                 |> List.filterMap identity
