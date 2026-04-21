@@ -30,7 +30,7 @@ viewPreview containerId wikiSlug publishedSlugExists markdownSource =
                     elements
 
                 Err _ ->
-                    [ Html.p [] [ Html.text "Could not render this page as Markdown." ] ]
+                    [ UI.contentParagraph [] [ Html.text "Could not render this page as Markdown." ] ]
     in
     Html.div
         [ Attr.id containerId
@@ -187,6 +187,7 @@ markdownListItemHtml listItem =
                             [ Attr.type_ "checkbox"
                             , Attr.checked False
                             , Attr.disabled True
+                            , TW.cls UI.focusVisibleRingClass
                             ]
                             []
                         , Html.text " "
@@ -199,6 +200,7 @@ markdownListItemHtml listItem =
                             [ Attr.type_ "checkbox"
                             , Attr.checked True
                             , Attr.disabled True
+                            , TW.cls UI.focusVisibleRingClass
                             ]
                             []
                         , Html.text " "

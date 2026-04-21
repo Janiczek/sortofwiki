@@ -15,6 +15,7 @@ import WikiRole exposing (WikiRole)
 type alias Link =
     { linkLabel : String
     , linkRoute : Route.Route
+    , linkEmphasized : Bool
     }
 
 
@@ -44,12 +45,14 @@ globalChromeSections input =
                 else if input.hostAdminAuthenticated then
                     [ { linkLabel = "Admin"
                       , linkRoute = Route.HostAdminWikis
+                      , linkEmphasized = False
                       }
                     ]
 
                 else
                     [ { linkLabel = "Admin"
                       , linkRoute = Route.HostAdmin Nothing
+                      , linkEmphasized = False
                       }
                     ]
           in
@@ -64,10 +67,10 @@ globalChromeSections input =
         , if input.hostAdminAuthenticated && input.showHostAdminTools then
             [ { sectionTitle = "Host admin"
               , links =
-                    [ { linkLabel = "Hosted wikis", linkRoute = Route.HostAdminWikis }
-                    , { linkLabel = "Add wiki", linkRoute = Route.HostAdminWikiNew }
-                    , { linkLabel = "Backup and restore", linkRoute = Route.HostAdminBackup }
-                    , { linkLabel = "Audit log", linkRoute = Route.HostAdminAudit }
+                    [ { linkLabel = "Hosted wikis", linkRoute = Route.HostAdminWikis, linkEmphasized = False }
+                    , { linkLabel = "Add wiki", linkRoute = Route.HostAdminWikiNew, linkEmphasized = False }
+                    , { linkLabel = "Backup and restore", linkRoute = Route.HostAdminBackup, linkEmphasized = False }
+                    , { linkLabel = "Audit log", linkRoute = Route.HostAdminAudit, linkEmphasized = False }
                     ]
               }
             ]
@@ -85,9 +88,11 @@ wikiNavLinks wikiSlug maybeRole =
         Nothing ->
             [ { linkLabel = "Log in"
               , linkRoute = Route.WikiLogin wikiSlug Nothing
+              , linkEmphasized = False
               }
             , { linkLabel = "Register"
               , linkRoute = Route.WikiRegister wikiSlug
+              , linkEmphasized = False
               }
             ]
 
@@ -95,12 +100,14 @@ wikiNavLinks wikiSlug maybeRole =
             List.concat
                 [ [ { linkLabel = "Create page"
                     , linkRoute = Route.WikiSubmitNew wikiSlug
+                    , linkEmphasized = False
                     }
                   ]
                     |> List.append
                         (if WikiRole.hasMySubmissionsAccess role then
                             [ { linkLabel = "My submissions"
                               , linkRoute = Route.WikiMySubmissions wikiSlug
+                              , linkEmphasized = False
                               }
                             ]
 
@@ -110,6 +117,7 @@ wikiNavLinks wikiSlug maybeRole =
                 , if WikiRole.isTrustedModerator role then
                     [ { linkLabel = "Review"
                       , linkRoute = Route.WikiReview wikiSlug
+                      , linkEmphasized = False
                       }
                     ]
 
@@ -118,9 +126,11 @@ wikiNavLinks wikiSlug maybeRole =
                 , if WikiRole.canAccessWikiAdminUsers role then
                     [ { linkLabel = "Admin"
                       , linkRoute = Route.WikiAdminUsers wikiSlug
+                      , linkEmphasized = False
                       }
                     , { linkLabel = "Audit log"
                       , linkRoute = Route.WikiAdminAudit wikiSlug
+                      , linkEmphasized = False
                       }
                     ]
 

@@ -34,6 +34,16 @@ endToEndTests =
                                     (ProgramTest.Query.expectHasText "demo_contributor")
                                 )
                             )
+                      , client.checkView 100
+                            (ProgramTest.Query.withinAriaLabel "Wiki"
+                                (ProgramTest.Query.withinLinkHref (Wiki.reviewQueueUrlPath "Demo")
+                                    (ProgramTest.Query.expectAll
+                                        [ ProgramTest.Query.expectHasText "Review (2)"
+                                        , ProgramTest.Query.expectHasClass "font-bold"
+                                        ]
+                                    )
+                                )
+                            )
                       ]
                     ]
         }

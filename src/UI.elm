@@ -18,7 +18,12 @@ module UI exposing
     , backlinksListClass
     , backlinksSectionClass
     , button
+    , contentHeading2
+    , contentLabel
+    , contentLink
+    , contentParagraph
     , dangerButton
+    , focusVisibleRingClass
     , formTextInputClass
     , formTextareaClass
     , formTextareaCompactClass
@@ -95,21 +100,69 @@ appMainScrollRegionId =
 
 appRootClass : String
 appRootClass =
-    "app-root flex flex-col h-dvh max-h-dvh min-h-0 overflow-hidden px-[0.5rem] pt-[0.25rem] pb-0 font-serif bg-[var(--bg)] text-[var(--fg)] leading-[1.35] [&_a]:text-[var(--link)] [&_a]:underline [&_a]:underline-offset-[2px] [&_a:hover]:text-[var(--link-hover)] [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-[var(--focus-ring)] [&_a:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-[var(--focus-ring)] [&_button:focus-visible]:outline-offset-2 [&_input:focus-visible]:outline-2 [&_input:focus-visible]:outline-[var(--focus-ring)] [&_input:focus-visible]:outline-offset-2 [&_textarea:focus-visible]:outline-2 [&_textarea:focus-visible]:outline-[var(--focus-ring)] [&_textarea:focus-visible]:outline-offset-2 [&_h1]:mt-[0.35rem] [&_h1]:mb-[0.2rem] [&_h1]:font-semibold [&_h1]:leading-[1.2] [&_h2]:mt-[0.35rem] [&_h2]:mb-[0.2rem] [&_h2]:font-semibold [&_h2]:leading-[1.2] [&_h2]:text-[1.1rem] [&_h3]:mt-[0.35rem] [&_h3]:mb-[0.2rem] [&_h3]:font-semibold [&_h3]:leading-[1.2] [&_h3]:text-[1rem] [&_p]:my-[0.25rem] [&_label]:block [&_label]:mt-[0.25rem] [&_label]:text-[1rem] [&_label]:text-[var(--fg-muted)]"
+    "app-root flex flex-col h-dvh max-h-dvh min-h-0 overflow-hidden px-[0.5rem] pt-[0.25rem] pb-0 font-serif bg-[var(--bg)] text-[var(--fg)] leading-[1.35]"
+
+
+focusVisibleRingClass : String
+focusVisibleRingClass =
+    "focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-offset-2"
+
+
+contentLinkClass : String
+contentLinkClass =
+    "text-[var(--link)] hover:text-[var(--link-hover)] hover:bg-[var(--link-bg-hover)] rounded-[2px] underline underline-offset-[2px] "
+        ++ focusVisibleRingClass
+
+
+contentLink : List (Attribute msg) -> List (Html msg) -> Html msg
+contentLink attrs children =
+    Html.a (TW.cls contentLinkClass :: attrs) children
+
+
+contentHeading2Class : String
+contentHeading2Class =
+    "mt-[0.35rem] mb-[0.2rem] font-semibold leading-[1.2] text-[1.1rem]"
+
+
+contentHeading2 : List (Attribute msg) -> List (Html msg) -> Html msg
+contentHeading2 attrs children =
+    Html.h2 (TW.cls contentHeading2Class :: attrs) children
+
+
+contentParagraphClass : String
+contentParagraphClass =
+    "my-[1rem]"
+
+
+contentParagraph : List (Attribute msg) -> List (Html msg) -> Html msg
+contentParagraph attrs children =
+    Html.p (TW.cls contentParagraphClass :: attrs) children
+
+
+contentLabelClass : String
+contentLabelClass =
+    "block mt-[0.25rem] text-[1rem] text-[var(--fg-muted)]"
+
+
+contentLabel : List (Attribute msg) -> List (Html msg) -> Html msg
+contentLabel attrs children =
+    Html.label (TW.cls contentLabelClass :: attrs) children
 
 
 {-| Single-line controls (`type=text`, `password`, …). Omit on `checkbox` / `radio`.
 -}
 formTextInputClass : String
 formTextInputClass =
-    "font-inherit text-[1rem] px-[0.3rem] py-[0.15rem] mt-[0.1rem] mb-[0.2rem] border border-[var(--border)] bg-[var(--input-bg)] text-[var(--fg)] max-w-full box-border"
+    "font-inherit text-[1rem] px-[0.3rem] py-[0.15rem] mt-[0.1rem] mb-[0.2rem] border border-[var(--border)] bg-[var(--input-bg)] text-[var(--fg)] max-w-full box-border "
+        ++ focusVisibleRingClass
 
 
 {-| Border, spacing, and width shared by `formTextareaClass` and `markdownBodyTextareaClass`.
 -}
 formTextareaChromeClass : String
 formTextareaChromeClass =
-    "box-border px-[0.3rem] py-[0.15rem] mt-[0.1rem] mb-[0.2rem] border border-[var(--border)] bg-[var(--input-bg)] text-[var(--fg)] max-w-full w-full max-w-[48rem]"
+    "box-border px-[0.3rem] py-[0.15rem] mt-[0.1rem] mb-[0.2rem] border border-[var(--border)] bg-[var(--input-bg)] text-[var(--fg)] max-w-full w-full max-w-[48rem] "
+        ++ focusVisibleRingClass
 
 
 {-| Serif body typography plus `formTextareaChromeClass`.
@@ -135,14 +188,16 @@ formTextareaCompactClass =
 
 buttonClass : String
 buttonClass =
-    "[font-family:inherit] text-[1rem] px-[0.45rem] py-[0.2rem] mt-[0.1rem] mr-[0.15rem] mb-[0.1rem] ml-0 bg-[var(--btn-bg)] text-[var(--btn-fg)] border border-[var(--btn-border)] rounded-[3px] cursor-pointer hover:brightness-[1.08] dark:hover:brightness-[1.12] dark:hover:border-[var(--border-dash)] disabled:opacity-[0.55] disabled:cursor-not-allowed"
+    "[font-family:inherit] text-[1rem] px-[0.45rem] py-[0.2rem] mt-[0.1rem] mr-[0.15rem] mb-[0.1rem] ml-0 bg-[var(--btn-bg)] text-[var(--btn-fg)] border border-[var(--btn-border)] rounded-[3px] cursor-pointer hover:brightness-[1.08] dark:hover:brightness-[1.12] dark:hover:border-[var(--border-dash)] disabled:opacity-[0.55] disabled:cursor-not-allowed "
+        ++ focusVisibleRingClass
 
 
 {-| Filled destructive control. Uses `--danger-btn-bg` / `--danger-btn-fg` (not `--danger`) so class-based `.dark` matches CSS variables; see `head.html`.
 -}
 buttonDangerClass : String
 buttonDangerClass =
-    "[font-family:inherit] text-[1rem] px-[0.45rem] py-[0.2rem] mt-[0.1rem] mr-[0.15rem] mb-[0.1rem] ml-0 bg-[var(--danger-btn-bg)] text-[var(--danger-btn-fg)] border border-[var(--danger-btn-bg)] rounded-[3px] cursor-pointer hover:brightness-[1.12] disabled:opacity-[0.55] disabled:cursor-not-allowed"
+    "[font-family:inherit] text-[1rem] px-[0.45rem] py-[0.2rem] mt-[0.1rem] mr-[0.15rem] mb-[0.1rem] ml-0 bg-[var(--danger-btn-bg)] text-[var(--danger-btn-fg)] border border-[var(--danger-btn-bg)] rounded-[3px] cursor-pointer hover:brightness-[1.12] disabled:opacity-[0.55] disabled:cursor-not-allowed "
+        ++ focusVisibleRingClass
 
 
 button : List (Attribute msg) -> List (Html msg) -> Html msg
@@ -222,7 +277,7 @@ sidebarNavSectionBodyClass =
 
 sidebarLinkClass : String
 sidebarLinkClass =
-    "text-[var(--link)] hover:text-[var(--link-hover)] underline underline-offset-[2px]"
+    "text-[var(--link)] hover:text-[var(--link-hover)] hover:bg-[var(--link-bg-hover)] rounded-[2px] underline underline-offset-[2px]"
 
 
 sidebarLink : List (Attribute msg) -> List (Html msg) -> Html msg
@@ -425,7 +480,8 @@ appHeaderSecondaryWikiLabelEmClass =
 
 appHeaderPrimaryLinkClass : String
 appHeaderPrimaryLinkClass =
-    "font-semibold text-[var(--fg)] no-underline"
+    "font-semibold text-[var(--fg)] hover:bg-[var(--link-bg-hover)] rounded-[2px] underline underline-offset-[2px] "
+        ++ focusVisibleRingClass
 
 
 appHeaderPrimaryPlainClass : String
@@ -455,7 +511,8 @@ appHeaderH1Class =
 
 themeToggleButtonClass : String
 themeToggleButtonClass =
-    "shrink-0 inline-flex items-center justify-center w-[2.35rem] h-[2.35rem] p-0 m-0 border-0 rounded-none bg-transparent text-[var(--fg)] cursor-pointer hover:bg-[var(--chrome-bg)]"
+    "shrink-0 inline-flex items-center justify-center w-[2.35rem] h-[2.35rem] p-0 m-0 border-0 rounded-none bg-transparent text-[var(--fg)] cursor-pointer hover:bg-[var(--chrome-bg)] "
+        ++ focusVisibleRingClass
 
 
 sideNavNavClass : String
@@ -477,7 +534,8 @@ sideNavListClass =
 -}
 sideNavPublicAdminLinkClass : String
 sideNavPublicAdminLinkClass =
-    "!text-[var(--fg-muted)] hover:!text-[var(--link)]"
+    "!text-[var(--fg-muted)] hover:!text-[var(--link)] hover:bg-[var(--link-bg-hover)] rounded-[2px] underline underline-offset-[2px] "
+        ++ focusVisibleRingClass
 
 
 wikiCatalogGridClass : String
@@ -609,7 +667,7 @@ markdownHeading6Class =
 
 markdownParagraphClass : String
 markdownParagraphClass =
-    "my-[0.35rem]"
+    contentParagraphClass
 
 
 markdownBlockQuoteClass : String
@@ -619,12 +677,12 @@ markdownBlockQuoteClass =
 
 markdownLinkClass : String
 markdownLinkClass =
-    "text-[var(--link)] hover:text-[var(--link-hover)] underline underline-offset-[2px]"
+    contentLinkClass
 
 
 markdownWikiLinkMissingClass : String
 markdownWikiLinkMissingClass =
-    "!text-red-600 dark:!text-red-400 hover:!text-red-700 dark:hover:!text-red-300 underline underline-offset-[2px]"
+    "!text-red-600 dark:!text-red-400 hover:!text-red-700 dark:hover:!text-red-300 hover:!bg-[var(--danger-link-bg-hover)] rounded-[2px] underline underline-offset-[2px]"
 
 
 markdownUnorderedListClass : String

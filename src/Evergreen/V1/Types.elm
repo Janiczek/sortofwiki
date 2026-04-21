@@ -379,6 +379,7 @@ type ToBackend
     | ImportHostAdminDataSnapshot String
     | RequestHostAdminWikiDataExport Evergreen.V1.Wiki.Slug
     | ImportHostAdminWikiDataSnapshot Evergreen.V1.Wiki.Slug String
+    | ImportHostAdminWikiDataSnapshotAuto String
 
 
 type BackendMsg
@@ -428,3 +429,4 @@ type ToFrontend
     | HostAdminDataImportResponse (Result Evergreen.V1.HostAdmin.DataImportError ())
     | HostAdminWikiDataExportResponse Evergreen.V1.Wiki.Slug (Result Evergreen.V1.HostAdmin.WikiDataExportError String)
     | HostAdminWikiDataImportResponse Evergreen.V1.Wiki.Slug (Result Evergreen.V1.HostAdmin.WikiDataImportError ())
+    | HostAdminWikiDataImportAutoResponse (Result Evergreen.V1.HostAdmin.WikiDataImportError Evergreen.V1.Wiki.Slug)

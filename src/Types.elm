@@ -142,6 +142,7 @@ type ToBackend
     | ImportHostAdminDataSnapshot String
     | RequestHostAdminWikiDataExport Wiki.Slug
     | ImportHostAdminWikiDataSnapshot Wiki.Slug String
+    | ImportHostAdminWikiDataSnapshotAuto String
 
 
 type ToFrontend
@@ -187,6 +188,7 @@ type ToFrontend
     | HostAdminDataImportResponse (Result HostAdmin.DataImportError ())
     | HostAdminWikiDataExportResponse Wiki.Slug (Result HostAdmin.WikiDataExportError String)
     | HostAdminWikiDataImportResponse Wiki.Slug (Result HostAdmin.WikiDataImportError ())
+    | HostAdminWikiDataImportAutoResponse (Result HostAdmin.WikiDataImportError Wiki.Slug)
 
 
 type alias BackendModel =
@@ -454,6 +456,9 @@ type FrontendMsg
     | HostAdminDataImportPickRequested
     | HostAdminDataImportFileSelected Effect.File.File
     | HostAdminDataImportFileRead (Result () String)
+    | HostAdminWikisDataImportPickRequested
+    | HostAdminWikisDataImportFileSelected Effect.File.File
+    | HostAdminWikisDataImportFileRead (Result () String)
     | HostAdminWikiDataExportClicked Wiki.Slug
     | HostAdminWikiDataImportPickRequested Wiki.Slug
     | HostAdminWikiDataImportFileSelected Effect.File.File

@@ -890,21 +890,66 @@ hostAdminSectionNavVisible model =
 
 sideNavLinkLi : SideNavMenu.Link -> Html Msg
 sideNavLinkLi link =
+    let
+        maybeBoldClass : List (Html.Attribute Msg)
+        maybeBoldClass =
+            if link.linkEmphasized then
+                [ TW.cls "font-bold" ]
+
+            else
+                []
+    in
     case link.linkRoute of
         Route.HostAdmin Nothing ->
             Html.li []
                 [ Html.a
-                    [ Attr.href (Route.navUrlPath link.linkRoute)
-                    , TW.cls UI.sideNavPublicAdminLinkClass
-                    ]
+                    ([ Attr.href (Route.navUrlPath link.linkRoute)
+                     , TW.cls UI.sideNavPublicAdminLinkClass
+                     ]
+                        ++ maybeBoldClass
+                    )
                     [ Html.text link.linkLabel ]
                 ]
 
         _ ->
             Html.li []
-                [ Html.a [ Attr.href (Route.navUrlPath link.linkRoute) ]
+                [ UI.contentLink
+                    (Attr.href (Route.navUrlPath link.linkRoute)
+                        :: maybeBoldClass
+                    )
                     [ Html.text link.linkLabel ]
                 ]
+
+
+reviewQueueCountForWiki : Wiki.Slug -> Store -> Maybe Int
+reviewQueueCountForWiki wikiSlug store =
+    case Store.get_ wikiSlug store.reviewQueues of
+        Success (Ok reviewQueue) ->
+            Just (List.length reviewQueue)
+
+        _ ->
+            Nothing
+
+
+withReviewQueueCount : Wiki.Slug -> Maybe Int -> List SideNavMenu.Link -> List SideNavMenu.Link
+withReviewQueueCount wikiSlug maybeReviewCount links =
+    links
+        |> List.map
+            (\link ->
+                case ( link.linkRoute, maybeReviewCount ) of
+                    ( Route.WikiReview routeWikiSlug, Just reviewCount ) ->
+                        if routeWikiSlug == wikiSlug then
+                            { link
+                                | linkLabel = "Review (" ++ String.fromInt reviewCount ++ ")"
+                                , linkEmphasized = reviewCount > 0
+                            }
+
+                        else
+                            link
+
+                    _ ->
+                        link
+            )
 
 
 sideNavSectionFromMenu : SideNavMenu.Section -> SideNavSection Msg
@@ -3218,6 +3263,41 @@ update msg model =
                 ( Route.HostAdminBackup, Err _ ) ->
                     ( { model
                         | hostAdminBackupNotice = Just "Could not read the selected file."
+                      }
+                    , Command.none
+                    )
+
+                _ ->
+                    ( model, Command.none )
+
+        HostAdminWikisDataImportPickRequested ->
+            case model.route of
+                Route.HostAdminWikis ->
+                    ( model
+                    , Effect.File.Select.file [ "application/json", "text/plain" ] HostAdminWikisDataImportFileSelected
+                    )
+
+                _ ->
+                    ( model, Command.none )
+
+        HostAdminWikisDataImportFileSelected file ->
+            ( model
+            , Effect.Task.attempt HostAdminWikisDataImportFileRead (Effect.File.toString file)
+            )
+
+        HostAdminWikisDataImportFileRead readResult ->
+            case ( model.route, readResult ) of
+                ( Route.HostAdminWikis, Ok content ) ->
+                    ( { model
+                        | hostAdminImportInFlight = True
+                        , hostAdminWikisNotice = Nothing
+                      }
+                    , Effect.Lamdera.sendToBackend (ImportHostAdminWikiDataSnapshotAuto content)
+                    )
+
+                ( Route.HostAdminWikis, Err _ ) ->
+                    ( { model
+                        | hostAdminWikisNotice = Just "Could not read the selected file."
                       }
                     , Command.none
                     )
@@ -5958,6 +6038,7 @@ updateFromBackend msg model =
                     ( { model
                         | hostAdminImportInFlight = False
                         , hostAdminBackupNotice = Just "Import completed. Reloading lists…"
+                        , hostAdminWikisNotice = Just "Import completed. Reloading lists…"
                         , store = Store.empty
                         , contributorWikiSessions = Dict.empty
                         , hostAdminWikis = RemoteData.Loading
@@ -5972,6 +6053,7 @@ updateFromBackend msg model =
                     ( { model
                         | hostAdminImportInFlight = False
                         , hostAdminBackupNotice = Just (HostAdmin.dataImportErrorToUserText e)
+                        , hostAdminWikisNotice = Just (HostAdmin.dataImportErrorToUserText e)
                       }
                     , Command.none
                     )
@@ -6030,6 +6112,34 @@ updateFromBackend msg model =
                         , Command.none
                         )
 
+        HostAdminWikiDataImportAutoResponse result ->
+            case result of
+                Ok _ ->
+                    let
+                        store0 : Store
+                        store0 =
+                            model.store
+                    in
+                    ( { model
+                        | hostAdminImportInFlight = False
+                        , hostAdminWikisNotice = Just "Wiki import completed. Reloading lists…"
+                        , store = { store0 | wikiCatalog = RemoteData.NotAsked }
+                        , hostAdminWikis = RemoteData.Loading
+                      }
+                    , Command.batch
+                        [ Effect.Lamdera.sendToBackend RequestHostWikiList
+                        , Effect.Lamdera.sendToBackend RequestWikiCatalog
+                        ]
+                    )
+
+                Err e ->
+                    ( { model
+                        | hostAdminImportInFlight = False
+                        , hostAdminWikisNotice = Just (HostAdmin.wikiDataImportErrorToUserText e)
+                      }
+                    , Command.none
+                    )
+
 
 catalogRows : Dict Wiki.Slug Wiki.CatalogEntry -> List Wiki.CatalogEntry
 catalogRows wikis =
@@ -6069,7 +6179,7 @@ viewWikiListBody store =
             Html.div
                 [ Attr.id "catalog-error"
                 ]
-                [ Html.p [] [ Html.text "Could not load the wiki catalog." ] ]
+                [ UI.contentParagraph [] [ Html.text "Could not load the wiki catalog." ] ]
 
         RemoteData.Loading ->
             viewWikiListLoading
@@ -6087,7 +6197,7 @@ viewWikiListEmpty =
             [ Attr.id "catalog-empty"
             , Attr.attribute "role" "status"
             ]
-            [ Html.p [] [ Html.text "There are no wikis yet." ] ]
+            [ UI.contentParagraph [] [ Html.text "There are no wikis yet." ] ]
         ]
 
 
@@ -6096,7 +6206,7 @@ viewWikiListLoading =
     Html.div
         [ Attr.id "catalog-loading"
         ]
-        [ Html.p [] [ Html.text "Loading…" ] ]
+        [ UI.contentParagraph [] [ Html.text "Loading…" ] ]
 
 
 viewWikiRow : Wiki.CatalogEntry -> Html Msg
@@ -6140,7 +6250,7 @@ viewWikiHomeLoading =
     Html.div
         [ Attr.id "wiki-home-loading"
         ]
-        [ Html.p [] [ Html.text "Loading…" ]
+        [ UI.contentParagraph [] [ Html.text "Loading…" ]
         ]
 
 
@@ -6149,7 +6259,7 @@ viewWikiRegisterLoading =
     Html.div
         [ Attr.id "wiki-register-loading"
         ]
-        [ Html.p [] [ Html.text "Loading…" ] ]
+        [ UI.contentParagraph [] [ Html.text "Loading…" ] ]
 
 
 viewWikiLoginLoading : Html Msg
@@ -6157,7 +6267,7 @@ viewWikiLoginLoading =
     Html.div
         [ Attr.id "wiki-login-loading"
         ]
-        [ Html.p [] [ Html.text "Loading…" ] ]
+        [ UI.contentParagraph [] [ Html.text "Loading…" ] ]
 
 
 viewWikiPublishedSlugList : String -> Wiki.Slug -> List Page.Slug -> Html Msg
@@ -6171,7 +6281,7 @@ viewWikiPublishedSlugList listId wikiSlug pageSlugs =
             |> List.map
                 (\pageSlug ->
                     Html.li []
-                        [ Html.a
+                        [ UI.contentLink
                             [ Attr.href (Wiki.publishedPageUrlPath wikiSlug pageSlug)
                             , Attr.attribute "data-page-slug" pageSlug
                             ]
@@ -6191,10 +6301,10 @@ viewWikiHome wikiSlug summary details =
             Html.text ""
 
           else
-            Html.p [] [ Html.text summary.summary ]
-        , Html.h2 [] [ Html.text "Pages" ]
+            UI.contentParagraph [] [ Html.text summary.summary ]
+        , UI.contentHeading2 [] [ Html.text "Pages" ]
         , if List.isEmpty details.pageSlugs then
-            Html.p
+            UI.contentParagraph
                 [ Attr.id "wiki-home-no-pages"
                 , Attr.attribute "data-context" "wiki-home-no-pages"
                 ]
@@ -6210,7 +6320,7 @@ viewNotFound =
     Html.div
         [ Attr.id "not-found-page"
         ]
-        [ Html.p [] [ Html.text "This URL is not part of SortOfWiki yet." ]
+        [ UI.contentParagraph [] [ Html.text "This URL is not part of SortOfWiki yet." ]
         ]
 
 
@@ -6220,7 +6330,7 @@ viewWikiNotFound slug =
         [ Attr.id "wiki-not-found-page"
         , Attr.attribute "data-wiki-slug" slug
         ]
-        [ Html.p []
+        [ UI.contentParagraph []
             [ Html.text "The wiki "
             , Html.code [ TW.cls UI.markdownCodeSpanClass ] [ Html.text slug ]
             , Html.text " doesn't exist."
@@ -6324,6 +6434,10 @@ wikiScopeSideNavItems wikiSlug model =
         maybeRole =
             Maybe.map .role maybeCw
 
+        maybeReviewCount : Maybe Int
+        maybeReviewCount =
+            reviewQueueCountForWiki wikiSlug model.store
+
         authChrome : List (Html Msg)
         authChrome =
             case maybeCw of
@@ -6348,7 +6462,9 @@ wikiScopeSideNavItems wikiSlug model =
     in
     List.concat
         [ authChrome
-        , SideNavMenu.wikiNavLinks wikiSlug maybeRole |> List.map sideNavLinkLi
+        , SideNavMenu.wikiNavLinks wikiSlug maybeRole
+            |> withReviewQueueCount wikiSlug maybeReviewCount
+            |> List.map sideNavLinkLi
         ]
 
 
@@ -6642,12 +6758,12 @@ viewHostAdminLoginFeedback maybeResult =
         Just (Ok ()) ->
             Html.div
                 [ Attr.id "host-admin-login-success" ]
-                [ Html.p [] [ Html.text "Signed in as platform host admin." ] ]
+                [ UI.contentParagraph [] [ Html.text "Signed in as platform host admin." ] ]
 
         Just (Err e) ->
             Html.div
                 [ Attr.id "host-admin-login-error" ]
-                [ Html.p [] [ Html.text (HostAdmin.loginErrorToUserText e) ] ]
+                [ UI.contentParagraph [] [ Html.text (HostAdmin.loginErrorToUserText e) ] ]
 
 
 viewHostAdminLogin : Model -> Html Msg
@@ -6664,7 +6780,7 @@ viewHostAdminLogin model =
             , Events.onSubmit HostAdminLoginSubmitted
             ]
             [ Html.div []
-                [ Html.label [ Attr.for "host-admin-login-password" ]
+                [ UI.contentLabel [ Attr.for "host-admin-login-password" ]
                     [ Html.text "Password" ]
                 , Html.input
                     [ Attr.id "host-admin-login-password"
@@ -6704,20 +6820,20 @@ viewHostAdminWikis model =
                     [ Html.text noticeText ]
         , case model.hostAdminWikis of
             RemoteData.NotAsked ->
-                Html.p [] [ Html.text "…" ]
+                UI.contentParagraph [] [ Html.text "…" ]
 
             RemoteData.Loading ->
-                Html.p
+                UI.contentParagraph
                     [ Attr.id "host-admin-wikis-loading" ]
                     [ Html.text "Loading…" ]
 
             RemoteData.Failure () ->
-                Html.p [] [ Html.text "Could not load." ]
+                UI.contentParagraph [] [ Html.text "Could not load." ]
 
             RemoteData.Success (Err HostAdmin.NotHostAuthenticated) ->
                 Html.div
                     [ Attr.id "host-admin-wikis-forbidden" ]
-                    [ Html.p [] [ Html.text "Redirecting to host admin sign-in…" ] ]
+                    [ UI.contentParagraph [] [ Html.text "Redirecting to host admin sign-in…" ] ]
 
             RemoteData.Success (Ok summaries) ->
                 let
@@ -6735,20 +6851,38 @@ viewHostAdminWikis model =
                         else
                             List.map (viewHostAdminWikiRow model) summaries
                 in
-                UI.table UI.TableAuto
-                    []
-                    { theadAttrs = []
-                    , headerRowAttrs = []
-                    , headerAlign = UI.TableAlignMiddle
-                    , headers =
-                        [ UI.tableHeaderText "Wiki"
-                        , UI.tableHeaderText "Slug"
-                        , UI.tableHeaderText "Status"
-                        , UI.tableHeaderText "Backup"
+                Html.div []
+                    [ Html.div [ TW.cls "mb-3" ]
+                        [ UI.button
+                            [ Attr.id "host-admin-import-json"
+                            , Attr.type_ "button"
+                            , Events.onClick HostAdminWikisDataImportPickRequested
+                            , Attr.disabled (model.hostAdminExportInFlight || model.hostAdminImportInFlight)
+                            ]
+                            [ Html.text
+                                (if model.hostAdminImportInFlight then
+                                    "Importing…"
+
+                                 else
+                                    "Import wiki JSON…"
+                                )
+                            ]
                         ]
-                    , tbodyAttrs = [ Attr.id "host-admin-wikis-list" ]
-                    , rows = rows
-                    }
+                    , UI.table UI.TableAuto
+                        []
+                        { theadAttrs = []
+                        , headerRowAttrs = []
+                        , headerAlign = UI.TableAlignMiddle
+                        , headers =
+                            [ UI.tableHeaderText "Wiki"
+                            , UI.tableHeaderText "Slug"
+                            , UI.tableHeaderText "Status"
+                            , UI.tableHeaderText "Backup"
+                            ]
+                        , tbodyAttrs = [ Attr.id "host-admin-wikis-list" ]
+                        , rows = rows
+                        }
+                    ]
         ]
 
 
@@ -6769,7 +6903,7 @@ viewHostAdminBackupPanel model =
                     Html.text ""
 
                 Just text ->
-                    Html.p
+                    UI.contentParagraph
                         [ Attr.id "host-admin-backup-notice"
                         , Attr.attribute "role" "status"
                         ]
@@ -6781,7 +6915,7 @@ viewHostAdminBackupPanel model =
         , TW.cls "mb-8 max-w-3xl rounded border border-[var(--border-subtle)] p-4"
         ]
         [ Html.h2 [ TW.cls "text-lg font-semibold mb-2" ] [ Html.text "Backup and restore" ]
-        , Html.p [ TW.cls "text-sm mb-3" ]
+        , UI.contentParagraph [ TW.cls "text-sm mb-3" ]
             [ Html.text
                 "Export all wiki data as JSON, or import a file from a previous export. Import replaces all server-side data except your current host admin sign-in. Contributor sign-ins are not included in the backup; contributors must sign in again after import."
             ]
@@ -6799,20 +6933,6 @@ viewHostAdminBackupPanel model =
 
                      else
                         "Download JSON export"
-                    )
-                ]
-            , UI.button
-                [ Attr.id "host-admin-import-json"
-                , Attr.type_ "button"
-                , Events.onClick HostAdminDataImportPickRequested
-                , Attr.disabled (model.hostAdminExportInFlight || model.hostAdminImportInFlight)
-                ]
-                [ Html.text
-                    (if model.hostAdminImportInFlight then
-                        "Importing…"
-
-                     else
-                        "Import JSON…"
                     )
                 ]
             ]
@@ -6850,7 +6970,7 @@ viewHostAdminWikiRow model summary =
         ]
         [ UI.tableTd UI.TableAlignMiddle
             []
-            [ Html.a
+            [ UI.contentLink
                 [ Attr.href (Wiki.hostAdminWikiDetailUrlPath summary.slug) ]
                 [ Html.text summary.name ]
             ]
@@ -6926,16 +7046,16 @@ viewHostAdminAuditBody remote =
         RemoteData.Failure _ ->
             Html.div
                 [ Attr.id "host-admin-audit-error" ]
-                [ Html.p [] [ Html.text "Could not load audit log." ] ]
+                [ UI.contentParagraph [] [ Html.text "Could not load audit log." ] ]
 
         RemoteData.Success (Err HostAdmin.NotHostAuthenticated) ->
             Html.div
                 [ Attr.id "host-admin-audit-forbidden" ]
-                [ Html.p [] [ Html.text "Redirecting to host admin sign-in…" ] ]
+                [ UI.contentParagraph [] [ Html.text "Redirecting to host admin sign-in…" ] ]
 
         RemoteData.Success (Ok events) ->
             if List.isEmpty events then
-                Html.p
+                UI.contentParagraph
                     [ Attr.id "host-admin-audit-empty" ]
                     [ Html.text "No audit events yet." ]
 
@@ -7085,7 +7205,7 @@ viewHostAdminCreateWikiFeedback maybeResult =
         Just (Err e) ->
             Html.div
                 [ Attr.id "host-admin-create-wiki-error" ]
-                [ Html.p [] [ Html.text (HostAdmin.createHostedWikiErrorToUserText e) ] ]
+                [ UI.contentParagraph [] [ Html.text (HostAdmin.createHostedWikiErrorToUserText e) ] ]
 
 
 viewHostAdminCreateWiki : Model -> Html Msg
@@ -7094,7 +7214,7 @@ viewHostAdminCreateWiki model =
         [ Attr.id "host-admin-create-wiki-page" ]
         [ case model.hostAdminWikis of
             RemoteData.Success (Err HostAdmin.NotHostAuthenticated) ->
-                Html.p
+                UI.contentParagraph
                     [ Attr.id "host-admin-create-wiki-sign-in-needed" ]
                     [ Html.text "Redirecting to host admin sign-in…" ]
 
@@ -7106,8 +7226,8 @@ viewHostAdminCreateWiki model =
 
                     formBody : List (Html Msg)
                     formBody =
-                        [ Html.p []
-                            [ Html.a
+                        [ UI.contentParagraph []
+                            [ UI.contentLink
                                 [ Attr.href Wiki.hostAdminWikisUrlPath ]
                                 [ Html.text "Back to wiki list" ]
                             ]
@@ -7116,7 +7236,7 @@ viewHostAdminCreateWiki model =
                             , Events.onSubmit HostAdminCreateWikiSubmitted
                             ]
                             [ Html.div []
-                                [ Html.label [ Attr.for "host-admin-create-wiki-slug" ]
+                                [ UI.contentLabel [ Attr.for "host-admin-create-wiki-slug" ]
                                     [ Html.text "Wiki slug" ]
                                 , Html.input
                                     [ Attr.id "host-admin-create-wiki-slug"
@@ -7134,7 +7254,7 @@ viewHostAdminCreateWiki model =
                                     []
                                 ]
                             , Html.div []
-                                [ Html.label [ Attr.for "host-admin-create-wiki-name" ]
+                                [ UI.contentLabel [ Attr.for "host-admin-create-wiki-name" ]
                                     [ Html.text "Wiki name" ]
                                 , Html.input
                                     [ Attr.id "host-admin-create-wiki-name"
@@ -7147,7 +7267,7 @@ viewHostAdminCreateWiki model =
                                     []
                                 ]
                             , Html.div []
-                                [ Html.label [ Attr.for "host-admin-create-wiki-initial-admin-username" ]
+                                [ UI.contentLabel [ Attr.for "host-admin-create-wiki-initial-admin-username" ]
                                     [ Html.text "Initial wiki admin username" ]
                                 , Html.input
                                     [ Attr.id "host-admin-create-wiki-initial-admin-username"
@@ -7160,7 +7280,7 @@ viewHostAdminCreateWiki model =
                                     []
                                 ]
                             , Html.div []
-                                [ Html.label [ Attr.for "host-admin-create-wiki-initial-admin-password" ]
+                                [ UI.contentLabel [ Attr.for "host-admin-create-wiki-initial-admin-password" ]
                                     [ Html.text "Initial wiki admin password" ]
                                 , Html.input
                                     [ Attr.id "host-admin-create-wiki-initial-admin-password"
@@ -7185,17 +7305,17 @@ viewHostAdminCreateWiki model =
                 Html.div [] formBody
 
             RemoteData.Loading ->
-                Html.p
+                UI.contentParagraph
                     [ Attr.id "host-admin-create-wiki-session-loading" ]
                     [ Html.text "Loading…" ]
 
             RemoteData.NotAsked ->
-                Html.p
+                UI.contentParagraph
                     [ Attr.id "host-admin-create-wiki-session-loading" ]
                     [ Html.text "Loading…" ]
 
             RemoteData.Failure () ->
-                Html.p [] [ Html.text "Could not verify host session." ]
+                UI.contentParagraph [] [ Html.text "Could not verify host session." ]
         ]
 
 
@@ -7208,12 +7328,12 @@ viewHostAdminWikiDetailSaveFeedback maybeResult =
         Just (Ok ()) ->
             Html.div
                 [ Attr.id "host-admin-wiki-detail-save-success" ]
-                [ Html.p [] [ Html.text "Saved." ] ]
+                [ UI.contentParagraph [] [ Html.text "Saved." ] ]
 
         Just (Err e) ->
             Html.div
                 [ Attr.id "host-admin-wiki-detail-save-error" ]
-                [ Html.p [] [ Html.text (HostAdmin.updateHostedWikiMetadataErrorToUserText e) ] ]
+                [ UI.contentParagraph [] [ Html.text (HostAdmin.updateHostedWikiMetadataErrorToUserText e) ] ]
 
 
 viewHostAdminWikiDetailLifecycleFeedback : Maybe (Result HostAdmin.WikiLifecycleError ()) -> Html Msg
@@ -7225,12 +7345,12 @@ viewHostAdminWikiDetailLifecycleFeedback maybeResult =
         Just (Ok ()) ->
             Html.div
                 [ Attr.id "host-admin-wiki-detail-lifecycle-success" ]
-                [ Html.p [] [ Html.text "Updated." ] ]
+                [ UI.contentParagraph [] [ Html.text "Updated." ] ]
 
         Just (Err e) ->
             Html.div
                 [ Attr.id "host-admin-wiki-detail-lifecycle-error" ]
-                [ Html.p [] [ Html.text (HostAdmin.wikiLifecycleErrorToUserText e) ] ]
+                [ UI.contentParagraph [] [ Html.text (HostAdmin.wikiLifecycleErrorToUserText e) ] ]
 
 
 viewHostAdminWikiDetailDeleteFeedback : Maybe (Result HostAdmin.DeleteHostedWikiError ()) -> Html Msg
@@ -7242,7 +7362,7 @@ viewHostAdminWikiDetailDeleteFeedback maybeResult =
         Just (Err e) ->
             Html.div
                 [ Attr.id "host-admin-delete-wiki-error" ]
-                [ Html.p [] [ Html.text (HostAdmin.deleteHostedWikiErrorToUserText e) ] ]
+                [ UI.contentParagraph [] [ Html.text (HostAdmin.deleteHostedWikiErrorToUserText e) ] ]
 
         Just (Ok ()) ->
             Html.text ""
@@ -7261,20 +7381,20 @@ viewHostAdminWikiDetail model =
         ]
         [ case d.load of
             RemoteData.NotAsked ->
-                Html.p [] [ Html.text "…" ]
+                UI.contentParagraph [] [ Html.text "…" ]
 
             RemoteData.Loading ->
-                Html.p
+                UI.contentParagraph
                     [ Attr.id "host-admin-wiki-detail-loading" ]
                     [ Html.text "Loading…" ]
 
             RemoteData.Failure _ ->
-                Html.p [] [ Html.text "Could not load." ]
+                UI.contentParagraph [] [ Html.text "Could not load." ]
 
             RemoteData.Success (Err e) ->
                 Html.div
                     [ Attr.id "host-admin-wiki-detail-error" ]
-                    [ Html.p [] [ Html.text (HostAdmin.hostWikiDetailErrorToUserText e) ] ]
+                    [ UI.contentParagraph [] [ Html.text (HostAdmin.hostWikiDetailErrorToUserText e) ] ]
 
             RemoteData.Success (Ok entry) ->
                 let
@@ -7294,7 +7414,7 @@ viewHostAdminWikiDetail model =
                                     , TW.cls "mt-1.5 flex flex-col gap-1 min-w-0"
                                     ]
                                     [ Html.div []
-                                        [ Html.label [ Attr.for "host-admin-wiki-detail-slug" ]
+                                        [ UI.contentLabel [ Attr.for "host-admin-wiki-detail-slug" ]
                                             [ Html.text "Wiki slug" ]
                                         , Html.input
                                             [ Attr.id "host-admin-wiki-detail-slug"
@@ -7309,7 +7429,7 @@ viewHostAdminWikiDetail model =
                                             []
                                         ]
                                     , Html.div []
-                                        [ Html.label [ Attr.for "host-admin-wiki-detail-name" ]
+                                        [ UI.contentLabel [ Attr.for "host-admin-wiki-detail-name" ]
                                             [ Html.text "Wiki name" ]
                                         , Html.input
                                             [ Attr.id "host-admin-wiki-detail-name"
@@ -7322,7 +7442,7 @@ viewHostAdminWikiDetail model =
                                             []
                                         ]
                                     , Html.div []
-                                        [ Html.label [ Attr.for "host-admin-wiki-detail-summary" ]
+                                        [ UI.contentLabel [ Attr.for "host-admin-wiki-detail-summary" ]
                                             [ Html.text "Public summary" ]
                                         , Html.textarea
                                             [ Attr.id "host-admin-wiki-detail-summary"
@@ -7396,7 +7516,7 @@ viewHostAdminWikiDetail model =
                             , Html.div [ TW.cls UI.hostAdminWikiDetailDangerCardClass ]
                                 [ Html.h2 [ TW.cls "m-0 mb-1.5 text-[1rem] font-semibold text-[var(--danger)]" ]
                                     [ Html.text "Delete wiki" ]
-                                , Html.p [ TW.cls "m-0 mb-2 text-[0.95rem] leading-[1.4] text-[var(--fg)]" ]
+                                , UI.contentParagraph [ TW.cls "m-0 mb-2 text-[0.95rem] leading-[1.4] text-[var(--fg)]" ]
                                     [ Html.text
                                         ("This permanently removes the wiki, its pages, submissions, and audit log. Type the slug "
                                             ++ d.wikiSlug
@@ -7408,7 +7528,7 @@ viewHostAdminWikiDetail model =
                                     , TW.cls "flex flex-col gap-1.5 min-w-0"
                                     ]
                                     [ Html.div []
-                                        [ Html.label [ Attr.for "host-admin-delete-wiki-confirm" ]
+                                        [ UI.contentLabel [ Attr.for "host-admin-delete-wiki-confirm" ]
                                             [ Html.text "Confirm wiki slug" ]
                                         , Html.input
                                             [ Attr.id "host-admin-delete-wiki-confirm"
@@ -7769,7 +7889,7 @@ viewRegisterLoaded wikiSlug draft =
             , Events.onSubmit RegisterFormSubmitted
             ]
             [ Html.div []
-                [ Html.label [ Attr.for "wiki-register-username" ]
+                [ UI.contentLabel [ Attr.for "wiki-register-username" ]
                     [ Html.text "Username" ]
                 , Html.input
                     [ Attr.id "wiki-register-username"
@@ -7782,7 +7902,7 @@ viewRegisterLoaded wikiSlug draft =
                     []
                 ]
             , Html.div []
-                [ Html.label [ Attr.for "wiki-register-password" ]
+                [ UI.contentLabel [ Attr.for "wiki-register-password" ]
                     [ Html.text "Password" ]
                 , Html.input
                     [ Attr.id "wiki-register-password"
@@ -7801,9 +7921,9 @@ viewRegisterLoaded wikiSlug draft =
                 ]
                 [ Html.text "Create account" ]
             ]
-        , Html.p []
+        , UI.contentParagraph []
             [ Html.text "Already have an account? "
-            , Html.a
+            , UI.contentLink
                 [ Attr.id "wiki-register-login-link"
                 , Attr.href (Wiki.loginUrlPath wikiSlug)
                 ]
@@ -7851,7 +7971,7 @@ viewLoginLoaded wikiSlug draft =
             , Events.onSubmit LoginFormSubmitted
             ]
             [ Html.div []
-                [ Html.label [ Attr.for "wiki-login-username" ]
+                [ UI.contentLabel [ Attr.for "wiki-login-username" ]
                     [ Html.text "Username" ]
                 , Html.input
                     [ Attr.id "wiki-login-username"
@@ -7864,7 +7984,7 @@ viewLoginLoaded wikiSlug draft =
                     []
                 ]
             , Html.div []
-                [ Html.label [ Attr.for "wiki-login-password" ]
+                [ UI.contentLabel [ Attr.for "wiki-login-password" ]
                     [ Html.text "Password" ]
                 , Html.input
                     [ Attr.id "wiki-login-password"
@@ -7883,9 +8003,9 @@ viewLoginLoaded wikiSlug draft =
                 ]
                 [ Html.text "Log in" ]
             ]
-        , Html.p []
+        , UI.contentParagraph []
             [ Html.text "Need an account? "
-            , Html.a
+            , UI.contentLink
                 [ Attr.id "wiki-login-register-link"
                 , Attr.href (Wiki.registerUrlPath wikiSlug)
                 ]
@@ -7927,7 +8047,7 @@ viewWikiSubmitNewLoading =
     Html.div
         [ Attr.id "wiki-submit-new-loading"
         ]
-        [ Html.p [] [ Html.text "Loading…" ] ]
+        [ UI.contentParagraph [] [ Html.text "Loading…" ] ]
 
 
 viewNewPageSaveDraftFeedback : NewPageSubmitDraft -> Html Msg
@@ -7973,9 +8093,9 @@ viewNewPageSubmitFeedback wikiSlug draft =
                             [ Attr.id "wiki-submit-new-success"
                             , Attr.attribute "data-submission-id" idStr
                             ]
-                            [ Html.p []
+                            [ UI.contentParagraph []
                                 [ Html.text "Submitted for review." ]
-                            , Html.a
+                            , UI.contentLink
                                 [ Attr.id "wiki-submit-new-success-link"
                                 , Attr.href (Wiki.submissionDetailUrlPath wikiSlug idStr)
                                 ]
@@ -8021,7 +8141,7 @@ viewSubmitNewLoaded wikiSlug publishedSlugExists showUntrustedContributorDisclai
             , Events.onSubmit NewPageSubmitFormSubmitted
             ]
             [ Html.div []
-                [ Html.label [ Attr.for "slug-input" ]
+                [ UI.contentLabel [ Attr.for "slug-input" ]
                     [ Html.text "Page slug" ]
                 , Html.input
                     ([ Attr.id "slug-input"
@@ -8157,9 +8277,9 @@ viewPageEditSubmitFeedback wikiSlug pageSlug draft =
                     Submission.EditPublishedImmediately ->
                         Html.div
                             [ Attr.id "wiki-submit-edit-success" ]
-                            [ Html.p []
+                            [ UI.contentParagraph []
                                 [ Html.text "Published. Your edit is live. " ]
-                            , Html.a
+                            , UI.contentLink
                                 [ Attr.id "wiki-submit-edit-success-published-link"
                                 , Attr.href (Wiki.publishedPageUrlPath wikiSlug pageSlug)
                                 ]
@@ -8176,9 +8296,9 @@ viewPageEditSubmitFeedback wikiSlug pageSlug draft =
                             [ Attr.id "wiki-submit-edit-success"
                             , Attr.attribute "data-submission-id" idStr
                             ]
-                            [ Html.p []
+                            [ UI.contentParagraph []
                                 [ Html.text "Submitted for review." ]
-                            , Html.a
+                            , UI.contentLink
                                 [ Attr.id "wiki-submit-edit-success-link"
                                 , Attr.href (Wiki.submissionDetailUrlPath wikiSlug idStr)
                                 ]
@@ -8249,7 +8369,7 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
         ]
         (List.concat
             [ if showUntrustedContributorDisclaimer then
-                [ Html.p []
+                [ UI.contentParagraph []
                     [ Html.text "Published content stays unchanged until a reviewer approves this proposal." ]
                 ]
 
@@ -8404,7 +8524,7 @@ viewPageDeleteSubmitFeedback wikiSlug pageSlug draft =
                     Submission.DeletePublishedImmediately ->
                         Html.div
                             [ Attr.id "wiki-submit-delete-success" ]
-                            [ Html.p []
+                            [ UI.contentParagraph []
                                 [ Html.text ("Published. Page \"" ++ pageSlug ++ "\" was removed.") ]
                             ]
 
@@ -8418,9 +8538,9 @@ viewPageDeleteSubmitFeedback wikiSlug pageSlug draft =
                             [ Attr.id "wiki-submit-delete-success"
                             , Attr.attribute "data-submission-id" idStr
                             ]
-                            [ Html.p []
+                            [ UI.contentParagraph []
                                 [ Html.text "Submitted for review." ]
-                            , Html.a
+                            , UI.contentLink
                                 [ Attr.id "wiki-submit-delete-success-link"
                                 , Attr.href (Wiki.submissionDetailUrlPath wikiSlug idStr)
                                 ]
@@ -8446,7 +8566,7 @@ viewSubmitDeleteLoaded trustedModeratorSession submitMsg wikiSlug pageSlug draft
 
         intro : Html Msg
         intro =
-            Html.p []
+            UI.contentParagraph []
                 [ Html.text
                     (if trustedModeratorSession then
                         "This removes the page from the wiki immediately."
@@ -8496,7 +8616,7 @@ viewSubmitDeleteLoaded trustedModeratorSession submitMsg wikiSlug pageSlug draft
             , Events.onSubmit submitMsg
             ]
             [ Html.div []
-                [ Html.label [ Attr.for "wiki-submit-delete-reason" ]
+                [ UI.contentLabel [ Attr.for "wiki-submit-delete-reason" ]
                     [ Html.text "Reason for deletion (required)" ]
                 , Html.textarea
                     [ Attr.id "wiki-submit-delete-reason"
@@ -8592,12 +8712,12 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
         RemoteData.Failure _ ->
             Html.div
                 [ Attr.id "wiki-submission-detail-error" ]
-                [ Html.p [] [ Html.text "Could not load submission details." ] ]
+                [ UI.contentParagraph [] [ Html.text "Could not load submission details." ] ]
 
         RemoteData.Success (Err e) ->
             Html.div
                 [ Attr.id "wiki-submission-detail-error" ]
-                [ Html.p []
+                [ UI.contentParagraph []
                     [ Html.text (Submission.detailsErrorToUserText e) ]
                 ]
 
@@ -8629,7 +8749,7 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
                     if detail.status == Submission.Draft && detail.contributionKind == Submission.ContributorKindNewPage then
                         Html.div
                             [ TW.cls "mb-2" ]
-                            [ Html.label
+                            [ UI.contentLabel
                                 [ Attr.for "wiki-submission-detail-new-page-slug" ]
                                 [ Html.text "Page slug" ]
                             , Html.input
@@ -8765,14 +8885,14 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
                                 [ Html.text errText ]
             in
             Html.div []
-                [ Html.p []
+                [ UI.contentParagraph []
                     [ Html.span
                         [ Attr.id "wiki-submission-detail-status"
                         , Attr.attribute "data-submission-status" (Submission.statusLabelUserText detail.status)
                         ]
                         [ Html.text (Submission.statusLabelUserText detail.status) ]
                     ]
-                , Html.p
+                , UI.contentParagraph
                     [ Attr.id "wiki-submission-detail-kind-summary" ]
                     [ Html.text detail.kindSummary ]
                 , case detail.reviewerNote of
@@ -8784,14 +8904,14 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
                             [ Attr.id "wiki-submission-detail-reviewer-note"
                             , Attr.attribute "data-has-reviewer-note" "true"
                             ]
-                            [ Html.h2 [] [ Html.text "Reviewer note" ]
-                            , Html.p [] [ Html.text noteText ]
+                            [ UI.contentHeading2 [] [ Html.text "Reviewer note" ]
+                            , UI.contentParagraph [] [ Html.text noteText ]
                             ]
                 , Html.section
                     [ Attr.id "wiki-submission-detail-next-steps"
                     , TW.cls "mt-3 mb-3"
                     ]
-                    [ Html.p [ TW.cls "m-0 text-[0.95rem] leading-[1.45]" ]
+                    [ UI.contentParagraph [ TW.cls "m-0 text-[0.95rem] leading-[1.45]" ]
                         [ Html.text (submissionDetailNextStepsText detail.status) ]
                     ]
                 , newPageSlugField
@@ -8856,7 +8976,7 @@ viewWikiReviewQueueLoading =
     Html.div
         [ Attr.id "wiki-review-queue-loading"
         ]
-        [ Html.p [] [ Html.text "Loading…" ] ]
+        [ UI.contentParagraph [] [ Html.text "Loading…" ] ]
 
 
 viewReviewQueueBody :
@@ -8874,16 +8994,16 @@ viewReviewQueueBody wikiSlug remote =
         RemoteData.Failure _ ->
             Html.div
                 [ Attr.id "wiki-review-queue-error" ]
-                [ Html.p [] [ Html.text "Could not load the review queue." ] ]
+                [ UI.contentParagraph [] [ Html.text "Could not load the review queue." ] ]
 
         RemoteData.Success (Err e) ->
             Html.div
                 [ Attr.id "wiki-review-queue-error" ]
-                [ Html.p [] [ Html.text (Submission.reviewQueueErrorToUserText e) ] ]
+                [ UI.contentParagraph [] [ Html.text (Submission.reviewQueueErrorToUserText e) ] ]
 
         RemoteData.Success (Ok items) ->
             if List.isEmpty items then
-                Html.p
+                UI.contentParagraph
                     [ Attr.id "wiki-review-queue-empty" ]
                     [ Html.text "No pending submissions." ]
 
@@ -8914,7 +9034,7 @@ viewReviewQueueBody wikiSlug remote =
                                         ]
                                         [ UI.tableTd UI.TableAlignTop
                                             []
-                                            [ Html.a
+                                            [ UI.contentLink
                                                 [ Attr.href (Wiki.reviewDetailUrlPath wikiSlug idStr)
                                                 , Attr.attribute "data-submission-id" idStr
                                                 ]
@@ -8993,7 +9113,7 @@ viewWikiMySubmissionsLoading =
     Html.div
         [ Attr.id "wiki-my-submissions-loading"
         ]
-        [ Html.p [] [ Html.text "Loading…" ] ]
+        [ UI.contentParagraph [] [ Html.text "Loading…" ] ]
 
 
 viewMySubmissionsBody :
@@ -9011,16 +9131,16 @@ viewMySubmissionsBody wikiSlug remote =
         RemoteData.Failure _ ->
             Html.div
                 [ Attr.id "wiki-my-submissions-error" ]
-                [ Html.p [] [ Html.text "Could not load your submissions." ] ]
+                [ UI.contentParagraph [] [ Html.text "Could not load your submissions." ] ]
 
         RemoteData.Success (Err e) ->
             Html.div
                 [ Attr.id "wiki-my-submissions-error" ]
-                [ Html.p [] [ Html.text (Submission.myPendingSubmissionsErrorToUserText e) ] ]
+                [ UI.contentParagraph [] [ Html.text (Submission.myPendingSubmissionsErrorToUserText e) ] ]
 
         RemoteData.Success (Ok items) ->
             if List.isEmpty items then
-                Html.p
+                UI.contentParagraph
                     [ Attr.id "wiki-my-submissions-empty" ]
                     [ Html.text "No submissions to show here yet." ]
 
@@ -9051,7 +9171,7 @@ viewMySubmissionsBody wikiSlug remote =
                                         ]
                                         [ UI.tableTd UI.TableAlignTop
                                             []
-                                            [ Html.a
+                                            [ UI.contentLink
                                                 [ Attr.href (Wiki.submissionDetailUrlPath wikiSlug idStr)
                                                 , Attr.attribute "data-submission-id" idStr
                                                 ]
@@ -9123,7 +9243,7 @@ viewWikiAdminUsersLoading =
     Html.div
         [ Attr.id "wiki-admin-users-loading"
         ]
-        [ Html.p [] [ Html.text "Loading…" ] ]
+        [ UI.contentParagraph [] [ Html.text "Loading…" ] ]
 
 
 viewWikiAdminUsersBody :
@@ -9142,12 +9262,12 @@ viewWikiAdminUsersBody wikiSlug maybeSelfUsername remote =
         RemoteData.Failure _ ->
             Html.div
                 [ Attr.id "wiki-admin-users-error" ]
-                [ Html.p [] [ Html.text "Could not load wiki users." ] ]
+                [ UI.contentParagraph [] [ Html.text "Could not load wiki users." ] ]
 
         RemoteData.Success (Err e) ->
             Html.div
                 [ Attr.id "wiki-admin-users-error" ]
-                [ Html.p [] [ Html.text (WikiAdminUsers.errorToUserText e) ] ]
+                [ UI.contentParagraph [] [ Html.text (WikiAdminUsers.errorToUserText e) ] ]
 
         RemoteData.Success (Ok users) ->
             UI.table UI.TableFullMax72
@@ -9301,7 +9421,7 @@ viewWikiAdminUsersPromoteFeedback maybeText =
         Just text ->
             Html.div
                 [ Attr.id "wiki-admin-promote-error" ]
-                [ Html.p [] [ Html.text text ] ]
+                [ UI.contentParagraph [] [ Html.text text ] ]
 
 
 viewWikiAdminUsersDemoteFeedback : Maybe String -> Html Msg
@@ -9313,7 +9433,7 @@ viewWikiAdminUsersDemoteFeedback maybeText =
         Just text ->
             Html.div
                 [ Attr.id "wiki-admin-demote-error" ]
-                [ Html.p [] [ Html.text text ] ]
+                [ UI.contentParagraph [] [ Html.text text ] ]
 
 
 viewWikiAdminUsersGrantAdminFeedback : Maybe String -> Html Msg
@@ -9325,7 +9445,7 @@ viewWikiAdminUsersGrantAdminFeedback maybeText =
         Just text ->
             Html.div
                 [ Attr.id "wiki-admin-grant-admin-error" ]
-                [ Html.p [] [ Html.text text ] ]
+                [ UI.contentParagraph [] [ Html.text text ] ]
 
 
 viewWikiAdminUsersRevokeAdminFeedback : Maybe String -> Html Msg
@@ -9337,7 +9457,7 @@ viewWikiAdminUsersRevokeAdminFeedback maybeText =
         Just text ->
             Html.div
                 [ Attr.id "wiki-admin-revoke-admin-error" ]
-                [ Html.p [] [ Html.text text ] ]
+                [ UI.contentParagraph [] [ Html.text text ] ]
 
 
 wikiAdminUsersSelfUsernameOnPage : Model -> Wiki.Slug -> Maybe String
@@ -9396,16 +9516,16 @@ viewWikiAdminAuditBody wikiSlug remote =
         RemoteData.Failure _ ->
             Html.div
                 [ Attr.id "wiki-admin-audit-error" ]
-                [ Html.p [] [ Html.text "Could not load audit log." ] ]
+                [ UI.contentParagraph [] [ Html.text "Could not load audit log." ] ]
 
         RemoteData.Success (Err e) ->
             Html.div
                 [ Attr.id "wiki-admin-audit-error" ]
-                [ Html.p [] [ Html.text (WikiAuditLog.errorToUserText e) ] ]
+                [ UI.contentParagraph [] [ Html.text (WikiAuditLog.errorToUserText e) ] ]
 
         RemoteData.Success (Ok events) ->
             if List.isEmpty events then
-                Html.p
+                UI.contentParagraph
                     [ Attr.id "wiki-admin-audit-empty" ]
                     [ Html.text "No audit events yet." ]
 
@@ -9682,12 +9802,12 @@ viewReviewSubmissionDetailBody wikiSlug publishedSlugExists remote =
         RemoteData.Failure _ ->
             Html.div
                 [ Attr.id "wiki-review-detail-error" ]
-                [ Html.p [] [ Html.text "Could not load submission review details." ] ]
+                [ UI.contentParagraph [] [ Html.text "Could not load submission review details." ] ]
 
         RemoteData.Success (Err e) ->
             Html.div
                 [ Attr.id "wiki-review-detail-error" ]
-                [ Html.p []
+                [ UI.contentParagraph []
                     [ Html.text (SubmissionReviewDetail.reviewSubmissionDetailErrorToUserText e) ]
                 ]
 
@@ -10032,7 +10152,7 @@ viewMissingPublishedPage wikiSlug pageSlug maybeContributorWiki myPendingRemote 
                     else
                         case myPendingRemote of
                             Loading ->
-                                Html.p
+                                UI.contentParagraph
                                     [ Attr.id "wiki-missing-published-pending-loading" ]
                                     [ Html.text "Loading your submission status…" ]
 
@@ -10057,14 +10177,14 @@ viewMissingPublishedPage wikiSlug pageSlug maybeContributorWiki myPendingRemote 
                                                     []
 
                                                   else
-                                                    [ Html.p [] [ Html.text line1 ] ]
+                                                    [ UI.contentParagraph [] [ Html.text line1 ] ]
                                                 , if String.isEmpty line2 then
                                                     []
 
                                                   else
-                                                    [ Html.p [] [ Html.text line2 ] ]
-                                                , [ Html.p []
-                                                        [ Html.a
+                                                    [ UI.contentParagraph [] [ Html.text line2 ] ]
+                                                , [ UI.contentParagraph []
+                                                        [ UI.contentLink
                                                             [ Attr.id "wiki-missing-published-open-submission-link"
                                                             , Attr.href (Wiki.submissionDetailUrlPath wikiSlug idStr)
                                                             ]
@@ -10098,8 +10218,8 @@ viewMissingPublishedPage wikiSlug pageSlug maybeContributorWiki myPendingRemote 
                             Html.text ""
 
                         else
-                            Html.p []
-                                [ Html.a
+                            UI.contentParagraph []
+                                [ UI.contentLink
                                     [ Attr.id "wiki-missing-published-create-link"
                                     , Attr.href (Wiki.submitNewPageUrlPathWithSuggestedSlug wikiSlug pageSlug)
                                     ]
@@ -10107,9 +10227,9 @@ viewMissingPublishedPage wikiSlug pageSlug maybeContributorWiki myPendingRemote 
                                 ]
 
                     else
-                        Html.p []
+                        UI.contentParagraph []
                             [ Html.text "Log in on this wiki to create it. "
-                            , Html.a
+                            , UI.contentLink
                                 [ Attr.id "wiki-missing-published-login-link"
                                 , Attr.href (Wiki.loginUrlPath wikiSlug)
                                 ]
@@ -10117,8 +10237,8 @@ viewMissingPublishedPage wikiSlug pageSlug maybeContributorWiki myPendingRemote 
                             ]
 
                 Nothing ->
-                    Html.p []
-                        [ Html.a
+                    UI.contentParagraph []
+                        [ UI.contentLink
                             [ Attr.id "wiki-missing-published-login-link"
                             , Attr.href
                                 (Wiki.loginUrlPathWithRedirect wikiSlug
@@ -10133,7 +10253,7 @@ viewMissingPublishedPage wikiSlug pageSlug maybeContributorWiki myPendingRemote 
         , Attr.attribute "data-wiki-slug" wikiSlug
         , Attr.attribute "data-page-slug" pageSlug
         ]
-        [ Html.p []
+        [ UI.contentParagraph []
             [ Html.text ("The page \"" ++ pageSlug ++ "\" does not exist yet.") ]
         , pendingSection
         , contributorCreateOrLogin

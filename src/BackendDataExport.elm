@@ -4,6 +4,7 @@ module BackendDataExport exposing
     , applySnapshotToBackendModel
     , applyWikiSnapshotMerge
     , decodeImportString
+    , decodeWikiImportString
     , decodeWikiImportForSlug
     , encodeModelToJsonString
     , encodeWikiSnapshotToJsonString
@@ -695,7 +696,7 @@ decodeWikiImportForSlug expectedSlug raw =
             Err ImportJsonInvalid
 
         Ok val ->
-            case Decode.decodeValue (wikiSnapshotFieldsDecoder expectedSlug) val of
+            case Decode.decodeValue (wikiSnapshotFieldsDecoder (Just expectedSlug)) val of
                 Ok snap ->
                     Ok snap
 
@@ -721,8 +722,47 @@ decodeWikiImportForSlug expectedSlug raw =
                                         Err (ImportDecodeError (Decode.errorToString e))
 
 
-wikiSnapshotFieldsDecoder : Wiki.Slug -> Decoder SnapshotFields
-wikiSnapshotFieldsDecoder expectedSlug =
+decodeWikiImportString : String -> Result ImportError ( Wiki.Slug, SnapshotFields )
+decodeWikiImportString raw =
+    case Decode.decodeString Decode.value raw of
+        Err _ ->
+            Err ImportJsonInvalid
+
+        Ok val ->
+            case Decode.decodeValue (wikiSnapshotWithDeclaredSlugDecoder Nothing) val of
+                Ok pair ->
+                    Ok pair
+
+                Err e ->
+                    case Decode.decodeValue (Decode.field "format" Decode.string) val of
+                        Err _ ->
+                            Err (ImportWrongFormat "missing or invalid format field")
+
+                        Ok fmt ->
+                            if fmt /= wikiSnapshotFormatId then
+                                Err (ImportWrongFormat ("expected format " ++ wikiSnapshotFormatId))
+
+                            else
+                                case Decode.decodeValue (Decode.field "version" Decode.int) val of
+                                    Ok v ->
+                                        if v /= currentVersion then
+                                            Err (ImportUnsupportedVersion v)
+
+                                        else
+                                            Err (ImportDecodeError (Decode.errorToString e))
+
+                                    Err _ ->
+                                        Err (ImportDecodeError (Decode.errorToString e))
+
+
+wikiSnapshotFieldsDecoder : Maybe Wiki.Slug -> Decoder SnapshotFields
+wikiSnapshotFieldsDecoder maybeExpectedSlug =
+    wikiSnapshotWithDeclaredSlugDecoder maybeExpectedSlug
+        |> Decode.map Tuple.second
+
+
+wikiSnapshotWithDeclaredSlugDecoder : Maybe Wiki.Slug -> Decoder ( Wiki.Slug, SnapshotFields )
+wikiSnapshotWithDeclaredSlugDecoder maybeExpectedSlug =
     Decode.field "format" Decode.string
         |> Decode.andThen
             (\fmt ->
@@ -748,17 +788,27 @@ wikiSnapshotFieldsDecoder expectedSlug =
                                         )
                                         |> Decode.andThen
                                             (\( declaredSlug, snap ) ->
-                                                if declaredSlug /= expectedSlug then
-                                                    Decode.fail
-                                                        "The file is for a different wiki slug than the row you imported from."
+                                                case maybeExpectedSlug of
+                                                    Just expectedSlug ->
+                                                        if declaredSlug /= expectedSlug then
+                                                            Decode.fail
+                                                                "The file is for a different wiki slug than the row you imported from."
 
-                                                else
-                                                    case validateWikiSnapshotForSlug expectedSlug snap of
-                                                        Err msg ->
-                                                            Decode.fail msg
+                                                        else
+                                                            case validateWikiSnapshotForSlug expectedSlug snap of
+                                                                Err msg ->
+                                                                    Decode.fail msg
 
-                                                        Ok () ->
-                                                            Decode.succeed snap
+                                                                Ok () ->
+                                                                    Decode.succeed ( declaredSlug, snap )
+
+                                                    Nothing ->
+                                                        case validateWikiSnapshotForSlug declaredSlug snap of
+                                                            Err msg ->
+                                                                Decode.fail msg
+
+                                                            Ok () ->
+                                                                Decode.succeed ( declaredSlug, snap )
                                             )
                             )
             )

@@ -2474,6 +2474,48 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                             (HostAdminWikiDataImportResponse wikiSlug (Ok ()))
                                         )
 
+        ImportHostAdminWikiDataSnapshotAuto rawJson ->
+            let
+                sessionKey : String
+                sessionKey =
+                    Effect.Lamdera.sessionIdToString sessionId
+            in
+            if not (Set.member sessionKey model.hostSessions) then
+                ( model
+                , Effect.Lamdera.sendToFrontend clientId
+                    (HostAdminWikiDataImportAutoResponse (Err HostAdmin.WikiDataImportNotHostAuthenticated))
+                )
+
+            else
+                case BackendDataExport.decodeWikiImportString rawJson of
+                    Err importErr ->
+                        ( model
+                        , Effect.Lamdera.sendToFrontend clientId
+                            (HostAdminWikiDataImportAutoResponse
+                                (Err
+                                    (HostAdmin.WikiDataImportInvalid
+                                        (BackendDataExport.importErrorToString importErr)
+                                    )
+                                )
+                            )
+                        )
+
+                    Ok ( wikiSlug, snap ) ->
+                        case BackendDataExport.applyWikiSnapshotMerge wikiSlug snap model of
+                            Err detail ->
+                                ( model
+                                , Effect.Lamdera.sendToFrontend clientId
+                                    (HostAdminWikiDataImportAutoResponse
+                                        (Err (HostAdmin.WikiDataImportInvalid detail))
+                                    )
+                                )
+
+                            Ok nextModel ->
+                                ( nextModel
+                                , Effect.Lamdera.sendToFrontend clientId
+                                    (HostAdminWikiDataImportAutoResponse (Ok wikiSlug))
+                                )
+
 
 subscriptions : Model -> Subscription BackendOnly Msg
 subscriptions _ =
