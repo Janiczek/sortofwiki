@@ -29,6 +29,7 @@ import Html.Events as Events
 import Json.Decode
 import Lamdera
 import Page
+import PageGraph
 import PageMarkdown
 import PageToc
 import PageTodos
@@ -315,6 +316,9 @@ wikiSideNavSlugIfActive model =
                     Just s
 
                 Route.WikiPage s _ ->
+                    Just s
+
+                Route.WikiPageGraph s _ ->
                     Just s
 
                 Route.WikiTodos s ->
@@ -668,6 +672,9 @@ runRouteStoreActions ( model, cmd ) =
                     Command.none
 
                 Route.WikiPage _ _ ->
+                    Command.none
+
+                Route.WikiPageGraph _ _ ->
                     Command.none
 
                 Route.WikiTodos _ ->
@@ -1191,6 +1198,9 @@ routeUsesAuditLogFillLayout route =
         Route.WikiPage _ _ ->
             False
 
+        Route.WikiPageGraph _ _ ->
+            False
+
         Route.WikiTodos _ ->
             False
 
@@ -1280,6 +1290,9 @@ applyWikiAdminAuditFilterFromModel model =
         Route.WikiPage _ _ ->
             ( model, Command.none )
 
+        Route.WikiPageGraph _ _ ->
+            ( model, Command.none )
+
         Route.WikiTodos _ ->
             ( model, Command.none )
 
@@ -1366,6 +1379,9 @@ applyHostAdminAuditFilterFromModel model =
             ( model, Command.none )
 
         Route.WikiPage _ _ ->
+            ( model, Command.none )
+
+        Route.WikiPageGraph _ _ ->
             ( model, Command.none )
 
         Route.WikiTodos _ ->
@@ -1646,6 +1662,9 @@ update msg model =
                                 Route.WikiPage _ _ ->
                                     RemoteData.NotAsked
 
+                                Route.WikiPageGraph _ _ ->
+                                    RemoteData.NotAsked
+
                                 Route.WikiTodos _ ->
                                     RemoteData.NotAsked
 
@@ -1774,6 +1793,9 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
+                Route.WikiPageGraph _ _ ->
+                    ( model, Command.none )
+
                 Route.WikiTodos _ ->
                     ( model, Command.none )
 
@@ -1890,6 +1912,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
+                    ( model, Command.none )
+
+                Route.WikiPageGraph _ _ ->
                     ( model, Command.none )
 
                 Route.WikiTodos _ ->
@@ -2012,6 +2037,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
+                    ( model, Command.none )
+
+                Route.WikiPageGraph _ _ ->
                     ( model, Command.none )
 
                 Route.WikiTodos _ ->
@@ -2194,6 +2222,9 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
+                Route.WikiPageGraph _ _ ->
+                    ( model, Command.none )
+
                 Route.WikiTodos _ ->
                     ( model, Command.none )
 
@@ -2369,6 +2400,9 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
+                Route.WikiPageGraph _ _ ->
+                    ( model, Command.none )
+
                 Route.WikiTodos _ ->
                     ( model, Command.none )
 
@@ -2530,6 +2564,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
+                    ( model, Command.none )
+
+                Route.WikiPageGraph _ _ ->
                     ( model, Command.none )
 
                 Route.WikiTodos _ ->
@@ -2914,6 +2951,9 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
+                Route.WikiPageGraph _ _ ->
+                    ( model, Command.none )
+
                 Route.WikiTodos _ ->
                     ( model, Command.none )
 
@@ -3007,6 +3047,9 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
+                Route.WikiPageGraph _ _ ->
+                    ( model, Command.none )
+
                 Route.WikiTodos _ ->
                     ( model, Command.none )
 
@@ -3078,6 +3121,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
+                    ( model, Command.none )
+
+                Route.WikiPageGraph _ _ ->
                     ( model, Command.none )
 
                 Route.WikiTodos _ ->
@@ -3153,6 +3199,9 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
+                Route.WikiPageGraph _ _ ->
+                    ( model, Command.none )
+
                 Route.WikiTodos _ ->
                     ( model, Command.none )
 
@@ -3224,6 +3273,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
+                    ( model, Command.none )
+
+                Route.WikiPageGraph _ _ ->
                     ( model, Command.none )
 
                 Route.WikiTodos _ ->
@@ -3579,6 +3631,9 @@ update msg model =
                 Route.WikiPage _ _ ->
                     ( model, Command.none )
 
+                Route.WikiPageGraph _ _ ->
+                    ( model, Command.none )
+
                 Route.WikiTodos _ ->
                     ( model, Command.none )
 
@@ -3744,6 +3799,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
+                    ( model, Command.none )
+
+                Route.WikiPageGraph _ _ ->
                     ( model, Command.none )
 
                 Route.WikiTodos _ ->
@@ -3932,6 +3990,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiPage _ _ ->
+                    ( model, Command.none )
+
+                Route.WikiPageGraph _ _ ->
                     ( model, Command.none )
 
                 Route.WikiTodos _ ->
@@ -6710,6 +6771,17 @@ appHeaderTitle ({ store, route } as model) =
                                         }
                                     )
 
+        Route.WikiPageGraph wikiSlug pageSlug ->
+            wikiScopeHeaderTitle store wikiSlug <|
+                \summary ->
+                    wikiLoadedHeaderTitle summary <|
+                        Just
+                            (AppHeaderSecondaryPlainThenWikiLink
+                                { plainPrefix = "Graph: "
+                                , wikiLabel = pageSlug
+                                }
+                            )
+
         Route.WikiRegister slug ->
             wikiScopeHeaderTitle store slug <|
                 \summary ->
@@ -7779,6 +7851,20 @@ documentTitle ({ store, route } as model) =
 
                         RemoteData.Failure _ ->
                             baseTitle
+
+                RemoteData.Failure _ ->
+                    "404 — SortOfWiki"
+
+                RemoteData.Loading ->
+                    "Loading - SortOfWiki"
+
+                RemoteData.NotAsked ->
+                    "Loading - SortOfWiki"
+
+        Route.WikiPageGraph wikiSlug pageSlug ->
+            case Store.get wikiSlug store.wikiCatalog of
+                RemoteData.Success summary ->
+                    "Graph — " ++ pageSlug ++ " — " ++ summary.name ++ " — SortOfWiki"
 
                 RemoteData.Failure _ ->
                     "404 — SortOfWiki"
@@ -10729,6 +10815,81 @@ viewWikiGraphPage wikiSlug wikiDetails =
         ]
 
 
+viewPublishedPageGraphRoute : Model -> Wiki.Slug -> Page.Slug -> Html Msg
+viewPublishedPageGraphRoute model wikiSlug pageSlug =
+    case Store.get_ wikiSlug model.store.wikiDetails of
+        RemoteData.NotAsked ->
+            viewWikiHomeLoading
+
+        RemoteData.Loading ->
+            viewWikiHomeLoading
+
+        RemoteData.Failure _ ->
+            viewNotFound
+
+        RemoteData.Success wikiDetails ->
+            case Store.get wikiSlug model.store.wikiCatalog of
+                RemoteData.NotAsked ->
+                    viewWikiHomeLoading
+
+                RemoteData.Loading ->
+                    viewWikiHomeLoading
+
+                RemoteData.Failure _ ->
+                    viewNotFound
+
+                RemoteData.Success _ ->
+                    case Store.get_ ( wikiSlug, pageSlug ) model.store.publishedPages of
+                        RemoteData.NotAsked ->
+                            viewWikiHomeLoading
+
+                        RemoteData.Loading ->
+                            viewWikiHomeLoading
+
+                        RemoteData.Failure _ ->
+                            viewMissingPublishedPage wikiSlug pageSlug Nothing NotAsked
+
+                        RemoteData.Success _ ->
+                            viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails
+
+
+viewPublishedPageGraphPage : Wiki.Slug -> Page.Slug -> Wiki.FrontendDetails -> Html Msg
+viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails =
+    let
+        graphSummary : PageGraph.Summary
+        graphSummary =
+            PageGraph.summary wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources
+    in
+    Html.div
+        [ Attr.id "page-immediate-graph-page"
+        , Attr.attribute "data-wiki-slug" wikiSlug
+        , Attr.attribute "data-page-slug" pageSlug
+        ]
+        [ UI.contentParagraph []
+            [ Html.text "Immediate graph of links to and from this page. Missing linked pages appear dashed in red." ]
+        , UI.contentParagraph
+            [ Attr.id "page-immediate-graph-summary"
+            , Attr.attribute "data-backlink-count" (String.fromInt (List.length graphSummary.backlinkPageSlugs))
+            , Attr.attribute "data-outgoing-count" (String.fromInt (List.length graphSummary.outgoingPageSlugs))
+            , Attr.attribute "data-missing-count" (String.fromInt (List.length graphSummary.missingPageSlugs))
+            ]
+            [ Html.text
+                (String.fromInt (List.length graphSummary.backlinkPageSlugs)
+                    ++ " backlinks, "
+                    ++ String.fromInt (List.length graphSummary.outgoingPageSlugs)
+                    ++ " outgoing links, "
+                    ++ String.fromInt (List.length graphSummary.missingPageSlugs)
+                    ++ " missing linked pages."
+                )
+            ]
+        , Html.node "graphviz-graph"
+            [ Attr.id "page-immediate-graphviz"
+            , Attr.attribute "graph" (PageGraph.dot wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources)
+            ]
+            []
+        ]
+
+
 viewBody : Model -> Html Msg
 viewBody model =
     case model.route of
@@ -10764,6 +10925,9 @@ viewBody model =
 
         Route.WikiPage wikiSlug pageSlug ->
             viewPublishedPageRoute model wikiSlug pageSlug
+
+        Route.WikiPageGraph wikiSlug pageSlug ->
+            viewPublishedPageGraphRoute model wikiSlug pageSlug
 
         Route.WikiRegister slug ->
             viewRegisterRoute model slug
@@ -10863,6 +11027,36 @@ publishedPageBacklinks model =
             of
                 ( Success _, Success _, Success pageDetails ) ->
                     Just (viewBacklinks wikiSlug pageDetails.backlinks)
+
+                _ ->
+                    Nothing
+
+        _ ->
+            Nothing
+
+
+publishedPageImmediateGraphLink : Model -> Maybe (Html Msg)
+publishedPageImmediateGraphLink model =
+    case model.route of
+        Route.WikiPage wikiSlug pageSlug ->
+            case
+                ( Store.get_ wikiSlug model.store.wikiDetails
+                , Store.get wikiSlug model.store.wikiCatalog
+                , Store.get_ ( wikiSlug, pageSlug ) model.store.publishedPages
+                )
+            of
+                ( Success _, Success _, Success _ ) ->
+                    Just
+                        (Html.div [ TW.cls UI.sidebarDesktopOnlyClass ]
+                            [ Html.div [ TW.cls UI.sidebarNavSectionBodyClass ]
+                                [ UI.sidebarLink
+                                    [ Attr.id "page-immediate-graph-link"
+                                    , Attr.href (Wiki.pageGraphUrlPath wikiSlug pageSlug)
+                                    ]
+                                    [ Html.text "Graph" ]
+                                ]
+                            ]
+                        )
 
                 _ ->
                     Nothing
@@ -10976,9 +11170,30 @@ view model =
         maybeTodos =
             publishedPageTodos model
 
+        maybePageGraphLink : Maybe (Html Msg)
+        maybePageGraphLink =
+            publishedPageImmediateGraphLink model
+
         maybeEditLink : Maybe (Html Msg)
         maybeEditLink =
             publishedPageEditLink model
+
+        maybeTopActionLinks : Maybe (Html Msg)
+        maybeTopActionLinks =
+            let
+                actionLinks : List (Html Msg)
+                actionLinks =
+                    [ maybeEditLink, maybePageGraphLink ]
+                        |> List.filterMap identity
+            in
+            if List.isEmpty actionLinks then
+                Nothing
+
+            else
+                Just
+                    (Html.div [ TW.cls "flex flex-col gap-[0.35rem]" ]
+                        actionLinks
+                    )
 
         hasRightColumn : Bool
         hasRightColumn =
@@ -10997,6 +11212,13 @@ view model =
                         Nothing ->
                             False
                    )
+                || (case maybePageGraphLink of
+                        Just _ ->
+                            True
+
+                        Nothing ->
+                            False
+                   )
                 || (case maybeBacklinks of
                         Just _ ->
                             True
@@ -11007,7 +11229,7 @@ view model =
 
         rightColumnSections : List (Html Msg)
         rightColumnSections =
-            [ maybeEditLink
+            [ maybeTopActionLinks
             , if List.isEmpty tocEntries then
                 Nothing
 

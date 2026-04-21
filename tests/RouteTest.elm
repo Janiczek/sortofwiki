@@ -21,6 +21,7 @@ suite =
             , ( "https://example.com/w/Demo/todos", Route.WikiTodos "Demo" )
             , ( "https://example.com/w/Demo/graph", Route.WikiGraph "Demo" )
             , ( "https://example.com/w/Demo/p/guides", Route.WikiPage "Demo" "guides" )
+            , ( "https://example.com/w/Demo/pg/guides", Route.WikiPageGraph "Demo" "guides" )
             , ( "https://example.com/w/Demo/register", Route.WikiRegister "Demo" )
             , ( "https://example.com/w/Demo/login", Route.WikiLogin "Demo" Nothing )
             , ( "https://example.com/w/Demo/submit/new", Route.WikiSubmitNew "Demo" )
@@ -217,6 +218,15 @@ suite =
                                 , Store.AskForPageFrontendDetails wikiSlug pageSlug
                                 , Store.AskForMyPendingSubmissions wikiSlug
                                 ]
+              , Test.fuzz (Fuzz.map2 Tuple.pair Fuzzers.wikiSlug Fuzzers.pageSlug) "storeActions WikiPageGraph asks catalog, details, published page, and my submissions" <|
+                    \( wikiSlug, pageSlug ) ->
+                        Route.storeActions (Route.WikiPageGraph wikiSlug pageSlug)
+                            |> Expect.equal
+                                [ Store.AskForWikiCatalog
+                                , Store.AskForWikiFrontendDetails wikiSlug
+                                , Store.AskForPageFrontendDetails wikiSlug pageSlug
+                                , Store.AskForMyPendingSubmissions wikiSlug
+                                ]
               , Test.test "storeActions HostAdmin asks nothing" <|
                     \_ ->
                         Route.storeActions (Route.HostAdmin Nothing)
@@ -278,6 +288,9 @@ suite =
                                             False
 
                                         Route.WikiPage _ _ ->
+                                            False
+
+                                        Route.WikiPageGraph _ _ ->
                                             False
 
                                         Route.WikiRegister _ ->

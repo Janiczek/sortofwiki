@@ -167,6 +167,9 @@ contributorForcedRedirect sessions url route =
         Route.WikiPage _ _ ->
             Nothing
 
+        Route.WikiPageGraph _ _ ->
+            Nothing
+
         Route.WikiLogin _ _ ->
             Nothing
 
@@ -241,6 +244,9 @@ contributorRestrictedReturnPath route =
             Nothing
 
         Route.WikiPage _ _ ->
+            Nothing
+
+        Route.WikiPageGraph _ _ ->
             Nothing
 
         Route.WikiLogin _ _ ->

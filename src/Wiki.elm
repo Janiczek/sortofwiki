@@ -19,6 +19,7 @@ module Wiki exposing
     , loginUrlPath
     , loginUrlPathWithRedirect
     , mySubmissionsUrlPath
+    , pageGraphUrlPath
     , publicCatalogDict
     , publishNewPageOnWiki
     , publishedPageFrontendDetails
@@ -179,6 +180,11 @@ todosUrlPath wikiSlug =
 graphUrlPath : Slug -> String
 graphUrlPath wikiSlug =
     "/w/" ++ wikiSlug ++ "/graph"
+
+
+pageGraphUrlPath : Slug -> Page.Slug -> String
+pageGraphUrlPath wikiSlug pageSlug =
+    "/w/" ++ wikiSlug ++ "/pg/" ++ pageSlug
 
 
 {-| Path segment after origin for the wiki homepage, e.g. `/w/my-wiki`.

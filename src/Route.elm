@@ -68,6 +68,9 @@ navUrlPath route =
         WikiPage wikiSlug pageSlug ->
             Wiki.publishedPageUrlPath wikiSlug pageSlug
 
+        WikiPageGraph wikiSlug pageSlug ->
+            Wiki.pageGraphUrlPath wikiSlug pageSlug
+
         WikiLogin wikiSlug maybeRedirect ->
             case maybeRedirect of
                 Nothing ->
@@ -169,6 +172,9 @@ canAccess ctx route =
         WikiPage wikiSlug _ ->
             slugOk wikiSlug
 
+        WikiPageGraph wikiSlug _ ->
+            slugOk wikiSlug
+
         WikiLogin wikiSlug _ ->
             slugOk wikiSlug
 
@@ -227,6 +233,7 @@ type Route
     | WikiTodos Wiki.Slug
     | WikiGraph Wiki.Slug
     | WikiPage Wiki.Slug Page.Slug
+    | WikiPageGraph Wiki.Slug Page.Slug
     | WikiLogin Wiki.Slug (Maybe String)
     | WikiRegister Wiki.Slug
     | WikiSubmitNew Wiki.Slug
@@ -310,6 +317,13 @@ fromUrl url =
 
                     else
                         WikiPage wikiSlug pageSlug
+
+                [ "w", wikiSlug, "pg", pageSlug ] ->
+                    if wikiSlug == "" || pageSlug == "" then
+                        NotFound url
+
+                    else
+                        WikiPageGraph wikiSlug pageSlug
 
                 [ "w", wikiSlug, "edit", pageSlug ] ->
                     if wikiSlug == "" || pageSlug == "" then
@@ -441,6 +455,9 @@ isWikiList route =
         WikiPage _ _ ->
             False
 
+        WikiPageGraph _ _ ->
+            False
+
         WikiLogin _ _ ->
             False
 
@@ -512,6 +529,13 @@ storeActions route =
             [ AskForWikiCatalog, AskForWikiFrontendDetails slug ]
 
         WikiPage wikiSlug pageSlug ->
+            [ AskForWikiCatalog
+            , AskForWikiFrontendDetails wikiSlug
+            , AskForPageFrontendDetails wikiSlug pageSlug
+            , AskForMyPendingSubmissions wikiSlug
+            ]
+
+        WikiPageGraph wikiSlug pageSlug ->
             [ AskForWikiCatalog
             , AskForWikiFrontendDetails wikiSlug
             , AskForPageFrontendDetails wikiSlug pageSlug
