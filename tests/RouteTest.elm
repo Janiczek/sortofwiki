@@ -19,6 +19,7 @@ suite =
             [ ( "https://example.com/w/Demo", Route.WikiHome "Demo" )
             , ( "https://example.com/w/ElmTips", Route.WikiHome "ElmTips" )
             , ( "https://example.com/w/Demo/todos", Route.WikiTodos "Demo" )
+            , ( "https://example.com/w/Demo/graph", Route.WikiGraph "Demo" )
             , ( "https://example.com/w/Demo/p/guides", Route.WikiPage "Demo" "guides" )
             , ( "https://example.com/w/Demo/register", Route.WikiRegister "Demo" )
             , ( "https://example.com/w/Demo/login", Route.WikiLogin "Demo" Nothing )
@@ -111,6 +112,13 @@ suite =
               , Test.fuzz Fuzzers.wikiSlug "storeActions WikiTodos asks catalog and details" <|
                     \slug ->
                         Route.storeActions (Route.WikiTodos slug)
+                            |> Expect.equal
+                                [ Store.AskForWikiCatalog
+                                , Store.AskForWikiFrontendDetails slug
+                                ]
+              , Test.fuzz Fuzzers.wikiSlug "storeActions WikiGraph asks catalog and details" <|
+                    \slug ->
+                        Route.storeActions (Route.WikiGraph slug)
                             |> Expect.equal
                                 [ Store.AskForWikiCatalog
                                 , Store.AskForWikiFrontendDetails slug
@@ -264,6 +272,9 @@ suite =
                                             False
 
                                         Route.WikiTodos _ ->
+                                            False
+
+                                        Route.WikiGraph _ ->
                                             False
 
                                         Route.WikiPage _ _ ->

@@ -30,8 +30,8 @@ import Json.Decode
 import Lamdera
 import Page
 import PageMarkdown
-import PageTodos
 import PageToc
+import PageTodos
 import Ports
 import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
@@ -50,8 +50,9 @@ import Url exposing (Url)
 import Wiki
 import WikiAdminUsers
 import WikiAuditLog
-import WikiTodos
+import WikiGraph
 import WikiRole exposing (WikiRole)
+import WikiTodos
 
 
 type alias Model =
@@ -317,6 +318,9 @@ wikiSideNavSlugIfActive model =
                     Just s
 
                 Route.WikiTodos s ->
+                    Just s
+
+                Route.WikiGraph s ->
                     Just s
 
                 Route.WikiRegister s ->
@@ -586,7 +590,8 @@ app_ =
 
 subscriptions : Model -> Subscription FrontendOnly Msg
 subscriptions _ =
-    Subscription.fromJs "colorThemeFromJs" Ports.colorThemeFromJs
+    Subscription.fromJs "colorThemeFromJs"
+        Ports.colorThemeFromJs
         (\value ->
             ColorThemeFromJs
                 (Json.Decode.decodeValue ColorTheme.incomingDecoder value
@@ -666,6 +671,9 @@ runRouteStoreActions ( model, cmd ) =
                     Command.none
 
                 Route.WikiTodos _ ->
+                    Command.none
+
+                Route.WikiGraph _ ->
                     Command.none
 
                 Route.WikiRegister _ ->
@@ -1186,6 +1194,9 @@ routeUsesAuditLogFillLayout route =
         Route.WikiTodos _ ->
             False
 
+        Route.WikiGraph _ ->
+            False
+
         Route.WikiLogin _ _ ->
             False
 
@@ -1272,6 +1283,9 @@ applyWikiAdminAuditFilterFromModel model =
         Route.WikiTodos _ ->
             ( model, Command.none )
 
+        Route.WikiGraph _ ->
+            ( model, Command.none )
+
         Route.WikiLogin _ _ ->
             ( model, Command.none )
 
@@ -1355,6 +1369,9 @@ applyHostAdminAuditFilterFromModel model =
             ( model, Command.none )
 
         Route.WikiTodos _ ->
+            ( model, Command.none )
+
+        Route.WikiGraph _ ->
             ( model, Command.none )
 
         Route.WikiLogin _ _ ->
@@ -1632,6 +1649,9 @@ update msg model =
                                 Route.WikiTodos _ ->
                                     RemoteData.NotAsked
 
+                                Route.WikiGraph _ ->
+                                    RemoteData.NotAsked
+
                                 Route.WikiRegister _ ->
                                     RemoteData.NotAsked
 
@@ -1757,6 +1777,9 @@ update msg model =
                 Route.WikiTodos _ ->
                     ( model, Command.none )
 
+                Route.WikiGraph _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -1870,6 +1893,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiTodos _ ->
+                    ( model, Command.none )
+
+                Route.WikiGraph _ ->
                     ( model, Command.none )
 
                 Route.WikiLogin wikiSlug _ ->
@@ -1989,6 +2015,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiTodos _ ->
+                    ( model, Command.none )
+
+                Route.WikiGraph _ ->
                     ( model, Command.none )
 
                 Route.WikiLogin _ _ ->
@@ -2168,6 +2197,9 @@ update msg model =
                 Route.WikiTodos _ ->
                     ( model, Command.none )
 
+                Route.WikiGraph _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -2340,6 +2372,9 @@ update msg model =
                 Route.WikiTodos _ ->
                     ( model, Command.none )
 
+                Route.WikiGraph _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -2498,6 +2533,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiTodos _ ->
+                    ( model, Command.none )
+
+                Route.WikiGraph _ ->
                     ( model, Command.none )
 
                 Route.WikiLogin _ _ ->
@@ -2879,6 +2917,9 @@ update msg model =
                 Route.WikiTodos _ ->
                     ( model, Command.none )
 
+                Route.WikiGraph _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -2969,6 +3010,9 @@ update msg model =
                 Route.WikiTodos _ ->
                     ( model, Command.none )
 
+                Route.WikiGraph _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -3037,6 +3081,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiTodos _ ->
+                    ( model, Command.none )
+
+                Route.WikiGraph _ ->
                     ( model, Command.none )
 
                 Route.WikiLogin _ _ ->
@@ -3109,6 +3156,9 @@ update msg model =
                 Route.WikiTodos _ ->
                     ( model, Command.none )
 
+                Route.WikiGraph _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -3177,6 +3227,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiTodos _ ->
+                    ( model, Command.none )
+
+                Route.WikiGraph _ ->
                     ( model, Command.none )
 
                 Route.WikiLogin _ _ ->
@@ -3529,6 +3582,9 @@ update msg model =
                 Route.WikiTodos _ ->
                     ( model, Command.none )
 
+                Route.WikiGraph _ ->
+                    ( model, Command.none )
+
                 Route.WikiRegister _ ->
                     ( model, Command.none )
 
@@ -3691,6 +3747,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiTodos _ ->
+                    ( model, Command.none )
+
+                Route.WikiGraph _ ->
                     ( model, Command.none )
 
                 Route.WikiRegister _ ->
@@ -3876,6 +3935,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiTodos _ ->
+                    ( model, Command.none )
+
+                Route.WikiGraph _ ->
                     ( model, Command.none )
 
                 Route.WikiRegister _ ->
@@ -6611,6 +6673,11 @@ appHeaderTitle ({ store, route } as model) =
                 \summary ->
                     wikiLoadedHeaderTitle summary (Just (AppHeaderSecondaryPlain "TODOs"))
 
+        Route.WikiGraph slug ->
+            wikiScopeHeaderTitle store slug <|
+                \summary ->
+                    wikiLoadedHeaderTitle summary (Just (AppHeaderSecondaryPlain "Graph"))
+
         Route.WikiPage wikiSlug pageSlug ->
             wikiScopeHeaderTitle store wikiSlug <|
                 \summary ->
@@ -7668,6 +7735,20 @@ documentTitle ({ store, route } as model) =
             case Store.get wikiSlug store.wikiCatalog of
                 RemoteData.Success summary ->
                     "TODOs — " ++ summary.name ++ " — SortOfWiki"
+
+                RemoteData.Failure _ ->
+                    "404 — SortOfWiki"
+
+                RemoteData.Loading ->
+                    "Loading - SortOfWiki"
+
+                RemoteData.NotAsked ->
+                    "Loading - SortOfWiki"
+
+        Route.WikiGraph wikiSlug ->
+            case Store.get wikiSlug store.wikiCatalog of
+                RemoteData.Success summary ->
+                    "Graph — " ++ summary.name ++ " — SortOfWiki"
 
                 RemoteData.Failure _ ->
                     "404 — SortOfWiki"
@@ -9800,7 +9881,8 @@ viewSubmissionReviewDiff wikiSlug publishedSlugExists detail =
                 [ Html.h3
                     [ TW.cls "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)] col-start-1 row-start-1" ]
                     [ Html.text "Proposed markdown" ]
-                , reviewReadonlyTextarea "wiki-review-diff-new" body.proposedMarkdown
+                , reviewReadonlyTextarea "wiki-review-diff-new"
+                    body.proposedMarkdown
                     (submissionDetailMarkdownTextareaDiffCellClass ++ " min-w-0 col-start-1 row-start-2")
                 , Html.h3
                     [ TW.cls "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg-muted)] col-start-2 row-start-1" ]
@@ -9827,7 +9909,8 @@ viewSubmissionReviewDiff wikiSlug publishedSlugExists detail =
                 [ Html.h2
                     [ TW.cls (reviewDiffCellHeadingClass ++ " col-start-1 row-start-1") ]
                     [ Html.text "Before (published)" ]
-                , reviewReadonlyTextarea "wiki-review-diff-old" body.beforeMarkdown
+                , reviewReadonlyTextarea "wiki-review-diff-old"
+                    body.beforeMarkdown
                     (submissionDetailMarkdownTextareaDiffCellClass ++ " min-w-0 col-start-1 row-start-2")
                 , Html.div
                     [ TW.cls "flex min-h-0 min-w-0 flex-col gap-1 col-start-1 row-start-3" ]
@@ -9839,7 +9922,8 @@ viewSubmissionReviewDiff wikiSlug publishedSlugExists detail =
                 , Html.h2
                     [ TW.cls (reviewDiffCellHeadingClass ++ " col-start-2 row-start-1") ]
                     [ Html.text "After (proposed)" ]
-                , reviewReadonlyTextarea "wiki-review-diff-new" body.afterMarkdown
+                , reviewReadonlyTextarea "wiki-review-diff-new"
+                    body.afterMarkdown
                     (submissionDetailMarkdownTextareaDiffCellClass ++ " min-w-0 col-start-2 row-start-2")
                 , Html.div
                     [ TW.cls "flex min-h-0 min-w-0 flex-col gap-1 col-start-2 row-start-3" ]
@@ -10544,7 +10628,8 @@ viewWikiTodosPage wikiSlug wikiDetails =
                                             |> Maybe.withDefault []
                                         ]
                                     )
-                                    [ UI.tableTd UI.TableAlignTop []
+                                    [ UI.tableTd UI.TableAlignTop
+                                        []
                                         [ case row.maybeMissingPageSlug of
                                             Just missingPageSlug ->
                                                 Html.a
@@ -10556,7 +10641,8 @@ viewWikiTodosPage wikiSlug wikiDetails =
                                             Nothing ->
                                                 Html.text row.itemText
                                         ]
-                                    , UI.tableTd UI.TableAlignTop []
+                                    , UI.tableTd UI.TableAlignTop
+                                        []
                                         [ Html.span
                                             [ Attr.attribute "data-used-in" row.itemText ]
                                             (commaSeparatedPageLinks row.usedInPageSlugs)
@@ -10564,6 +10650,82 @@ viewWikiTodosPage wikiSlug wikiDetails =
                                     ]
                             )
                 }
+        ]
+
+
+viewWikiGraphRoute : Model -> Wiki.Slug -> Html Msg
+viewWikiGraphRoute model wikiSlug =
+    case Store.get_ wikiSlug model.store.wikiDetails of
+        RemoteData.NotAsked ->
+            viewWikiHomeLoading
+
+        RemoteData.Loading ->
+            viewWikiHomeLoading
+
+        RemoteData.Failure _ ->
+            viewNotFound
+
+        RemoteData.Success wikiDetails ->
+            case Store.get wikiSlug model.store.wikiCatalog of
+                RemoteData.NotAsked ->
+                    viewWikiHomeLoading
+
+                RemoteData.Loading ->
+                    viewWikiHomeLoading
+
+                RemoteData.Failure _ ->
+                    viewNotFound
+
+                RemoteData.Success _ ->
+                    viewWikiGraphPage wikiSlug wikiDetails
+
+
+viewWikiGraphPage : Wiki.Slug -> Wiki.FrontendDetails -> Html Msg
+viewWikiGraphPage wikiSlug wikiDetails =
+    let
+        graphSummary : WikiGraph.Summary
+        graphSummary =
+            WikiGraph.summary wikiSlug wikiDetails.publishedPageMarkdownSources
+    in
+    Html.div
+        [ Attr.id "wiki-graph-page"
+        , Attr.attribute "data-wiki-slug" wikiSlug
+        ]
+        [ UI.contentParagraph []
+            [ Html.text "Graph of published wiki pages and their in-wiki links. Missing linked pages appear dashed in red." ]
+        , UI.contentParagraph
+            [ Attr.id "wiki-graph-summary"
+            , Attr.attribute "data-published-count" (String.fromInt (List.length graphSummary.publishedPageSlugs))
+            , Attr.attribute "data-edge-count" (String.fromInt (List.length graphSummary.edges))
+            , Attr.attribute "data-missing-count" (String.fromInt (List.length graphSummary.missingPageSlugs))
+            ]
+            [ Html.text
+                (String.fromInt (List.length graphSummary.publishedPageSlugs)
+                    ++ " published pages, "
+                    ++ String.fromInt (List.length graphSummary.edges)
+                    ++ " links, "
+                    ++ String.fromInt (List.length graphSummary.missingPageSlugs)
+                    ++ " missing linked pages."
+                )
+            ]
+        , if List.isEmpty graphSummary.publishedPageSlugs then
+            UI.contentParagraph
+                [ Attr.id "wiki-graph-empty" ]
+                [ Html.text "No published pages to graph yet." ]
+
+          else
+            let
+                graphDot : String
+                graphDot =
+                    WikiGraph.dot wikiSlug wikiDetails.publishedPageMarkdownSources
+            in
+            Html.node "graphviz-graph"
+                [ Attr.id "wiki-graphviz"
+                , Attr.attribute "graph" graphDot
+                , Attr.attribute "data-graphviz-pages" (String.fromInt (List.length graphSummary.publishedPageSlugs))
+                , Attr.attribute "data-graphviz-edges" (String.fromInt (List.length graphSummary.edges))
+                ]
+                []
         ]
 
 
@@ -10596,6 +10758,9 @@ viewBody model =
 
         Route.WikiTodos wikiSlug ->
             viewWikiTodosRoute model wikiSlug
+
+        Route.WikiGraph wikiSlug ->
+            viewWikiGraphRoute model wikiSlug
 
         Route.WikiPage wikiSlug pageSlug ->
             viewPublishedPageRoute model wikiSlug pageSlug

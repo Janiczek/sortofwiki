@@ -41,7 +41,13 @@ suite =
                         |> Expect.equal False
             ]
         , Test.describe "wikiNavLinks"
-            [ Test.test "anonymous wiki nav includes public TODOs page" <|
+            [ Test.test "anonymous wiki nav includes public graph page" <|
+                \() ->
+                    SideNavMenu.wikiNavLinks "Demo" Nothing
+                        |> List.map .linkRoute
+                        |> List.member (Route.WikiGraph "Demo")
+                        |> Expect.equal True
+            , Test.test "anonymous wiki nav includes public TODOs page" <|
                 \() ->
                     SideNavMenu.wikiNavLinks "Demo" Nothing
                         |> List.map .linkRoute

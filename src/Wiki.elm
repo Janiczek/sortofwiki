@@ -9,6 +9,7 @@ module Wiki exposing
     , catalogEntry
     , catalogUrlPath
     , frontendDetails
+    , graphUrlPath
     , hostAdminAuditUrlPath
     , hostAdminBackupUrlPath
     , hostAdminLoginUrlPathWithRedirect
@@ -173,6 +174,11 @@ wikiHomeUrlPath wikiSlug =
 todosUrlPath : Slug -> String
 todosUrlPath wikiSlug =
     "/w/" ++ wikiSlug ++ "/todos"
+
+
+graphUrlPath : Slug -> String
+graphUrlPath wikiSlug =
+    "/w/" ++ wikiSlug ++ "/graph"
 
 
 {-| Path segment after origin for the wiki homepage, e.g. `/w/my-wiki`.

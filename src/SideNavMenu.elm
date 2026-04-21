@@ -87,7 +87,11 @@ wikiNavLinks wikiSlug maybeRole =
     let
         publicLinks : List Link
         publicLinks =
-            [ { linkLabel = "TODOs"
+            [ { linkLabel = "Graph"
+              , linkRoute = Route.WikiGraph wikiSlug
+              , linkEmphasized = False
+              }
+            , { linkLabel = "TODOs"
               , linkRoute = Route.WikiTodos wikiSlug
               , linkEmphasized = False
               }
