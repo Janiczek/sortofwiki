@@ -10,7 +10,7 @@ module Submission exposing
     , EditConflictContext
     , EditPageBody
     , EditSubmitSuccess(..)
-    , Id
+    , Id(..)
     , Kind(..)
     , MyPendingSubmissionListItem
     , MyPendingSubmissionsError(..)
@@ -38,9 +38,9 @@ module Submission exposing
     , applyApprovedSubmission
     , approveSubmissionErrorToUserText
     , contributorViewFromSubmission
-    , deleteReasonErrorToUserText
     , currentPublishedRevision
     , deleteMySubmissionErrorToUserText
+    , deleteReasonErrorToUserText
     , detailsErrorToUserText
     , idFromCounter
     , idFromKey
@@ -100,7 +100,7 @@ import Page
 import Wiki
 
 
-{-| Opaque server-issued submission id (string wire format).
+{-| Server-issued submission id (string wire format).
 -}
 type Id
     = Id String
@@ -111,14 +111,14 @@ idToString (Id s) =
     s
 
 
-{-| Sequential opaque ids from backend counter (not derived from payload).
+{-| Sequential ids from backend counter (not derived from payload).
 -}
 idFromCounter : Int -> Id
 idFromCounter n =
     Id ("sub_" ++ String.fromInt n)
 
 
-{-| Opaque id from URL segment or seed key (distinct from counter-based ids).
+{-| Id from URL segment or seed key (distinct from counter-based ids).
 -}
 idFromKey : String -> Id
 idFromKey s =
