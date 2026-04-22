@@ -10898,8 +10898,9 @@ viewMissingPublishedPage :
     -> List Page.Slug
     -> Maybe Wiki.Slug
     -> RemoteData () (Result Submission.MyPendingSubmissionsError (List Submission.MyPendingSubmissionListItem))
+    -> Wiki.FrontendDetails
     -> Html Msg
-viewMissingPublishedPage wikiSlug pageSlug taggedPageSlugs maybeContributorWiki myPendingRemote =
+viewMissingPublishedPage wikiSlug pageSlug taggedPageSlugs maybeContributorWiki myPendingRemote wikiDetails =
     let
         maybeMyRow : Maybe { id : Submission.Id, status : Submission.Status }
         maybeMyRow =
@@ -11023,6 +11024,15 @@ viewMissingPublishedPage wikiSlug pageSlug taggedPageSlugs maybeContributorWiki 
         taggedSection : Html Msg
         taggedSection =
             viewTaggedPagesWithTag wikiSlug taggedPageSlugs
+
+        graphSection : Html Msg
+        graphSection =
+            Html.div
+                [ Attr.id "wiki-missing-published-page-graph"
+                , TW.cls "-mx-[0.85rem] px-[0.85rem]"
+                ]
+                [ immediatePublishedPageGraphviz "wiki-missing-published-graphviz" wikiSlug pageSlug wikiDetails
+                ]
     in
     Html.div
         [ Attr.id "wiki-missing-published-page"
@@ -11031,8 +11041,9 @@ viewMissingPublishedPage wikiSlug pageSlug taggedPageSlugs maybeContributorWiki 
         ]
         [ UI.contentParagraph []
             [ Html.text ("The page \"" ++ pageSlug ++ "\" does not exist yet.") ]
-        , pendingSection
         , contributorCreateOrLogin
+        , graphSection
+        , pendingSection
         , taggedSection
         ]
 
@@ -11130,6 +11141,7 @@ viewPublishedPageRoute model wikiSlug pageSlug =
                                          else
                                             NotAsked
                                         )
+                                        wikiDetails
 
                         RemoteData.Failure _ ->
                             viewMissingPublishedPage wikiSlug
@@ -11147,6 +11159,7 @@ viewPublishedPageRoute model wikiSlug pageSlug =
                                  else
                                     NotAsked
                                 )
+                                wikiDetails
 
 
 viewWikiTodosRoute : Model -> Wiki.Slug -> Html Msg
@@ -11379,10 +11392,27 @@ viewPublishedPageGraphRoute model wikiSlug pageSlug =
                             viewWikiHomeLoading
 
                         RemoteData.Failure _ ->
-                            viewMissingPublishedPage wikiSlug pageSlug [] Nothing NotAsked
+                            viewMissingPublishedPage wikiSlug pageSlug [] Nothing NotAsked wikiDetails
 
                         RemoteData.Success _ ->
                             viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails
+
+
+{-| Shared copy under `WikiPageGraph` (`/pg/`) and missing published page (`/p/`).
+-}
+immediatePublishedPageGraphDescription : Html Msg
+immediatePublishedPageGraphDescription =
+    UI.contentParagraph []
+        [ Html.text "Legend: Red pages are missing; tag edges are purple dashed." ]
+
+
+immediatePublishedPageGraphviz : String -> Wiki.Slug -> Page.Slug -> Wiki.FrontendDetails -> Html Msg
+immediatePublishedPageGraphviz graphvizId wikiSlug pageSlug wikiDetails =
+    Html.node "graphviz-graph"
+        [ Attr.id graphvizId
+        , Attr.attribute "graph" (PageGraph.dot wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags)
+        ]
+        []
 
 
 viewPublishedPageGraphPage : Wiki.Slug -> Page.Slug -> Wiki.FrontendDetails -> Html Msg
@@ -11392,13 +11422,8 @@ viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails =
         , Attr.attribute "data-wiki-slug" wikiSlug
         , Attr.attribute "data-page-slug" pageSlug
         ]
-        [ UI.contentParagraph []
-            [ Html.text "Immediate graph of wiki-link and tag edges to and from this page. Missing linked pages appear dashed in red; tag edges are purple dashed." ]
-        , Html.node "graphviz-graph"
-            [ Attr.id "page-immediate-graphviz"
-            , Attr.attribute "graph" (PageGraph.dot wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags)
-            ]
-            []
+        [ immediatePublishedPageGraphDescription
+        , immediatePublishedPageGraphviz "page-immediate-graphviz" wikiSlug pageSlug wikiDetails
         ]
 
 

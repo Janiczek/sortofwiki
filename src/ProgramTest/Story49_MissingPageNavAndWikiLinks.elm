@@ -158,4 +158,22 @@ endToEndTests =
                     (ProgramTest.Query.expectBacklinks "Demo" [ "MarkdownPlayground" ])
                 ]
         }
+    , ProgramTest.Start.start
+        { name = "49 — missing published page shows immediate page graph on /p/ route"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , sessionId = "session-story49-missing-page-graph"
+        , path = "/w/Demo/p/TodoGap"
+        , connectClientMs = Nothing
+        , clientSteps =
+            \client ->
+                [ client.checkView 200
+                    (ProgramTest.Query.withinId "wiki-missing-published-page"
+                        (ProgramTest.Query.withinId "wiki-missing-published-page-graph"
+                            (ProgramTest.Query.withinId "wiki-missing-published-graphviz"
+                                (ProgramTest.Query.expectHasDataAttributes [])
+                            )
+                        )
+                    )
+                ]
+        }
     ]
