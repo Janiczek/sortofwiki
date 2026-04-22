@@ -11273,16 +11273,20 @@ viewPublishedPageGraphRoute model wikiSlug pageSlug =
                         RemoteData.Failure _ ->
                             viewMissingPublishedPage wikiSlug pageSlug [] Nothing NotAsked
 
-                        RemoteData.Success _ ->
-                            viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails
+                        RemoteData.Success pageDetails ->
+                            viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails pageDetails
 
 
-viewPublishedPageGraphPage : Wiki.Slug -> Page.Slug -> Wiki.FrontendDetails -> Html Msg
-viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails =
+viewPublishedPageGraphPage : Wiki.Slug -> Page.Slug -> Wiki.FrontendDetails -> Page.FrontendDetails -> Html Msg
+viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails pageDetails =
     let
+        publishedPageTagsForGraph : Dict Page.Slug (List Page.Slug)
+        publishedPageTagsForGraph =
+            Dict.insert pageSlug pageDetails.tags wikiDetails.publishedPageTags
+
         graphSummary : PageGraph.Summary
         graphSummary =
-            PageGraph.summary wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags
+            PageGraph.summary wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources publishedPageTagsForGraph
 
         pageEdgeCount : Int
         pageEdgeCount =
@@ -11326,7 +11330,7 @@ viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails =
             ]
         , Html.node "graphviz-graph"
             [ Attr.id "page-immediate-graphviz"
-            , Attr.attribute "graph" (PageGraph.dot wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags)
+            , Attr.attribute "graph" (PageGraph.dot wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources publishedPageTagsForGraph)
             ]
             []
         ]
