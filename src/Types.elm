@@ -148,6 +148,7 @@ type ToBackend
 
 type ToFrontend
     = WikiCatalogResponse (Dict Wiki.Slug Wiki.CatalogEntry)
+    | PendingReviewCountUpdated Wiki.Slug Int
     | WikiFrontendDetailsResponse Wiki.Slug (Maybe Wiki.FrontendDetails)
     | PageFrontendDetailsResponse Wiki.Slug Page.Slug (Maybe Page.FrontendDetails)
     | MyPendingSubmissionsResponse Wiki.Slug (Result Submission.MyPendingSubmissionsError (List Submission.MyPendingSubmissionListItem))
@@ -200,6 +201,7 @@ type alias BackendModel =
     , submissions : Dict String Submission.Submission
     , nextSubmissionCounter : Int
     , wikiAuditEvents : Dict Wiki.Slug (List WikiAuditLog.AuditEvent)
+    , pendingReviewCounts : Dict Wiki.Slug Int
     }
 
 

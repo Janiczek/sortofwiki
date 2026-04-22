@@ -33,6 +33,7 @@ import PageGraph
 import PageMarkdown
 import PageToc
 import PageTodos
+import PendingReviewCount
 import Ports
 import RemoteData exposing (RemoteData(..))
 import Route exposing (Route)
@@ -950,13 +951,43 @@ sideNavLinkLi link =
                 ]
 
 
-reviewQueueCountForWiki : Wiki.Slug -> Store -> Maybe Int
-reviewQueueCountForWiki wikiSlug store =
-    case Store.get_ wikiSlug store.reviewQueues of
-        Success (Ok reviewQueue) ->
-            Just (List.length reviewQueue)
+reviewQueueCountForWiki :
+    WikiRole.WikiRole
+    -> Wiki.Slug
+    -> Store
+    -> Maybe Int
+reviewQueueCountForWiki role wikiSlug store =
+    let
+        fromDetails : Maybe Int
+        fromDetails =
+            if WikiRole.isTrustedModerator role then
+                case Store.get_ wikiSlug store.wikiDetails of
+                    Success details ->
+                        details.pendingReviewCountForTrustedViewer
 
-        _ ->
+                    _ ->
+                        Nothing
+
+            else
+                Nothing
+
+        fromQueue : Maybe Int
+        fromQueue =
+            case Store.get_ wikiSlug store.reviewQueues of
+                Success (Ok reviewQueue) ->
+                    Just (List.length reviewQueue)
+
+                _ ->
+                    Nothing
+    in
+    case ( fromDetails, fromQueue ) of
+        ( Just n, _ ) ->
+            Just n
+
+        ( Nothing, Just n ) ->
+            Just n
+
+        ( Nothing, Nothing ) ->
             Nothing
 
 
@@ -965,13 +996,21 @@ withReviewQueueCount wikiSlug maybeReviewCount links =
     links
         |> List.map
             (\link ->
-                case ( link.linkRoute, maybeReviewCount ) of
-                    ( Route.WikiReview routeWikiSlug, Just reviewCount ) ->
+                case link.linkRoute of
+                    Route.WikiReview routeWikiSlug ->
                         if routeWikiSlug == wikiSlug then
-                            { link
-                                | linkLabel = "Review (" ++ String.fromInt reviewCount ++ ")"
-                                , linkEmphasized = reviewCount > 0
-                            }
+                            case maybeReviewCount of
+                                Just reviewCount ->
+                                    { link
+                                        | linkLabel = "Review (" ++ String.fromInt reviewCount ++ ")"
+                                        , linkEmphasized = reviewCount > 0
+                                    }
+
+                                Nothing ->
+                                    { link
+                                        | linkLabel = "Review (…)"
+                                        , linkEmphasized = False
+                                    }
 
                         else
                             link
@@ -4086,6 +4125,14 @@ updateFromBackend msg model =
             ( { model | store = nextStore }, Command.none )
                 |> runRouteStoreActions
 
+        PendingReviewCountUpdated wikiSlug count ->
+            ( { model
+                | store =
+                    PendingReviewCount.mergeIntoStoreWikiDetails wikiSlug count model.store
+              }
+            , Command.none
+            )
+
         WikiFrontendDetailsResponse wikiSlug maybeDetails ->
             let
                 store : Store
@@ -6671,7 +6718,8 @@ wikiScopeSideNavItems wikiSlug model =
 
         maybeReviewCount : Maybe Int
         maybeReviewCount =
-            reviewQueueCountForWiki wikiSlug model.store
+            maybeRole
+                |> Maybe.andThen (\role -> reviewQueueCountForWiki role wikiSlug model.store)
 
         authChrome : List (Html Msg)
         authChrome =

@@ -12,6 +12,7 @@ import Env
 import HostAdmin
 import Lamdera
 import Page
+import PendingReviewCount
 import Set
 import Submission
 import SubmissionReviewDetail
@@ -58,7 +59,48 @@ applyHostedWikiSlugRename oldSlug newSlug nextWiki model =
         , contributorSessions = WikiUser.remapSessionsForWikiSlugRename oldSlug newSlug model.contributorSessions
         , submissions = Submission.remapWikiSlugInSubmissions oldSlug newSlug model.submissions
         , wikiAuditEvents = nextAudit
+        , pendingReviewCounts =
+            PendingReviewCount.remapSlugInPendingCounts oldSlug newSlug model.pendingReviewCounts
     }
+
+
+pendingCountForWiki : Wiki.Slug -> Model -> Int
+pendingCountForWiki wikiSlug model =
+    Dict.get wikiSlug model.pendingReviewCounts
+        |> Maybe.withDefault (Submission.pendingReviewCountForWiki wikiSlug model.submissions)
+
+
+withPendingMutation : Wiki.Slug -> Model -> Model
+withPendingMutation wikiSlug model =
+    let
+        n : Int
+        n =
+            Submission.pendingReviewCountForWiki wikiSlug model.submissions
+    in
+    { model | pendingReviewCounts = Dict.insert wikiSlug n model.pendingReviewCounts }
+
+
+withSubmissionMutation : Submission.Submission -> Maybe Submission.Submission -> Wiki.Slug -> Model -> Model
+withSubmissionMutation prevSub nextSub wikiSlug model =
+    let
+        touched : Wiki.Slug -> Bool
+        touched slug =
+            if slug /= wikiSlug then
+                False
+
+            else
+                prevSub /= nextSub && (Submission.statusTriggersPendingReviewCount prevSub || Submission.statusTriggersPendingReviewCount nextSub)
+    in
+    if touched wikiSlug then
+        withPendingMutation wikiSlug model
+
+    else
+        model
+
+
+broadcastPendingReviewCount : Wiki.Slug -> Model -> Command BackendOnly ToFrontend Msg
+broadcastPendingReviewCount wikiSlug model =
+    Effect.Lamdera.broadcast (PendingReviewCountUpdated wikiSlug (pendingCountForWiki wikiSlug model))
 
 
 {-| Append one audit row at `now`.
@@ -87,6 +129,7 @@ init =
       , submissions = Dict.empty
       , nextSubmissionCounter = 1
       , wikiAuditEvents = Dict.empty
+      , pendingReviewCounts = PendingReviewCount.emptyCountMap
       }
     , Command.none
     )
@@ -141,21 +184,39 @@ updateFromFrontendWithTime sessionId clientId msg now model =
             )
 
         RequestWikiFrontendDetails slug ->
-            ( model
-            , Effect.Lamdera.sendToFrontend clientId
-                (WikiFrontendDetailsResponse slug
-                    (model.wikis
+            let
+                sessionKey : String
+                sessionKey =
+                    Effect.Lamdera.sessionIdToString sessionId
+
+                maybeTrustedCount : Maybe Int
+                maybeTrustedCount =
+                    Just (pendingCountForWiki slug model)
+
+                payload : Maybe Wiki.FrontendDetails
+                payload =
+                    model.wikis
                         |> Dict.get slug
                         |> Maybe.andThen
                             (\w ->
                                 if w.active then
-                                    Just (Wiki.frontendDetails w)
+                                    case WikiUser.sessionContributorOnWiki sessionKey slug model.contributorSessions of
+                                        WikiUser.SessionHasAccount accountId ->
+                                            Just
+                                                (Wiki.frontendDetailsForViewer w
+                                                    (WikiContributors.isTrustedForWiki slug accountId model.contributors)
+                                                    maybeTrustedCount
+                                                )
+
+                                        _ ->
+                                            Just (Wiki.frontendDetailsForViewer w False Nothing)
 
                                 else
                                     Nothing
                             )
-                    )
-                )
+            in
+            ( model
+            , Effect.Lamdera.sendToFrontend clientId (WikiFrontendDetailsResponse slug payload)
             )
 
         RequestPageFrontendDetails wikiSlug pageSlug ->
@@ -867,17 +928,24 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                     , reviewerNote = Nothing
                                                     }
 
+                                                inserted : Dict String Submission.Submission
+                                                inserted =
+                                                    Dict.insert (Submission.idToString submissionId) sub model.submissions
+
                                                 nextModel : Model
                                                 nextModel =
-                                                    { model
-                                                        | submissions =
-                                                            Dict.insert (Submission.idToString submissionId) sub model.submissions
-                                                        , nextSubmissionCounter = model.nextSubmissionCounter + 1
-                                                    }
+                                                    withPendingMutation wikiSlug
+                                                        { model
+                                                            | submissions = inserted
+                                                            , nextSubmissionCounter = model.nextSubmissionCounter + 1
+                                                        }
                                             in
                                             ( nextModel
-                                            , Effect.Lamdera.sendToFrontend clientId
-                                                (SubmitNewPageResponse wikiSlug (Ok (Submission.NewPageSubmittedForReview submissionId)))
+                                            , Command.batch
+                                                [ Effect.Lamdera.sendToFrontend clientId
+                                                    (SubmitNewPageResponse wikiSlug (Ok (Submission.NewPageSubmittedForReview submissionId)))
+                                                , broadcastPendingReviewCount wikiSlug nextModel
+                                                ]
                                             )
 
         SubmitPageEdit wikiSlug pageSlug rawMarkdown rawTags ->
@@ -987,17 +1055,24 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                     , reviewerNote = Nothing
                                                     }
 
+                                                inserted : Dict String Submission.Submission
+                                                inserted =
+                                                    Dict.insert (Submission.idToString submissionId) sub model.submissions
+
                                                 nextModel : Model
                                                 nextModel =
-                                                    { model
-                                                        | submissions =
-                                                            Dict.insert (Submission.idToString submissionId) sub model.submissions
-                                                        , nextSubmissionCounter = model.nextSubmissionCounter + 1
-                                                    }
+                                                    withPendingMutation wikiSlug
+                                                        { model
+                                                            | submissions = inserted
+                                                            , nextSubmissionCounter = model.nextSubmissionCounter + 1
+                                                        }
                                             in
                                             ( nextModel
-                                            , Effect.Lamdera.sendToFrontend clientId
-                                                (SubmitPageEditResponse wikiSlug (Ok (Submission.EditSubmittedForReview submissionId)))
+                                            , Command.batch
+                                                [ Effect.Lamdera.sendToFrontend clientId
+                                                    (SubmitPageEditResponse wikiSlug (Ok (Submission.EditSubmittedForReview submissionId)))
+                                                , broadcastPendingReviewCount wikiSlug nextModel
+                                                ]
                                             )
 
         RequestPublishedPageDeletion wikiSlug pageSlug rawReason ->
@@ -1062,17 +1137,24 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                         , reviewerNote = Nothing
                                                         }
 
+                                                    inserted : Dict String Submission.Submission
+                                                    inserted =
+                                                        Dict.insert (Submission.idToString submissionId) sub model.submissions
+
                                                     nextModel : Model
                                                     nextModel =
-                                                        { model
-                                                            | submissions =
-                                                                Dict.insert (Submission.idToString submissionId) sub model.submissions
-                                                            , nextSubmissionCounter = model.nextSubmissionCounter + 1
-                                                        }
+                                                        withPendingMutation wikiSlug
+                                                            { model
+                                                                | submissions = inserted
+                                                                , nextSubmissionCounter = model.nextSubmissionCounter + 1
+                                                            }
                                                 in
                                                 ( nextModel
-                                                , Effect.Lamdera.sendToFrontend clientId
-                                                    (RequestPublishedPageDeletionResponse wikiSlug (Ok submissionId))
+                                                , Command.batch
+                                                    [ Effect.Lamdera.sendToFrontend clientId
+                                                        (RequestPublishedPageDeletionResponse wikiSlug (Ok submissionId))
+                                                    , broadcastPendingReviewCount wikiSlug nextModel
+                                                    ]
                                                 )
 
         DeletePublishedPageImmediately wikiSlug pageSlug rawReason ->
@@ -1594,12 +1676,21 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                             respond (Err e)
 
                                                         Ok nextSub ->
-                                                            ( { model
-                                                                | submissions =
+                                                            let
+                                                                inserted : Dict String Submission.Submission
+                                                                inserted =
                                                                     Dict.insert submissionIdStr nextSub model.submissions
-                                                              }
-                                                            , Effect.Lamdera.sendToFrontend clientId
-                                                                (SubmitDraftForReviewResponse wikiSlug submissionIdStr (Ok ()))
+
+                                                                nextModel : Model
+                                                                nextModel =
+                                                                    withSubmissionMutation sub nextSub wikiSlug { model | submissions = inserted }
+                                                            in
+                                                            ( nextModel
+                                                            , Command.batch
+                                                                [ Effect.Lamdera.sendToFrontend clientId
+                                                                    (SubmitDraftForReviewResponse wikiSlug submissionIdStr (Ok ()))
+                                                                , broadcastPendingReviewCount wikiSlug nextModel
+                                                                ]
                                                             )
 
         WithdrawSubmission wikiSlug submissionIdStr ->
@@ -1649,12 +1740,21 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                     respond (Err e)
 
                                                 Ok nextSub ->
-                                                    ( { model
-                                                        | submissions =
+                                                    let
+                                                        inserted : Dict String Submission.Submission
+                                                        inserted =
                                                             Dict.insert submissionIdStr nextSub model.submissions
-                                                      }
-                                                    , Effect.Lamdera.sendToFrontend clientId
-                                                        (WithdrawSubmissionResponse wikiSlug submissionIdStr (Ok ()))
+
+                                                        nextModel : Model
+                                                        nextModel =
+                                                            withSubmissionMutation sub nextSub wikiSlug { model | submissions = inserted }
+                                                    in
+                                                    ( nextModel
+                                                    , Command.batch
+                                                        [ Effect.Lamdera.sendToFrontend clientId
+                                                            (WithdrawSubmissionResponse wikiSlug submissionIdStr (Ok ()))
+                                                        , broadcastPendingReviewCount wikiSlug nextModel
+                                                        ]
                                                     )
 
         DeleteMySubmission wikiSlug submissionIdStr ->
@@ -1704,12 +1804,21 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                     respond (Err e)
 
                                                 Ok () ->
-                                                    ( { model
-                                                        | submissions =
+                                                    let
+                                                        nextSubmissions : Dict String Submission.Submission
+                                                        nextSubmissions =
                                                             Dict.remove submissionIdStr model.submissions
-                                                      }
-                                                    , Effect.Lamdera.sendToFrontend clientId
-                                                        (DeleteMySubmissionResponse wikiSlug submissionIdStr (Ok ()))
+
+                                                        nextModel : Model
+                                                        nextModel =
+                                                            withSubmissionMutation sub Nothing wikiSlug { model | submissions = nextSubmissions }
+                                                    in
+                                                    ( nextModel
+                                                    , Command.batch
+                                                        [ Effect.Lamdera.sendToFrontend clientId
+                                                            (DeleteMySubmissionResponse wikiSlug submissionIdStr (Ok ()))
+                                                        , broadcastPendingReviewCount wikiSlug nextModel
+                                                        ]
                                                     )
 
         ApproveSubmission wikiSlug submissionId ->
@@ -1814,19 +1923,24 @@ updateFromFrontendWithTime sessionId clientId msg now model =
 
                                                             nextModel : Model
                                                             nextModel =
-                                                                recordAudit now
-                                                                    wikiSlug
-                                                                    accountId
-                                                                    (WikiAuditLog.ApprovedSubmission
-                                                                        { submissionId = submissionId
-                                                                        , pageSlug = pageSlug
-                                                                        }
+                                                                withPendingMutation wikiSlug
+                                                                    (recordAudit now
+                                                                        wikiSlug
+                                                                        accountId
+                                                                        (WikiAuditLog.ApprovedSubmission
+                                                                            { submissionId = submissionId
+                                                                            , pageSlug = pageSlug
+                                                                            }
+                                                                        )
+                                                                        nextModel0
                                                                     )
-                                                                    nextModel0
                                                         in
                                                         ( nextModel
-                                                        , Effect.Lamdera.sendToFrontend clientId
-                                                            (ApproveSubmissionResponse wikiSlug submissionId (Ok ()))
+                                                        , Command.batch
+                                                            [ Effect.Lamdera.sendToFrontend clientId
+                                                                (ApproveSubmissionResponse wikiSlug submissionId (Ok ()))
+                                                            , broadcastPendingReviewCount wikiSlug nextModel
+                                                            ]
                                                         )
 
         RejectSubmission wikiSlug rej ->
@@ -1887,12 +2001,13 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                                 Submission.pageSlugFromKind sub.kind
                                                                     |> Maybe.withDefault ""
 
+                                                            inserted : Dict String Submission.Submission
+                                                            inserted =
+                                                                Dict.insert submissionId rejected model.submissions
+
                                                             nextModel0 : Model
                                                             nextModel0 =
-                                                                { model
-                                                                    | submissions =
-                                                                        Dict.insert submissionId rejected model.submissions
-                                                                }
+                                                                withSubmissionMutation sub rejected wikiSlug { model | submissions = inserted }
 
                                                             nextModel : Model
                                                             nextModel =
@@ -1907,8 +2022,11 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                                     nextModel0
                                                         in
                                                         ( nextModel
-                                                        , Effect.Lamdera.sendToFrontend clientId
-                                                            (RejectSubmissionResponse wikiSlug submissionId (Ok ()))
+                                                        , Command.batch
+                                                            [ Effect.Lamdera.sendToFrontend clientId
+                                                                (RejectSubmissionResponse wikiSlug submissionId (Ok ()))
+                                                            , broadcastPendingReviewCount wikiSlug nextModel
+                                                            ]
                                                         )
 
         RequestSubmissionChanges wikiSlug req ->
@@ -1969,12 +2087,13 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                                 Submission.pageSlugFromKind sub.kind
                                                                     |> Maybe.withDefault ""
 
+                                                            inserted : Dict String Submission.Submission
+                                                            inserted =
+                                                                Dict.insert submissionId needsRevision model.submissions
+
                                                             nextModel0 : Model
                                                             nextModel0 =
-                                                                { model
-                                                                    | submissions =
-                                                                        Dict.insert submissionId needsRevision model.submissions
-                                                                }
+                                                                withSubmissionMutation sub needsRevision wikiSlug { model | submissions = inserted }
 
                                                             nextModel : Model
                                                             nextModel =
@@ -1989,8 +2108,11 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                                     nextModel0
                                                         in
                                                         ( nextModel
-                                                        , Effect.Lamdera.sendToFrontend clientId
-                                                            (RequestSubmissionChangesResponse wikiSlug submissionId (Ok ()))
+                                                        , Command.batch
+                                                            [ Effect.Lamdera.sendToFrontend clientId
+                                                                (RequestSubmissionChangesResponse wikiSlug submissionId (Ok ()))
+                                                            , broadcastPendingReviewCount wikiSlug nextModel
+                                                            ]
                                                         )
 
         HostAdminLogin password ->
@@ -2354,6 +2476,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                         , contributorSessions = WikiUser.dropBindingsForWiki wikiSlug model.contributorSessions
                                         , submissions = nextSubmissions
                                         , wikiAuditEvents = Dict.remove wikiSlug model.wikiAuditEvents
+                                        , pendingReviewCounts = Dict.remove wikiSlug model.pendingReviewCounts
                                     }
                             in
                             ( nextModel
@@ -2485,8 +2608,11 @@ updateFromFrontendWithTime sessionId clientId msg now model =
 
                                     Ok nextModel ->
                                         ( nextModel
-                                        , Effect.Lamdera.sendToFrontend clientId
-                                            (HostAdminWikiDataImportResponse wikiSlug (Ok ()))
+                                        , Command.batch
+                                            [ Effect.Lamdera.sendToFrontend clientId
+                                                (HostAdminWikiDataImportResponse wikiSlug (Ok ()))
+                                            , broadcastPendingReviewCount wikiSlug nextModel
+                                            ]
                                         )
 
         ImportHostAdminWikiDataSnapshotAuto rawJson ->
@@ -2527,8 +2653,11 @@ updateFromFrontendWithTime sessionId clientId msg now model =
 
                             Ok nextModel ->
                                 ( nextModel
-                                , Effect.Lamdera.sendToFrontend clientId
-                                    (HostAdminWikiDataImportAutoResponse (Ok wikiSlug))
+                                , Command.batch
+                                    [ Effect.Lamdera.sendToFrontend clientId
+                                        (HostAdminWikiDataImportAutoResponse (Ok wikiSlug))
+                                    , broadcastPendingReviewCount wikiSlug nextModel
+                                    ]
                                 )
 
 
