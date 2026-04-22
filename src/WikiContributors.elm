@@ -1,6 +1,7 @@
 module WikiContributors exposing
     ( Registry
     , StoredContributor
+    , contributorAccountIdForNormalizedUsername
     , attemptLogin
     , attemptRegister
     , demoteTrustedToContributorAtWiki
@@ -128,6 +129,16 @@ roleForAccount wikiSlug accountId registry =
         |> List.filter (\stored -> stored.id == accountId)
         |> List.head
         |> Maybe.map .role
+
+
+{-| Account id for a normalized username row on one wiki (admin flows).
+-}
+contributorAccountIdForNormalizedUsername : Wiki.Slug -> String -> Registry -> Maybe ContributorAccount.Id
+contributorAccountIdForNormalizedUsername wikiSlug normalizedUsername registry =
+    registry
+        |> Dict.get wikiSlug
+        |> Maybe.andThen (Dict.get normalizedUsername)
+        |> Maybe.map .id
 
 
 {-| True when `accountId` is a contributor on `wikiSlug` with trusted-moderator status (trusted or admin).
