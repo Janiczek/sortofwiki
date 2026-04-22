@@ -4731,27 +4731,6 @@ updateFromBackend msg model =
                     else
                         d
 
-                validatedEditPayload : Maybe { pageSlug : Page.Slug, proposedMarkdown : String, tags : List Page.Slug }
-                validatedEditPayload =
-                    case model.route of
-                        Route.WikiSubmitEdit routeWiki pageSlug ->
-                            if routeWiki == wikiSlug then
-                                Submission.validateEditMarkdown d.markdownBody d.tagsInput pageSlug
-                                    |> Result.toMaybe
-                                    |> Maybe.map
-                                        (\edit ->
-                                            { pageSlug = pageSlug
-                                            , proposedMarkdown = edit.proposedMarkdown
-                                            , tags = edit.tags
-                                            }
-                                        )
-
-                            else
-                                Nothing
-
-                        _ ->
-                            Nothing
-
                 nextStore : Store
                 nextStore =
                     let
@@ -4761,9 +4740,32 @@ updateFromBackend msg model =
                     in
                     case result of
                         Ok Submission.EditPublishedImmediately ->
+                            let
+                                validatedEditPayload : Maybe { pageSlug : Page.Slug, proposedMarkdown : String, tags : List Page.Slug }
+                                validatedEditPayload =
+                                    case model.route of
+                                        Route.WikiSubmitEdit routeWiki pageSlug ->
+                                            if routeWiki == wikiSlug then
+                                                Submission.validateEditMarkdown d.markdownBody d.tagsInput pageSlug
+                                                    |> Result.toMaybe
+                                                    |> Maybe.map
+                                                        (\edit ->
+                                                            { pageSlug = pageSlug
+                                                            , proposedMarkdown = edit.proposedMarkdown
+                                                            , tags = edit.tags
+                                                            }
+                                                        )
+
+                                            else
+                                                Nothing
+
+                                        _ ->
+                                            Nothing
+                            in
                             case validatedEditPayload of
                                 Just editPayload ->
-                                    afterTrustedEditPublishedImmediately wikiSlug editPayload.pageSlug
+                                    afterTrustedEditPublishedImmediately wikiSlug
+                                        editPayload.pageSlug
                                         { proposedMarkdown = editPayload.proposedMarkdown
                                         , tags = editPayload.tags
                                         }

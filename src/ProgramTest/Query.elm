@@ -20,8 +20,8 @@ module ProgramTest.Query exposing
     , expectHasWikiSlug
     , expectHostAdminCreateWikiSlugInputUsesHtmlConstraints
     , expectLink
+    , expectNoBacklinkFrom
     , expectNoLinkWithHref
-    , expectNoBacklinks
     , expectPageShowsWikiSlug
     , expectTagOccurrenceCount
     , expectTextOccurrenceCount
@@ -340,9 +340,11 @@ expectBacklinks wikiSlug backlinkPageSlugs root =
         root
 
 
-expectNoBacklinks : Test.Html.Query.Single msg -> Expectation
-expectNoBacklinks root =
-    expectHasNotId "page-backlinks" root
+expectNoBacklinkFrom : String -> Test.Html.Query.Single msg -> Expectation
+expectNoBacklinkFrom sourcePageSlug root =
+    Test.Html.Query.hasNot
+        [ dataAttr "data-backlink-page-slug" sourcePageSlug ]
+        root
 
 
 expectAll : List (Test.Html.Query.Single msg -> Expectation) -> Test.Html.Query.Single msg -> Expectation
