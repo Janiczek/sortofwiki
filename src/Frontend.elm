@@ -6726,13 +6726,36 @@ themeToggleIconMoon =
         ]
 
 
+themeToggleIconSystem : Html Msg
+themeToggleIconSystem =
+    Svg.svg
+        [ SvgAttr.width "22"
+        , SvgAttr.height "22"
+        , SvgAttr.viewBox "0 0 24 24"
+        , SvgAttr.fill "none"
+        , SvgAttr.stroke "currentColor"
+        , SvgAttr.strokeWidth "1.5"
+        , SvgAttr.strokeLinecap "round"
+        , SvgAttr.strokeLinejoin "round"
+        ]
+        [ Svg.circle
+            [ SvgAttr.cx "8"
+            , SvgAttr.cy "10"
+            , SvgAttr.r "3"
+            ]
+            []
+        , Svg.path
+            [ SvgAttr.d "M8 4.5v1.5m0 8v1.5m-3.89-9.89 1.06 1.06m5.66 5.66 1.06 1.06M2.5 10H4m8 0h1.5m-9.39 3.89 1.06-1.06m5.66-5.66 1.06-1.06" ]
+            []
+        , Svg.path
+            [ SvgAttr.d "M20.5 16.5A4.5 4.5 0 1 1 16 12a3.5 3.5 0 0 0 4.5 4.5z" ]
+            []
+        ]
+
+
 viewThemeToggle : Model -> Html Msg
 viewThemeToggle model =
     let
-        effective : ColorTheme.ColorTheme
-        effective =
-            ColorTheme.effectiveColorTheme model.colorThemePreference model.systemColorTheme
-
         nextPreference : ColorTheme.ColorThemePreference
         nextPreference =
             ColorTheme.cyclePreference model.colorThemePreference
@@ -6756,11 +6779,14 @@ viewThemeToggle model =
         , Events.onClick ColorThemeToggled
         , Attr.attribute "aria-label" ariaLabel
         ]
-        [ case effective of
-            ColorTheme.Light ->
+        [ case model.colorThemePreference of
+            ColorTheme.FollowSystem ->
+                themeToggleIconSystem
+
+            ColorTheme.Fixed ColorTheme.Light ->
                 themeToggleIconMoon
 
-            ColorTheme.Dark ->
+            ColorTheme.Fixed ColorTheme.Dark ->
                 themeToggleIconSun
         ]
 
@@ -11293,18 +11319,6 @@ viewWikiGraphPage wikiSlug wikiDetails =
         graphSummary : WikiGraph.Summary
         graphSummary =
             WikiGraph.summary wikiSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags
-
-        pageEdgeCount : Int
-        pageEdgeCount =
-            graphSummary.edges
-                |> List.filter (\edge -> edge.kind == WikiGraph.WikiLinkEdge)
-                |> List.length
-
-        tagEdgeCount : Int
-        tagEdgeCount =
-            graphSummary.edges
-                |> List.filter (\edge -> edge.kind == WikiGraph.TagEdge)
-                |> List.length
     in
     Html.div
         [ Attr.id "wiki-graph-page"
@@ -11312,25 +11326,6 @@ viewWikiGraphPage wikiSlug wikiDetails =
         ]
         [ UI.contentParagraph []
             [ Html.text "Graph of published wiki pages with wiki-link and tag edges. Missing linked pages appear dashed in red; tag edges are purple dashed." ]
-        , UI.contentParagraph
-            [ Attr.id "wiki-graph-summary"
-            , Attr.attribute "data-published-count" (String.fromInt (List.length graphSummary.publishedPageSlugs))
-            , Attr.attribute "data-page-edge-count" (String.fromInt pageEdgeCount)
-            , Attr.attribute "data-tag-edge-count" (String.fromInt tagEdgeCount)
-            , Attr.attribute "data-edge-count" (String.fromInt (List.length graphSummary.edges))
-            , Attr.attribute "data-missing-count" (String.fromInt (List.length graphSummary.missingPageSlugs))
-            ]
-            [ Html.text
-                (String.fromInt (List.length graphSummary.publishedPageSlugs)
-                    ++ " published pages, "
-                    ++ String.fromInt pageEdgeCount
-                    ++ " page-link edges, "
-                    ++ String.fromInt tagEdgeCount
-                    ++ " tag edges, "
-                    ++ String.fromInt (List.length graphSummary.missingPageSlugs)
-                    ++ " missing linked pages."
-                )
-            ]
         , if List.isEmpty graphSummary.publishedPageSlugs then
             UI.contentParagraph
                 [ Attr.id "wiki-graph-empty" ]
@@ -11392,23 +11387,6 @@ viewPublishedPageGraphRoute model wikiSlug pageSlug =
 
 viewPublishedPageGraphPage : Wiki.Slug -> Page.Slug -> Wiki.FrontendDetails -> Html Msg
 viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails =
-    let
-        graphSummary : PageGraph.Summary
-        graphSummary =
-            PageGraph.summary wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags
-
-        pageEdgeCount : Int
-        pageEdgeCount =
-            graphSummary.edges
-                |> List.filter (\edge -> edge.kind == PageGraph.WikiLinkEdge)
-                |> List.length
-
-        tagEdgeCount : Int
-        tagEdgeCount =
-            graphSummary.edges
-                |> List.filter (\edge -> edge.kind == PageGraph.TagEdge)
-                |> List.length
-    in
     Html.div
         [ Attr.id "page-immediate-graph-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
@@ -11416,27 +11394,6 @@ viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails =
         ]
         [ UI.contentParagraph []
             [ Html.text "Immediate graph of wiki-link and tag edges to and from this page. Missing linked pages appear dashed in red; tag edges are purple dashed." ]
-        , UI.contentParagraph
-            [ Attr.id "page-immediate-graph-summary"
-            , Attr.attribute "data-backlink-count" (String.fromInt (List.length graphSummary.backlinkPageSlugs))
-            , Attr.attribute "data-outgoing-count" (String.fromInt (List.length graphSummary.outgoingPageSlugs))
-            , Attr.attribute "data-page-edge-count" (String.fromInt pageEdgeCount)
-            , Attr.attribute "data-tag-edge-count" (String.fromInt tagEdgeCount)
-            , Attr.attribute "data-missing-count" (String.fromInt (List.length graphSummary.missingPageSlugs))
-            ]
-            [ Html.text
-                (String.fromInt (List.length graphSummary.backlinkPageSlugs)
-                    ++ " backlinks, "
-                    ++ String.fromInt (List.length graphSummary.outgoingPageSlugs)
-                    ++ " outgoing links, "
-                    ++ String.fromInt pageEdgeCount
-                    ++ " page-link edges, "
-                    ++ String.fromInt tagEdgeCount
-                    ++ " tag edges, "
-                    ++ String.fromInt (List.length graphSummary.missingPageSlugs)
-                    ++ " missing linked pages."
-                )
-            ]
         , Html.node "graphviz-graph"
             [ Attr.id "page-immediate-graphviz"
             , Attr.attribute "graph" (PageGraph.dot wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags)

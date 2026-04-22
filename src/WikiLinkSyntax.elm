@@ -1,4 +1,4 @@
-module WikiLinkSyntax exposing (Segment(..), segmentsFromPlainText, wikiRefSlugsFromPlainText)
+module WikiLinkSyntax exposing (Segment(..), escapeLabelPipesInWikiLinks, segmentsFromPlainText, wikiRefSlugsFromPlainText)
 
 import Page
 
@@ -24,6 +24,52 @@ wikiRefSlugsFromPlainText text =
                     WikiRef slug _ ->
                         Just slug
             )
+
+
+{-| Escape `|` inside valid `[[slug|label]]` wiki links so markdown table parsing does not treat them as cell separators.
+-}
+escapeLabelPipesInWikiLinks : String -> String
+escapeLabelPipesInWikiLinks content =
+    escapeLabelPipesHelp content ""
+
+
+escapeLabelPipesHelp : String -> String -> String
+escapeLabelPipesHelp remaining acc =
+    case String.indexes "[[" remaining |> List.head of
+        Nothing ->
+            acc ++ remaining
+
+        Just i ->
+            let
+                before : String
+                before =
+                    String.left i remaining
+
+                inner : String
+                inner =
+                    String.dropLeft (i + 2) remaining
+            in
+            case parseWikiLinkInner inner of
+                Nothing ->
+                    escapeLabelPipesHelp
+                        (String.dropLeft (i + 1) remaining)
+                        (acc ++ before ++ "[")
+
+                Just parsed ->
+                    let
+                        rest : String
+                        rest =
+                            String.dropLeft (i + 2 + parsed.consumed) remaining
+
+                        renderedWikiLink : String
+                        renderedWikiLink =
+                            if parsed.hasCustomDisplay then
+                                "[[" ++ parsed.slug ++ "\\|" ++ String.replace "|" "\\|" parsed.display ++ "]]"
+
+                            else
+                                "[[" ++ parsed.slug ++ "]]"
+                    in
+                    escapeLabelPipesHelp rest (acc ++ before ++ renderedWikiLink)
 
 
 {-| Split plain text into alternating plain segments and wiki links. Invalid `[[` sequences emit a literal `[` and rescan.
@@ -87,6 +133,7 @@ type alias ParsedWikiLink =
     { slug : Page.Slug
     , display : String
     , consumed : Int
+    , hasCustomDisplay : Bool
     }
 
 
@@ -110,6 +157,7 @@ parseWikiLinkInner s =
                 { slug = slug
                 , display = slug
                 , consumed = slugEnd + 2
+                , hasCustomDisplay = False
                 }
 
         else if String.startsWith "|" afterSlug then
@@ -127,6 +175,27 @@ parseWikiLinkInner s =
                         { slug = slug
                         , display = String.left j afterBar
                         , consumed = slugEnd + 1 + j + 2
+                        , hasCustomDisplay = True
+                        }
+
+        else if String.startsWith "\\|" afterSlug then
+            let
+                afterEscapedBar : String
+                afterEscapedBar =
+                    String.dropLeft 2 afterSlug
+            in
+            case String.indexes "]]" afterEscapedBar |> List.head of
+                Nothing ->
+                    Nothing
+
+                Just j ->
+                    Just
+                        { slug = slug
+                        , display =
+                            String.left j afterEscapedBar
+                                |> String.replace "\\|" "|"
+                        , consumed = slugEnd + 2 + j + 2
+                        , hasCustomDisplay = True
                         }
 
         else

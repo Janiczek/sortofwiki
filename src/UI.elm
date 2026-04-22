@@ -621,7 +621,7 @@ wikiCatalogCardSummaryClass =
 
 markdownContainerClass : String
 markdownContainerClass =
-    "block max-w-[52rem] text-[0.95rem] font-serif"
+    "markdown-body block max-w-[52rem] text-[0.95rem] font-serif"
 
 
 markdownHeading1Class : String

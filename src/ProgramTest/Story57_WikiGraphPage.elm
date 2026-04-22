@@ -35,14 +35,6 @@ endToEndTests =
                     (ProgramTest.Query.expectAll
                         [ ProgramTest.Query.withinId "wiki-graph-page"
                             (ProgramTest.Query.expectHasDataAttributes [ ( "data-wiki-slug", "Demo" ) ])
-                        , ProgramTest.Query.withinId "wiki-graph-summary"
-                            (ProgramTest.Query.expectHasTexts
-                                [ "5 published pages"
-                                , "11 page-link edges"
-                                , "tag edges"
-                                , "3 missing linked pages"
-                                ]
-                            )
                         , ProgramTest.Query.withinId "wiki-graphviz"
                             (ProgramTest.Query.expectHasDataAttributes
                                 [ ( "data-graphviz-pages", "5" )

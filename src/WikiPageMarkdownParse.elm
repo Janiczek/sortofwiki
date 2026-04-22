@@ -6,6 +6,7 @@ import Markdown.Parser as MarkdownParser
 import MarkdownHeadingSlugs
 import Page
 import Wiki
+import WikiLinkSyntax
 import WikiMarkdown
 
 
@@ -14,6 +15,7 @@ import WikiMarkdown
 blocksWithHeadingSlugs : Wiki.Slug -> (Page.Slug -> Bool) -> String -> Result String (List ( Block.Block, Maybe String ))
 blocksWithHeadingSlugs wikiSlug publishedSlugExists source =
     source
+        |> WikiLinkSyntax.escapeLabelPipesInWikiLinks
         |> MarkdownParser.parse
         |> Result.mapError (List.map MarkdownParser.deadEndToString >> String.join "\n")
         |> Result.map (WikiMarkdown.postProcessBlocksWithWikiLinks wikiSlug publishedSlugExists)

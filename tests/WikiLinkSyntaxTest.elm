@@ -23,6 +23,10 @@ suite =
                 \() ->
                     WikiLinkSyntax.segmentsFromPlainText "[[guides|Help]]"
                         |> Expect.equal [ WikiLinkSyntax.WikiRef "guides" "Help" ]
+            , Test.test "parses [[slug\\|label]] after markdown table escaping" <|
+                \() ->
+                    WikiLinkSyntax.segmentsFromPlainText "[[guides\\|Help]]"
+                        |> Expect.equal [ WikiLinkSyntax.WikiRef "guides" "Help" ]
             , Test.test "invalid opener emits bracket and continues" <|
                 \() ->
                     WikiLinkSyntax.segmentsFromPlainText "a [[x"
@@ -76,6 +80,16 @@ suite =
                     in
                     WikiLinkSyntax.wikiRefSlugsFromPlainText ("[[" ++ slug ++ "]]")
                         |> Expect.equal [ slug ]
+            ]
+        , Test.describe "escapeLabelPipesInWikiLinks"
+            [ Test.test "escapes label separator for markdown table parsing" <|
+                \() ->
+                    WikiLinkSyntax.escapeLabelPipesInWikiLinks "[[guides|Help]]"
+                        |> Expect.equal "[[guides\\|Help]]"
+            , Test.test "escapes extra pipes inside label text" <|
+                \() ->
+                    WikiLinkSyntax.escapeLabelPipesInWikiLinks "[[guides|Help|Now]]"
+                        |> Expect.equal "[[guides\\|Help\\|Now]]"
             ]
         ]
 

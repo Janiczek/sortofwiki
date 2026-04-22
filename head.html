@@ -72,7 +72,8 @@
     --code-bg: #e9ecd3;
     --focus-ring: #587232;
     --input-bg: #ffffff;
-    --table-stripe: rgba(239, 242, 219, 0.5);
+    --table-stripe: #e2eac8;
+    --table-row-hover: #d6e5b2;
     /* Audit filter chips (badge-style toggles; distinct from primary buttons) */
     --chip-off-bg: var(--input-bg);
     --chip-off-fg: var(--fg-muted);
@@ -115,12 +116,41 @@
     --focus-ring: #a3cf6e;
     --input-bg: #1c2312;
     --table-stripe: rgba(48, 57, 32, 0.58);
+    --table-row-hover: #3f4f2b;
     --chip-off-bg: var(--chrome-bg);
     --chip-off-fg: var(--fg-muted);
     --chip-off-border: var(--border);
     --chip-on-bg: #3d5228;
     --chip-on-fg: #f3f5e8;
     --chip-on-border: #5a7238;
+  }
+
+  /* Markdown body tables: quiet, bookish styling inspired by Tufte's restrained rules. */
+  .app-root .markdown-body table {
+    width: auto;
+    max-width: 100%;
+    margin: 0.8rem 0 1rem;
+    border-collapse: collapse;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    font-size: 0.94em;
+    line-height: 1.35;
+  }
+  .app-root .markdown-body thead th {
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+  }
+  .app-root .markdown-body th,
+  .app-root .markdown-body td {
+    padding: 0.22rem 0.55rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  .app-root .markdown-body tbody tr:nth-child(even) {
+    background: var(--table-stripe);
+  }
+  .app-root .markdown-body tbody tr:hover {
+    background: var(--table-row-hover);
   }
 
 </style>

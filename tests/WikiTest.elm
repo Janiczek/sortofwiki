@@ -271,15 +271,20 @@ suite =
                     Wiki.publishedPageFrontendDetails "home" w
                         |> Expect.equal
                             (Just (Page.frontendDetails (Just "body") [] [] []))
-            , Test.test "returns tag-hub details when page is missing" <|
+            , Test.test "returns backlinks and tag-hub details when page is missing" <|
                 \() ->
                     let
                         w : Wiki.Wiki
                         w =
-                            Wiki.wikiWithPages "Demo" "Demo" Dict.empty
+                            Wiki.wikiWithPages "Demo"
+                                "Demo"
+                                (Dict.singleton
+                                    "Linker"
+                                    (Page.withPublished "Linker" "See [[home]] for details.")
+                                )
                     in
                     Wiki.publishedPageFrontendDetails "home" w
-                        |> Expect.equal (Just (Page.frontendDetails Nothing [] [] []))
+                        |> Expect.equal (Just (Page.frontendDetails Nothing [ "Linker" ] [] []))
             , Test.test "returns details for pending-only page without markdown" <|
                 \() ->
                     let

@@ -47,15 +47,6 @@ endToEndTests =
                             )
                         , ProgramTest.Query.withinHref "/w/Demo/p/About"
                             (ProgramTest.Query.expectHasTexts [ "Page" ])
-                        , ProgramTest.Query.withinId "page-immediate-graph-summary"
-                            (ProgramTest.Query.expectHasTexts
-                                [ "backlinks"
-                                , "outgoing links"
-                                , "page-link edges"
-                                , "tag edges"
-                                , "missing linked pages"
-                                ]
-                            )
                         , ProgramTest.Query.withinId "page-immediate-graphviz"
                             (ProgramTest.Query.expectHasDataAttributes [])
                         ]

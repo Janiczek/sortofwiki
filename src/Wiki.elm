@@ -165,7 +165,7 @@ publishedPageFrontendDetails pageSlug wiki =
             Just
                 (Page.frontendDetails
                     Nothing
-                    []
+                    (PageBacklinks.slugsPointingTo wiki.slug pageSlug wiki.pages)
                     []
                     (PageTags.slugsPointingToTag pageSlug wiki.pages)
                 )

@@ -146,4 +146,16 @@ endToEndTests =
                     )
                 ]
         }
+    , ProgramTest.Start.start
+        { name = "49 — missing published page shows backlinks in right nav"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , sessionId = "session-story49-sidebar-backlinks"
+        , path = "/w/Demo/p/Story49MissingPage"
+        , connectClientMs = Nothing
+        , clientSteps =
+            \client ->
+                [ client.checkView 200
+                    (ProgramTest.Query.expectBacklinks "Demo" [ "MarkdownPlayground" ])
+                ]
+        }
     ]

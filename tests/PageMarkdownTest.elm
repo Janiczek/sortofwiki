@@ -5,6 +5,7 @@ import Html
 import Html.Attributes
 import Page
 import PageMarkdown
+import ProgramTest.Query
 import Test exposing (Test)
 import Test.Html.Query
 import Test.Html.Selector
@@ -142,6 +143,30 @@ suite =
                             , Test.Html.Selector.attribute (Html.Attributes.href "/w/Demo/p/ghost")
                             , Test.Html.Selector.class "!text-red-600"
                             ]
+            , Test.test "renders [[slug|label]] inside markdown table cell" <|
+                \() ->
+                    Page.frontendDetails
+                        (Just """| Supporting skill | Receiving skill |
+| - | - |
+| [[AlgorithmsSkill|Algorithms]] | [[CombatSkill|Combat]] |
+""")
+                        []
+                        []
+                        []
+                        |> PageMarkdown.view wiki (\slug -> List.member slug [ "AlgorithmsSkill", "CombatSkill" ])
+                        |> Test.Html.Query.fromHtml
+                        |> ProgramTest.Query.withinTag "table"
+                            (ProgramTest.Query.expectAll
+                                [ ProgramTest.Query.expectLink
+                                    { href = "/w/Demo/p/AlgorithmsSkill"
+                                    , label = "Algorithms"
+                                    }
+                                , ProgramTest.Query.expectLink
+                                    { href = "/w/Demo/p/CombatSkill"
+                                    , label = "Combat"
+                                    }
+                                ]
+                            )
             ]
         , Test.describe "viewPreview"
             [ Test.test "uses given container id" <|

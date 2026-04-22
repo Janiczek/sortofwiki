@@ -3,6 +3,8 @@ For compiling and using the package manager, use `lamdera` instead of `elm`.
 For testing the Elm codebase, use `elm-test --compiler=lamdera`.
 Do not nest another module’s `suite` inside one module's `suite`; keep domain/unit suites in their own modules.
 
+Don't edit src/Evergreen/* files unless explicitly asked to.
+
 You can test things yourself by running a local Lamdera development server via `lamdera live` and opening http://localhost:8000/ in the browser.
 Even better, if an end-to-end test fails (tests/Story/*), you can open the dev server and open http://localhost:8000/src/ProgramTest/Viewer.elm, select the test and then you can click on the timeline to see how it looked at various steps, show the model, rightclick to diff the models, etc.
 
