@@ -199,7 +199,7 @@ dot wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags =
 
                     else
                         ", penwidth=2, style="
-                            ++ dotString "rounded,dashed"
+                            ++ dotString "dashed"
                             ++ ", color="
                             ++ dotString "#dc2626"
                             ++ ", fontcolor="
@@ -222,7 +222,7 @@ dot wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags =
                 ++ " [href="
                 ++ dotString (Wiki.pageGraphUrlPath wikiSlug pageSlug)
                 ++ ", style="
-                ++ dotString "rounded,dashed"
+                ++ dotString "dashed"
                 ++ ", color="
                 ++ dotString "#dc2626"
                 ++ ", fontcolor="
@@ -275,8 +275,7 @@ dot wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags =
                     ++ ", ranksep="
                     ++ dotString "0.35"
                     ++ "];"
-              , "  node [shape=box, style="
-                    ++ dotString "rounded"
+              , "  node [shape=box"
                     ++ ", fontname="
                     ++ dotString "'Source Serif 4', system-ui, sans-serif"
                     ++ ", fontsize="
