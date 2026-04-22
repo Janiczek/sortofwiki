@@ -922,6 +922,10 @@ updateFromFrontendWithTime sessionId clientId msg now model =
 
                                         else if WikiContributors.isTrustedForWiki wikiSlug accountId model.contributors then
                                             let
+                                                previousMarkdown : String
+                                                previousMarkdown =
+                                                    SubmissionReviewDetail.publishedMarkdownForSlug wiki pageSlug
+
                                                 nextWiki : Wiki
                                                 nextWiki =
                                                     Wiki.applyPublishedMarkdownEdit pageSlug markdown wiki
@@ -937,7 +941,12 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                     recordAudit now
                                                         wikiSlug
                                                         accountId
-                                                        (WikiAuditLog.TrustedPublishedPageEdit { pageSlug = pageSlug })
+                                                        (WikiAuditLog.TrustedPublishedPageEdit
+                                                            { pageSlug = pageSlug
+                                                            , beforeMarkdown = previousMarkdown
+                                                            , afterMarkdown = markdown
+                                                            }
+                                                        )
                                                         nextModel0
                                             in
                                             ( nextModel

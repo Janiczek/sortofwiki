@@ -39,6 +39,16 @@ suite =
                     linkRoutes
                         |> List.any touchesForbidden
                         |> Expect.equal False
+            , Test.fuzz (Fuzz.map2 Tuple.pair Fuzz.bool Fuzz.bool) "SortOfWiki nav always includes All wikis" <|
+                \( hostAdminAuthenticated, showHostAdminTools ) ->
+                    SideNavMenu.globalChromeSections
+                        { hostAdminAuthenticated = hostAdminAuthenticated
+                        , showHostAdminTools = showHostAdminTools
+                        }
+                        |> SideNavMenu.allLinks
+                        |> List.map .linkRoute
+                        |> List.member Route.WikiList
+                        |> Expect.equal True
             ]
         , Test.describe "wikiNavLinks"
             [ Test.test "anonymous wiki nav includes public graph page" <|

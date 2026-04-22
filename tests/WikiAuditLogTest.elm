@@ -53,9 +53,13 @@ suite =
                         |> Expect.equal "Trusted publish: created page new-page"
             , Test.test "TrustedPublishedPageEdit" <|
                 \() ->
-                    WikiAuditLog.TrustedPublishedPageEdit { pageSlug = "home" }
+                    WikiAuditLog.TrustedPublishedPageEdit
+                        { pageSlug = "home"
+                        , beforeMarkdown = "Before"
+                        , afterMarkdown = "After"
+                        }
                         |> WikiAuditLog.eventKindUserText
-                        |> Expect.equal "Trusted publish: edited page home"
+                        |> Expect.equal "Trusted publish: edited page home (before: 6 chars, after: 5 chars)"
             , Test.test "TrustedPublishedPageDelete without reason text (legacy)" <|
                 \() ->
                     WikiAuditLog.TrustedPublishedPageDelete { pageSlug = "gone", reason = "" }
@@ -68,7 +72,7 @@ suite =
                         |> Expect.equal "Trusted publish: deleted page gone — obsolete"
             ]
         , Test.describe "formatEventRowText"
-            [ Test.test "includes UTC YYYY-MM-DD HH:mm:ss.sss, actor, and kind text" <|
+            [ Test.test "includes UTC YYYY-MM-DD HH:mm:ss, actor, and kind text" <|
                 \() ->
                     { at = Time.millisToPosix 1704067200000
                     , actorUsername = "mod"
@@ -76,15 +80,15 @@ suite =
                         WikiAuditLog.ApprovedSubmission { submissionId = "s1", pageSlug = "p" }
                     }
                         |> WikiAuditLog.formatEventRowText
-                        |> Expect.equal "2024-01-01 00:00:00.000 · mod — Approved submission s1 (page p)"
-            , Test.test "pads UTC milliseconds to three digits" <|
+                        |> Expect.equal "2024-01-01 00:00:00 · mod — Approved submission s1 (page p)"
+            , Test.test "drops milliseconds from UTC timestamp display" <|
                 \() ->
                     { at = Time.millisToPosix 1
                     , actorUsername = "a"
                     , kind = WikiAuditLog.GrantedWikiAdmin { targetUsername = "x" }
                     }
                         |> WikiAuditLog.formatEventRowText
-                        |> Expect.equal "1970-01-01 00:00:00.001 · a — Granted wiki admin to x"
+                        |> Expect.equal "1970-01-01 00:00:00 · a — Granted wiki admin to x"
             ]
         , Test.describe "append"
             [ Test.test "appends in chronological order for one wiki" <|

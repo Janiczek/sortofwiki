@@ -673,7 +673,7 @@ markdownParagraphClass =
 
 markdownTodoClass : String
 markdownTodoClass =
-    "italic text-red-700 dark:text-red-400"
+    "italic text-red-600 dark:text-red-400"
 
 
 markdownBlockQuoteClass : String

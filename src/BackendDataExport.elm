@@ -532,10 +532,12 @@ encodeAuditKind kind =
                 , ( "pageSlug", Encode.string pageSlug )
                 ]
 
-        WikiAuditLog.TrustedPublishedPageEdit { pageSlug } ->
+        WikiAuditLog.TrustedPublishedPageEdit { pageSlug, beforeMarkdown, afterMarkdown } ->
             Encode.object
                 [ ( "tag", Encode.string "trusted_published_page_edit" )
                 , ( "pageSlug", Encode.string pageSlug )
+                , ( "beforeMarkdown", Encode.string beforeMarkdown )
+                , ( "afterMarkdown", Encode.string afterMarkdown )
                 ]
 
         WikiAuditLog.TrustedPublishedPageDelete { pageSlug, reason } ->
@@ -613,8 +615,25 @@ decodeAuditKindFromTag tag =
                 (Decode.field "pageSlug" Decode.string)
 
         "trusted_published_page_edit" ->
-            Decode.map (\p -> WikiAuditLog.TrustedPublishedPageEdit { pageSlug = p })
+            Decode.map3
+                (\p beforeMarkdown afterMarkdown ->
+                    WikiAuditLog.TrustedPublishedPageEdit
+                        { pageSlug = p
+                        , beforeMarkdown = beforeMarkdown
+                        , afterMarkdown = afterMarkdown
+                        }
+                )
                 (Decode.field "pageSlug" Decode.string)
+                (Decode.oneOf
+                    [ Decode.field "beforeMarkdown" Decode.string
+                    , Decode.succeed ""
+                    ]
+                )
+                (Decode.oneOf
+                    [ Decode.field "afterMarkdown" Decode.string
+                    , Decode.succeed ""
+                    ]
+                )
 
         "trusted_published_page_delete" ->
             Decode.map2

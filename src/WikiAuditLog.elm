@@ -48,7 +48,7 @@ type AuditEventKind
     | GrantedWikiAdmin { targetUsername : String }
     | RevokedWikiAdmin { targetUsername : String }
     | TrustedPublishedNewPage { pageSlug : String }
-    | TrustedPublishedPageEdit { pageSlug : String }
+    | TrustedPublishedPageEdit { pageSlug : String, beforeMarkdown : String, afterMarkdown : String }
     | TrustedPublishedPageDelete { pageSlug : String, reason : String }
 
 
@@ -441,15 +441,15 @@ append wikiSlug at actorUsername kind dict =
         dict
 
 
-{-| UTC wall time as `YYYY-MM-DD HH:mm:ss.sss` (from [`elm/time`](https://package.elm-lang.org/packages/elm/time/latest/Time)).
+{-| UTC wall time as `YYYY-MM-DD HH:mm:ss` (from [`elm/time`](https://package.elm-lang.org/packages/elm/time/latest/Time)).
 -}
 eventUtcTimestampString : AuditEvent -> String
 eventUtcTimestampString e =
-    posixUtcToYyyyMmDdHhMmSsSss e.at
+    posixUtcToYyyyMmDdHhMmSs e.at
 
 
-posixUtcToYyyyMmDdHhMmSsSss : Time.Posix -> String
-posixUtcToYyyyMmDdHhMmSsSss posix =
+posixUtcToYyyyMmDdHhMmSs : Time.Posix -> String
+posixUtcToYyyyMmDdHhMmSs posix =
     let
         zone : Time.Zone
         zone =
@@ -460,12 +460,6 @@ posixUtcToYyyyMmDdHhMmSsSss posix =
             n
                 |> String.fromInt
                 |> String.padLeft 2 '0'
-
-        pad3 : Int -> String
-        pad3 n =
-            n
-                |> String.fromInt
-                |> String.padLeft 3 '0'
 
         year : String
         year =
@@ -484,8 +478,6 @@ posixUtcToYyyyMmDdHhMmSsSss posix =
         ++ pad2 (Time.toMinute zone posix)
         ++ ":"
         ++ pad2 (Time.toSecond zone posix)
-        ++ "."
-        ++ pad3 (Time.toMillis zone posix)
 
 
 monthToInt : Time.Month -> Int
@@ -567,8 +559,15 @@ eventKindUserText kind =
         TrustedPublishedNewPage { pageSlug } ->
             "Trusted publish: created page " ++ pageSlug
 
-        TrustedPublishedPageEdit { pageSlug } ->
-            "Trusted publish: edited page " ++ pageSlug
+        TrustedPublishedPageEdit { pageSlug, beforeMarkdown, afterMarkdown } ->
+            "Trusted publish: edited page "
+                ++ pageSlug
+                ++ " (before: "
+                ++ String.fromInt (String.length beforeMarkdown)
+                ++ " chars, after: "
+                ++ String.fromInt (String.length afterMarkdown)
+                ++ " chars"
+                ++ ")"
 
         TrustedPublishedPageDelete { pageSlug, reason } ->
             "Trusted publish: deleted page "
@@ -588,3 +587,5 @@ formatEventRowText e =
         ++ e.actorUsername
         ++ " — "
         ++ eventKindUserText e.kind
+
+

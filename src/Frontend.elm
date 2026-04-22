@@ -45,6 +45,7 @@ import SubmissionReviewDetail
 import Svg
 import Svg.Attributes as SvgAttr
 import TW
+import Time
 import Types exposing (FrontendModel, FrontendMsg(..), HostAdminCreateWikiDraft, HostAdminLoginDraft, HostAdminWikiDetailDraft, LoginDraft, NewPageSubmitDraft, PageDeleteSubmitDraft, PageEditSubmitDraft, RegisterDraft, ReviewApproveDraft, ReviewDecision(..), ReviewRejectDraft, ReviewRequestChangesDraft, SubmissionDetailEditDraft, ToBackend(..), ToFrontend(..), emptySubmissionDetailEditDraft)
 import UI
 import Url exposing (Url)
@@ -6278,11 +6279,15 @@ updateFromBackend msg model =
                             store0 : Store
                             store0 =
                                 model.store
+
+                            store1 : Store
+                            store1 =
+                                invalidateWikiPublishedCaches wikiSlug store0
                         in
                         ( { model
                             | hostAdminWikiImportInFlightSlug = Nothing
                             , hostAdminWikisNotice = Just "Wiki import completed. Reloading lists…"
-                            , store = { store0 | wikiCatalog = RemoteData.NotAsked }
+                            , store = { store1 | wikiCatalog = RemoteData.NotAsked }
                             , hostAdminWikis = RemoteData.Loading
                           }
                         , Command.batch
@@ -6301,16 +6306,20 @@ updateFromBackend msg model =
 
         HostAdminWikiDataImportAutoResponse result ->
             case result of
-                Ok _ ->
+                Ok wikiSlug ->
                     let
                         store0 : Store
                         store0 =
                             model.store
+
+                        store1 : Store
+                        store1 =
+                            invalidateWikiPublishedCaches wikiSlug store0
                     in
                     ( { model
                         | hostAdminImportInFlight = False
                         , hostAdminWikisNotice = Just "Wiki import completed. Reloading lists…"
-                        , store = { store0 | wikiCatalog = RemoteData.NotAsked }
+                        , store = { store1 | wikiCatalog = RemoteData.NotAsked }
                         , hostAdminWikis = RemoteData.Loading
                       }
                     , Command.batch
@@ -7293,10 +7302,54 @@ viewHostAdminAuditBody remote =
                                             [ Html.text (WikiAuditLog.eventUtcTimestampStringScoped ev) ]
                                         , UI.tableTd UI.TableAlignTop [] [ Html.text ev.wikiSlug ]
                                         , UI.tableTd UI.TableAlignTop [] [ Html.text ev.actorUsername ]
-                                        , UI.tableTd UI.TableAlignTop [] [ Html.text (WikiAuditLog.eventKindUserText ev.kind) ]
+                                        , UI.tableTd UI.TableAlignTop [] [ viewAuditEventKindCell True ev.wikiSlug ev.at ev.kind ]
                                         ]
                                 )
                     }
+
+
+viewAuditEventKindCell : Bool -> Wiki.Slug -> Time.Posix -> WikiAuditLog.AuditEventKind -> Html Msg
+viewAuditEventKindCell isHostAuditView wikiSlug at kind =
+    case kind of
+        WikiAuditLog.TrustedPublishedPageEdit { pageSlug, beforeMarkdown, afterMarkdown } ->
+            let
+                diffHref : String
+                diffHref =
+                    let
+                        atMillis : Int
+                        atMillis =
+                            Time.posixToMillis at
+
+                        fragment : String
+                        fragment =
+                            "#audit-diff:" ++ wikiSlug ++ ":" ++ String.fromInt atMillis
+                    in
+                    if isHostAuditView then
+                        Wiki.hostAdminAuditUrlPath ++ fragment
+
+                    else
+                        Wiki.adminAuditUrlPath wikiSlug ++ fragment
+            in
+            Html.span
+                [ TW.cls "inline-flex flex-wrap items-center gap-2" ]
+                [ Html.text
+                    ("Trusted publish: edited page "
+                        ++ pageSlug
+                        ++ " (before: "
+                        ++ String.fromInt (String.length beforeMarkdown)
+                        ++ " chars, after: "
+                        ++ String.fromInt (String.length afterMarkdown)
+                        ++ " chars)"
+                    )
+                , Html.a
+                    [ Attr.href diffHref
+                    , TW.cls "text-[var(--link)] underline underline-offset-2"
+                    ]
+                    [ Html.text "View diff" ]
+                ]
+
+        _ ->
+            Html.text (WikiAuditLog.eventKindUserText kind)
 
 
 viewHostAdminAuditKindChip : Model -> ( WikiAuditLog.AuditEventKindFilterTag, String ) -> Html Msg
@@ -7388,17 +7441,22 @@ viewHostAdminAuditFilters model =
 
 viewHostAdminAudit : Model -> Html Msg
 viewHostAdminAudit model =
-    Html.div
-        [ Attr.id "host-admin-audit-page"
-        , TW.cls "flex min-h-0 flex-1 flex-col gap-3"
-        ]
-        [ viewHostAdminAuditFilters model
-        , Html.div
-            [ Attr.id "host-admin-audit-table-region"
-            , TW.cls "flex min-h-0 min-w-0 flex-1 flex-col overflow-auto"
-            ]
-            [ viewHostAdminAuditBody model.hostAdminAuditLog ]
-        ]
+    case auditDiffRefFromFragment model.navigationFragment of
+        Just ( wikiSlug, atMillis ) ->
+            viewHostAdminAuditDiffRoute wikiSlug atMillis model
+
+        Nothing ->
+            Html.div
+                [ Attr.id "host-admin-audit-page"
+                , TW.cls "flex min-h-0 flex-1 flex-col gap-3"
+                ]
+                [ viewHostAdminAuditFilters model
+                , Html.div
+                    [ Attr.id "host-admin-audit-table-region"
+                    , TW.cls "flex min-h-0 min-w-0 flex-1 flex-col overflow-auto"
+                    ]
+                    [ viewHostAdminAuditBody model.hostAdminAuditLog ]
+                ]
 
 
 viewHostAdminCreateWikiFeedback : Maybe (Result HostAdmin.CreateHostedWikiError Wiki.CatalogEntry) -> Html Msg
@@ -9807,7 +9865,7 @@ viewWikiAdminAuditBody wikiSlug remote =
                                             ]
                                             [ Html.text (WikiAuditLog.eventUtcTimestampString ev) ]
                                         , UI.tableTd UI.TableAlignTop [] [ Html.text ev.actorUsername ]
-                                        , UI.tableTd UI.TableAlignTop [] [ Html.text (WikiAuditLog.eventKindUserText ev.kind) ]
+                                        , UI.tableTd UI.TableAlignTop [] [ viewAuditEventKindCell False wikiSlug ev.at ev.kind ]
                                         ]
                                 )
                     }
@@ -9904,10 +9962,19 @@ viewWikiAdminAuditLoaded wikiSlug model =
 viewWikiAdminAuditRoute : Model -> Wiki.Slug -> Html Msg
 viewWikiAdminAuditRoute model wikiSlug =
     case Store.get_ wikiSlug model.store.wikiDetails of
-        RemoteData.Success _ ->
+        RemoteData.Success wikiDetails ->
             case Store.get wikiSlug model.store.wikiCatalog of
                 RemoteData.Success _ ->
-                    viewWikiAdminAuditLoaded wikiSlug model
+                    case auditDiffRefFromFragment model.navigationFragment of
+                        Just ( fragmentWikiSlug, atMillis ) ->
+                            if fragmentWikiSlug == wikiSlug then
+                                viewWikiAdminAuditDiffRoute wikiSlug wikiDetails atMillis model
+
+                            else
+                                viewWikiAdminAuditLoaded wikiSlug model
+
+                        Nothing ->
+                            viewWikiAdminAuditLoaded wikiSlug model
 
                 RemoteData.Failure _ ->
                     viewNotFound
@@ -9926,6 +9993,164 @@ viewWikiAdminAuditRoute model wikiSlug =
 
         RemoteData.NotAsked ->
             viewWikiAdminAuditLoading
+
+
+auditDiffRefFromFragment : Maybe String -> Maybe ( Wiki.Slug, Int )
+auditDiffRefFromFragment maybeFragment =
+    maybeFragment
+        |> Maybe.andThen
+            (\fragment ->
+                if String.startsWith "audit-diff:" fragment then
+                    case String.split ":" fragment of
+                        [ "audit-diff", wikiSlug, atMillisRaw ] ->
+                            String.toInt atMillisRaw
+                                |> Maybe.map (\atMillis -> ( wikiSlug, atMillis ))
+
+                        _ ->
+                            Nothing
+
+                else
+                    Nothing
+            )
+
+
+type alias TrustedAuditEditDiffBody =
+    { pageSlug : Page.Slug
+    , beforeMarkdown : String
+    , afterMarkdown : String
+    }
+
+
+trustedAuditEditFromEvent : Int -> WikiAuditLog.AuditEvent -> Maybe TrustedAuditEditDiffBody
+trustedAuditEditFromEvent atMillis ev =
+    if Time.posixToMillis ev.at /= atMillis then
+        Nothing
+
+    else
+        case ev.kind of
+            WikiAuditLog.TrustedPublishedPageEdit { pageSlug, beforeMarkdown, afterMarkdown } ->
+                Just
+                    { pageSlug = pageSlug
+                    , beforeMarkdown = beforeMarkdown
+                    , afterMarkdown = afterMarkdown
+                    }
+
+            _ ->
+                Nothing
+
+
+findTrustedAuditEditDiff : Model -> Wiki.Slug -> Int -> Maybe TrustedAuditEditDiffBody
+findTrustedAuditEditDiff model wikiSlug atMillis =
+    let
+        fromWikiAudit : Maybe TrustedAuditEditDiffBody
+        fromWikiAudit =
+            case Store.getWikiAuditLog wikiSlug WikiAuditLog.emptyAuditLogFilter model.store of
+                Success (Ok events) ->
+                    List.filterMap (trustedAuditEditFromEvent atMillis) events
+                        |> List.head
+
+                _ ->
+                    Nothing
+    in
+    case fromWikiAudit of
+        Just body ->
+            Just body
+
+        Nothing ->
+            case model.hostAdminAuditLog of
+                Success (Ok scopedEvents) ->
+                    scopedEvents
+                        |> List.filter (\ev -> ev.wikiSlug == wikiSlug)
+                        |> List.filterMap
+                            (\ev ->
+                                trustedAuditEditFromEvent atMillis
+                                    { at = ev.at
+                                    , actorUsername = ev.actorUsername
+                                    , kind = ev.kind
+                                    }
+                            )
+                        |> List.head
+
+                _ ->
+                    Nothing
+
+
+viewWikiAdminAuditDiffRoute : Wiki.Slug -> Wiki.FrontendDetails -> Int -> Model -> Html Msg
+viewWikiAdminAuditDiffRoute wikiSlug wikiDetails atMillis model =
+    let
+        maybeDiffBody : Maybe TrustedAuditEditDiffBody
+        maybeDiffBody =
+            findTrustedAuditEditDiff model wikiSlug atMillis
+    in
+    case maybeDiffBody of
+        Just diffBody ->
+            Html.div
+                [ Attr.id "wiki-admin-audit-diff-page"
+                , TW.cls "flex min-h-0 flex-1 flex-col gap-3 overflow-auto"
+                ]
+                [ UI.contentParagraph []
+                    [ Html.a
+                        [ Attr.href (Wiki.adminAuditUrlPath wikiSlug)
+                        , TW.cls "text-[var(--link)] underline underline-offset-2"
+                        ]
+                        [ Html.text "Back to audit log" ]
+                    ]
+                , viewSubmissionReviewDiff
+                    wikiSlug
+                    (publishedSlugExistsFromWikiDetails wikiDetails)
+                    (SubmissionReviewDetail.EditPageDiff diffBody)
+                ]
+
+        Nothing ->
+            Html.div
+                [ Attr.id "wiki-admin-audit-diff-missing" ]
+                [ UI.contentParagraph []
+                    [ Html.text "Diff details not available for this audit event." ]
+                ]
+
+
+viewHostAdminAuditDiffRoute : Wiki.Slug -> Int -> Model -> Html Msg
+viewHostAdminAuditDiffRoute wikiSlug atMillis model =
+    let
+        maybeDiffBody : Maybe TrustedAuditEditDiffBody
+        maybeDiffBody =
+            findTrustedAuditEditDiff model wikiSlug atMillis
+    in
+    case maybeDiffBody of
+        Just diffBody ->
+            let
+                publishedSlugExists : Page.Slug -> Bool
+                publishedSlugExists =
+                    case Store.get_ wikiSlug model.store.wikiDetails of
+                        Success wikiDetails ->
+                            publishedSlugExistsFromWikiDetails wikiDetails
+
+                        _ ->
+                            \_ -> False
+            in
+            Html.div
+                [ Attr.id "host-admin-audit-diff-page"
+                , TW.cls "flex min-h-0 flex-1 flex-col gap-3 overflow-auto"
+                ]
+                [ UI.contentParagraph []
+                    [ Html.a
+                        [ Attr.href Wiki.hostAdminAuditUrlPath
+                        , TW.cls "text-[var(--link)] underline underline-offset-2"
+                        ]
+                        [ Html.text "Back to platform audit log" ]
+                    ]
+                , viewSubmissionReviewDiff
+                    wikiSlug
+                    publishedSlugExists
+                    (SubmissionReviewDetail.EditPageDiff diffBody)
+                ]
+
+        Nothing ->
+            Html.div
+                [ Attr.id "host-admin-audit-diff-missing" ]
+                [ UI.contentParagraph []
+                    [ Html.text "Diff details not available for this audit event." ]
+                ]
 
 
 viewSubmissionReviewDiff :
@@ -10332,7 +10557,7 @@ viewPageTodos todoTexts =
         , Html.div [ TW.cls UI.sidebarNavSectionBodyClass ]
             [ Html.ul
                 [ Attr.id "page-todos-list"
-                , TW.cls UI.backlinksListClass
+                , TW.cls "m-0 pl-[1.15rem] list-disc"
                 ]
                 (todoTexts
                     |> List.indexedMap

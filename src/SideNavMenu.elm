@@ -39,22 +39,27 @@ globalChromeSections input =
         [ let
             sortOfWikiLinks : List Link
             sortOfWikiLinks =
-                if input.hostAdminAuthenticated && input.showHostAdminTools then
-                    []
+                { linkLabel = "All wikis"
+                  , linkRoute = Route.WikiList
+                  , linkEmphasized = False
+                  }
+                    :: (if input.hostAdminAuthenticated && input.showHostAdminTools then
+                            []
 
-                else if input.hostAdminAuthenticated then
-                    [ { linkLabel = "Admin"
-                      , linkRoute = Route.HostAdminWikis
-                      , linkEmphasized = False
-                      }
-                    ]
+                        else if input.hostAdminAuthenticated then
+                            [ { linkLabel = "Admin"
+                              , linkRoute = Route.HostAdminWikis
+                              , linkEmphasized = False
+                              }
+                            ]
 
-                else
-                    [ { linkLabel = "Admin"
-                      , linkRoute = Route.HostAdmin Nothing
-                      , linkEmphasized = False
-                      }
-                    ]
+                        else
+                            [ { linkLabel = "Admin"
+                              , linkRoute = Route.HostAdmin Nothing
+                              , linkEmphasized = False
+                              }
+                            ]
+                       )
           in
           if List.isEmpty sortOfWikiLinks then
             []
