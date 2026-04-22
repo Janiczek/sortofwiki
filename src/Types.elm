@@ -38,6 +38,7 @@ import Effect.File
 import Effect.Lamdera exposing (ClientId, SessionId)
 import HostAdmin
 import Page
+import PendingReviewCount
 import RemoteData exposing (RemoteData)
 import Route exposing (Route)
 import Set exposing (Set)
@@ -202,6 +203,7 @@ type alias BackendModel =
     , nextSubmissionCounter : Int
     , wikiAuditEvents : Dict Wiki.Slug (List WikiAuditLog.AuditEvent)
     , pendingReviewCounts : Dict Wiki.Slug Int
+    , pendingReviewClients : PendingReviewCount.PendingReviewClientSets
     }
 
 

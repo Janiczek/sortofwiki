@@ -134,6 +134,7 @@ applySnapshotToBackendModel snapshot keptHostSessions =
     , wikiAuditEvents = snapshot.wikiAuditEvents
     , pendingReviewCounts =
         PendingReviewCount.recallFromSubmissions snapshot.submissions
+    , pendingReviewClients = PendingReviewCount.emptyClientSets
     }
 
 
@@ -970,6 +971,8 @@ applyWikiSnapshotMerge wikiSlug snap model =
                             , nextSubmissionCounter = nextCounter
                             , wikiAuditEvents = Dict.insert wikiSlug remappedAudit model.wikiAuditEvents
                             , pendingReviewCounts = pendingCounts
+                            , pendingReviewClients =
+                                PendingReviewCount.removeWikiSubscribers wikiSlug model.pendingReviewClients
                         }
 
 
