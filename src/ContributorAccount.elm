@@ -1,8 +1,8 @@
 module ContributorAccount exposing
-    ( Id
+    ( Id(..)
     , LoginContributorError(..)
     , RegisterContributorError(..)
-    , Verifier
+    , Verifier(..)
     , idDecoder
     , idToString
     , loginErrorToUserText

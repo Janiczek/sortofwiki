@@ -30,6 +30,7 @@ suite =
                                 Submission.NewPage
                                     { pageSlug = "QueueDemoPage"
                                     , markdown = "Seeded pending submission for the trusted review queue."
+                                    , tags = []
                                     }
                             , status = Submission.Pending
                             , reviewerNote = Nothing
@@ -64,6 +65,7 @@ suite =
                                     , baseMarkdown = "## Published\n\nOriginal."
                                     , baseRevision = 1
                                     , proposedMarkdown = "## Proposed\n\nReplacement."
+                                    , tags = []
                                     }
                             , status = Submission.Pending
                             , reviewerNote = Nothing

@@ -97,6 +97,7 @@ module Submission exposing
 import ContributorAccount
 import Dict exposing (Dict)
 import Page
+import Set
 import Wiki
 
 
@@ -740,7 +741,7 @@ applyApprovedSubmission wiki sub =
 
                 else
                     Ok
-                        { wiki = Wiki.applyPublishedMarkdownEdit body.pageSlug body.proposedMarkdown wiki
+                        { wiki = Wiki.applyPublishedMarkdownEdit body.pageSlug body.proposedMarkdown body.tags wiki
                         , submission =
                             { sub
                                 | status = Approved
@@ -766,6 +767,7 @@ applyApprovedSubmission wiki sub =
 type alias NewPageBody =
     { pageSlug : Page.Slug
     , markdown : String
+    , tags : List Page.Slug
     }
 
 
@@ -774,6 +776,7 @@ type alias EditPageBody =
     , baseMarkdown : String
     , baseRevision : Int
     , proposedMarkdown : String
+    , tags : List Page.Slug
     }
 
 
@@ -1087,8 +1090,8 @@ wikiHasPublishedPage pageSlug wiki =
 
 {-| Proposed replacement markdown for an edit submission (trimmed); body must be non-empty.
 -}
-validateEditMarkdown : String -> Result ValidationError String
-validateEditMarkdown rawMarkdown =
+validateEditMarkdown : String -> String -> Page.Slug -> Result ValidationError { proposedMarkdown : String, tags : List Page.Slug }
+validateEditMarkdown rawMarkdown rawTags currentPageSlug =
     let
         markdown : String
         markdown =
@@ -1098,7 +1101,8 @@ validateEditMarkdown rawMarkdown =
         Err BodyEmpty
 
     else
-        Ok markdown
+        normalizeTags rawTags currentPageSlug
+            |> Result.map (\tags -> { proposedMarkdown = markdown, tags = tags })
 
 
 slugCharsOk : String -> Bool
@@ -1170,8 +1174,8 @@ validatePageSlug rawSlug =
         Ok pageSlug
 
 
-validateNewPageFields : String -> String -> Result ValidationError { pageSlug : Page.Slug, markdown : String }
-validateNewPageFields rawSlug rawMarkdown =
+validateNewPageFields : String -> String -> String -> Result ValidationError { pageSlug : Page.Slug, markdown : String, tags : List Page.Slug }
+validateNewPageFields rawSlug rawMarkdown rawTags =
     case validatePageSlug rawSlug of
         Err e ->
             Err e
@@ -1186,26 +1190,55 @@ validateNewPageFields rawSlug rawMarkdown =
                 Err BodyEmpty
 
             else
-                Ok { pageSlug = pageSlug, markdown = markdown }
+                normalizeTags rawTags pageSlug
+                    |> Result.map (\tags -> { pageSlug = pageSlug, markdown = markdown, tags = tags })
 
 
 {-| Draft save: slug rules apply; markdown may be empty.
 -}
-validateNewPageDraftFields : String -> String -> Result ValidationError { pageSlug : Page.Slug, markdown : String }
-validateNewPageDraftFields rawSlug rawMarkdown =
+validateNewPageDraftFields : String -> String -> String -> Result ValidationError { pageSlug : Page.Slug, markdown : String, tags : List Page.Slug }
+validateNewPageDraftFields rawSlug rawMarkdown rawTags =
     case validatePageSlug rawSlug of
         Err e ->
             Err e
 
         Ok pageSlug ->
-            Ok { pageSlug = pageSlug, markdown = String.trim rawMarkdown }
+            normalizeTags rawTags pageSlug
+                |> Result.map (\tags -> { pageSlug = pageSlug, markdown = String.trim rawMarkdown, tags = tags })
 
 
 {-| Draft save: proposed markdown may be empty.
 -}
-validateEditMarkdownDraft : String -> Result ValidationError String
-validateEditMarkdownDraft rawMarkdown =
-    Ok (String.trim rawMarkdown)
+validateEditMarkdownDraft : String -> String -> Page.Slug -> Result ValidationError { proposedMarkdown : String, tags : List Page.Slug }
+validateEditMarkdownDraft rawMarkdown rawTags currentPageSlug =
+    normalizeTags rawTags currentPageSlug
+        |> Result.map (\tags -> { proposedMarkdown = String.trim rawMarkdown, tags = tags })
+
+
+normalizeTags : String -> Page.Slug -> Result ValidationError (List Page.Slug)
+normalizeTags rawTags currentPageSlug =
+    rawTags
+        |> String.split ","
+        |> List.map String.trim
+        |> List.filter (\piece -> not (String.isEmpty piece))
+        |> List.foldl
+            (\piece acc ->
+                case ( acc, validatePageSlug piece ) of
+                    ( Ok tags, Ok tagSlug ) ->
+                        if String.toLower tagSlug == String.toLower currentPageSlug then
+                            Ok tags
+
+                        else
+                            Ok (tagSlug :: tags)
+
+                    ( Err e, _ ) ->
+                        Err e
+
+                    ( Ok _, Err e ) ->
+                        Err e
+            )
+            (Ok [])
+        |> Result.map (Set.fromList >> Set.toList)
 
 
 {-| For trusted `SubmitNewPage`: pending new-page (any author) blocks; another contributor's draft
@@ -1719,7 +1752,7 @@ promoteDraftToPending wiki allSubs sub =
     else
         case sub.kind of
             NewPage body ->
-                case validateNewPageFields body.pageSlug body.markdown of
+                case validateNewPageFields body.pageSlug body.markdown (String.join "," body.tags) of
                     Err e ->
                         Err (SubmitDraftForReviewValidation e)
 
@@ -1739,15 +1772,16 @@ promoteDraftToPending wiki allSubs sub =
                                         NewPage
                                             { pageSlug = payload.pageSlug
                                             , markdown = payload.markdown
+                                            , tags = payload.tags
                                             }
                                 }
 
             EditPage body ->
-                case validateEditMarkdown body.proposedMarkdown of
+                case validateEditMarkdown body.proposedMarkdown (String.join "," body.tags) body.pageSlug of
                     Err e ->
                         Err (SubmitDraftForReviewValidation e)
 
-                    Ok proposedMarkdown ->
+                    Ok validEdit ->
                         if not (wikiHasPublishedPage body.pageSlug wiki) then
                             Err SubmitDraftForReviewEditTargetNotPublished
 
@@ -1774,7 +1808,8 @@ promoteDraftToPending wiki allSubs sub =
                                             { pageSlug = body.pageSlug
                                             , baseMarkdown = currentMarkdown
                                             , baseRevision = currentRevision
-                                            , proposedMarkdown = proposedMarkdown
+                                            , proposedMarkdown = validEdit.proposedMarkdown
+                                            , tags = validEdit.tags
                                             }
                                 }
 

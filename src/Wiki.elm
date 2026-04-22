@@ -42,6 +42,7 @@ module Wiki exposing
 import Dict exposing (Dict)
 import Page
 import PageBacklinks
+import PageTags
 import Url.Builder as UrlBuilder
 
 
@@ -71,6 +72,7 @@ type alias CatalogEntry =
 type alias FrontendDetails =
     { pageSlugs : List Page.Slug
     , publishedPageMarkdownSources : Dict Page.Slug String
+    , publishedPageTags : Dict Page.Slug (List Page.Slug)
     }
 
 
@@ -124,6 +126,13 @@ frontendDetails w =
                     ( slug, Page.publishedMarkdownForLinks page )
                 )
             |> Dict.fromList
+    , publishedPageTags =
+        publishedPages
+            |> List.map
+                (\( slug, page ) ->
+                    ( slug, page.tags )
+                )
+            |> Dict.fromList
     }
 
 
@@ -131,17 +140,32 @@ publishedPageFrontendDetails : Page.Slug -> Wiki -> Maybe Page.FrontendDetails
 publishedPageFrontendDetails pageSlug wiki =
     case pageBySlugCaseInsensitive pageSlug wiki.pages of
         Nothing ->
-            Nothing
+            Just
+                (Page.frontendDetails
+                    Nothing
+                    []
+                    []
+                    (PageTags.slugsPointingToTag pageSlug wiki.pages)
+                )
 
         Just ( resolvedSlug, page ) ->
             case page.publishedMarkdown of
                 Nothing ->
-                    Nothing
+                    Just
+                        (Page.frontendDetails
+                            Nothing
+                            []
+                            page.tags
+                            (PageTags.slugsPointingToTag resolvedSlug wiki.pages)
+                        )
 
                 Just markdown ->
                     Just
-                        (Page.frontendDetails markdown
+                        (Page.frontendDetails
+                            (Just markdown)
                             (PageBacklinks.slugsPointingTo wiki.slug resolvedSlug wiki.pages)
+                            page.tags
+                            (PageTags.slugsPointingToTag resolvedSlug wiki.pages)
                         )
 
 
@@ -339,18 +363,27 @@ publishedPageUrlPath wikiSlug pageSlug =
 
 {-| Trusted direct publish and approval of a new-page submission.
 -}
-publishNewPageOnWiki : { pageSlug : Page.Slug, markdown : String } -> Wiki -> Wiki
+publishNewPageOnWiki : { pageSlug : Page.Slug, markdown : String, tags : List Page.Slug } -> Wiki -> Wiki
 publishNewPageOnWiki payload wiki =
+    let
+        basePage : Page.Page
+        basePage =
+            Page.withPublished payload.pageSlug payload.markdown
+
+        newPage : Page.Page
+        newPage =
+            { basePage | tags = payload.tags }
+    in
     { wiki
         | pages =
-            Dict.insert payload.pageSlug (Page.withPublished payload.pageSlug payload.markdown) wiki.pages
+            Dict.insert payload.pageSlug newPage wiki.pages
     }
 
 
 {-| Replace published markdown for an existing page (trusted edit / approved edit submission).
 -}
-applyPublishedMarkdownEdit : Page.Slug -> String -> Wiki -> Wiki
-applyPublishedMarkdownEdit pageSlug markdown wiki =
+applyPublishedMarkdownEdit : Page.Slug -> String -> List Page.Slug -> Wiki -> Wiki
+applyPublishedMarkdownEdit pageSlug markdown tags wiki =
     case Dict.get pageSlug wiki.pages of
         Nothing ->
             wiki
@@ -361,6 +394,7 @@ applyPublishedMarkdownEdit pageSlug markdown wiki =
                 nextPage =
                     { page
                         | publishedMarkdown = Just markdown
+                        , tags = tags
                     }
                         |> Page.incrementPublishedRevision
             in

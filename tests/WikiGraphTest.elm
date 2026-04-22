@@ -32,13 +32,19 @@ suite =
                             , ( "Home", "[[About]]" )
                             ]
                         )
+                        (Dict.fromList
+                            [ ( "About", [ "Meta" ] )
+                            , ( "Home", [] )
+                            ]
+                        )
                         |> Expect.equal
                             { publishedPageSlugs = [ "About", "Home" ]
-                            , missingPageSlugs = [ "TodoGap" ]
+                            , missingPageSlugs = [ "Meta", "TodoGap" ]
                             , edges =
-                                [ { fromPageSlug = "About", toPageSlug = "Home", targetPublished = True }
-                                , { fromPageSlug = "About", toPageSlug = "TodoGap", targetPublished = False }
-                                , { fromPageSlug = "Home", toPageSlug = "About", targetPublished = True }
+                                [ { fromPageSlug = "About", toPageSlug = "Home", targetPublished = True, kind = WikiGraph.WikiLinkEdge }
+                                , { fromPageSlug = "About", toPageSlug = "TodoGap", targetPublished = False, kind = WikiGraph.WikiLinkEdge }
+                                , { fromPageSlug = "Home", toPageSlug = "About", targetPublished = True, kind = WikiGraph.WikiLinkEdge }
+                                , { fromPageSlug = "About", toPageSlug = "Meta", targetPublished = False, kind = WikiGraph.TagEdge }
                                 ]
                             }
             ]
@@ -54,20 +60,27 @@ suite =
                                     , ( "Home", "[[About]]" )
                                     ]
                                 )
+                                (Dict.fromList
+                                    [ ( "About", [ "Meta" ] )
+                                    , ( "Home", [] )
+                                    ]
+                                )
                     in
-                    [ String.contains "\"About\" [href=\"/w/Demo/p/About\"];" graphDot
-                    , String.contains "\"Home\" [href=\"/w/Demo/p/Home\"];" graphDot
-                    , String.contains "\"TodoGap\" [href=\"/w/Demo/p/TodoGap\", style=\"rounded,dashed\", color=\"#dc2626\", fontcolor=\"#dc2626\"];" graphDot
+                    [ String.contains "\"About\" [href=\"/w/Demo/pg/About\"];" graphDot
+                    , String.contains "\"Home\" [href=\"/w/Demo/pg/Home\"];" graphDot
+                    , String.contains "\"TodoGap\" [href=\"/w/Demo/pg/TodoGap\", style=\"rounded,dashed\", color=\"#dc2626\", fontcolor=\"#dc2626\"];" graphDot
                     , String.contains "\"About\" -> \"Home\";" graphDot
                     , String.contains "\"About\" -> \"TodoGap\";" graphDot
                     , String.contains "\"Home\" -> \"About\";" graphDot
+                    , String.contains "\"About\" -> \"Meta\" [style=\"dashed\", color=\"#7c3aed\"];" graphDot
+                    , String.contains "label=" graphDot |> not
                     ]
                         |> List.all identity
                         |> Expect.equal True
             , Test.fuzz (Fuzz.map2 Tuple.pair Fuzzers.wikiSlug Fuzzers.pageSlug) "includes href for each published page node" <|
                 \( wikiSlug, pageSlug ) ->
-                    WikiGraph.dot wikiSlug (Dict.fromList [ ( pageSlug, "" ) ])
-                        |> String.contains (dotString (Wiki.publishedPageUrlPath wikiSlug pageSlug))
+                    WikiGraph.dot wikiSlug (Dict.fromList [ ( pageSlug, "" ) ]) (Dict.fromList [ ( pageSlug, [] ) ])
+                        |> String.contains (dotString (Wiki.pageGraphUrlPath wikiSlug pageSlug))
                         |> Expect.equal True
             ]
         ]

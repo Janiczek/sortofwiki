@@ -227,6 +227,7 @@ encodePage p =
         , ( "publishedMarkdown", encodeMaybeString p.publishedMarkdown )
         , ( "publishedRevision", Encode.int p.publishedRevision )
         , ( "pendingMarkdown", encodeMaybeString p.pendingMarkdown )
+        , ( "tags", Encode.list Encode.string p.tags )
         ]
 
 
@@ -262,11 +263,16 @@ decodePages =
 
 decodePage : Decoder Page.Page
 decodePage =
-    Decode.map4 Page.Page
+    Decode.map5 Page.Page
         (Decode.field "slug" Decode.string)
         (Decode.field "publishedMarkdown" (Decode.nullable Decode.string))
         (Decode.field "publishedRevision" Decode.int)
         (Decode.field "pendingMarkdown" (Decode.nullable Decode.string))
+        (Decode.oneOf
+            [ Decode.field "tags" (Decode.list Decode.string)
+            , Decode.succeed []
+            ]
+        )
 
 
 encodeContributors : WikiContributors.Registry -> Encode.Value
@@ -364,6 +370,7 @@ encodeSubmissionKind kind =
                 [ ( "kind", Encode.string "new_page" )
                 , ( "pageSlug", Encode.string body.pageSlug )
                 , ( "markdown", Encode.string body.markdown )
+                , ( "tags", Encode.list Encode.string body.tags )
                 ]
 
         Submission.EditPage body ->
@@ -373,6 +380,7 @@ encodeSubmissionKind kind =
                 , ( "baseMarkdown", Encode.string body.baseMarkdown )
                 , ( "baseRevision", Encode.int body.baseRevision )
                 , ( "proposedMarkdown", Encode.string body.proposedMarkdown )
+                , ( "tags", Encode.list Encode.string body.tags )
                 ]
 
         Submission.DeletePage body ->
@@ -435,17 +443,27 @@ decodeSubmissionKindFromTag : String -> Decoder Submission.Kind
 decodeSubmissionKindFromTag tag =
     case tag of
         "new_page" ->
-            Decode.map2 Submission.NewPageBody
+            Decode.map3 Submission.NewPageBody
                 (Decode.field "pageSlug" Decode.string)
                 (Decode.field "markdown" Decode.string)
+                (Decode.oneOf
+                    [ Decode.field "tags" (Decode.list Decode.string)
+                    , Decode.succeed []
+                    ]
+                )
                 |> Decode.map Submission.NewPage
 
         "edit_page" ->
-            Decode.map4 Submission.EditPageBody
+            Decode.map5 Submission.EditPageBody
                 (Decode.field "pageSlug" Decode.string)
                 (Decode.field "baseMarkdown" Decode.string)
                 (Decode.field "baseRevision" Decode.int)
                 (Decode.field "proposedMarkdown" Decode.string)
+                (Decode.oneOf
+                    [ Decode.field "tags" (Decode.list Decode.string)
+                    , Decode.succeed []
+                    ]
+                )
                 |> Decode.map Submission.EditPage
 
         "delete_page" ->

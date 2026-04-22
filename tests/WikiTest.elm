@@ -262,8 +262,8 @@ suite =
                     in
                     Wiki.publishedPageFrontendDetails "home" w
                         |> Expect.equal
-                            (Just (Page.frontendDetails "body" []))
-            , Test.test "returns Nothing when page is missing" <|
+                            (Just (Page.frontendDetails (Just "body") [] [] []))
+            , Test.test "returns tag-hub details when page is missing" <|
                 \() ->
                     let
                         w : Wiki.Wiki
@@ -271,8 +271,8 @@ suite =
                             Wiki.wikiWithPages "Demo" "Demo" Dict.empty
                     in
                     Wiki.publishedPageFrontendDetails "home" w
-                        |> Expect.equal Nothing
-            , Test.test "returns Nothing for pending-only page" <|
+                        |> Expect.equal (Just (Page.frontendDetails Nothing [] [] []))
+            , Test.test "returns details for pending-only page without markdown" <|
                 \() ->
                     let
                         w : Wiki.Wiki
@@ -282,8 +282,8 @@ suite =
                                 (Dict.singleton "x" (Page.pendingOnly "x" "secret"))
                     in
                     Wiki.publishedPageFrontendDetails "x" w
-                        |> Expect.equal Nothing
-            , Test.fuzz Fuzzers.pageSlug "Nothing for empty page map" <|
+                        |> Expect.equal (Just (Page.frontendDetails Nothing [] [] []))
+            , Test.fuzz Fuzzers.pageSlug "returns empty details for empty page map" <|
                 \pageSlug ->
                     let
                         w : Wiki.Wiki
@@ -291,7 +291,7 @@ suite =
                             Wiki.wikiWithPages "w" "W" Dict.empty
                     in
                     Wiki.publishedPageFrontendDetails pageSlug w
-                        |> Expect.equal Nothing
+                        |> Expect.equal (Just (Page.frontendDetails Nothing [] [] []))
             , Test.test "uses published markdown only in response" <|
                 \() ->
                     let
@@ -305,7 +305,7 @@ suite =
                     in
                     Wiki.publishedPageFrontendDetails "home" w
                         |> Expect.equal
-                            (Just (Page.frontendDetails "published body" []))
+                            (Just (Page.frontendDetails (Just "published body") [] [] []))
             , Test.test "includes backlinks from other published pages only" <|
                 \() ->
                     let
@@ -322,7 +322,51 @@ suite =
                     Wiki.publishedPageFrontendDetails "guides" w
                         |> Expect.equal
                             (Just
-                                (Page.frontendDetails "No link to home." [ "home" ])
+                                (Page.frontendDetails (Just "No link to home.") [ "home" ] [] [])
                             )
+            , Test.test "includes page tags and reverse tagged pages" <|
+                \() ->
+                    let
+                        primary : Page.Page
+                        primary =
+                            let
+                                base : Page.Page
+                                base =
+                                    Page.withPublished "TagPage" "Tag page body"
+                            in
+                            { base | tags = [ "Meta" ] }
+
+                        sourceA : Page.Page
+                        sourceA =
+                            let
+                                base : Page.Page
+                                base =
+                                    Page.withPublished "SourceA" "Body"
+                            in
+                            { base | tags = [ "TagPage" ] }
+
+                        sourceB : Page.Page
+                        sourceB =
+                            let
+                                base : Page.Page
+                                base =
+                                    Page.withPublished "SourceB" "Body"
+                            in
+                            { base | tags = [ "TagPage", "Meta" ] }
+
+                        w : Wiki.Wiki
+                        w =
+                            Wiki.wikiWithPages "Demo"
+                                "Demo"
+                                (Dict.fromList
+                                    [ ( "TagPage", primary )
+                                    , ( "SourceA", sourceA )
+                                    , ( "SourceB", sourceB )
+                                    ]
+                                )
+                    in
+                    Wiki.publishedPageFrontendDetails "TagPage" w
+                        |> Expect.equal
+                            (Just (Page.frontendDetails (Just "Tag page body") [] [ "Meta" ] [ "SourceA", "SourceB" ]))
             ]
         ]

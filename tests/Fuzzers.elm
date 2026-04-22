@@ -22,6 +22,7 @@ page =
             , publishedMarkdown = published
             , publishedRevision = 1
             , pendingMarkdown = pending
+            , tags = []
             }
         )
         pageSlug

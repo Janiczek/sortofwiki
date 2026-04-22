@@ -342,7 +342,7 @@ expectBacklinks wikiSlug backlinkPageSlugs root =
 
 expectNoBacklinks : Test.Html.Query.Single msg -> Expectation
 expectNoBacklinks root =
-    withinId "page-backlinks-empty" (expectHasText "No backlinks.") root
+    expectHasNotId "page-backlinks" root
 
 
 expectAll : List (Test.Html.Query.Single msg -> Expectation) -> Test.Html.Query.Single msg -> Expectation

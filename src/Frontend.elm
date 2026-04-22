@@ -190,6 +190,7 @@ emptyNewPageSubmitDraft =
     { pageSlug = ""
     , pageSlugLockedFromQuery = False
     , markdownBody = ""
+    , tagsInput = ""
     , maybeSavedDraftId = Nothing
     , inFlight = False
     , saveDraftInFlight = False
@@ -378,6 +379,7 @@ wikiSideNavSlugIfActive model =
 emptyPageEditSubmitDraft : PageEditSubmitDraft
 emptyPageEditSubmitDraft =
     { markdownBody = ""
+    , tagsInput = ""
     , maybeSavedDraftId = Nothing
     , inFlight = False
     , saveDraftInFlight = False
@@ -393,7 +395,10 @@ pageEditSubmitDraftForRoute route store =
         Route.WikiSubmitEdit wikiSlug pageSlug ->
             case Store.get_ ( wikiSlug, pageSlug ) store.publishedPages of
                 Success details ->
-                    { emptyPageEditSubmitDraft | markdownBody = details.markdownSource }
+                    { emptyPageEditSubmitDraft
+                        | markdownBody = details.maybeMarkdownSource |> Maybe.withDefault ""
+                        , tagsInput = String.join ", " details.tags
+                    }
 
                 Failure _ ->
                     emptyPageEditSubmitDraft
@@ -1445,7 +1450,7 @@ invalidateWikiPublishedCaches wikiSlug store =
 `/submit/new` (which would flash until `WikiFrontendDetailsResponse`). Navigation to the new page
 uses `pushUrl` in the same update.
 -}
-afterTrustedNewPagePublishedImmediately : Wiki.Slug -> { pageSlug : Page.Slug, markdown : String } -> Store -> Store
+afterTrustedNewPagePublishedImmediately : Wiki.Slug -> { pageSlug : Page.Slug, markdown : String, tags : List Page.Slug } -> Store -> Store
 afterTrustedNewPagePublishedImmediately wikiSlug payload store =
     let
         publishedPagesNext : Dict ( Wiki.Slug, Page.Slug ) (RemoteData () Page.FrontendDetails)
@@ -2029,6 +2034,16 @@ update msg model =
                 , Command.none
                 )
 
+        NewPageSubmitTagsChanged value ->
+            let
+                d : NewPageSubmitDraft
+                d =
+                    model.newPageSubmitDraft
+            in
+            ( { model | newPageSubmitDraft = { d | tagsInput = value } }
+            , Command.none
+            )
+
         NewPageSubmitFormSubmitted ->
             case model.route of
                 Route.WikiList ->
@@ -2061,7 +2076,7 @@ update msg model =
                         d =
                             model.newPageSubmitDraft
                     in
-                    case Submission.validateNewPageFields d.pageSlug d.markdownBody of
+                    case Submission.validateNewPageFields d.pageSlug d.markdownBody d.tagsInput of
                         Err ve ->
                             ( { model
                                 | newPageSubmitDraft =
@@ -2088,7 +2103,7 @@ update msg model =
                                         }
                                   }
                                 , Effect.Lamdera.sendToBackend
-                                    (SubmitNewPage wikiSlug { rawPageSlug = d.pageSlug, rawMarkdown = d.markdownBody })
+                                    (SubmitNewPage wikiSlug { rawPageSlug = d.pageSlug, rawMarkdown = d.markdownBody, rawTags = d.tagsInput })
                                 )
 
                             else
@@ -2113,7 +2128,7 @@ update msg model =
                                                 }
                                           }
                                         , Effect.Lamdera.sendToBackend
-                                            (SubmitNewPage wikiSlug { rawPageSlug = d.pageSlug, rawMarkdown = d.markdownBody })
+                                            (SubmitNewPage wikiSlug { rawPageSlug = d.pageSlug, rawMarkdown = d.markdownBody, rawTags = d.tagsInput })
                                         )
 
                 Route.WikiSubmitEdit _ _ ->
@@ -2169,7 +2184,7 @@ update msg model =
                         d =
                             model.newPageSubmitDraft
                     in
-                    case Submission.validateNewPageDraftFields d.pageSlug d.markdownBody of
+                    case Submission.validateNewPageDraftFields d.pageSlug d.markdownBody d.tagsInput of
                         Err ve ->
                             ( { model
                                 | newPageSubmitDraft =
@@ -2195,6 +2210,7 @@ update msg model =
                                     { maybeSubmissionId = d.maybeSavedDraftId
                                     , rawPageSlug = d.pageSlug
                                     , rawMarkdown = d.markdownBody
+                                    , rawTags = d.tagsInput
                                     }
                                 )
                             )
@@ -2209,6 +2225,16 @@ update msg model =
                     model.pageEditSubmitDraft
             in
             ( { model | pageEditSubmitDraft = { d | markdownBody = value } }
+            , Command.none
+            )
+
+        PageEditSubmitTagsChanged value ->
+            let
+                d : PageEditSubmitDraft
+                d =
+                    model.pageEditSubmitDraft
+            in
+            ( { model | pageEditSubmitDraft = { d | tagsInput = value } }
             , Command.none
             )
 
@@ -2249,7 +2275,7 @@ update msg model =
                     in
                     case d.maybeSavedDraftId of
                         Just draftId ->
-                            case Submission.validateEditMarkdown d.markdownBody of
+                            case Submission.validateEditMarkdown d.markdownBody d.tagsInput pageSlug of
                                 Err ve ->
                                     ( { model
                                         | pageEditSubmitDraft =
@@ -2273,7 +2299,7 @@ update msg model =
                                     )
 
                         Nothing ->
-                            case Submission.validateEditMarkdown d.markdownBody of
+                            case Submission.validateEditMarkdown d.markdownBody d.tagsInput pageSlug of
                                 Err ve ->
                                     ( { model
                                         | pageEditSubmitDraft =
@@ -2294,7 +2320,7 @@ update msg model =
                                             }
                                       }
                                     , Effect.Lamdera.sendToBackend
-                                        (SubmitPageEdit wikiSlug pageSlug d.markdownBody)
+                                        (SubmitPageEdit wikiSlug pageSlug d.markdownBody d.tagsInput)
                                     )
 
                 Route.WikiSubmitDelete _ _ ->
@@ -2347,7 +2373,7 @@ update msg model =
                         d =
                             model.pageEditSubmitDraft
                     in
-                    case Submission.validateEditMarkdownDraft d.markdownBody of
+                    case Submission.validateEditMarkdownDraft d.markdownBody d.tagsInput pageSlug of
                         Err ve ->
                             ( { model
                                 | pageEditSubmitDraft =
@@ -2373,6 +2399,7 @@ update msg model =
                                     { maybeSubmissionId = d.maybeSavedDraftId
                                     , pageSlug = pageSlug
                                     , rawMarkdown = d.markdownBody
+                                    , rawTags = d.tagsInput
                                     }
                                 )
                             )
@@ -2718,6 +2745,7 @@ update msg model =
                                                 { maybeSubmissionId = Just submissionId
                                                 , rawPageSlug = inter.newPageSlug
                                                 , rawMarkdown = inter.markdownBody
+                                                , rawTags = ""
                                                 }
                                             )
                                         )
@@ -2731,6 +2759,7 @@ update msg model =
                                                         { maybeSubmissionId = Just submissionId
                                                         , pageSlug = pageSlug
                                                         , rawMarkdown = inter.markdownBody
+                                                        , rawTags = ""
                                                         }
                                                     )
                                                 )
@@ -2803,6 +2832,7 @@ update msg model =
                                                 { maybeSubmissionId = Just submissionId
                                                 , rawPageSlug = inter.newPageSlug
                                                 , rawMarkdown = inter.markdownBody
+                                                , rawTags = ""
                                                 }
                                             )
                                         )
@@ -2816,6 +2846,7 @@ update msg model =
                                                         { maybeSubmissionId = Just submissionId
                                                         , pageSlug = pageSlug
                                                         , rawMarkdown = inter.markdownBody
+                                                        , rawTags = ""
                                                         }
                                                     )
                                                 )
@@ -4115,7 +4146,10 @@ updateFromBackend msg model =
                     case ( maybeDetails, model.route ) of
                         ( Just details, Route.WikiSubmitEdit rs rp ) ->
                             if rs == wikiSlug && rp == pageSlug && String.isEmpty dEdit.markdownBody then
-                                { dEdit | markdownBody = details.markdownSource }
+                                { dEdit
+                                    | markdownBody = details.maybeMarkdownSource |> Maybe.withDefault ""
+                                    , tagsInput = String.join ", " details.tags
+                                }
 
                             else
                                 dEdit
@@ -4138,9 +4172,14 @@ updateFromBackend msg model =
 
                 ( storeAfterPendingFetch, fetchMyPendingCmd ) =
                     case ( maybeDetails, model.route ) of
-                        ( Nothing, Route.WikiPage rs rp ) ->
+                        ( Just details, Route.WikiPage rs rp ) ->
                             if rs == wikiSlug && rp == pageSlug && contributorLoggedInOnWikiSlug wikiSlug model then
-                                runStoreActions nextStore [ Store.AskForMyPendingSubmissions wikiSlug ]
+                                case details.maybeMarkdownSource of
+                                    Nothing ->
+                                        runStoreActions nextStore [ Store.AskForMyPendingSubmissions wikiSlug ]
+
+                                    Just _ ->
+                                        ( nextStore, Command.none )
 
                             else
                                 ( nextStore, Command.none )
@@ -4591,9 +4630,9 @@ updateFromBackend msg model =
                 store0 =
                     model.store
 
-                validatedNewPagePayload : Maybe { pageSlug : Page.Slug, markdown : String }
+                validatedNewPagePayload : Maybe { pageSlug : Page.Slug, markdown : String, tags : List Page.Slug }
                 validatedNewPagePayload =
-                    Submission.validateNewPageFields d.pageSlug d.markdownBody
+                    Submission.validateNewPageFields d.pageSlug d.markdownBody d.tagsInput
                         |> Result.toMaybe
 
                 immediatePublishNavCmd : Command FrontendOnly ToBackend Msg
@@ -6225,8 +6264,8 @@ updateFromBackend msg model =
                 Ok () ->
                     ( { model
                         | hostAdminImportInFlight = False
-                        , hostAdminBackupNotice = Just "Import completed. Reloading lists…"
-                        , hostAdminWikisNotice = Just "Import completed. Reloading lists…"
+                        , hostAdminBackupNotice = Just "Import completed."
+                        , hostAdminWikisNotice = Just "Import completed."
                         , store = Store.empty
                         , contributorWikiSessions = Dict.empty
                         , hostAdminWikis = RemoteData.Loading
@@ -6286,7 +6325,7 @@ updateFromBackend msg model =
                         in
                         ( { model
                             | hostAdminWikiImportInFlightSlug = Nothing
-                            , hostAdminWikisNotice = Just "Wiki import completed. Reloading lists…"
+                            , hostAdminWikisNotice = Just "Wiki import completed."
                             , store = { store1 | wikiCatalog = RemoteData.NotAsked }
                             , hostAdminWikis = RemoteData.Loading
                           }
@@ -6318,7 +6357,7 @@ updateFromBackend msg model =
                     in
                     ( { model
                         | hostAdminImportInFlight = False
-                        , hostAdminWikisNotice = Just "Wiki import completed. Reloading lists…"
+                        , hostAdminWikisNotice = Just "Wiki import completed."
                         , store = { store1 | wikiCatalog = RemoteData.NotAsked }
                         , hostAdminWikis = RemoteData.Loading
                       }
@@ -6753,8 +6792,18 @@ appHeaderTitle ({ store, route } as model) =
                 \summary ->
                     wikiLoadedHeaderTitle summary <|
                         case Store.get_ ( wikiSlug, pageSlug ) store.publishedPages of
-                            RemoteData.Success _ ->
-                                Just (AppHeaderSecondaryWikiLink pageSlug)
+                            RemoteData.Success details ->
+                                case details.maybeMarkdownSource of
+                                    Just _ ->
+                                        Just (AppHeaderSecondaryWikiLink pageSlug)
+
+                                    Nothing ->
+                                        Just
+                                            (AppHeaderSecondaryWikiLinkThenPlain
+                                                { wikiLabel = pageSlug
+                                                , plainSuffix = ": Create?"
+                                                }
+                                            )
 
                             RemoteData.Failure _ ->
                                 Just
@@ -8467,6 +8516,19 @@ viewSubmitNewLoaded wikiSlug publishedSlugExists showUntrustedContributorDisclai
                     )
                     []
                 ]
+            , Html.div []
+                [ UI.contentLabel [ Attr.for "tags-input" ]
+                    [ Html.text "Tags (comma-separated page slugs)" ]
+                , Html.input
+                    [ Attr.id "tags-input"
+                    , Attr.type_ "text"
+                    , Attr.value draft.tagsInput
+                    , Events.onInput NewPageSubmitTagsChanged
+                    , Attr.disabled formBusy
+                    , TW.cls UI.formTextInputClass
+                    ]
+                    []
+                ]
             , Html.div
                 [ TW.cls "grid min-w-0 grid-cols-2 gap-4 items-stretch" ]
                 [ Html.div
@@ -8639,7 +8701,7 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
 
         originalMarkdown : String
         originalMarkdown =
-            pageDetails.markdownSource
+            pageDetails.maybeMarkdownSource |> Maybe.withDefault ""
 
         submitEditDiffCellShellClass : String
         submitEditDiffCellShellClass =
@@ -8688,6 +8750,20 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
                     , Events.onSubmit PageEditSubmitFormSubmitted
                     ]
                     [ Html.div
+                        [ TW.cls "mb-3" ]
+                        [ UI.contentLabel [ Attr.for "wiki-submit-edit-tags" ]
+                            [ Html.text "Tags (comma-separated page slugs)" ]
+                        , Html.input
+                            [ Attr.id "wiki-submit-edit-tags"
+                            , Attr.type_ "text"
+                            , Attr.value draft.tagsInput
+                            , Events.onInput PageEditSubmitTagsChanged
+                            , Attr.disabled formBusy
+                            , TW.cls UI.formTextInputClass
+                            ]
+                            []
+                        ]
+                    , Html.div
                         [ TW.cls "grid min-w-0 grid-cols-2 grid-rows-2 gap-4 items-stretch" ]
                         [ Html.div
                             [ TW.cls submitEditDiffCellShellClass ]
@@ -8791,12 +8867,17 @@ viewSubmitEditRoute model wikiSlug pageSlug =
                             viewNotFound
 
                         RemoteData.Success pageDetails ->
-                            viewSubmitEditLoaded wikiSlug
-                                pageSlug
-                                (contributorLoggedInOnWikiSlug wikiSlug model && not (wikiSessionTrustedOnWiki wikiSlug model))
-                                (publishedSlugExistsFromWikiDetails wikiDetails)
-                                pageDetails
-                                model.pageEditSubmitDraft
+                            case pageDetails.maybeMarkdownSource of
+                                Nothing ->
+                                    viewNotFound
+
+                                Just _ ->
+                                    viewSubmitEditLoaded wikiSlug
+                                        pageSlug
+                                        (contributorLoggedInOnWikiSlug wikiSlug model && not (wikiSessionTrustedOnWiki wikiSlug model))
+                                        (publishedSlugExistsFromWikiDetails wikiDetails)
+                                        pageDetails
+                                        model.pageEditSubmitDraft
 
 
 viewPageDeleteSaveDraftFeedback : PageDeleteSubmitDraft -> Html Msg
@@ -10538,6 +10619,52 @@ viewBacklinks wikiSlug backlinks =
                                     [ UI.sidebarTocEntryLink
                                         [ Attr.href (Wiki.publishedPageUrlPath wikiSlug slug)
                                         , Attr.attribute "data-backlink-page-slug" slug
+                                        , TW.cls "break-all"
+                                        ]
+                                        [ Html.text slug ]
+                                    ]
+                            )
+                    )
+            ]
+        ]
+
+
+viewPageTags : Wiki.Slug -> (Page.Slug -> Bool) -> List Page.Slug -> Html Msg
+viewPageTags wikiSlug publishedSlugExists tags =
+    Html.section
+        [ Attr.id "page-tags"
+        , TW.cls UI.backlinksSectionClass
+        ]
+        [ UI.sidebarHeading "Tags"
+        , Html.div [ TW.cls UI.sidebarNavSectionBodyClass ]
+            [ if List.isEmpty tags then
+                Html.p
+                    [ Attr.id "page-tags-empty"
+                    , TW.cls "m-0"
+                    ]
+                    [ Html.text "No tags." ]
+
+              else
+                Html.ul
+                    [ Attr.id "page-tags-list"
+                    , TW.cls UI.backlinksListClass
+                    ]
+                    (tags
+                        |> List.map
+                            (\slug ->
+                                Html.li [ TW.cls "m-0 leading-[1.3]" ]
+                                    [ UI.sidebarTocEntryLink
+                                        [ Attr.href (Wiki.publishedPageUrlPath wikiSlug slug)
+                                        , Attr.attribute "data-tag-page-slug" slug
+                                        , TW.cls
+                                            ("break-all"
+                                                ++ (if publishedSlugExists slug then
+                                                        ""
+
+                                                    else
+                                                        " " ++ UI.markdownWikiLinkMissingClass
+                                                   )
+                                            )
                                         ]
                                         [ Html.text slug ]
                                     ]
@@ -10629,10 +10756,11 @@ missingPublishedPageNoticeLines status =
 viewMissingPublishedPage :
     Wiki.Slug
     -> Page.Slug
+    -> List Page.Slug
     -> Maybe Wiki.Slug
     -> RemoteData () (Result Submission.MyPendingSubmissionsError (List Submission.MyPendingSubmissionListItem))
     -> Html Msg
-viewMissingPublishedPage wikiSlug pageSlug maybeContributorWiki myPendingRemote =
+viewMissingPublishedPage wikiSlug pageSlug taggedPageSlugs maybeContributorWiki myPendingRemote =
     let
         maybeMyRow : Maybe { id : Submission.Id, status : Submission.Status }
         maybeMyRow =
@@ -10752,6 +10880,10 @@ viewMissingPublishedPage wikiSlug pageSlug maybeContributorWiki myPendingRemote 
                             ]
                             [ Html.text "Log in to create this page" ]
                         ]
+
+        taggedSection : Html Msg
+        taggedSection =
+            viewTaggedPagesWithTag wikiSlug taggedPageSlugs
     in
     Html.div
         [ Attr.id "wiki-missing-published-page"
@@ -10762,7 +10894,37 @@ viewMissingPublishedPage wikiSlug pageSlug maybeContributorWiki myPendingRemote 
             [ Html.text ("The page \"" ++ pageSlug ++ "\" does not exist yet.") ]
         , pendingSection
         , contributorCreateOrLogin
+        , taggedSection
         ]
+
+
+viewTaggedPagesWithTag : Wiki.Slug -> List Page.Slug -> Html Msg
+viewTaggedPagesWithTag wikiSlug taggedPageSlugs =
+    if List.isEmpty taggedPageSlugs then
+        Html.text ""
+
+    else
+        Html.section
+            [ Attr.id "page-tagged-pages"
+            , TW.cls "mt-4 -mx-[0.85rem] px-[0.85rem] border-t border-dashed border-[var(--border-dash)] pt-4"
+            ]
+            [ UI.contentParagraph
+                [ TW.cls "my-0" ]
+                [ Html.text "Pages with this tag: "
+                , Html.span []
+                    (taggedPageSlugs
+                        |> List.map
+                            (\slug ->
+                                UI.contentLink
+                                    [ Attr.href (Wiki.publishedPageUrlPath wikiSlug slug)
+                                    , Attr.attribute "data-tagged-page-slug" slug
+                                    ]
+                                    [ Html.text slug ]
+                            )
+                        |> List.intersperse (Html.text ", ")
+                    )
+                ]
+            ]
 
 
 viewPublishedPage : Wiki.Slug -> Page.Slug -> Page.FrontendDetails -> (Page.Slug -> Bool) -> Html Msg
@@ -10773,6 +10935,7 @@ viewPublishedPage wikiSlug pageSlug pageDetails publishedSlugExists =
         , Attr.attribute "data-page-slug" pageSlug
         ]
         [ PageMarkdown.view wikiSlug publishedSlugExists pageDetails
+        , viewTaggedPagesWithTag wikiSlug pageDetails.taggedPageSlugs
         ]
 
 
@@ -10807,9 +10970,32 @@ viewPublishedPageRoute model wikiSlug pageSlug =
                         RemoteData.Loading ->
                             viewWikiHomeLoading
 
+                        RemoteData.Success pageDetails ->
+                            case pageDetails.maybeMarkdownSource of
+                                Just _ ->
+                                    viewPublishedPage wikiSlug pageSlug pageDetails (publishedSlugExistsFromWikiDetails wikiDetails)
+
+                                Nothing ->
+                                    viewMissingPublishedPage wikiSlug
+                                        pageSlug
+                                        pageDetails.taggedPageSlugs
+                                        (if Dict.member wikiSlug model.contributorWikiSessions then
+                                            Just wikiSlug
+
+                                         else
+                                            Nothing
+                                        )
+                                        (if Dict.member wikiSlug model.contributorWikiSessions then
+                                            Store.get_ wikiSlug model.store.myPendingSubmissions
+
+                                         else
+                                            NotAsked
+                                        )
+
                         RemoteData.Failure _ ->
                             viewMissingPublishedPage wikiSlug
                                 pageSlug
+                                []
                                 (if Dict.member wikiSlug model.contributorWikiSessions then
                                     Just wikiSlug
 
@@ -10822,9 +11008,6 @@ viewPublishedPageRoute model wikiSlug pageSlug =
                                  else
                                     NotAsked
                                 )
-
-                        RemoteData.Success pageDetails ->
-                            viewPublishedPage wikiSlug pageSlug pageDetails (publishedSlugExistsFromWikiDetails wikiDetails)
 
 
 viewWikiTodosRoute : Model -> Wiki.Slug -> Html Msg
@@ -10996,25 +11179,41 @@ viewWikiGraphPage wikiSlug wikiDetails =
     let
         graphSummary : WikiGraph.Summary
         graphSummary =
-            WikiGraph.summary wikiSlug wikiDetails.publishedPageMarkdownSources
+            WikiGraph.summary wikiSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags
+
+        pageEdgeCount : Int
+        pageEdgeCount =
+            graphSummary.edges
+                |> List.filter (\edge -> edge.kind == WikiGraph.WikiLinkEdge)
+                |> List.length
+
+        tagEdgeCount : Int
+        tagEdgeCount =
+            graphSummary.edges
+                |> List.filter (\edge -> edge.kind == WikiGraph.TagEdge)
+                |> List.length
     in
     Html.div
         [ Attr.id "wiki-graph-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
         ]
         [ UI.contentParagraph []
-            [ Html.text "Graph of published wiki pages and their in-wiki links. Missing linked pages appear dashed in red." ]
+            [ Html.text "Graph of published wiki pages with wiki-link and tag edges. Missing linked pages appear dashed in red; tag edges are purple dashed." ]
         , UI.contentParagraph
             [ Attr.id "wiki-graph-summary"
             , Attr.attribute "data-published-count" (String.fromInt (List.length graphSummary.publishedPageSlugs))
+            , Attr.attribute "data-page-edge-count" (String.fromInt pageEdgeCount)
+            , Attr.attribute "data-tag-edge-count" (String.fromInt tagEdgeCount)
             , Attr.attribute "data-edge-count" (String.fromInt (List.length graphSummary.edges))
             , Attr.attribute "data-missing-count" (String.fromInt (List.length graphSummary.missingPageSlugs))
             ]
             [ Html.text
                 (String.fromInt (List.length graphSummary.publishedPageSlugs)
                     ++ " published pages, "
-                    ++ String.fromInt (List.length graphSummary.edges)
-                    ++ " links, "
+                    ++ String.fromInt pageEdgeCount
+                    ++ " page-link edges, "
+                    ++ String.fromInt tagEdgeCount
+                    ++ " tag edges, "
                     ++ String.fromInt (List.length graphSummary.missingPageSlugs)
                     ++ " missing linked pages."
                 )
@@ -11028,7 +11227,7 @@ viewWikiGraphPage wikiSlug wikiDetails =
             let
                 graphDot : String
                 graphDot =
-                    WikiGraph.dot wikiSlug wikiDetails.publishedPageMarkdownSources
+                    WikiGraph.dot wikiSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags
             in
             Html.node "graphviz-graph"
                 [ Attr.id "wiki-graphviz"
@@ -11072,7 +11271,7 @@ viewPublishedPageGraphRoute model wikiSlug pageSlug =
                             viewWikiHomeLoading
 
                         RemoteData.Failure _ ->
-                            viewMissingPublishedPage wikiSlug pageSlug Nothing NotAsked
+                            viewMissingPublishedPage wikiSlug pageSlug [] Nothing NotAsked
 
                         RemoteData.Success _ ->
                             viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails
@@ -11083,7 +11282,19 @@ viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails =
     let
         graphSummary : PageGraph.Summary
         graphSummary =
-            PageGraph.summary wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources
+            PageGraph.summary wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags
+
+        pageEdgeCount : Int
+        pageEdgeCount =
+            graphSummary.edges
+                |> List.filter (\edge -> edge.kind == PageGraph.WikiLinkEdge)
+                |> List.length
+
+        tagEdgeCount : Int
+        tagEdgeCount =
+            graphSummary.edges
+                |> List.filter (\edge -> edge.kind == PageGraph.TagEdge)
+                |> List.length
     in
     Html.div
         [ Attr.id "page-immediate-graph-page"
@@ -11091,11 +11302,13 @@ viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails =
         , Attr.attribute "data-page-slug" pageSlug
         ]
         [ UI.contentParagraph []
-            [ Html.text "Immediate graph of links to and from this page. Missing linked pages appear dashed in red." ]
+            [ Html.text "Immediate graph of wiki-link and tag edges to and from this page. Missing linked pages appear dashed in red; tag edges are purple dashed." ]
         , UI.contentParagraph
             [ Attr.id "page-immediate-graph-summary"
             , Attr.attribute "data-backlink-count" (String.fromInt (List.length graphSummary.backlinkPageSlugs))
             , Attr.attribute "data-outgoing-count" (String.fromInt (List.length graphSummary.outgoingPageSlugs))
+            , Attr.attribute "data-page-edge-count" (String.fromInt pageEdgeCount)
+            , Attr.attribute "data-tag-edge-count" (String.fromInt tagEdgeCount)
             , Attr.attribute "data-missing-count" (String.fromInt (List.length graphSummary.missingPageSlugs))
             ]
             [ Html.text
@@ -11103,13 +11316,17 @@ viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails =
                     ++ " backlinks, "
                     ++ String.fromInt (List.length graphSummary.outgoingPageSlugs)
                     ++ " outgoing links, "
+                    ++ String.fromInt pageEdgeCount
+                    ++ " page-link edges, "
+                    ++ String.fromInt tagEdgeCount
+                    ++ " tag edges, "
                     ++ String.fromInt (List.length graphSummary.missingPageSlugs)
                     ++ " missing linked pages."
                 )
             ]
         , Html.node "graphviz-graph"
             [ Attr.id "page-immediate-graphviz"
-            , Attr.attribute "graph" (PageGraph.dot wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources)
+            , Attr.attribute "graph" (PageGraph.dot wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags)
             ]
             []
         ]
@@ -11222,16 +11439,45 @@ publishedPageTodos model =
                 )
             of
                 ( Success _, Success _, Success pageDetails ) ->
-                    let
-                        todoTexts : List String
-                        todoTexts =
-                            PageTodos.todoTexts pageDetails.markdownSource
-                    in
-                    if List.isEmpty todoTexts then
+                    case pageDetails.maybeMarkdownSource of
+                        Nothing ->
+                            Nothing
+
+                        Just markdownSource ->
+                            let
+                                todoTexts : List String
+                                todoTexts =
+                                    PageTodos.todoTexts markdownSource
+                            in
+                            if List.isEmpty todoTexts then
+                                Nothing
+
+                            else
+                                Just (viewPageTodos todoTexts)
+
+                _ ->
+                    Nothing
+
+        _ ->
+            Nothing
+
+
+publishedPageTags : Model -> Maybe (Html Msg)
+publishedPageTags model =
+    case model.route of
+        Route.WikiPage wikiSlug pageSlug ->
+            case
+                ( Store.get_ wikiSlug model.store.wikiDetails
+                , Store.get wikiSlug model.store.wikiCatalog
+                , Store.get_ ( wikiSlug, pageSlug ) model.store.publishedPages
+                )
+            of
+                ( Success wikiDetails, Success _, Success pageDetails ) ->
+                    if List.isEmpty pageDetails.tags then
                         Nothing
 
                     else
-                        Just (viewPageTodos todoTexts)
+                        Just (viewPageTags wikiSlug (publishedSlugExistsFromWikiDetails wikiDetails) pageDetails.tags)
 
                 _ ->
                     Nothing
@@ -11251,7 +11497,11 @@ publishedPageBacklinks model =
                 )
             of
                 ( Success _, Success _, Success pageDetails ) ->
-                    Just (viewBacklinks wikiSlug pageDetails.backlinks)
+                    if List.isEmpty pageDetails.backlinks then
+                        Nothing
+
+                    else
+                        Just (viewBacklinks wikiSlug pageDetails.backlinks)
 
                 _ ->
                     Nothing
@@ -11279,6 +11529,35 @@ publishedPageImmediateGraphLink model =
                                     , Attr.href (Wiki.pageGraphUrlPath wikiSlug pageSlug)
                                     ]
                                     [ Html.text "Graph" ]
+                                ]
+                            ]
+                        )
+
+                _ ->
+                    Nothing
+
+        _ ->
+            Nothing
+
+
+pageGraphPublishedPageLink : Model -> Maybe (Html Msg)
+pageGraphPublishedPageLink model =
+    case model.route of
+        Route.WikiPageGraph wikiSlug pageSlug ->
+            case
+                ( Store.get_ wikiSlug model.store.wikiDetails
+                , Store.get wikiSlug model.store.wikiCatalog
+                )
+            of
+                ( Success _, Success _ ) ->
+                    Just
+                        (Html.div [ TW.cls UI.sidebarDesktopOnlyClass ]
+                            [ Html.div [ TW.cls UI.sidebarNavSectionBodyClass ]
+                                [ UI.sidebarLink
+                                    [ Attr.id "page-graph-page-link"
+                                    , Attr.href (Wiki.publishedPageUrlPath wikiSlug pageSlug)
+                                    ]
+                                    [ Html.text "Page" ]
                                 ]
                             ]
                         )
@@ -11353,25 +11632,27 @@ publishedPageEditLink model =
                 , Store.get_ ( wikiSlug, pageSlug ) model.store.publishedPages
                 )
             of
-                ( Success _, Success _, Success _ ) ->
-                    if contributorLoggedInOnWikiSlug wikiSlug model then
-                        Just (contributorPublishedPageActions wikiSlug pageSlug)
+                ( Success _, Success _, Success pageDetails ) ->
+                    case pageDetails.maybeMarkdownSource of
+                        Just _ ->
+                            if contributorLoggedInOnWikiSlug wikiSlug model then
+                                Just (contributorPublishedPageActions wikiSlug pageSlug)
 
-                    else
-                        Just
-                            (sidebarPageActionLink
-                                "Edit page"
-                                (Wiki.submitEditUrlPath wikiSlug pageSlug)
-                                "page-edit-link"
-                            )
+                            else
+                                Just
+                                    (sidebarPageActionLink
+                                        "Edit page"
+                                        (Wiki.submitEditUrlPath wikiSlug pageSlug)
+                                        "page-edit-link"
+                                    )
 
-                ( Success _, Success _, Failure _ ) ->
-                    Just
-                        (sidebarPageActionLink
-                            "Create page"
-                            (Wiki.submitNewPageUrlPathWithSuggestedSlug wikiSlug pageSlug)
-                            "page-create-link"
-                        )
+                        Nothing ->
+                            Just
+                                (sidebarPageActionLink
+                                    "Create page"
+                                    (Wiki.submitNewPageUrlPathWithSuggestedSlug wikiSlug pageSlug)
+                                    "page-create-link"
+                                )
 
                 _ ->
                     Nothing
@@ -11391,6 +11672,10 @@ view model =
         maybeBacklinks =
             publishedPageBacklinks model
 
+        maybeTags : Maybe (Html Msg)
+        maybeTags =
+            publishedPageTags model
+
         maybeTodos : Maybe (Html Msg)
         maybeTodos =
             publishedPageTodos model
@@ -11398,6 +11683,10 @@ view model =
         maybePageGraphLink : Maybe (Html Msg)
         maybePageGraphLink =
             publishedPageImmediateGraphLink model
+
+        maybePageFromGraphLink : Maybe (Html Msg)
+        maybePageFromGraphLink =
+            pageGraphPublishedPageLink model
 
         maybeEditLink : Maybe (Html Msg)
         maybeEditLink =
@@ -11408,7 +11697,7 @@ view model =
             let
                 actionLinks : List (Html Msg)
                 actionLinks =
-                    [ maybeEditLink, maybePageGraphLink ]
+                    [ maybeEditLink, maybePageGraphLink, maybePageFromGraphLink ]
                         |> List.filterMap identity
             in
             if List.isEmpty actionLinks then
@@ -11444,6 +11733,20 @@ view model =
                         Nothing ->
                             False
                    )
+                || (case maybePageFromGraphLink of
+                        Just _ ->
+                            True
+
+                        Nothing ->
+                            False
+                   )
+                || (case maybeTags of
+                        Just _ ->
+                            True
+
+                        Nothing ->
+                            False
+                   )
                 || (case maybeBacklinks of
                         Just _ ->
                             True
@@ -11464,6 +11767,7 @@ view model =
                         [ PageToc.view tocEntries ]
                     )
             , maybeTodos
+            , maybeTags
             , maybeBacklinks
             ]
                 |> List.filterMap identity

@@ -114,8 +114,8 @@ suite =
                     , ( "GrantWikiAdmin", GrantWikiAdmin "Demo" "x" )
                     , ( "RevokeWikiAdmin", RevokeWikiAdmin "Demo" "x" )
                     , ( "RequestSubmissionDetails", RequestSubmissionDetails "Demo" "sub_1" )
-                    , ( "SubmitNewPage", SubmitNewPage "Demo" { rawPageSlug = "NewPage", rawMarkdown = "## Body" } )
-                    , ( "SubmitPageEdit", SubmitPageEdit "Demo" "Home" "## Edit" )
+                    , ( "SubmitNewPage", SubmitNewPage "Demo" { rawPageSlug = "NewPage", rawMarkdown = "## Body", rawTags = "" } )
+                    , ( "SubmitPageEdit", SubmitPageEdit "Demo" "Home" "## Edit" "" )
                     , ( "RequestPublishedPageDeletion", RequestPublishedPageDeletion "Demo" "Home" "reason" )
                     , ( "DeletePublishedPageImmediately", DeletePublishedPageImmediately "Demo" "Home" "reason" )
                     , ( "ApproveSubmission", ApproveSubmission "Demo" "sub_1" )
@@ -185,7 +185,7 @@ suite =
             , Test.describe "session wiki does not match payload wiki"
                 [ Test.test "SubmitNewPage to other wiki returns wrong session without changing model" <|
                     \() ->
-                        expectUnchanged demoContributorOnDemo (SubmitNewPage "ElmTips" { rawPageSlug = "P", rawMarkdown = "## x" })
+                        expectUnchanged demoContributorOnDemo (SubmitNewPage "ElmTips" { rawPageSlug = "P", rawMarkdown = "## x", rawTags = "" })
                 , Test.test "RequestReviewQueue for other wiki returns wrong session without changing model" <|
                     \() ->
                         expectUnchanged demoContributorOnDemo (RequestReviewQueue "ElmTips")
@@ -203,7 +203,7 @@ suite =
                     \() ->
                         demoContributorOnDemo
                             |> withDemoWikiInactive
-                            |> (\m -> expectUnchanged m (SubmitNewPage "Demo" { rawPageSlug = "NewPage", rawMarkdown = "## Body" }))
+                            |> (\m -> expectUnchanged m (SubmitNewPage "Demo" { rawPageSlug = "NewPage", rawMarkdown = "## Body", rawTags = "" }))
                 , Test.test "trusted ApproveSubmission leaves model unchanged" <|
                     \() ->
                         demoTrustedPublisherOnDemoModeration

@@ -10,19 +10,24 @@ suite : Test
 suite =
     Test.describe "Page"
         [ Test.describe "frontendDetails"
-            [ Test.test "maps markdown argument to markdownSource" <|
+            [ Test.test "maps markdown argument to maybeMarkdownSource" <|
                 \() ->
-                    Page.frontendDetails "## Hi\n" []
-                        |> Expect.equal { markdownSource = "## Hi\n", backlinks = [] }
-            , Test.fuzz Fuzz.string "markdownSource equals first argument" <|
+                    Page.frontendDetails (Just "## Hi\n") [] [] []
+                        |> Expect.equal
+                            { maybeMarkdownSource = Just "## Hi\n"
+                            , backlinks = []
+                            , tags = []
+                            , taggedPageSlugs = []
+                            }
+            , Test.fuzz Fuzz.string "maybeMarkdownSource equals first argument" <|
                 \markdownSource ->
                     let
                         fd : Page.FrontendDetails
                         fd =
-                            Page.frontendDetails markdownSource []
+                            Page.frontendDetails (Just markdownSource) [] [] []
                     in
-                    fd.markdownSource
-                        |> Expect.equal markdownSource
+                    fd.maybeMarkdownSource
+                        |> Expect.equal (Just markdownSource)
             ]
         , Test.describe "hasPublished"
             [ Test.test "False for pending-only" <|

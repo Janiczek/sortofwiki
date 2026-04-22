@@ -172,13 +172,13 @@ demoWikiPagesSeedSteps =
     , initStep "pt-init-demo_wiki_admin-login" "pt-c4" (PromoteContributorToTrusted "Demo" "demo_trusted_publisher")
     , initStep "pt-init-demo_wiki_admin-login" "pt-c4" (PromoteContributorToTrusted "Demo" "grantadmin_trusted")
     , initStep "pt-init-demo_trusted_publisher-pub" "pt-c5" (LoginContributor "Demo" { username = "demo_trusted_publisher", password = "password12" })
-    , initStep "pt-init-demo_trusted_publisher-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "Home", rawMarkdown = Fixtures.demoHomePublished })
-    , initStep "pt-init-demo_trusted_publisher-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "Guides", rawMarkdown = Fixtures.demoGuidesPublished })
-    , initStep "pt-init-demo_trusted_publisher-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "About", rawMarkdown = Fixtures.demoAboutPublished })
-    , initStep "pt-init-demo_trusted_publisher-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "MarkdownPlayground", rawMarkdown = Fixtures.demoMarkdownPlaygroundPublished })
-    , initStep "pt-init-demo_trusted_publisher-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "KitchenSink", rawMarkdown = Fixtures.demoKitchenSinkMarkdownPublished })
+    , initStep "pt-init-demo_trusted_publisher-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "Home", rawMarkdown = Fixtures.demoHomePublished, rawTags = "" })
+    , initStep "pt-init-demo_trusted_publisher-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "Guides", rawMarkdown = Fixtures.demoGuidesPublished, rawTags = "" })
+    , initStep "pt-init-demo_trusted_publisher-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "About", rawMarkdown = Fixtures.demoAboutPublished, rawTags = "" })
+    , initStep "pt-init-demo_trusted_publisher-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "MarkdownPlayground", rawMarkdown = Fixtures.demoMarkdownPlaygroundPublished, rawTags = "" })
+    , initStep "pt-init-demo_trusted_publisher-pub" "pt-c5" (SubmitNewPage "Demo" { rawPageSlug = "KitchenSink", rawMarkdown = Fixtures.demoKitchenSinkMarkdownPublished, rawTags = "" })
     , initStep "pt-init-elmtips-admin" "pt-c6" (LoginContributor "ElmTips" { username = "elmtipsadmin", password = "password12" })
-    , initStep "pt-init-elmtips-admin" "pt-c6" (SubmitNewPage "ElmTips" { rawPageSlug = "Home", rawMarkdown = "Tips and notes about Elm." })
+    , initStep "pt-init-elmtips-admin" "pt-c6" (SubmitNewPage "ElmTips" { rawPageSlug = "Home", rawMarkdown = "Tips and notes about Elm.", rawTags = "" })
     ]
 
 
@@ -227,10 +227,10 @@ demoWikiPagesPlusTwoPendingSubmissionsSteps =
         , [ initStep "pt-mod2-demo_contributor" "pt-m2a" (LoginContributor "Demo" { username = "demo_contributor", password = "password12" })
           , initStep "pt-mod2-demo_contributor"
                 "pt-m2a"
-                (SubmitNewPage "Demo" { rawPageSlug = "QueueDemoPage", rawMarkdown = "Seeded pending submission for the trusted review queue." })
+                (SubmitNewPage "Demo" { rawPageSlug = "QueueDemoPage", rawMarkdown = "Seeded pending submission for the trusted review queue.", rawTags = "" })
           , initStep "pt-mod2-demo_contributor"
                 "pt-m2a"
-                (SubmitNewPage "Demo" { rawPageSlug = "RequestChangesDemoPage", rawMarkdown = "Seeded pending submission for request-changes." })
+                (SubmitNewPage "Demo" { rawPageSlug = "RequestChangesDemoPage", rawMarkdown = "Seeded pending submission for request-changes.", rawTags = "" })
           ]
         ]
 
@@ -242,19 +242,19 @@ demoWikiModerationSteps =
         , [ initStep "pt-mod-demo_contributor" "pt-m1" (LoginContributor "Demo" { username = "demo_contributor", password = "password12" })
           , initStep "pt-mod-demo_contributor"
                 "pt-m1"
-                (SubmitNewPage "Demo" { rawPageSlug = "QueueDemoPage", rawMarkdown = "Seeded pending submission for the trusted review queue." })
+                (SubmitNewPage "Demo" { rawPageSlug = "QueueDemoPage", rawMarkdown = "Seeded pending submission for the trusted review queue.", rawTags = "" })
           , initStep "pt-mod-demo_contributor"
                 "pt-m1"
-                (SubmitNewPage "Demo" { rawPageSlug = "RequestChangesDemoPage", rawMarkdown = "Seeded pending submission for request-changes." })
+                (SubmitNewPage "Demo" { rawPageSlug = "RequestChangesDemoPage", rawMarkdown = "Seeded pending submission for request-changes.", rawTags = "" })
           , initStep "pt-mod-demo_contributor"
                 "pt-m1"
-                (SubmitNewPage "Demo" { rawPageSlug = "SeedRejected", rawMarkdown = "Seeded submission (rejected)." })
+                (SubmitNewPage "Demo" { rawPageSlug = "SeedRejected", rawMarkdown = "Seeded submission (rejected).", rawTags = "" })
           , initStep "pt-mod-demo_trusted_publisher" "pt-m2" (LoginContributor "Demo" { username = "demo_trusted_publisher", password = "password12" })
           , initStep "pt-mod-demo_trusted_publisher" "pt-m2" (RejectSubmission "Demo" { submissionId = "sub_3", reasonText = story13RejectReason })
           , initStep "pt-mod-demo_contributor" "pt-m3" (LoginContributor "Demo" { username = "demo_contributor", password = "password12" })
           , initStep "pt-mod-demo_contributor"
                 "pt-m3"
-                (SubmitPageEdit "Demo" "About" "Seeded submission (approved).")
+                (SubmitPageEdit "Demo" "About" "Seeded submission (approved)." "")
           , initStep "pt-mod-demo_trusted_publisher" "pt-m4" (LoginContributor "Demo" { username = "demo_trusted_publisher", password = "password12" })
           , initStep "pt-mod-demo_trusted_publisher" "pt-m4" (ApproveSubmission "Demo" "sub_4")
           , initStep "pt-mod-demo_contributor" "pt-m5" (LoginContributor "Demo" { username = "demo_contributor", password = "password12" })

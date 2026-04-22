@@ -23,9 +23,14 @@ type alias Entry =
 -}
 entries : Wiki.Slug -> (Page.Slug -> Bool) -> Page.FrontendDetails -> List Entry
 entries wikiSlug publishedSlugExists pageDetails =
-    WikiPageMarkdownParse.blocksWithHeadingSlugs wikiSlug publishedSlugExists pageDetails.markdownSource
-        |> Result.map entriesFromBlocksWithSlugMeta
-        |> Result.withDefault []
+    case pageDetails.maybeMarkdownSource of
+        Just markdownSource ->
+            WikiPageMarkdownParse.blocksWithHeadingSlugs wikiSlug publishedSlugExists markdownSource
+                |> Result.map entriesFromBlocksWithSlugMeta
+                |> Result.withDefault []
+
+        Nothing ->
+            []
 
 
 entriesFromBlocksWithSlugMeta : List ( Block.Block, Maybe String ) -> List Entry

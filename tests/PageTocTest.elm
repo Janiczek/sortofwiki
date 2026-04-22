@@ -26,7 +26,7 @@ suite =
         [ Test.describe "entries"
             [ Test.test "collects heading labels and slugs" <|
                 \() ->
-                    Page.frontendDetails "## First\n\n### Second one\n" []
+                    Page.frontendDetails (Just "## First\n\n### Second one\n") [] [] []
                         |> PageToc.entries wiki allPagesExist
                         |> Expect.equal
                             [ { level = Block.H2, label = "First", slug = "first" }
@@ -34,7 +34,7 @@ suite =
                             ]
             , Test.test "empty for plain paragraph markdown" <|
                 \() ->
-                    Page.frontendDetails "Just text." []
+                    Page.frontendDetails (Just "Just text.") [] [] []
                         |> PageToc.entries wiki allPagesExist
                         |> Expect.equal []
             ]

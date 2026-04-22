@@ -1,4 +1,4 @@
-module WikiGraph exposing (Edge, Summary, dot, summary)
+module WikiGraph exposing (Edge, EdgeKind(..), Summary, dot, summary)
 
 import Dict exposing (Dict)
 import Page
@@ -11,7 +11,13 @@ type alias Edge =
     { fromPageSlug : Page.Slug
     , toPageSlug : Page.Slug
     , targetPublished : Bool
+    , kind : EdgeKind
     }
+
+
+type EdgeKind
+    = WikiLinkEdge
+    | TagEdge
 
 
 type alias Summary =
@@ -21,8 +27,8 @@ type alias Summary =
     }
 
 
-summary : Wiki.Slug -> Dict Page.Slug String -> Summary
-summary wikiSlug publishedPageMarkdownSources =
+summary : Wiki.Slug -> Dict Page.Slug String -> Dict Page.Slug (List Page.Slug) -> Summary
+summary wikiSlug publishedPageMarkdownSources publishedPageTags =
     let
         publishedPageSlugs : List Page.Slug
         publishedPageSlugs =
@@ -36,8 +42,8 @@ summary wikiSlug publishedPageMarkdownSources =
                 |> List.map String.toLower
                 |> Set.fromList
 
-        edges : List Edge
-        edges =
+        wikiLinkEdges : List Edge
+        wikiLinkEdges =
             publishedPageMarkdownSources
                 |> Dict.toList
                 |> List.sortBy (Tuple.first >> String.toLower)
@@ -50,9 +56,33 @@ summary wikiSlug publishedPageMarkdownSources =
                                     { fromPageSlug = fromPageSlug
                                     , toPageSlug = toPageSlug
                                     , targetPublished = Set.member (String.toLower toPageSlug) publishedSlugSet
+                                    , kind = WikiLinkEdge
                                     }
                                 )
                     )
+
+        tagEdges : List Edge
+        tagEdges =
+            publishedPageTags
+                |> Dict.toList
+                |> List.sortBy (Tuple.first >> String.toLower)
+                |> List.concatMap
+                    (\( fromPageSlug, tags ) ->
+                        tags
+                            |> List.sortBy String.toLower
+                            |> List.map
+                                (\toPageSlug ->
+                                    { fromPageSlug = fromPageSlug
+                                    , toPageSlug = toPageSlug
+                                    , targetPublished = Set.member (String.toLower toPageSlug) publishedSlugSet
+                                    , kind = TagEdge
+                                    }
+                                )
+                    )
+
+        edges : List Edge
+        edges =
+            List.append wikiLinkEdges tagEdges
 
         missingPageSlugs : List Page.Slug
         missingPageSlugs =
@@ -81,23 +111,21 @@ summary wikiSlug publishedPageMarkdownSources =
     }
 
 
-dot : Wiki.Slug -> Dict Page.Slug String -> String
-dot wikiSlug publishedPageMarkdownSources =
+dot : Wiki.Slug -> Dict Page.Slug String -> Dict Page.Slug (List Page.Slug) -> String
+dot wikiSlug publishedPageMarkdownSources publishedPageTags =
     let
         graphSummary : Summary
         graphSummary =
-            summary wikiSlug publishedPageMarkdownSources
+            summary wikiSlug publishedPageMarkdownSources publishedPageTags
 
         graphAttrsLine : String
         graphAttrsLine =
-            "  graph [label="
-                ++ dotString wikiSlug
-                ++ ", labelloc=t, pad="
-                ++ dotString "0.25"
+            "  graph [pad="
+                ++ dotString "0.1"
                 ++ ", nodesep="
-                ++ dotString "0.4"
+                ++ dotString "0.2"
                 ++ ", ranksep="
-                ++ dotString "0.7"
+                ++ dotString "0.35"
                 ++ "];"
 
         nodeAttrsLine : String
@@ -105,7 +133,11 @@ dot wikiSlug publishedPageMarkdownSources =
             "  node [shape=box, style="
                 ++ dotString "rounded"
                 ++ ", fontname="
-                ++ dotString "Inter, system-ui, sans-serif"
+                ++ dotString "'Source Serif 4', system-ui, sans-serif"
+                ++ ", fontsize="
+                ++ dotString "12"
+                ++ ", margin="
+                ++ dotString "0.2,0.04"
                 ++ "];"
 
         edgeAttrsLine : String
@@ -117,7 +149,7 @@ dot wikiSlug publishedPageMarkdownSources =
             "  "
                 ++ dotString pageSlug
                 ++ " [href="
-                ++ dotString (Wiki.publishedPageUrlPath wikiSlug pageSlug)
+                ++ dotString (Wiki.pageGraphUrlPath wikiSlug pageSlug)
                 ++ "];"
 
         missingNodeLine : Page.Slug -> String
@@ -125,7 +157,7 @@ dot wikiSlug publishedPageMarkdownSources =
             "  "
                 ++ dotString pageSlug
                 ++ " [href="
-                ++ dotString (Wiki.publishedPageUrlPath wikiSlug pageSlug)
+                ++ dotString (Wiki.pageGraphUrlPath wikiSlug pageSlug)
                 ++ ", style="
                 ++ dotString "rounded,dashed"
                 ++ ", color="
@@ -140,7 +172,17 @@ dot wikiSlug publishedPageMarkdownSources =
                 ++ dotString edge.fromPageSlug
                 ++ " -> "
                 ++ dotString edge.toPageSlug
-                ++ ";"
+                ++ (case edge.kind of
+                        WikiLinkEdge ->
+                            ";"
+
+                        TagEdge ->
+                            " [style="
+                                ++ dotString "dashed"
+                                ++ ", color="
+                                ++ dotString "#7c3aed"
+                                ++ "];"
+                   )
     in
     String.join "\n"
         (List.concat

@@ -84,6 +84,7 @@ type alias LoginContributorPayload =
 type alias SubmitNewPagePayload =
     { rawPageSlug : String
     , rawMarkdown : String
+    , rawTags : String
     }
 
 
@@ -117,11 +118,11 @@ type ToBackend
     | LoginContributor Wiki.Slug LoginContributorPayload
     | LogoutContributor Wiki.Slug
     | SubmitNewPage Wiki.Slug SubmitNewPagePayload
-    | SubmitPageEdit Wiki.Slug Page.Slug String
+    | SubmitPageEdit Wiki.Slug Page.Slug String String
     | RequestPublishedPageDeletion Wiki.Slug Page.Slug String
     | DeletePublishedPageImmediately Wiki.Slug Page.Slug String
-    | SaveNewPageDraft Wiki.Slug { maybeSubmissionId : Maybe String, rawPageSlug : String, rawMarkdown : String }
-    | SavePageEditDraft Wiki.Slug { maybeSubmissionId : Maybe String, pageSlug : Page.Slug, rawMarkdown : String }
+    | SaveNewPageDraft Wiki.Slug { maybeSubmissionId : Maybe String, rawPageSlug : String, rawMarkdown : String, rawTags : String }
+    | SavePageEditDraft Wiki.Slug { maybeSubmissionId : Maybe String, pageSlug : Page.Slug, rawMarkdown : String, rawTags : String }
     | SavePageDeleteDraft Wiki.Slug { maybeSubmissionId : Maybe String, pageSlug : Page.Slug, rawReason : String }
     | SubmitDraftForReview Wiki.Slug String
     | WithdrawSubmission Wiki.Slug String
@@ -259,6 +260,7 @@ type alias NewPageSubmitDraft =
     { pageSlug : String
     , pageSlugLockedFromQuery : Bool
     , markdownBody : String
+    , tagsInput : String
     , maybeSavedDraftId : Maybe String
     , inFlight : Bool
     , saveDraftInFlight : Bool
@@ -270,6 +272,7 @@ type alias NewPageSubmitDraft =
 
 type alias PageEditSubmitDraft =
     { markdownBody : String
+    , tagsInput : String
     , maybeSavedDraftId : Maybe String
     , inFlight : Bool
     , saveDraftInFlight : Bool
@@ -407,8 +410,10 @@ type FrontendMsg
     | ContributorLogoutWiki Wiki.Slug
     | NewPageSubmitMarkdownChanged String
     | NewPageSubmitSlugChanged String
+    | NewPageSubmitTagsChanged String
     | NewPageSubmitFormSubmitted
     | PageEditSubmitMarkdownChanged String
+    | PageEditSubmitTagsChanged String
     | PageEditSubmitFormSubmitted
     | PageDeleteSubmitReasonChanged String
     | PageDeleteRequestDeletionSubmitted

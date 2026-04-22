@@ -236,7 +236,7 @@ suite =
                             , publishedPages =
                                 Dict.singleton key
                                     (RemoteData.succeed
-                                        (Page.frontendDetails "body" [])
+                                        (Page.frontendDetails (Just "body") [] [] [])
                                     )
                             , reviewQueues = Dict.empty
                             , myPendingSubmissions = Dict.empty

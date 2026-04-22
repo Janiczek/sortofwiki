@@ -38,7 +38,8 @@ endToEndTests =
                         , ProgramTest.Query.withinId "wiki-graph-summary"
                             (ProgramTest.Query.expectHasTexts
                                 [ "5 published pages"
-                                , "11 links"
+                                , "11 page-link edges"
+                                , "tag edges"
                                 , "3 missing linked pages"
                                 ]
                             )

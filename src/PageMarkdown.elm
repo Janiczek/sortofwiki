@@ -46,7 +46,12 @@ viewPreview containerId wikiSlug publishedSlugExists markdownSource =
 -}
 view : Wiki.Slug -> (Page.Slug -> Bool) -> Page.FrontendDetails -> Html msg
 view wikiSlug publishedSlugExists pageDetails =
-    viewPreview "page-markdown" wikiSlug publishedSlugExists pageDetails.markdownSource
+    case pageDetails.maybeMarkdownSource of
+        Just markdownSource ->
+            viewPreview "page-markdown" wikiSlug publishedSlugExists markdownSource
+
+        Nothing ->
+            Html.text ""
 
 
 htmlRendererWithHeadingIds : Maybe String -> MarkdownRenderer.Renderer (Html msg)

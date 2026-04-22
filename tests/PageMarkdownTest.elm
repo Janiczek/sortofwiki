@@ -26,28 +26,28 @@ suite =
         [ Test.describe "view"
             [ Test.test "renders heading from markdown" <|
                 \() ->
-                    Page.frontendDetails "## Hello\n" []
+                    Page.frontendDetails (Just "## Hello\n") [] [] []
                         |> PageMarkdown.view wiki allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "h2" ]
                         |> Test.Html.Query.has [ Test.Html.Selector.text "Hello" ]
             , Test.test "adds GitHub-style id on headings for TOC anchors" <|
                 \() ->
-                    Page.frontendDetails "## Hello\n" []
+                    Page.frontendDetails (Just "## Hello\n") [] [] []
                         |> PageMarkdown.view wiki allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "h2" ]
                         |> Test.Html.Query.has [ Test.Html.Selector.attribute (Html.Attributes.id "hello") ]
             , Test.test "renders strong emphasis" <|
                 \() ->
-                    Page.frontendDetails "**bold**" []
+                    Page.frontendDetails (Just "**bold**") [] [] []
                         |> PageMarkdown.view wiki allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "strong" ]
                         |> Test.Html.Query.has [ Test.Html.Selector.text "bold" ]
             , Test.test "renders [[page]] as same-wiki published page link" <|
                 \() ->
-                    Page.frontendDetails "Go to [[guides]]." []
+                    Page.frontendDetails (Just "Go to [[guides]].") [] [] []
                         |> PageMarkdown.view wiki (\s -> String.toLower s == "guides")
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "a" ]
@@ -57,7 +57,7 @@ suite =
                             ]
             , Test.test "renders [[slug|label]] with custom link text" <|
                 \() ->
-                    Page.frontendDetails "[[home|Start here]]" []
+                    Page.frontendDetails (Just "[[home|Start here]]") [] [] []
                         |> PageMarkdown.view wiki (\s -> String.toLower s == "home")
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "a" ]
@@ -67,14 +67,14 @@ suite =
                             ]
             , Test.test "does not expand wiki link inside inline code" <|
                 \() ->
-                    Page.frontendDetails "Use `[[home]]` syntax." []
+                    Page.frontendDetails (Just "Use `[[home]]` syntax.") [] [] []
                         |> PageMarkdown.view wiki allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "code" ]
                         |> Test.Html.Query.has [ Test.Html.Selector.text "[[home]]" ]
             , Test.test "renders TODO marker as styled inline text" <|
                 \() ->
-                    Page.frontendDetails "Ship {TODO: write docs} soon." []
+                    Page.frontendDetails (Just "Ship {TODO: write docs} soon.") [] [] []
                         |> PageMarkdown.view wiki allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find
@@ -85,14 +85,14 @@ suite =
                             ]
             , Test.test "does not expand TODO marker inside inline code" <|
                 \() ->
-                    Page.frontendDetails "Use `{TODO: write docs}` syntax." []
+                    Page.frontendDetails (Just "Use `{TODO: write docs}` syntax.") [] [] []
                         |> PageMarkdown.view wiki allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "code" ]
                         |> Test.Html.Query.has [ Test.Html.Selector.text "{TODO: write docs}" ]
             , Test.test "renders $$...$$ as inline-equation custom element" <|
                 \() ->
-                    Page.frontendDetails "Inline $$x^2 + y^2$$ math." []
+                    Page.frontendDetails (Just "Inline $$x^2 + y^2$$ math.") [] [] []
                         |> PageMarkdown.view wiki allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find
@@ -102,7 +102,7 @@ suite =
                         |> Test.Html.Query.has []
             , Test.test "renders $$$...$$$ as block-equation custom element" <|
                 \() ->
-                    Page.frontendDetails "Before\n\n$$$x^2 + y^2$$$\n\nAfter" []
+                    Page.frontendDetails (Just "Before\n\n$$$x^2 + y^2$$$\n\nAfter") [] [] []
                         |> PageMarkdown.view wiki allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find
@@ -112,7 +112,7 @@ suite =
                         |> Test.Html.Query.has []
             , Test.fuzz (Fuzz.map String.fromInt (Fuzz.intRange 0 999999)) "heading line with numeric title renders as h2 text" <|
                 \title ->
-                    Page.frontendDetails ("## " ++ title ++ "\n") []
+                    Page.frontendDetails (Just ("## " ++ title ++ "\n")) [] [] []
                         |> PageMarkdown.view wiki allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "h2" ]
@@ -124,7 +124,7 @@ suite =
                         slug =
                             "pg" ++ String.fromInt n
                     in
-                    Page.frontendDetails ("[[" ++ slug ++ "]]") []
+                    Page.frontendDetails (Just ("[[" ++ slug ++ "]]")) [] [] []
                         |> PageMarkdown.view wiki allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "a" ]
@@ -133,7 +133,7 @@ suite =
                             ]
             , Test.test "[[missing]] uses missing-wiki-link styling when slug not published" <|
                 \() ->
-                    Page.frontendDetails "See [[ghost]]." []
+                    Page.frontendDetails (Just "See [[ghost]].") [] [] []
                         |> PageMarkdown.view wiki (\_ -> False)
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "a" ]

@@ -23,6 +23,7 @@ type alias Page =
     , publishedMarkdown : Maybe String
     , publishedRevision : Int
     , pendingMarkdown : Maybe String
+    , tags : List Slug
     }
 
 
@@ -31,8 +32,10 @@ type alias Slug =
 
 
 type alias FrontendDetails =
-    { markdownSource : String
+    { maybeMarkdownSource : Maybe String
     , backlinks : List Slug
+    , tags : List Slug
+    , taggedPageSlugs : List Slug
     }
 
 
@@ -64,6 +67,7 @@ withPublished slug markdown =
     , publishedMarkdown = Just markdown
     , publishedRevision = 1
     , pendingMarkdown = Nothing
+    , tags = []
     }
 
 
@@ -73,6 +77,7 @@ withPublishedAndPending slug publishedMarkdown_ pendingMarkdown_ =
     , publishedMarkdown = Just publishedMarkdown_
     , publishedRevision = 1
     , pendingMarkdown = Just pendingMarkdown_
+    , tags = []
     }
 
 
@@ -82,6 +87,7 @@ pendingOnly slug pendingMarkdown_ =
     , publishedMarkdown = Nothing
     , publishedRevision = 0
     , pendingMarkdown = Just pendingMarkdown_
+    , tags = []
     }
 
 
@@ -95,11 +101,19 @@ incrementPublishedRevision page =
     { page | publishedRevision = page.publishedRevision + 1 }
 
 
-frontendDetails : String -> List Slug -> FrontendDetails
-frontendDetails markdownSource backlinks =
-    { markdownSource = markdownSource
+frontendDetails : Maybe String -> List Slug -> List Slug -> List Slug -> FrontendDetails
+frontendDetails maybeMarkdownSource backlinks tags taggedPageSlugs =
+    { maybeMarkdownSource = maybeMarkdownSource
     , backlinks =
         backlinks
+            |> Set.fromList
+            |> Set.toList
+    , tags =
+        tags
+            |> Set.fromList
+            |> Set.toList
+    , taggedPageSlugs =
+        taggedPageSlugs
             |> Set.fromList
             |> Set.toList
     }

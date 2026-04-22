@@ -801,7 +801,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                 respondErr Submission.WikiInactive
 
                             else
-                                case Submission.validateNewPageFields body.rawPageSlug body.rawMarkdown of
+                                case Submission.validateNewPageFields body.rawPageSlug body.rawMarkdown body.rawTags of
                                     Err ve ->
                                         respondErr (Submission.Validation ve)
 
@@ -861,6 +861,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                         Submission.NewPage
                                                             { pageSlug = payload.pageSlug
                                                             , markdown = payload.markdown
+                                                            , tags = payload.tags
                                                             }
                                                     , status = Submission.Pending
                                                     , reviewerNote = Nothing
@@ -879,7 +880,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                 (SubmitNewPageResponse wikiSlug (Ok (Submission.NewPageSubmittedForReview submissionId)))
                                             )
 
-        SubmitPageEdit wikiSlug pageSlug rawMarkdown ->
+        SubmitPageEdit wikiSlug pageSlug rawMarkdown rawTags ->
             let
                 sessionKey : String
                 sessionKey =
@@ -909,11 +910,11 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                 respondErr Submission.EditWikiInactive
 
                             else
-                                case Submission.validateEditMarkdown rawMarkdown of
+                                case Submission.validateEditMarkdown rawMarkdown rawTags pageSlug of
                                     Err ve ->
                                         respondErr (Submission.EditValidation ve)
 
-                                    Ok markdown ->
+                                    Ok validEdit ->
                                         if not (Submission.wikiHasPublishedPage pageSlug wiki) then
                                             respondErr Submission.EditTargetPageNotPublished
 
@@ -928,7 +929,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
 
                                                 nextWiki : Wiki
                                                 nextWiki =
-                                                    Wiki.applyPublishedMarkdownEdit pageSlug markdown wiki
+                                                    Wiki.applyPublishedMarkdownEdit pageSlug validEdit.proposedMarkdown validEdit.tags wiki
 
                                                 nextModel0 : Model
                                                 nextModel0 =
@@ -944,7 +945,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                         (WikiAuditLog.TrustedPublishedPageEdit
                                                             { pageSlug = pageSlug
                                                             , beforeMarkdown = previousMarkdown
-                                                            , afterMarkdown = markdown
+                                                            , afterMarkdown = validEdit.proposedMarkdown
                                                             }
                                                         )
                                                         nextModel0
@@ -979,7 +980,8 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                             { pageSlug = pageSlug
                                                             , baseMarkdown = baseMarkdown
                                                             , baseRevision = baseRevision
-                                                            , proposedMarkdown = markdown
+                                                            , proposedMarkdown = validEdit.proposedMarkdown
+                                                            , tags = validEdit.tags
                                                             }
                                                     , status = Submission.Pending
                                                     , reviewerNote = Nothing
@@ -1174,7 +1176,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                 respond (Err Submission.SaveNewPageDraftWikiInactive)
 
                             else
-                                case Submission.validateNewPageDraftFields payload.rawPageSlug payload.rawMarkdown of
+                                case Submission.validateNewPageDraftFields payload.rawPageSlug payload.rawMarkdown payload.rawTags of
                                     Err ve ->
                                         respond (Err (Submission.SaveNewPageDraftValidation ve))
 
@@ -1199,6 +1201,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                                 Submission.NewPage
                                                                     { pageSlug = draftPayload.pageSlug
                                                                     , markdown = draftPayload.markdown
+                                                                    , tags = draftPayload.tags
                                                                     }
                                                             , status = Submission.Draft
                                                             , reviewerNote = Nothing
@@ -1247,6 +1250,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                                                         Submission.NewPage
                                                                                             { pageSlug = draftPayload.pageSlug
                                                                                             , markdown = draftPayload.markdown
+                                                                                            , tags = draftPayload.tags
                                                                                             }
                                                                                 }
                                                                         in
@@ -1294,11 +1298,11 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                 respond (Err Submission.SavePageEditDraftWikiInactive)
 
                             else
-                                case Submission.validateEditMarkdownDraft payload.rawMarkdown of
+                                case Submission.validateEditMarkdownDraft payload.rawMarkdown payload.rawTags payload.pageSlug of
                                     Err ve ->
                                         respond (Err (Submission.SavePageEditDraftValidation ve))
 
-                                    Ok proposedTrimmed ->
+                                    Ok draftEdit ->
                                         let
                                             pageSlug : Page.Slug
                                             pageSlug =
@@ -1339,7 +1343,8 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                                         { pageSlug = pageSlug
                                                                         , baseMarkdown = baseMarkdown
                                                                         , baseRevision = baseRevision
-                                                                        , proposedMarkdown = proposedTrimmed
+                                                                        , proposedMarkdown = draftEdit.proposedMarkdown
+                                                                        , tags = draftEdit.tags
                                                                         }
                                                                 , status = Submission.Draft
                                                                 , reviewerNote = Nothing
@@ -1389,7 +1394,8 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                                                                 { pageSlug = pageSlug
                                                                                                 , baseMarkdown = baseMarkdown
                                                                                                 , baseRevision = baseRevision
-                                                                                                , proposedMarkdown = proposedTrimmed
+                                                                                                , proposedMarkdown = draftEdit.proposedMarkdown
+                                                                                                , tags = draftEdit.tags
                                                                                                 }
                                                                                     }
                                                                             in
