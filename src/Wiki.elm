@@ -9,6 +9,7 @@ module Wiki exposing
     , catalogEntry
     , catalogUrlPath
     , frontendDetails
+    , frontendDetailsForViewer
     , graphUrlPath
     , hostAdminAuditUrlPath
     , hostAdminBackupUrlPath
@@ -73,6 +74,7 @@ type alias FrontendDetails =
     { pageSlugs : List Page.Slug
     , publishedPageMarkdownSources : Dict Page.Slug String
     , publishedPageTags : Dict Page.Slug (List Page.Slug)
+    , pendingReviewCountForTrustedViewer : Maybe Int
     }
 
 
@@ -133,6 +135,26 @@ frontendDetails w =
                     ( slug, page.tags )
                 )
             |> Dict.fromList
+    , pendingReviewCountForTrustedViewer = Nothing
+    }
+
+
+{-| Wiki home / graph payload: pending count is only populated for trusted moderators (server sets `Maybe`).
+-}
+frontendDetailsForViewer : Wiki -> Bool -> Maybe Int -> FrontendDetails
+frontendDetailsForViewer wiki isTrusted maybePendingCount =
+    let
+        base : FrontendDetails
+        base =
+            frontendDetails wiki
+    in
+    { base
+        | pendingReviewCountForTrustedViewer =
+            if isTrusted then
+                maybePendingCount
+
+            else
+                Nothing
     }
 
 

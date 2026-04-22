@@ -8,6 +8,7 @@ module WikiUser exposing
     , emptySessions
     , remapSessionsForWikiSlugRename
     , sessionContributorOnWiki
+    , sessionKeysForContributorOnWiki
     , unbindContributor
     , unionSessionOverlayPreferred
     )
@@ -77,6 +78,27 @@ contributorIdForWiki sessionKey wikiSlug sessions =
     sessions
         |> Dict.get sessionKey
         |> Maybe.andThen (Dict.get wikiSlug)
+
+
+{-| Session keys whose Lamdera cookie is bound to `accountId` on `wikiSlug` (promotion/demotion cleanup).
+-}
+sessionKeysForContributorOnWiki : Wiki.Slug -> ContributorAccount.Id -> SessionTable -> List String
+sessionKeysForContributorOnWiki wikiSlug accountId sessions =
+    sessions
+        |> Dict.foldr
+            (\sessionKey inner acc ->
+                case Dict.get wikiSlug inner of
+                    Just aid ->
+                        if aid == accountId then
+                            sessionKey :: acc
+
+                        else
+                            acc
+
+                    Nothing ->
+                        acc
+            )
+            []
 
 
 sessionContributorOnWiki : String -> Wiki.Slug -> SessionTable -> SessionContributorOnWiki

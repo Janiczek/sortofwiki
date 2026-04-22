@@ -1,5 +1,5 @@
 module WikiRole exposing
-    ( SubmissionsScope(..)
+    ( SubmissionsScope
     , UntrustedContributorCaps
     , WikiRole(..)
     , backupTagDecoder

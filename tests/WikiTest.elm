@@ -218,6 +218,12 @@ suite =
                                     [ ( "a", "x" )
                                     , ( "m", "y" )
                                     ]
+                            , publishedPageTags =
+                                Dict.fromList
+                                    [ ( "a", [] )
+                                    , ( "m", [] )
+                                    ]
+                            , pendingReviewCountForTrustedViewer = Nothing
                             }
             , Test.fuzz Fuzzers.pageSlug "pending-only wiki yields empty page list" <|
                 \slug ->
@@ -230,6 +236,8 @@ suite =
                         |> Expect.equal
                             { pageSlugs = []
                             , publishedPageMarkdownSources = Dict.empty
+                            , publishedPageTags = Dict.empty
+                            , pendingReviewCountForTrustedViewer = Nothing
                             }
             , Test.fuzz (Fuzz.map Dict.fromList (Fuzz.list (Fuzz.pair Fuzzers.pageSlug Fuzzers.page))) "frontendDetails lists exactly published slugs sorted" <|
                 \pages ->

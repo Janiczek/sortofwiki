@@ -3,6 +3,7 @@ module BackendDataExportTest exposing (suite)
 import BackendDataExport
 import Dict exposing (Dict)
 import Expect
+import PendingReviewCount
 import ProgramTest.Config
 import Set
 import Submission exposing (Submission)
@@ -50,6 +51,9 @@ suite =
                             , \() -> restored.submissions |> Expect.equal fixtureModel.submissions
                             , \() -> restored.wikiAuditEvents |> Expect.equal fixtureModel.wikiAuditEvents
                             , \() -> restored.hostSessions |> Expect.equal Set.empty
+                            , \() ->
+                                restored.pendingReviewCounts
+                                    |> Expect.equal (PendingReviewCount.recallFromSubmissions fixtureModel.submissions)
                             , \() ->
                                 restored.nextSubmissionCounter
                                     |> Expect.equal

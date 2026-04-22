@@ -61,6 +61,8 @@ module Submission exposing
     , pendingNewPageSlugBlocksTrustedPublish
     , pendingNewPageSlugInUse
     , pendingNewPageSlugInUseExcept
+    , pendingReviewCountForWiki
+    , statusTriggersPendingReviewCount
     , pendingSubmissionsForWiki
     , promoteDraftToPending
     , rejectPendingSubmission
@@ -386,6 +388,21 @@ pendingSubmissionsForWiki wikiSlug submissions =
                 sub.wikiSlug == wikiSlug && sub.status == Pending
             )
         |> List.sortBy (\sub -> idToString sub.id)
+
+
+{-| Number of pending submissions for one wiki (matches review queue length).
+-}
+pendingReviewCountForWiki : Wiki.Slug -> Dict String Submission -> Int
+pendingReviewCountForWiki wikiSlug submissions =
+    pendingSubmissionsForWiki wikiSlug submissions
+        |> List.length
+
+
+{-| Whether this submission contributes to trusted moderator pending-review badge count.
+-}
+statusTriggersPendingReviewCount : Submission -> Bool
+statusTriggersPendingReviewCount sub =
+    sub.status == Pending
 
 
 {-| After a hosted wiki slug rename: point submissions and embedded author ids at the new slug.

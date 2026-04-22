@@ -17,6 +17,7 @@ import Dict exposing (Dict)
 import Json.Decode as Decode exposing (Decoder)
 import Json.Encode as Encode
 import Page
+import PendingReviewCount
 import Set exposing (Set)
 import Submission
 import Time
@@ -131,6 +132,9 @@ applySnapshotToBackendModel snapshot keptHostSessions =
     , submissions = snapshot.submissions
     , nextSubmissionCounter = nextSubmissionCounterFromSubmissions snapshot.submissions
     , wikiAuditEvents = snapshot.wikiAuditEvents
+    , pendingReviewCounts =
+        PendingReviewCount.recallFromSubmissions snapshot.submissions
+    , pendingReviewClients = PendingReviewCount.emptyClientSets
     }
 
 
@@ -951,6 +955,10 @@ applyWikiSnapshotMerge wikiSlug snap model =
                         nextCounter =
                             max model.nextSubmissionCounter nextCounterAfterRemap
                                 |> max (nextSubmissionCounterFromSubmissions mergedSubmissions)
+
+                        pendingCounts : Dict Wiki.Slug Int
+                        pendingCounts =
+                            PendingReviewCount.recallFromSubmissions mergedSubmissions
                     in
                     Ok
                         { model
@@ -962,6 +970,9 @@ applyWikiSnapshotMerge wikiSlug snap model =
                             , submissions = mergedSubmissions
                             , nextSubmissionCounter = nextCounter
                             , wikiAuditEvents = Dict.insert wikiSlug remappedAudit model.wikiAuditEvents
+                            , pendingReviewCounts = pendingCounts
+                            , pendingReviewClients =
+                                PendingReviewCount.removeWikiSubscribers wikiSlug model.pendingReviewClients
                         }
 
 

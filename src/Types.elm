@@ -38,6 +38,7 @@ import Effect.File
 import Effect.Lamdera exposing (ClientId, SessionId)
 import HostAdmin
 import Page
+import PendingReviewCount
 import RemoteData exposing (RemoteData)
 import Route exposing (Route)
 import Set exposing (Set)
@@ -148,6 +149,7 @@ type ToBackend
 
 type ToFrontend
     = WikiCatalogResponse (Dict Wiki.Slug Wiki.CatalogEntry)
+    | PendingReviewCountUpdated Wiki.Slug Int
     | WikiFrontendDetailsResponse Wiki.Slug (Maybe Wiki.FrontendDetails)
     | PageFrontendDetailsResponse Wiki.Slug Page.Slug (Maybe Page.FrontendDetails)
     | MyPendingSubmissionsResponse Wiki.Slug (Result Submission.MyPendingSubmissionsError (List Submission.MyPendingSubmissionListItem))
@@ -200,6 +202,8 @@ type alias BackendModel =
     , submissions : Dict String Submission.Submission
     , nextSubmissionCounter : Int
     , wikiAuditEvents : Dict Wiki.Slug (List WikiAuditLog.AuditEvent)
+    , pendingReviewCounts : Dict Wiki.Slug Int
+    , pendingReviewClients : PendingReviewCount.PendingReviewClientSets
     }
 
 
