@@ -89,10 +89,10 @@ broadcastWikiFrontendDetails wikiSlug model =
                     (WikiFrontendDetailsResponse wikiSlug (Just (Wiki.frontendDetails w)))
 
             else
-                Effect.Lamdera.broadcast (WikiFrontendDetailsResponse wikiSlug Nothing)
+                Command.none
 
         Nothing ->
-            Effect.Lamdera.broadcast (WikiFrontendDetailsResponse wikiSlug Nothing)
+            Command.none
 
 
 init : ( Model, Command BackendOnly ToFrontend Msg )
