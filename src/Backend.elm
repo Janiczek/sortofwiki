@@ -120,6 +120,23 @@ recordAudit now wikiSlug actorId kind model =
     }
 
 
+{-| Push fresh `Wiki.frontendDetails` so all clients keep tag maps and link sources aligned after publish/delete.
+-}
+broadcastWikiFrontendDetails : Wiki.Slug -> Model -> Command BackendOnly ToFrontend Msg
+broadcastWikiFrontendDetails wikiSlug model =
+    case Dict.get wikiSlug model.wikis of
+        Just w ->
+            if w.active then
+                Effect.Lamdera.broadcast
+                    (WikiFrontendDetailsResponse wikiSlug (Just (Wiki.frontendDetails w)))
+
+            else
+                Command.none
+
+        Nothing ->
+            Command.none
+
+
 init : ( Model, Command BackendOnly ToFrontend Msg )
 init =
     ( { wikis = Dict.empty
@@ -900,8 +917,11 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                             nextModel0
                                                 in
                                                 ( nextModel
-                                                , Effect.Lamdera.sendToFrontend clientId
-                                                    (SubmitNewPageResponse wikiSlug (Ok Submission.NewPagePublishedImmediately))
+                                                , Command.batch
+                                                    [ Effect.Lamdera.sendToFrontend clientId
+                                                        (SubmitNewPageResponse wikiSlug (Ok Submission.NewPagePublishedImmediately))
+                                                    , broadcastWikiFrontendDetails wikiSlug nextModel
+                                                    ]
                                                 )
 
                                         else if Submission.pendingNewPageSlugInUse wikiSlug payload.pageSlug model.submissions then
@@ -1019,8 +1039,11 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                         nextModel0
                                             in
                                             ( nextModel
-                                            , Effect.Lamdera.sendToFrontend clientId
-                                                (SubmitPageEditResponse wikiSlug (Ok Submission.EditPublishedImmediately))
+                                            , Command.batch
+                                                [ Effect.Lamdera.sendToFrontend clientId
+                                                    (SubmitPageEditResponse wikiSlug (Ok Submission.EditPublishedImmediately))
+                                                , broadcastWikiFrontendDetails wikiSlug nextModel
+                                                ]
                                             )
 
                                         else
@@ -1224,8 +1247,11 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                             nextModel0
                                                 in
                                                 ( nextModel
-                                                , Effect.Lamdera.sendToFrontend clientId
-                                                    (DeletePublishedPageImmediatelyResponse wikiSlug (Ok ()))
+                                                , Command.batch
+                                                    [ Effect.Lamdera.sendToFrontend clientId
+                                                        (DeletePublishedPageImmediatelyResponse wikiSlug (Ok ()))
+                                                    , broadcastWikiFrontendDetails wikiSlug nextModel
+                                                    ]
                                                 )
 
         SaveNewPageDraft wikiSlug payload ->
@@ -1940,6 +1966,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                             [ Effect.Lamdera.sendToFrontend clientId
                                                                 (ApproveSubmissionResponse wikiSlug submissionId (Ok ()))
                                                             , broadcastPendingReviewCount wikiSlug nextModel
+                                                            , broadcastWikiFrontendDetails wikiSlug nextModel
                                                             ]
                                                         )
 

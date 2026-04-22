@@ -725,7 +725,7 @@ markdownCodeBlockCodeClass =
 -}
 markdownTextareaClass : String
 markdownTextareaClass =
-    "[font-family:var(--font-mono)] text-[0.85rem] leading-[1.4]"
+    "[font-family:var(--font-mono)] [font-variant-ligatures:none] text-[0.85rem] leading-[1.4]"
 
 
 markdownThematicBreakClass : String

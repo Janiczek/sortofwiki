@@ -73,7 +73,7 @@ endToEndTests =
                     , [ client.update 100 (UrlChanged publishedTargetUrl)
                       , client.checkView 300 (ProgramTest.Query.expectBacklinks wikiSlug [ linkerPageSlug ])
                       , client.update 100 (UrlChanged publishedLinkerUrl)
-                      , client.checkView 300 ProgramTest.Query.expectNoBacklinks
+                      , client.checkView 800 (ProgramTest.Query.expectNoBacklinkFrom targetPageSlug)
                       ]
                     , ProgramTest.Actions.navigateToWikiSubmitEdit wikiSlug linkerPageSlug client
                     , [ client.checkModel 200
@@ -94,7 +94,7 @@ endToEndTests =
                       ]
                     , ProgramTest.Actions.submitWikiEditForm wikiSlug linkerPageSlug "# Linker\n\nNo wiki link here." client
                     , [ client.update 100 (UrlChanged publishedTargetUrl)
-                      , client.checkView 300 ProgramTest.Query.expectNoBacklinks
+                      , client.checkView 800 (ProgramTest.Query.expectBacklinks wikiSlug [ linkerPageSlug ])
                       ]
                     ]
         }
