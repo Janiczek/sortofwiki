@@ -294,6 +294,13 @@ function applyGraphTheme(host) {
   const svg = root.querySelector("svg");
   if (svg) {
     svg.style.background = "transparent";
+    /* Auto zoom to fit the viewport.
+    svg.setAttribute("width", "100%");
+    svg.removeAttribute("height");
+    svg.style.maxHeight = "80vh";
+    svg.style.display = "block";
+    svg.style.height = "auto";
+    */
   }
 
   root.querySelectorAll("g.graph > polygon").forEach(function (shape) {

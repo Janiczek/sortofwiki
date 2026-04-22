@@ -673,7 +673,7 @@ markdownParagraphClass =
 
 markdownTodoClass : String
 markdownTodoClass =
-    "italic text-red-600 dark:text-red-400"
+    "italic text-red-700 dark:text-red-400"
 
 
 markdownBlockQuoteClass : String
@@ -688,7 +688,7 @@ markdownLinkClass =
 
 markdownWikiLinkMissingClass : String
 markdownWikiLinkMissingClass =
-    "!text-red-600 dark:!text-red-400 hover:!text-red-700 dark:hover:!text-red-300 hover:!bg-[var(--danger-link-bg-hover)] rounded-[2px] underline underline-offset-[2px]"
+    "!text-red-700 dark:!text-red-400 hover:!bg-[var(--danger-link-bg-hover)] rounded-[2px] underline underline-offset-[2px]"
 
 
 markdownUnorderedListClass : String

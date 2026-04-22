@@ -45,7 +45,7 @@ endToEndTests =
                 [ client.checkView 100
                     (ProgramTest.Query.withinTagAndHref "a"
                         "/w/Demo/p/Story49MissingPage"
-                        (ProgramTest.Query.expectHasClass "!text-red-600")
+                        (ProgramTest.Query.expectHasClass "!text-red-700")
                     )
                 ]
         }

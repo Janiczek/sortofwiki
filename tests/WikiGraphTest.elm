@@ -68,7 +68,7 @@ suite =
                     in
                     [ String.contains "\"About\" [href=\"/w/Demo/pg/About\"];" graphDot
                     , String.contains "\"Home\" [href=\"/w/Demo/pg/Home\"];" graphDot
-                    , String.contains "\"TodoGap\" [href=\"/w/Demo/pg/TodoGap\", style=\"rounded,dashed\", color=\"#dc2626\", fontcolor=\"#dc2626\"];" graphDot
+                    , String.contains "\"TodoGap\" [href=\"/w/Demo/pg/TodoGap\", style=\"dashed\", color=\"#dc2626\", fontcolor=\"#dc2626\"];" graphDot
                     , String.contains "\"About\" -> \"Home\";" graphDot
                     , String.contains "\"About\" -> \"TodoGap\";" graphDot
                     , String.contains "\"Home\" -> \"About\";" graphDot

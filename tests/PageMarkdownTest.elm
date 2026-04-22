@@ -141,7 +141,7 @@ suite =
                         |> Test.Html.Query.has
                             [ Test.Html.Selector.text "ghost"
                             , Test.Html.Selector.attribute (Html.Attributes.href "/w/Demo/p/ghost")
-                            , Test.Html.Selector.class "!text-red-600"
+                            , Test.Html.Selector.class "!text-red-700"
                             ]
             , Test.test "renders [[slug|label]] inside markdown table cell" <|
                 \() ->

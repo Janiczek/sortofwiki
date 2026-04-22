@@ -118,15 +118,23 @@ dot wikiSlug publishedPageMarkdownSources publishedPageTags =
         graphSummary =
             summary wikiSlug publishedPageMarkdownSources publishedPageTags
 
-        graphAttrsLine : String
-        graphAttrsLine =
-            "  graph [pad="
-                ++ dotString "0.1"
-                ++ ", nodesep="
-                ++ dotString "0.2"
-                ++ ", ranksep="
-                ++ dotString "0.35"
-                ++ "];"
+        graphAttrsLines : List String
+        graphAttrsLines =
+            [ "  layout=neato;"
+            , "  overlap=" ++ dotString "prism" ++ ";"
+            , "  overlap_scaling=1;"
+            , "  sep=" ++ dotString "+6" ++ ";"
+            , "  esep=" ++ dotString "+2" ++ ";"
+            , "  splines=true;"
+            , "  mode=major;"
+            , "  model=" ++ dotString "shortpath" ++ ";"
+            , "  start=" ++ dotString "random42" ++ ";"
+            , "  epsilon=0.0001;"
+            , "  maxiter=2000;"
+            , "  pad=" ++ dotString "0.2" ++ ";"
+            , "  concentrate=true;"
+            , "  bgcolor=" ++ dotString "transparent" ++ ";"
+            ]
 
         nodeAttrsLine : String
         nodeAttrsLine =
@@ -134,14 +142,21 @@ dot wikiSlug publishedPageMarkdownSources publishedPageTags =
                 ++ ", fontname="
                 ++ dotString "'Source Serif 4', system-ui, sans-serif"
                 ++ ", fontsize="
-                ++ dotString "12"
+                ++ dotString "11"
                 ++ ", margin="
-                ++ dotString "0.2,0.04"
+                ++ dotString "0.18,0.08"
+                ++ ", height=0.3"
+                ++ ", penwidth=1"
                 ++ "];"
 
         edgeAttrsLine : String
         edgeAttrsLine =
-            "  edge [color=" ++ dotString "#6b7280" ++ "];"
+            "  edge [color="
+                ++ dotString "#6b7280"
+                ++ ", arrowsize=0.7"
+                ++ ", penwidth=0.9"
+                ++ ", len=0.9"
+                ++ "];"
 
         nodeLine : Page.Slug -> String
         nodeLine pageSlug =
@@ -185,10 +200,9 @@ dot wikiSlug publishedPageMarkdownSources publishedPageTags =
     in
     String.join "\n"
         (List.concat
-            [ [ "digraph wiki {"
-              , "  rankdir=LR;"
-              , graphAttrsLine
-              , nodeAttrsLine
+            [ [ "digraph wiki {" ]
+            , graphAttrsLines
+            , [ nodeAttrsLine
               , edgeAttrsLine
               ]
             , List.map nodeLine graphSummary.publishedPageSlugs

@@ -61,10 +61,10 @@ suite =
                                     ]
                                 )
                     in
-                    [ String.contains "\"Home\" [href=\"/w/Demo/pg/Home\", penwidth=2];" graphDot
+                    [ String.contains "\"Home\" [href=\"/w/Demo/p/Home\", penwidth=2];" graphDot
                     , String.contains "\"Guide\" [href=\"/w/Demo/pg/Guide\"];" graphDot
                     , String.contains "\"About\" [href=\"/w/Demo/pg/About\"];" graphDot
-                    , String.contains "\"TodoGap\" [href=\"/w/Demo/pg/TodoGap\", style=\"rounded,dashed\", color=\"#dc2626\", fontcolor=\"#dc2626\"];" graphDot
+                    , String.contains "\"TodoGap\" [href=\"/w/Demo/pg/TodoGap\", style=\"dashed\", color=\"#dc2626\", fontcolor=\"#dc2626\"];" graphDot
                     , String.contains "\"Guide\" -> \"Home\";" graphDot
                     , String.contains "\"Home\" -> \"About\";" graphDot
                     , String.contains "\"Home\" -> \"TodoGap\";" graphDot
@@ -110,7 +110,7 @@ suite =
                                     ]
                                 )
                     in
-                    String.contains "\"MissingFocus\" [href=\"/w/Demo/pg/MissingFocus\", penwidth=2, style=\"rounded,dashed\", color=\"#dc2626\", fontcolor=\"#dc2626\"];" graphDot
+                    String.contains "\"MissingFocus\" [href=\"/w/Demo/p/MissingFocus\", penwidth=2, style=\"dashed\", color=\"#dc2626\", fontcolor=\"#dc2626\"];" graphDot
                         |> Expect.equal True
             ]
         ]

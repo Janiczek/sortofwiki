@@ -48,7 +48,7 @@ endToEndTests =
                             , \md ->
                                 ProgramTest.Query.withinTagAndHref "a"
                                     "/w/Demo/p/Story55MissingPage"
-                                    (ProgramTest.Query.expectHasClass "!text-red-600")
+                                    (ProgramTest.Query.expectHasClass "!text-red-700")
                                     md
                             , \md -> ProgramTest.Query.expectHasText "Open task" md
                             , \md -> ProgramTest.Query.expectHasText "Done task" md

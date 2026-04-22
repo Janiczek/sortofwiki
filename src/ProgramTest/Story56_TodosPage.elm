@@ -71,7 +71,7 @@ endToEndTests =
                                 (ProgramTest.Query.expectHasTexts [ "TodoGap", "About", "MarkdownPlayground" ])
                             )
                         , ProgramTest.Query.withinHref "/w/Demo/p/TodoGap"
-                            (ProgramTest.Query.expectHasClass "!text-red-600")
+                            (ProgramTest.Query.expectHasClass "!text-red-700")
                         ]
                     )
                 ]
