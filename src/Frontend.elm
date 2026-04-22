@@ -1473,6 +1473,8 @@ afterTrustedNewPagePublishedImmediately wikiSlug payload store =
                                         payload.pageSlug :: details.pageSlugs |> List.sort
                                 , publishedPageMarkdownSources =
                                     Dict.insert payload.pageSlug payload.markdown details.publishedPageMarkdownSources
+                                , publishedPageTags =
+                                    Dict.insert payload.pageSlug payload.tags details.publishedPageTags
                             }
                         )
                         store.wikiDetails
@@ -1481,6 +1483,37 @@ afterTrustedNewPagePublishedImmediately wikiSlug payload store =
                     Dict.remove wikiSlug store.wikiDetails
     in
     { store | publishedPages = publishedPagesNext, wikiDetails = wikiDetailsNext }
+
+
+{-| Trusted immediate edit: extend cached wiki details with new markdown and tags for this slug (matches server `Wiki.applyPublishedMarkdownEdit`).
+-}
+afterTrustedEditPublishedImmediately :
+    Wiki.Slug
+    -> Page.Slug
+    -> { proposedMarkdown : String, tags : List Page.Slug }
+    -> Store
+    -> Store
+afterTrustedEditPublishedImmediately wikiSlug pageSlug edit store =
+    case Dict.get wikiSlug store.wikiDetails of
+        Just (Success details) ->
+            { store
+                | wikiDetails =
+                    Dict.insert wikiSlug
+                        (Success
+                            { details
+                                | publishedPageMarkdownSources =
+                                    Dict.insert pageSlug edit.proposedMarkdown details.publishedPageMarkdownSources
+                                , publishedPageTags =
+                                    Dict.insert pageSlug edit.tags details.publishedPageTags
+                            }
+                        )
+                        store.wikiDetails
+                , publishedPages =
+                    Dict.remove ( wikiSlug, pageSlug ) store.publishedPages
+            }
+
+        _ ->
+            invalidateWikiPublishedCaches wikiSlug store
 
 
 {-| After a successful approve, drop cached wiki/page/review data so the next fetch matches the server.
@@ -4698,6 +4731,27 @@ updateFromBackend msg model =
                     else
                         d
 
+                validatedEditPayload : Maybe { pageSlug : Page.Slug, proposedMarkdown : String, tags : List Page.Slug }
+                validatedEditPayload =
+                    case model.route of
+                        Route.WikiSubmitEdit routeWiki pageSlug ->
+                            if routeWiki == wikiSlug then
+                                Submission.validateEditMarkdown d.markdownBody d.tagsInput pageSlug
+                                    |> Result.toMaybe
+                                    |> Maybe.map
+                                        (\edit ->
+                                            { pageSlug = pageSlug
+                                            , proposedMarkdown = edit.proposedMarkdown
+                                            , tags = edit.tags
+                                            }
+                                        )
+
+                            else
+                                Nothing
+
+                        _ ->
+                            Nothing
+
                 nextStore : Store
                 nextStore =
                     let
@@ -4707,7 +4761,16 @@ updateFromBackend msg model =
                     in
                     case result of
                         Ok Submission.EditPublishedImmediately ->
-                            invalidateWikiPublishedCaches wikiSlug store0
+                            case validatedEditPayload of
+                                Just editPayload ->
+                                    afterTrustedEditPublishedImmediately wikiSlug editPayload.pageSlug
+                                        { proposedMarkdown = editPayload.proposedMarkdown
+                                        , tags = editPayload.tags
+                                        }
+                                        store0
+
+                                Nothing ->
+                                    invalidateWikiPublishedCaches wikiSlug store0
 
                         Ok (Submission.EditSubmittedForReview _) ->
                             { store0
@@ -11273,20 +11336,16 @@ viewPublishedPageGraphRoute model wikiSlug pageSlug =
                         RemoteData.Failure _ ->
                             viewMissingPublishedPage wikiSlug pageSlug [] Nothing NotAsked
 
-                        RemoteData.Success pageDetails ->
-                            viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails pageDetails
+                        RemoteData.Success _ ->
+                            viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails
 
 
-viewPublishedPageGraphPage : Wiki.Slug -> Page.Slug -> Wiki.FrontendDetails -> Page.FrontendDetails -> Html Msg
-viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails pageDetails =
+viewPublishedPageGraphPage : Wiki.Slug -> Page.Slug -> Wiki.FrontendDetails -> Html Msg
+viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails =
     let
-        publishedPageTagsForGraph : Dict Page.Slug (List Page.Slug)
-        publishedPageTagsForGraph =
-            Dict.insert pageSlug pageDetails.tags wikiDetails.publishedPageTags
-
         graphSummary : PageGraph.Summary
         graphSummary =
-            PageGraph.summary wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources publishedPageTagsForGraph
+            PageGraph.summary wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags
 
         pageEdgeCount : Int
         pageEdgeCount =
@@ -11330,7 +11389,7 @@ viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails pageDetails =
             ]
         , Html.node "graphviz-graph"
             [ Attr.id "page-immediate-graphviz"
-            , Attr.attribute "graph" (PageGraph.dot wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources publishedPageTagsForGraph)
+            , Attr.attribute "graph" (PageGraph.dot wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags)
             ]
             []
         ]
