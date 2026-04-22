@@ -25,6 +25,7 @@ import Types exposing (BackendModel)
 import Wiki exposing (Wiki)
 import WikiAuditLog
 import WikiContributors
+import WikiFrontendSubscription
 import WikiRole
 import WikiUser
 
@@ -135,6 +136,7 @@ applySnapshotToBackendModel snapshot keptHostSessions =
     , pendingReviewCounts =
         PendingReviewCount.recallFromSubmissions snapshot.submissions
     , pendingReviewClients = PendingReviewCount.emptyClientSets
+    , wikiFrontendClients = WikiFrontendSubscription.emptyClientSets
     }
 
 
@@ -973,6 +975,8 @@ applyWikiSnapshotMerge wikiSlug snap model =
                             , pendingReviewCounts = pendingCounts
                             , pendingReviewClients =
                                 PendingReviewCount.removeWikiSubscribers wikiSlug model.pendingReviewClients
+                            , wikiFrontendClients =
+                                WikiFrontendSubscription.removeWikiSubscribers wikiSlug model.wikiFrontendClients
                         }
 
 

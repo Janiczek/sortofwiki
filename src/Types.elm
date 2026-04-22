@@ -51,6 +51,7 @@ import Wiki exposing (Wiki)
 import WikiAdminUsers
 import WikiAuditLog
 import WikiContributors
+import WikiFrontendSubscription
 import WikiRole
 import WikiUser
 
@@ -204,6 +205,7 @@ type alias BackendModel =
     , wikiAuditEvents : Dict Wiki.Slug (List WikiAuditLog.AuditEvent)
     , pendingReviewCounts : Dict Wiki.Slug Int
     , pendingReviewClients : PendingReviewCount.PendingReviewClientSets
+    , wikiFrontendClients : WikiFrontendSubscription.WikiFrontendClientSets
     }
 
 

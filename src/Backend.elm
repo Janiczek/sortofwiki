@@ -10,6 +10,7 @@ import Effect.Task
 import Effect.Time
 import Env
 import HostAdmin
+import Lamdera
 import Page
 import PendingReviewCount
 import Set
@@ -21,6 +22,7 @@ import Wiki exposing (Wiki)
 import WikiAdminUsers
 import WikiAuditLog
 import WikiContributors
+import WikiFrontendSubscription
 import WikiRole
 import WikiUser
 
@@ -62,6 +64,8 @@ applyHostedWikiSlugRename oldSlug newSlug nextWiki model =
             PendingReviewCount.remapSlugInPendingCounts oldSlug newSlug model.pendingReviewCounts
         , pendingReviewClients =
             PendingReviewCount.remapSlugInPendingReviewClients oldSlug newSlug model.pendingReviewClients
+        , wikiFrontendClients =
+            WikiFrontendSubscription.remapSlugInWikiFrontendClients oldSlug newSlug model.wikiFrontendClients
     }
 
 
@@ -90,7 +94,20 @@ withSubmissionMutation prevSub nextSub wikiSlug model =
                 False
 
             else
-                prevSub /= nextSub && (Submission.statusTriggersPendingReviewCount prevSub || Submission.statusTriggersPendingReviewCount nextSub)
+                let
+                    nextTouchedPendingCount : Bool
+                    nextTouchedPendingCount =
+                        nextSub
+                            |> Maybe.map Submission.statusTriggersPendingReviewCount
+                            |> Maybe.withDefault False
+
+                    submissionChanged : Bool
+                    submissionChanged =
+                        nextSub
+                            |> Maybe.map (\sub -> prevSub /= sub)
+                            |> Maybe.withDefault True
+                in
+                submissionChanged && (Submission.statusTriggersPendingReviewCount prevSub || nextTouchedPendingCount)
     in
     if touched wikiSlug then
         withPendingMutation wikiSlug model
@@ -121,28 +138,31 @@ refreshTrustedListenerWikiFrontendDetails :
     -> List String
     -> Command BackendOnly ToFrontend Msg
 refreshTrustedListenerWikiFrontendDetails wikiSlug model sessionKeys =
+    let
+        listenersBySession : Dict String (Set.Set String)
+        listenersBySession =
+            WikiFrontendSubscription.listenerSessionsForWiki wikiSlug model.wikiFrontendClients
+    in
     sessionKeys
         |> List.map
             (\sessionKey ->
-                Effect.Lamdera.sendToFrontend
-                    (Effect.Lamdera.sessionIdFromString sessionKey)
-                    (WikiFrontendDetailsResponse wikiSlug (wikiFrontendDetailsPayloadForSession wikiSlug sessionKey model))
-            )
-        |> Command.batch
-
-
-logoutRefreshWikiFrontendDetailsEvictedSlugs :
-    Model
-    -> String
-    -> List Wiki.Slug
-    -> Command BackendOnly ToFrontend Msg
-logoutRefreshWikiFrontendDetailsEvictedSlugs model sessionKey wikiSlugs =
-    wikiSlugs
-        |> List.map
-            (\slug ->
-                Effect.Lamdera.sendToFrontend
-                    (Effect.Lamdera.sessionIdFromString sessionKey)
-                    (WikiFrontendDetailsResponse slug (wikiFrontendDetailsPayloadForSession slug sessionKey model))
+                listenersBySession
+                    |> Dict.get sessionKey
+                    |> Maybe.map
+                        (\clientIds ->
+                            clientIds
+                                |> Set.toList
+                                |> List.map
+                                    (\targetClientId ->
+                                        Effect.Lamdera.sendToFrontend
+                                            (Effect.Lamdera.clientIdFromString targetClientId)
+                                            (WikiFrontendDetailsResponse wikiSlug
+                                                (wikiFrontendDetailsPayloadForSession wikiSlug sessionKey model)
+                                            )
+                                    )
+                                |> Command.batch
+                        )
+                    |> Maybe.withDefault Command.none
             )
         |> Command.batch
 
@@ -168,11 +188,6 @@ wikiFrontendDetailsPayloadForSession :
     -> Model
     -> Maybe Wiki.FrontendDetails
 wikiFrontendDetailsPayloadForSession slug sessionKey model =
-    let
-        maybeTrustedCount : Maybe Int
-        maybeTrustedCount =
-            Just (pendingCountForWiki slug model)
-    in
     model.wikis
         |> Dict.get slug
         |> Maybe.andThen
@@ -180,6 +195,11 @@ wikiFrontendDetailsPayloadForSession slug sessionKey model =
                 if w.active then
                     case WikiUser.sessionContributorOnWiki sessionKey slug model.contributorSessions of
                         WikiUser.SessionHasAccount accountId ->
+                            let
+                                maybeTrustedCount : Maybe Int
+                                maybeTrustedCount =
+                                    Just (pendingCountForWiki slug model)
+                            in
                             Just
                                 (Wiki.frontendDetailsForViewer w
                                     (WikiContributors.isTrustedForWiki slug accountId model.contributors)
@@ -215,17 +235,23 @@ recordAudit now wikiSlug actorId kind model =
 -}
 broadcastWikiFrontendDetails : Wiki.Slug -> Model -> Command BackendOnly ToFrontend Msg
 broadcastWikiFrontendDetails wikiSlug model =
-    case Dict.get wikiSlug model.wikis of
-        Just w ->
-            if w.active then
-                Effect.Lamdera.broadcast
-                    (WikiFrontendDetailsResponse wikiSlug (Just (Wiki.frontendDetails w)))
-
-            else
-                Command.none
-
-        Nothing ->
-            Command.none
+    WikiFrontendSubscription.listenerSessionsForWiki wikiSlug model.wikiFrontendClients
+        |> Dict.toList
+        |> List.map
+            (\( sessionKey, clientIds ) ->
+                clientIds
+                    |> Set.toList
+                    |> List.map
+                        (\targetClientId ->
+                            Effect.Lamdera.sendToFrontend
+                                (Effect.Lamdera.clientIdFromString targetClientId)
+                                (WikiFrontendDetailsResponse wikiSlug
+                                    (wikiFrontendDetailsPayloadForSession wikiSlug sessionKey model)
+                                )
+                        )
+                    |> Command.batch
+            )
+        |> Command.batch
 
 
 init : ( Model, Command BackendOnly ToFrontend Msg )
@@ -239,6 +265,7 @@ init =
       , wikiAuditEvents = Dict.empty
       , pendingReviewCounts = PendingReviewCount.emptyCountMap
       , pendingReviewClients = PendingReviewCount.emptyClientSets
+      , wikiFrontendClients = WikiFrontendSubscription.emptyClientSets
       }
     , Command.none
     )
@@ -298,6 +325,10 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                 sessionKey =
                     Effect.Lamdera.sessionIdToString sessionId
 
+                wikiFrontendClientsNext : WikiFrontendSubscription.WikiFrontendClientSets
+                wikiFrontendClientsNext =
+                    WikiFrontendSubscription.subscribeViewer slug sessionKey clientId model.wikiFrontendClients
+
                 pendingClientsNext : PendingReviewCount.PendingReviewClientSets
                 pendingClientsNext =
                     case WikiUser.sessionContributorOnWiki sessionKey slug model.contributorSessions of
@@ -313,7 +344,10 @@ updateFromFrontendWithTime sessionId clientId msg now model =
 
                 modelForResponse : Model
                 modelForResponse =
-                    { model | pendingReviewClients = pendingClientsNext }
+                    { model
+                        | pendingReviewClients = pendingClientsNext
+                        , wikiFrontendClients = wikiFrontendClientsNext
+                    }
 
                 payload : Maybe Wiki.FrontendDetails
                 payload =
@@ -984,7 +1018,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
 
                 wikiSlugsToRefresh : List Wiki.Slug
                 wikiSlugsToRefresh =
-                    PendingReviewCount.wikiSlugsListeningForSession sessionKey model.pendingReviewClients
+                    WikiFrontendSubscription.wikiSlugsListeningForSession sessionKey model.wikiFrontendClients
 
                 nextSessions : WikiUser.SessionTable
                 nextSessions =
@@ -1003,7 +1037,12 @@ updateFromFrontendWithTime sessionId clientId msg now model =
 
                 logoutRefreshCmd : Command BackendOnly ToFrontend Msg
                 logoutRefreshCmd =
-                    logoutRefreshWikiFrontendDetailsEvictedSlugs nextModel sessionKey wikiSlugsToRefresh
+                    wikiSlugsToRefresh
+                        |> List.map
+                            (\slug ->
+                                refreshTrustedListenerWikiFrontendDetails slug nextModel [ sessionKey ]
+                            )
+                        |> Command.batch
             in
             ( nextModel
             , Command.batch
@@ -1872,7 +1911,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
 
                                                                 nextModel : Model
                                                                 nextModel =
-                                                                    withSubmissionMutation sub nextSub wikiSlug { model | submissions = inserted }
+                                                                    withSubmissionMutation sub (Just nextSub) wikiSlug { model | submissions = inserted }
                                                             in
                                                             ( nextModel
                                                             , Command.batch
@@ -1936,7 +1975,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
 
                                                         nextModel : Model
                                                         nextModel =
-                                                            withSubmissionMutation sub nextSub wikiSlug { model | submissions = inserted }
+                                                            withSubmissionMutation sub (Just nextSub) wikiSlug { model | submissions = inserted }
                                                     in
                                                     ( nextModel
                                                     , Command.batch
@@ -2197,7 +2236,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
 
                                                             nextModel0 : Model
                                                             nextModel0 =
-                                                                withSubmissionMutation sub rejected wikiSlug { model | submissions = inserted }
+                                                                withSubmissionMutation sub (Just rejected) wikiSlug { model | submissions = inserted }
 
                                                             nextModel : Model
                                                             nextModel =
@@ -2283,7 +2322,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
 
                                                             nextModel0 : Model
                                                             nextModel0 =
-                                                                withSubmissionMutation sub needsRevision wikiSlug { model | submissions = inserted }
+                                                                withSubmissionMutation sub (Just needsRevision) wikiSlug { model | submissions = inserted }
 
                                                             nextModel : Model
                                                             nextModel =
@@ -2669,6 +2708,8 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                         , pendingReviewCounts = Dict.remove wikiSlug model.pendingReviewCounts
                                         , pendingReviewClients =
                                             PendingReviewCount.removeWikiSubscribers wikiSlug model.pendingReviewClients
+                                        , wikiFrontendClients =
+                                            WikiFrontendSubscription.removeWikiSubscribers wikiSlug model.wikiFrontendClients
                                     }
                             in
                             ( nextModel
