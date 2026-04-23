@@ -56,6 +56,10 @@ module UI exposing
     , markdownListItemClass
     , markdownOrderedListClass
     , markdownParagraphClass
+    , markdownTableCellClass
+    , markdownTableClass
+    , markdownTableHeaderCellClass
+    , markdownTableRowClass
     , markdownTodoClass
     , markdownTextareaClass
     , markdownThematicBreakClass
@@ -295,7 +299,7 @@ sidebarTocEntryLink =
 
 tableBaseClass : String
 tableBaseClass =
-    "border-collapse text-[1rem] border border-[var(--border)]"
+    "border-collapse text-[0.94rem] leading-[1.35] border-t border-b border-[var(--border)] [&_th+th]:border-l [&_th+th]:border-[var(--border-dash)] [&_td+td]:border-l [&_td+td]:border-[var(--border-dash)] [&_tbody_tr:hover]:bg-[var(--table-row-hover)]"
 
 
 tableAutoClass : String
@@ -315,26 +319,26 @@ tableFullWidthClass =
 
 tableHeaderCellClass : String
 tableHeaderCellClass =
-    "px-[0.35rem] py-[0.15rem] border border-[var(--border)] text-left align-top bg-[var(--chrome-bg)] font-semibold border-b border-[var(--border)]"
+    "px-[0.55rem] py-[0.22rem] text-left align-top bg-[var(--chrome-bg)] font-semibold border-b border-[var(--border)]"
 
 
 {-| Same as `tableHeaderCellClass` but vertically centers content (e.g. rows with buttons). Use `tableHeaderCellClass` when cell text may wrap across lines.
 -}
 tableHeaderCellMiddleClass : String
 tableHeaderCellMiddleClass =
-    "px-[0.35rem] py-[0.15rem] border border-[var(--border)] text-left align-middle bg-[var(--chrome-bg)] font-semibold border-b border-[var(--border)]"
+    "px-[0.55rem] py-[0.22rem] text-left align-middle bg-[var(--chrome-bg)] font-semibold border-b border-[var(--border)]"
 
 
 tableCellClass : String
 tableCellClass =
-    "px-[0.35rem] py-[0.15rem] border border-[var(--border)] text-left align-top"
+    "px-[0.55rem] py-[0.22rem] text-left align-top"
 
 
 {-| Same as `tableCellClass` but vertically centers content. Use `tableCellClass` when multi-line cell text is expected.
 -}
 tableCellMiddleClass : String
 tableCellMiddleClass =
-    "px-[0.35rem] py-[0.15rem] border border-[var(--border)] text-left align-middle"
+    "px-[0.55rem] py-[0.22rem] text-left align-middle"
 
 
 tableStripedRowClass : String
@@ -669,6 +673,26 @@ markdownHeading6Class =
 markdownParagraphClass : String
 markdownParagraphClass =
     contentParagraphClass
+
+
+markdownTableClass : String
+markdownTableClass =
+    "my-[0.8rem] mb-[1rem] max-w-full w-auto " ++ tableBaseClass
+
+
+markdownTableHeaderCellClass : String
+markdownTableHeaderCellClass =
+    tableHeaderCellClass
+
+
+markdownTableCellClass : String
+markdownTableCellClass =
+    tableCellClass
+
+
+markdownTableRowClass : String
+markdownTableRowClass =
+    tableStripedRowClass
 
 
 markdownTodoClass : String

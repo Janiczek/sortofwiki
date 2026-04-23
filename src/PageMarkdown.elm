@@ -140,6 +140,28 @@ htmlRendererWithHeadingIds maybeSlug =
                     (items
                         |> List.map (\children -> Html.li [ TW.cls UI.markdownListItemClass ] children)
                     )
+        , table =
+            \children ->
+                Html.table [ TW.cls UI.markdownTableClass ] children
+        , tableHeader =
+            \children ->
+                Html.thead [] children
+        , tableBody =
+            \children ->
+                Html.tbody [] children
+        , tableRow =
+            \children ->
+                Html.tr [ TW.cls UI.markdownTableRowClass ] children
+        , tableHeaderCell =
+            \alignment children ->
+                Html.th
+                    (TW.cls UI.markdownTableHeaderCellClass :: tableAlignmentAttrs alignment)
+                    children
+        , tableCell =
+            \alignment children ->
+                Html.td
+                    (TW.cls UI.markdownTableCellClass :: tableAlignmentAttrs alignment)
+                    children
         , codeBlock =
             \{ body } ->
                 Html.pre [ TW.cls UI.markdownCodeBlockPreClass ]
@@ -178,6 +200,22 @@ headingHtml attrs level children =
 
         Block.H6 ->
             Html.h6 attrs children
+
+
+tableAlignmentAttrs : Maybe Block.Alignment -> List (Html.Attribute msg)
+tableAlignmentAttrs maybeAlignment =
+    case maybeAlignment of
+        Just Block.AlignLeft ->
+            [ Attr.style "text-align" "left" ]
+
+        Just Block.AlignCenter ->
+            [ Attr.style "text-align" "center" ]
+
+        Just Block.AlignRight ->
+            [ Attr.style "text-align" "right" ]
+
+        Nothing ->
+            []
 
 
 markdownListItemHtml : Block.ListItem (Html msg) -> Html msg
