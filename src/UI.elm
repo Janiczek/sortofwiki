@@ -115,7 +115,7 @@ focusVisibleRingClass =
 
 contentLinkClass : String
 contentLinkClass =
-    "text-[var(--link)] hover:text-[var(--link-hover)] hover:bg-[var(--link-bg-hover)] rounded-[2px] underline underline-offset-[2px] "
+    "text-[var(--link)] hover:text-[var(--link-hover)] hover:bg-[var(--link-bg-hover)] underline underline-offset-[2px] "
         ++ focusVisibleRingClass
 
 
@@ -193,7 +193,7 @@ formTextareaCompactClass =
 
 buttonClass : String
 buttonClass =
-    "[font-family:inherit] text-[1rem] px-[0.45rem] py-[0.2rem] mt-[0.1rem] mr-[0.15rem] mb-[0.1rem] ml-0 bg-[var(--btn-bg)] text-[var(--btn-fg)] border border-[var(--btn-border)] rounded-[3px] cursor-pointer hover:brightness-[1.08] dark:hover:brightness-[1.12] dark:hover:border-[var(--border-dash)] disabled:opacity-[0.55] disabled:cursor-not-allowed "
+    "[font-family:inherit] text-[1rem] px-[0.45rem] py-[0.2rem] mt-[0.1rem] mr-[0.15rem] mb-[0.1rem] ml-0 bg-[var(--btn-bg)] text-[var(--btn-fg)] border border-[var(--btn-border)] cursor-pointer hover:brightness-[1.08] dark:hover:brightness-[1.12] dark:hover:border-[var(--border-dash)] disabled:opacity-[0.55] disabled:cursor-not-allowed "
         ++ focusVisibleRingClass
 
 
@@ -201,7 +201,7 @@ buttonClass =
 -}
 buttonDangerClass : String
 buttonDangerClass =
-    "[font-family:inherit] text-[1rem] px-[0.45rem] py-[0.2rem] mt-[0.1rem] mr-[0.15rem] mb-[0.1rem] ml-0 bg-[var(--danger-btn-bg)] text-[var(--danger-btn-fg)] border border-[var(--danger-btn-bg)] rounded-[3px] cursor-pointer hover:brightness-[1.12] disabled:opacity-[0.55] disabled:cursor-not-allowed "
+    "[font-family:inherit] text-[1rem] px-[0.45rem] py-[0.2rem] mt-[0.1rem] mr-[0.15rem] mb-[0.1rem] ml-0 bg-[var(--danger-btn-bg)] text-[var(--danger-btn-fg)] border border-[var(--danger-btn-bg)] cursor-pointer hover:brightness-[1.12] disabled:opacity-[0.55] disabled:cursor-not-allowed "
         ++ focusVisibleRingClass
 
 
@@ -230,7 +230,7 @@ togglableChip extraAttrs { pressed, onClick, label } =
     in
     Html.button
         (TW.cls
-            ("[font-family:inherit] inline-flex items-center rounded-md text-[0.8125rem] leading-snug px-[0.55rem] py-[0.28rem] border font-medium "
+            ("[font-family:inherit] inline-flex items-center text-[0.8125rem] leading-snug px-[0.55rem] py-[0.28rem] border font-medium "
                 ++ "transition-[background-color,border-color,color] duration-100 cursor-pointer "
                 ++ "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-offset-2 "
                 ++ stateClass
@@ -282,7 +282,7 @@ sidebarNavSectionBodyClass =
 
 sidebarLinkClass : String
 sidebarLinkClass =
-    "text-[var(--link)] hover:text-[var(--link-hover)] hover:bg-[var(--link-bg-hover)] rounded-[2px] underline underline-offset-[2px]"
+    "text-[var(--link)] hover:text-[var(--link-hover)] hover:bg-[var(--link-bg-hover)] underline underline-offset-[2px]"
 
 
 sidebarLink : List (Attribute msg) -> List (Html msg) -> Html msg
@@ -485,7 +485,7 @@ appHeaderSecondaryWikiLabelEmClass =
 
 appHeaderPrimaryLinkClass : String
 appHeaderPrimaryLinkClass =
-    "font-semibold text-[var(--fg)] hover:bg-[var(--link-bg-hover)] rounded-[2px] underline underline-offset-[2px] "
+    "font-semibold text-[var(--fg)] hover:bg-[var(--link-bg-hover)] underline underline-offset-[2px] "
         ++ focusVisibleRingClass
 
 
@@ -516,7 +516,7 @@ appHeaderH1Class =
 
 themeToggleButtonClass : String
 themeToggleButtonClass =
-    "shrink-0 inline-flex items-center justify-center w-[2.35rem] h-[2.35rem] p-0 m-0 border-0 rounded-none bg-transparent text-[var(--fg)] cursor-pointer hover:bg-[var(--chrome-bg)] "
+    "shrink-0 inline-flex items-center justify-center w-[2.35rem] h-[2.35rem] p-0 m-0 border-0 bg-transparent text-[var(--fg)] cursor-pointer hover:bg-[var(--chrome-bg)] "
         ++ focusVisibleRingClass
 
 
@@ -539,7 +539,7 @@ sideNavListClass =
 -}
 sideNavPublicAdminLinkClass : String
 sideNavPublicAdminLinkClass =
-    "!text-[var(--fg-muted)] hover:!text-[var(--link)] hover:bg-[var(--link-bg-hover)] rounded-[2px] underline underline-offset-[2px] "
+    "!text-[var(--fg-muted)] hover:!text-[var(--link)] hover:bg-[var(--link-bg-hover)] underline underline-offset-[2px] "
         ++ focusVisibleRingClass
 
 
@@ -570,12 +570,12 @@ hostAdminWikiDetailSideStackClass =
 
 hostAdminWikiDetailCardClass : String
 hostAdminWikiDetailCardClass =
-    "rounded border border-[var(--border)] bg-[var(--chrome-bg)] p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+    "border border-[var(--border)] bg-[var(--chrome-bg)] p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
 
 
 hostAdminWikiDetailDangerCardClass : String
 hostAdminWikiDetailDangerCardClass =
-    "rounded border border-[var(--danger)] bg-[var(--danger-bg)] p-3 shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+    "border border-[var(--danger)] bg-[var(--danger-bg)] p-3 shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
 
 
 hostAdminWikiDetailPageTitleClass : String
@@ -590,17 +590,17 @@ hostAdminWikiSlugClass =
 
 hostAdminWikiStatusBadgeActiveClass : String
 hostAdminWikiStatusBadgeActiveClass =
-    "inline-block text-[0.82rem] font-semibold tracking-wide uppercase px-[0.4rem] py-[0.12rem] rounded border border-[var(--border)] bg-[var(--input-bg)] text-[var(--fg)]"
+    "inline-block text-[0.82rem] font-semibold tracking-wide uppercase px-[0.4rem] py-[0.12rem] border border-[var(--border)] bg-[var(--input-bg)] text-[var(--fg)]"
 
 
 hostAdminWikiStatusBadgeInactiveClass : String
 hostAdminWikiStatusBadgeInactiveClass =
-    "inline-block text-[0.82rem] font-semibold tracking-wide uppercase px-[0.4rem] py-[0.12rem] rounded border border-[var(--border-dash)] bg-[var(--bg)] text-[var(--fg-muted)]"
+    "inline-block text-[0.82rem] font-semibold tracking-wide uppercase px-[0.4rem] py-[0.12rem] border border-[var(--border-dash)] bg-[var(--bg)] text-[var(--fg-muted)]"
 
 
 wikiCatalogCardClass : String
 wikiCatalogCardClass =
-    "rounded border border-[var(--border)] bg-[var(--chrome-bg)] p-3 font-serif"
+    "border border-[var(--border)] bg-[var(--chrome-bg)] p-3 font-serif"
 
 
 wikiCatalogCardTitleClass : String
@@ -712,7 +712,7 @@ markdownLinkClass =
 
 markdownWikiLinkMissingClass : String
 markdownWikiLinkMissingClass =
-    "!text-red-700 dark:!text-red-400 hover:!bg-[var(--danger-link-bg-hover)] rounded-[2px] underline underline-offset-[2px]"
+    "!text-red-700 dark:!text-red-400 hover:!bg-[var(--danger-link-bg-hover)] underline underline-offset-[2px]"
 
 
 markdownUnorderedListClass : String

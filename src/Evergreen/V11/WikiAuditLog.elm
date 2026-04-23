@@ -39,6 +39,7 @@ type AuditEventKind
         }
     | TrustedPublishedNewPage
         { pageSlug : String
+        , markdown : String
         }
     | TrustedPublishedPageEdit
         { pageSlug : String

@@ -247,5 +247,65 @@ suite =
                         _ ->
                             Expect.fail
                                 ("expected at least 2 audit events, got " ++ String.fromInt (List.length events))
+            , Test.test "trusted direct new-page publish records markdown in audit event" <|
+                \() ->
+                    let
+                        pageMarkdown : String
+                        pageMarkdown =
+                            "# MyPage\n\nInitial body for audit."
+
+                        after : Backend.Model
+                        after =
+                            updateTrusted
+                                (Time.millisToPosix 3000)
+                                (SubmitNewPage "Demo"
+                                    { rawPageSlug = "AuditCreatePage"
+                                    , rawMarkdown = pageMarkdown
+                                    , rawTags = ""
+                                    }
+                                )
+                                demoTrustedPublisherOnDemo
+                    in
+                    case lastDemoEvent after of
+                        Nothing ->
+                            Expect.fail "expected an audit event"
+
+                        Just ev ->
+                            Expect.all
+                                [ expectActorTrustedModerator
+                                , \e ->
+                                    case e.kind of
+                                        WikiAuditLog.TrustedPublishedNewPage { pageSlug, markdown } ->
+                                            ( pageSlug, markdown )
+                                                |> Expect.equal ( "AuditCreatePage", pageMarkdown )
+
+                                        WikiAuditLog.ApprovedSubmission _ ->
+                                            Expect.fail "expected TrustedPublishedNewPage"
+
+                                        WikiAuditLog.RejectedSubmission _ ->
+                                            Expect.fail "expected TrustedPublishedNewPage"
+
+                                        WikiAuditLog.RequestedSubmissionChanges _ ->
+                                            Expect.fail "expected TrustedPublishedNewPage"
+
+                                        WikiAuditLog.PromotedContributorToTrusted _ ->
+                                            Expect.fail "expected TrustedPublishedNewPage"
+
+                                        WikiAuditLog.DemotedTrustedToContributor _ ->
+                                            Expect.fail "expected TrustedPublishedNewPage"
+
+                                        WikiAuditLog.GrantedWikiAdmin _ ->
+                                            Expect.fail "expected TrustedPublishedNewPage"
+
+                                        WikiAuditLog.RevokedWikiAdmin _ ->
+                                            Expect.fail "expected TrustedPublishedNewPage"
+
+                                        WikiAuditLog.TrustedPublishedPageEdit _ ->
+                                            Expect.fail "expected TrustedPublishedNewPage"
+
+                                        WikiAuditLog.TrustedPublishedPageDelete _ ->
+                                            Expect.fail "expected TrustedPublishedNewPage"
+                                ]
+                                ev
             ]
         ]

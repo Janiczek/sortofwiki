@@ -285,7 +285,7 @@ publishedSlugExistsFromWikiDetails details refSlug =
 submissionDetailMarkdownTextareaBaseClass : String
 submissionDetailMarkdownTextareaBaseClass =
     UI.markdownTextareaClass
-        ++ " box-border m-0 min-h-[12rem] max-h-[24rem] w-full flex-1 overflow-auto rounded border border-[var(--border)] bg-[var(--input-bg)] p-2 whitespace-pre-wrap break-words"
+        ++ " box-border m-0 min-h-[12rem] max-h-[24rem] w-full flex-1 overflow-auto border border-[var(--border)] bg-[var(--input-bg)] p-2 whitespace-pre-wrap break-words"
 
 
 submissionDetailMarkdownTextareaReadonlyClass : String
@@ -306,7 +306,7 @@ submissionDetailMarkdownTextareaDiffCellClass =
 
 markdownPreviewScrollClass : String
 markdownPreviewScrollClass =
-    "max-h-[24rem] min-w-0 overflow-auto rounded border border-[var(--border)] bg-[var(--bg)] p-2"
+    "max-h-[24rem] min-w-0 overflow-auto border border-[var(--border)] bg-[var(--bg)] p-2"
 
 
 wikiSideNavSlugIfActive : Model -> Maybe Wiki.Slug
@@ -6920,7 +6920,7 @@ wikiScopeSideNavItems wikiSlug model =
                             , Attr.id "wiki-logout-button"
                             , TW.cls
                                 ("text-left bg-transparent border-0 p-0 font-inherit cursor-pointer "
-                                    ++ "text-[var(--link)] hover:text-[var(--link-hover)] hover:bg-[var(--link-bg-hover)] rounded-[2px] underline underline-offset-[2px] "
+                                    ++ "text-[var(--link)] hover:text-[var(--link-hover)] hover:bg-[var(--link-bg-hover)] underline underline-offset-[2px] "
                                     ++ UI.focusVisibleRingClass
                                 )
                             , Events.onClick (ContributorLogoutWiki wikiSlug)
@@ -7415,7 +7415,7 @@ viewHostAdminBackupPanel model =
     Html.section
         [ Attr.id "host-admin-backup-panel"
         , Attr.attribute "data-context" "host-admin-backup"
-        , TW.cls "mb-8 max-w-3xl rounded border border-[var(--border-subtle)] p-4"
+        , TW.cls "mb-8 max-w-3xl border border-[var(--border-subtle)] p-4"
         ]
         [ Html.h2 [ TW.cls "text-lg font-semibold mb-2" ] [ Html.text "Backup and restore" ]
         , UI.contentParagraph [ TW.cls "text-sm mb-3" ]
@@ -7681,6 +7681,42 @@ viewHostAdminAuditBody remote =
 viewAuditEventKindCell : Bool -> Wiki.Slug -> Time.Posix -> WikiAuditLog.AuditEventKind -> Html Msg
 viewAuditEventKindCell isHostAuditView wikiSlug at kind =
     case kind of
+        WikiAuditLog.TrustedPublishedNewPage { pageSlug, markdown } ->
+            let
+                diffHref : String
+                diffHref =
+                    let
+                        atMillis : Int
+                        atMillis =
+                            Time.posixToMillis at
+
+                        fragment : String
+                        fragment =
+                            "#audit-diff:" ++ wikiSlug ++ ":" ++ String.fromInt atMillis
+                    in
+                    if isHostAuditView then
+                        Wiki.hostAdminAuditUrlPath ++ fragment
+
+                    else
+                        Wiki.adminAuditUrlPath wikiSlug ++ fragment
+            in
+            Html.span
+                [ TW.cls "inline-flex flex-wrap items-center gap-2" ]
+                [ Html.text
+                    ("Trusted publish: created page "
+                        ++ pageSlug
+                        ++ " ("
+                        ++ String.fromInt (String.length markdown)
+                        ++ " chars)"
+                    )
+                , Html.a
+                    [ Attr.href diffHref
+                    , Attr.id ("wiki-audit-view-diff-create-" ++ pageSlug)
+                    , TW.cls "text-[var(--link)] underline underline-offset-2"
+                    ]
+                    [ Html.text "View diff" ]
+                ]
+
         WikiAuditLog.TrustedPublishedPageEdit { pageSlug, beforeMarkdown, afterMarkdown } ->
             let
                 diffHref : String
@@ -7741,7 +7777,7 @@ viewHostAdminAuditFilters : Model -> Html Msg
 viewHostAdminAuditFilters model =
     Html.div
         [ Attr.attribute "data-context" "host-admin-audit-filters"
-        , TW.cls "shrink-0 rounded-md border border-[var(--border)] bg-[var(--chrome-bg)] p-3"
+        , TW.cls "shrink-0 border border-[var(--border)] bg-[var(--chrome-bg)] p-3"
         ]
         [ Html.div
             [ TW.cls "grid grid-cols-3 gap-3" ]
@@ -10279,7 +10315,7 @@ viewWikiAdminAuditFilters : Model -> Html Msg
 viewWikiAdminAuditFilters model =
     Html.div
         [ Attr.attribute "data-context" "wiki-admin-audit-filters"
-        , TW.cls "shrink-0 rounded-md border border-[var(--border)] bg-[var(--chrome-bg)] p-3"
+        , TW.cls "shrink-0 border border-[var(--border)] bg-[var(--chrome-bg)] p-3"
         ]
         [ Html.div
             [ TW.cls "grid grid-cols-2 gap-3" ]
@@ -10425,32 +10461,51 @@ type alias TrustedAuditEditDiffBody =
     }
 
 
-trustedAuditEditFromEvent : Int -> WikiAuditLog.AuditEvent -> Maybe TrustedAuditEditDiffBody
-trustedAuditEditFromEvent atMillis ev =
+type TrustedAuditDiffBody
+    = TrustedAuditNewPageDiffBody
+        { pageSlug : Page.Slug
+        , markdown : String
+        }
+    | TrustedAuditEditDiffBody_
+        TrustedAuditEditDiffBody
+
+
+trustedAuditDiffFromEvent : Int -> WikiAuditLog.AuditEvent -> Maybe TrustedAuditDiffBody
+trustedAuditDiffFromEvent atMillis ev =
     if Time.posixToMillis ev.at /= atMillis then
         Nothing
 
     else
         case ev.kind of
+            WikiAuditLog.TrustedPublishedNewPage { pageSlug, markdown } ->
+                Just
+                    (TrustedAuditNewPageDiffBody
+                        { pageSlug = pageSlug
+                        , markdown = markdown
+                        }
+                    )
+
             WikiAuditLog.TrustedPublishedPageEdit { pageSlug, beforeMarkdown, afterMarkdown } ->
                 Just
-                    { pageSlug = pageSlug
-                    , beforeMarkdown = beforeMarkdown
-                    , afterMarkdown = afterMarkdown
-                    }
+                    (TrustedAuditEditDiffBody_
+                        { pageSlug = pageSlug
+                        , beforeMarkdown = beforeMarkdown
+                        , afterMarkdown = afterMarkdown
+                        }
+                    )
 
             _ ->
                 Nothing
 
 
-findTrustedAuditEditDiff : Model -> Wiki.Slug -> Int -> Maybe TrustedAuditEditDiffBody
-findTrustedAuditEditDiff model wikiSlug atMillis =
+findTrustedAuditDiff : Model -> Wiki.Slug -> Int -> Maybe TrustedAuditDiffBody
+findTrustedAuditDiff model wikiSlug atMillis =
     let
-        fromWikiAudit : Maybe TrustedAuditEditDiffBody
+        fromWikiAudit : Maybe TrustedAuditDiffBody
         fromWikiAudit =
             case Store.getWikiAuditLog wikiSlug WikiAuditLog.emptyAuditLogFilter model.store of
                 Success (Ok events) ->
-                    List.filterMap (trustedAuditEditFromEvent atMillis) events
+                    List.filterMap (trustedAuditDiffFromEvent atMillis) events
                         |> List.head
 
                 _ ->
@@ -10467,7 +10522,7 @@ findTrustedAuditEditDiff model wikiSlug atMillis =
                         |> List.filter (\ev -> ev.wikiSlug == wikiSlug)
                         |> List.filterMap
                             (\ev ->
-                                trustedAuditEditFromEvent atMillis
+                                trustedAuditDiffFromEvent atMillis
                                     { at = ev.at
                                     , actorUsername = ev.actorUsername
                                     , kind = ev.kind
@@ -10482,12 +10537,34 @@ findTrustedAuditEditDiff model wikiSlug atMillis =
 viewWikiAdminAuditDiffRoute : Wiki.Slug -> Wiki.FrontendDetails -> Int -> Model -> Html Msg
 viewWikiAdminAuditDiffRoute wikiSlug wikiDetails atMillis model =
     let
-        maybeDiffBody : Maybe TrustedAuditEditDiffBody
+        maybeDiffBody : Maybe TrustedAuditDiffBody
         maybeDiffBody =
-            findTrustedAuditEditDiff model wikiSlug atMillis
+            findTrustedAuditDiff model wikiSlug atMillis
     in
     case maybeDiffBody of
-        Just diffBody ->
+        Just (TrustedAuditNewPageDiffBody diffBody) ->
+            Html.div
+                [ Attr.id "wiki-admin-audit-diff-page"
+                , TW.cls "flex min-h-0 flex-1 flex-col gap-3 overflow-auto"
+                ]
+                [ UI.contentParagraph []
+                    [ Html.a
+                        [ Attr.href (Wiki.adminAuditUrlPath wikiSlug)
+                        , TW.cls "text-[var(--link)] underline underline-offset-2"
+                        ]
+                        [ Html.text "Back to audit log" ]
+                    ]
+                , viewSubmissionReviewDiff
+                    wikiSlug
+                    (publishedSlugExistsFromWikiDetails wikiDetails)
+                    (SubmissionReviewDetail.NewPageDiff
+                        { pageSlug = diffBody.pageSlug
+                        , proposedMarkdown = diffBody.markdown
+                        }
+                    )
+                ]
+
+        Just (TrustedAuditEditDiffBody_ diffBody) ->
             Html.div
                 [ Attr.id "wiki-admin-audit-diff-page"
                 , TW.cls "flex min-h-0 flex-1 flex-col gap-3 overflow-auto"
@@ -10516,12 +10593,44 @@ viewWikiAdminAuditDiffRoute wikiSlug wikiDetails atMillis model =
 viewHostAdminAuditDiffRoute : Wiki.Slug -> Int -> Model -> Html Msg
 viewHostAdminAuditDiffRoute wikiSlug atMillis model =
     let
-        maybeDiffBody : Maybe TrustedAuditEditDiffBody
+        maybeDiffBody : Maybe TrustedAuditDiffBody
         maybeDiffBody =
-            findTrustedAuditEditDiff model wikiSlug atMillis
+            findTrustedAuditDiff model wikiSlug atMillis
     in
     case maybeDiffBody of
-        Just diffBody ->
+        Just (TrustedAuditNewPageDiffBody diffBody) ->
+            let
+                publishedSlugExists : Page.Slug -> Bool
+                publishedSlugExists =
+                    case Store.get_ wikiSlug model.store.wikiDetails of
+                        Success wikiDetails ->
+                            publishedSlugExistsFromWikiDetails wikiDetails
+
+                        _ ->
+                            \_ -> False
+            in
+            Html.div
+                [ Attr.id "host-admin-audit-diff-page"
+                , TW.cls "flex min-h-0 flex-1 flex-col gap-3 overflow-auto"
+                ]
+                [ UI.contentParagraph []
+                    [ Html.a
+                        [ Attr.href Wiki.hostAdminAuditUrlPath
+                        , TW.cls "text-[var(--link)] underline underline-offset-2"
+                        ]
+                        [ Html.text "Back to platform audit log" ]
+                    ]
+                , viewSubmissionReviewDiff
+                    wikiSlug
+                    publishedSlugExists
+                    (SubmissionReviewDetail.NewPageDiff
+                        { pageSlug = diffBody.pageSlug
+                        , proposedMarkdown = diffBody.markdown
+                        }
+                    )
+                ]
+
+        Just (TrustedAuditEditDiffBody_ diffBody) ->
             let
                 publishedSlugExists : Page.Slug -> Bool
                 publishedSlugExists =
@@ -10573,7 +10682,7 @@ viewSubmissionReviewDiff wikiSlug publishedSlugExists detail =
         reviewPreviewInDiffCell : String -> String -> Html Msg
         reviewPreviewInDiffCell previewId markdown =
             Html.div
-                [ TW.cls (markdownPreviewScrollClass ++ " min-h-0 flex-1") ]
+                [ TW.cls (markdownPreviewScrollClass ++ " min-h-0 h-full flex-1") ]
                 [ PageMarkdown.viewPreview previewId wikiSlug publishedSlugExists markdown ]
 
         reviewReadonlyTextarea : String -> String -> String -> Html Msg
@@ -10603,7 +10712,7 @@ viewSubmissionReviewDiff wikiSlug publishedSlugExists detail =
                     [ TW.cls "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg-muted)] col-start-2 row-start-1" ]
                     [ Html.text "Preview" ]
                 , Html.div
-                    [ TW.cls "min-h-0 min-w-0 col-start-2 row-start-2" ]
+                    [ TW.cls "flex min-h-0 min-w-0 h-full col-start-2 row-start-2" ]
                     [ reviewPreviewInDiffCell "wiki-review-diff-new-preview" body.proposedMarkdown ]
                 ]
 

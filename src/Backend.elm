@@ -1127,7 +1127,11 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                         recordAudit now
                                                             wikiSlug
                                                             accountId
-                                                            (WikiAuditLog.TrustedPublishedNewPage { pageSlug = payload.pageSlug })
+                                                            (WikiAuditLog.TrustedPublishedNewPage
+                                                                { pageSlug = payload.pageSlug
+                                                                , markdown = payload.markdown
+                                                                }
+                                                            )
                                                             nextModel0
                                                 in
                                                 ( nextModel

@@ -1535,7 +1535,10 @@ migrate_WikiAuditLog_AuditEventKind old =
             Evergreen.V11.WikiAuditLog.RevokedWikiAdmin p0
 
         Evergreen.V5.WikiAuditLog.TrustedPublishedNewPage p0 ->
-            Evergreen.V11.WikiAuditLog.TrustedPublishedNewPage p0
+            Evergreen.V11.WikiAuditLog.TrustedPublishedNewPage
+                { pageSlug = p0.pageSlug
+                , markdown = ""
+                }
 
         Evergreen.V5.WikiAuditLog.TrustedPublishedPageEdit p0 ->
             Evergreen.V11.WikiAuditLog.TrustedPublishedPageEdit p0

@@ -550,10 +550,11 @@ encodeAuditKind kind =
                 , ( "targetUsername", Encode.string targetUsername )
                 ]
 
-        WikiAuditLog.TrustedPublishedNewPage { pageSlug } ->
+        WikiAuditLog.TrustedPublishedNewPage { pageSlug, markdown } ->
             Encode.object
                 [ ( "tag", Encode.string "trusted_published_new_page" )
                 , ( "pageSlug", Encode.string pageSlug )
+                , ( "markdown", Encode.string markdown )
                 ]
 
         WikiAuditLog.TrustedPublishedPageEdit { pageSlug, beforeMarkdown, afterMarkdown } ->
@@ -635,8 +636,19 @@ decodeAuditKindFromTag tag =
                 (Decode.field "targetUsername" Decode.string)
 
         "trusted_published_new_page" ->
-            Decode.map (\p -> WikiAuditLog.TrustedPublishedNewPage { pageSlug = p })
+            Decode.map2
+                (\p markdown ->
+                    WikiAuditLog.TrustedPublishedNewPage
+                        { pageSlug = p
+                        , markdown = markdown
+                        }
+                )
                 (Decode.field "pageSlug" Decode.string)
+                (Decode.oneOf
+                    [ Decode.field "markdown" Decode.string
+                    , Decode.succeed ""
+                    ]
+                )
 
         "trusted_published_page_edit" ->
             Decode.map3

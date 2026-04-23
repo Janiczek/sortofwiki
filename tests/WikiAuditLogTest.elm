@@ -48,9 +48,12 @@ suite =
                         |> Expect.equal "Revoked wiki admin from dave"
             , Test.test "TrustedPublishedNewPage" <|
                 \() ->
-                    WikiAuditLog.TrustedPublishedNewPage { pageSlug = "new-page" }
+                    WikiAuditLog.TrustedPublishedNewPage
+                        { pageSlug = "new-page"
+                        , markdown = "Hello"
+                        }
                         |> WikiAuditLog.eventKindUserText
-                        |> Expect.equal "Trusted publish: created page new-page"
+                        |> Expect.equal "Trusted publish: created page new-page (5 chars)"
             , Test.test "TrustedPublishedPageEdit" <|
                 \() ->
                     WikiAuditLog.TrustedPublishedPageEdit

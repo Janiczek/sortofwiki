@@ -47,7 +47,7 @@ type AuditEventKind
     | DemotedTrustedToContributor { targetUsername : String }
     | GrantedWikiAdmin { targetUsername : String }
     | RevokedWikiAdmin { targetUsername : String }
-    | TrustedPublishedNewPage { pageSlug : String }
+    | TrustedPublishedNewPage { pageSlug : String, markdown : String }
     | TrustedPublishedPageEdit { pageSlug : String, beforeMarkdown : String, afterMarkdown : String }
     | TrustedPublishedPageDelete { pageSlug : String, reason : String }
 
@@ -556,8 +556,12 @@ eventKindUserText kind =
         RevokedWikiAdmin { targetUsername } ->
             "Revoked wiki admin from " ++ targetUsername
 
-        TrustedPublishedNewPage { pageSlug } ->
-            "Trusted publish: created page " ++ pageSlug
+        TrustedPublishedNewPage { pageSlug, markdown } ->
+            "Trusted publish: created page "
+                ++ pageSlug
+                ++ " ("
+                ++ String.fromInt (String.length markdown)
+                ++ " chars)"
 
         TrustedPublishedPageEdit { pageSlug, beforeMarkdown, afterMarkdown } ->
             "Trusted publish: edited page "

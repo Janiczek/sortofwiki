@@ -37,12 +37,24 @@ endToEndTests =
                             (ProgramTest.Query.withinId "wiki-admin-users-page"
                                 (ProgramTest.Query.expectHasText "grantadmin_trusted")
                             )
-                      , client.clickLink 100 (Wiki.adminAuditUrlPath "Demo")
+                      , client.click 100 (Effect.Browser.Dom.id "wiki-logout-button")
+                      ]
+                    , ProgramTest.Actions.submitWikiLoginForm
+                        { username = "grantadmin_trusted"
+                        , password = "password12"
+                        }
+                        client
+                    , ProgramTest.Actions.createPage
+                        "Demo"
+                        "AuditPreviewPage"
+                        "# Audit Preview Page\n\nBody from trusted direct publish."
+                        client
+                    , [ client.clickLink 100 (Wiki.adminAuditUrlPath "Demo")
                       , client.checkView 600
                             (ProgramTest.Query.withinId "wiki-admin-audit-list"
                                 (ProgramTest.Query.expectHasTexts
-                                    [ "demo_wiki_admin"
-                                    , "Granted wiki admin to grantadmin_trusted"
+                                    [ "AuditPreviewPage"
+                                    , "View diff"
                                     ]
                                 )
                             )
