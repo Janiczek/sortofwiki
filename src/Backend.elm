@@ -2,6 +2,7 @@ module Backend exposing (Model, Msg, app, app_, updateFromFrontendWithTime)
 
 import BackendDataExport
 import ContributorAccount
+import ContributorWikiSession
 import Dict exposing (Dict)
 import Effect.Command as Command exposing (BackendOnly, Command)
 import Effect.Lamdera exposing (ClientId, SessionId)
@@ -196,18 +197,29 @@ wikiFrontendDetailsPayloadForSession slug sessionKey model =
                     case WikiUser.sessionContributorOnWiki sessionKey slug model.contributorSessions of
                         WikiUser.SessionHasAccount accountId ->
                             let
+                                viewerSession : Maybe ContributorWikiSession.ContributorWikiSession
+                                viewerSession =
+                                    Maybe.map2
+                                        (\displayUsername role ->
+                                            { role = role
+                                            , displayUsername = displayUsername
+                                            }
+                                        )
+                                        (WikiContributors.displayUsernameForAccount slug accountId model.contributors)
+                                        (WikiContributors.roleForAccount slug accountId model.contributors)
+
                                 maybeTrustedCount : Maybe Int
                                 maybeTrustedCount =
                                     Just (pendingCountForWiki slug model)
                             in
                             Just
                                 (Wiki.frontendDetailsForViewer w
-                                    (WikiContributors.isTrustedForWiki slug accountId model.contributors)
+                                    viewerSession
                                     maybeTrustedCount
                                 )
 
                         _ ->
-                            Just (Wiki.frontendDetailsForViewer w False Nothing)
+                            Just (Wiki.frontendDetailsForViewer w Nothing Nothing)
 
                 else
                     Nothing

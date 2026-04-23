@@ -60,6 +60,83 @@ endToEndTests =
                       ]
                     ]
         }
+    , ProgramTest.Start.startWith
+        { name = "Second tab in same session stays logged in"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , steps =
+            [ ProgramTest.Start.connectFrontend
+                { sessionId = "session-story08-second-tab"
+                , path = "/"
+                , connectClientMs = Nothing
+                , steps =
+                    \client ->
+                        List.concat
+                            [ ProgramTest.Actions.loginToWiki
+                                { wikiSlug = "Demo"
+                                , username = "demo_trusted_publisher"
+                                , password = "password12"
+                                }
+                                client
+                            , [ client.checkView 400
+                                    (ProgramTest.Query.expectAll
+                                        [ ProgramTest.Query.expectWikiHomePageShowsSlug "Demo"
+                                        , ProgramTest.Query.withinId "wiki-logout-button"
+                                            (ProgramTest.Query.expectHasText "Log out")
+                                        , ProgramTest.Query.expectHasText "Logged in as demo_trusted_publisher"
+                                        ]
+                                    )
+                              ]
+                            ]
+                }
+            , ProgramTest.Start.connectFrontend
+                { sessionId = "session-story08-second-tab"
+                , path = "/w/Demo"
+                , connectClientMs = Just 200
+                , steps =
+                    \client ->
+                        [ client.checkView 500
+                            (ProgramTest.Query.expectAll
+                                [ ProgramTest.Query.expectWikiHomePageShowsSlug "Demo"
+                                , ProgramTest.Query.withinId "wiki-logout-button"
+                                    (ProgramTest.Query.expectHasText "Log out")
+                                , ProgramTest.Query.expectHasText "Logged in as demo_trusted_publisher"
+                                ]
+                            )
+                        , client.checkModel 200
+                            (\model ->
+                                case Dict.get "Demo" model.contributorWikiSessions of
+                                    Just session ->
+                                        if session.displayUsername == "demo_trusted_publisher" then
+                                            Ok ()
+
+                                        else
+                                            Err "expected same-session tab to rebuild Demo contributor username"
+
+                                    Nothing ->
+                                        Err "expected same-session tab to rebuild Demo contributor session"
+                            )
+                        ]
+                }
+            , ProgramTest.Start.connectFrontend
+                { sessionId = "session-story08-second-tab"
+                , path = "/w/Demo/review"
+                , connectClientMs = Just 300
+                , steps =
+                    \client ->
+                        [ client.checkModel 500
+                            (ProgramTest.Model.expectRoute (Route.WikiReview "Demo")
+                                "expected same-session gated tab to land on WikiReview after auth sync"
+                            )
+                        , client.checkView 500
+                            (ProgramTest.Query.withinId "wiki-review-queue-page"
+                                (ProgramTest.Query.withinId "wiki-review-queue-empty"
+                                    (ProgramTest.Query.expectHasText "No pending submissions.")
+                                )
+                            )
+                        ]
+                }
+            ]
+        }
     , ProgramTest.Start.start
         { name = "Logged in user can't see login form"
         , config = ProgramTest.Config.demoWikiPagesOnly

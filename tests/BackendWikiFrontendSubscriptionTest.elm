@@ -12,6 +12,7 @@ import Test exposing (Test)
 import Time
 import Types exposing (ToBackend(..), ToFrontend(..))
 import Wiki
+import WikiRole
 import WikiFrontendSubscription
 import WikiUser
 
@@ -78,6 +79,51 @@ suite =
                                     requestSessionKey
                                     (Effect.Lamdera.clientIdFromString requestClientKey)
                             )
+            , Test.test "logged-in viewer gets same-session auth details in payload" <|
+                \() ->
+                    let
+                        viewerSessionKey : String
+                        viewerSessionKey =
+                            "wiki-details-viewer-session"
+
+                        viewerClient =
+                            Effect.Lamdera.clientIdFromString "wiki-details-viewer-client"
+
+                        before : Backend.Model
+                        before =
+                            pagesFixture
+                                |> withContributorSession
+                                    "Demo"
+                                    (ContributorAccount.newAccountId "Demo" "demo_trusted_publisher")
+                                    viewerSessionKey
+
+                        ( _, cmd ) =
+                            Backend.updateFromFrontendWithTime
+                                (Effect.Lamdera.sessionIdFromString viewerSessionKey)
+                                viewerClient
+                                (RequestWikiFrontendDetails "Demo")
+                                (Time.millisToPosix 0)
+                                before
+
+                        expectedPayload : Maybe Wiki.FrontendDetails
+                        expectedPayload =
+                            Dict.get "Demo" before.wikis
+                                |> Maybe.map
+                                    (\wiki ->
+                                        Wiki.frontendDetailsForViewer wiki
+                                            (Just
+                                                { role = WikiRole.TrustedContributor
+                                                , displayUsername = "demo_trusted_publisher"
+                                                }
+                                            )
+                                            (Just 0)
+                                    )
+                    in
+                    cmd
+                        |> Expect.equal
+                            (Effect.Lamdera.sendToFrontend viewerClient
+                                (WikiFrontendDetailsResponse "Demo" expectedPayload)
+                            )
             ]
         , Test.describe "broadcastWikiFrontendDetails"
             [ Test.test "trusted immediate page edit sends wiki details only to listening clients for that wiki" <|
@@ -129,7 +175,7 @@ suite =
                         demoPayload : Maybe Wiki.FrontendDetails
                         demoPayload =
                             Dict.get "Demo" after.wikis
-                                |> Maybe.map (\wiki -> Wiki.frontendDetailsForViewer wiki False Nothing)
+                                |> Maybe.map (\wiki -> Wiki.frontendDetailsForViewer wiki Nothing Nothing)
                     in
                     cmd
                         |> Expect.equal
@@ -195,12 +241,12 @@ suite =
                         demoPayload : Maybe Wiki.FrontendDetails
                         demoPayload =
                             Dict.get "Demo" after.wikis
-                                |> Maybe.map (\wiki -> Wiki.frontendDetailsForViewer wiki False Nothing)
+                                |> Maybe.map (\wiki -> Wiki.frontendDetailsForViewer wiki Nothing Nothing)
 
                         elmTipsPayload : Maybe Wiki.FrontendDetails
                         elmTipsPayload =
                             Dict.get "ElmTips" after.wikis
-                                |> Maybe.map (\wiki -> Wiki.frontendDetailsForViewer wiki False Nothing)
+                                |> Maybe.map (\wiki -> Wiki.frontendDetailsForViewer wiki Nothing Nothing)
                     in
                     cmd
                         |> Expect.equal

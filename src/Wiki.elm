@@ -41,10 +41,12 @@ module Wiki exposing
     )
 
 import Dict exposing (Dict)
+import ContributorWikiSession exposing (ContributorWikiSession)
 import Page
 import PageBacklinks
 import PageTags
 import Url.Builder as UrlBuilder
+import WikiRole
 
 
 type alias Slug =
@@ -75,6 +77,7 @@ type alias FrontendDetails =
     , publishedPageMarkdownSources : Dict Page.Slug String
     , publishedPageTags : Dict Page.Slug (List Page.Slug)
     , pendingReviewCountForTrustedViewer : Maybe Int
+    , viewerSession : Maybe ContributorWikiSession
     }
 
 
@@ -136,17 +139,24 @@ frontendDetails w =
                 )
             |> Dict.fromList
     , pendingReviewCountForTrustedViewer = Nothing
+    , viewerSession = Nothing
     }
 
 
 {-| Wiki home / graph payload: pending count is only populated for trusted moderators (server sets `Maybe`).
 -}
-frontendDetailsForViewer : Wiki -> Bool -> Maybe Int -> FrontendDetails
-frontendDetailsForViewer wiki isTrusted maybePendingCount =
+frontendDetailsForViewer : Wiki -> Maybe ContributorWikiSession -> Maybe Int -> FrontendDetails
+frontendDetailsForViewer wiki maybeViewerSession maybePendingCount =
     let
         base : FrontendDetails
         base =
             frontendDetails wiki
+
+        isTrusted : Bool
+        isTrusted =
+            maybeViewerSession
+                |> Maybe.map (.role >> WikiRole.isTrustedModerator)
+                |> Maybe.withDefault False
     in
     { base
         | pendingReviewCountForTrustedViewer =
@@ -155,6 +165,7 @@ frontendDetailsForViewer wiki isTrusted maybePendingCount =
 
             else
                 Nothing
+        , viewerSession = maybeViewerSession
     }
 
 

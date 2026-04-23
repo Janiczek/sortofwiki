@@ -871,6 +871,93 @@ contributorLoggedInOnWikiSlug wikiSlug model =
     Dict.member wikiSlug model.contributorWikiSessions
 
 
+syncContributorWikiSessionFromFrontendDetails :
+    Wiki.Slug
+    -> Maybe Wiki.FrontendDetails
+    -> Dict Wiki.Slug ContributorWikiSession
+    -> Dict Wiki.Slug ContributorWikiSession
+syncContributorWikiSessionFromFrontendDetails wikiSlug maybeDetails sessions =
+    case maybeDetails |> Maybe.andThen .viewerSession of
+        Just viewerSession ->
+            Dict.insert wikiSlug viewerSession sessions
+
+        Nothing ->
+            Dict.remove wikiSlug sessions
+
+
+contributorRouteNeedsSessionRefresh : Wiki.Slug -> Route -> Bool
+contributorRouteNeedsSessionRefresh wikiSlug route =
+    case route of
+        Route.WikiLogin routeWikiSlug _ ->
+            routeWikiSlug == wikiSlug
+
+        Route.WikiRegister routeWikiSlug ->
+            routeWikiSlug == wikiSlug
+
+        _ ->
+            case RouteAccess.contributorRestrictedReturnPath route of
+                Just ( routeWikiSlug, _ ) ->
+                    routeWikiSlug == wikiSlug
+
+                Nothing ->
+                    False
+
+
+currentRouteUrl : Route -> Url
+currentRouteUrl route =
+    Url.fromString ("https://sortofwiki.test" ++ Route.navUrlPath route)
+        |> Maybe.withDefault
+            { protocol = Url.Https
+            , host = "sortofwiki.test"
+            , port_ = Nothing
+            , path = Route.navUrlPath route
+            , query = Nothing
+            , fragment = Nothing
+            }
+
+
+contributorRouteRefreshCmd : Wiki.Slug -> Model -> Command FrontendOnly ToBackend Msg
+contributorRouteRefreshCmd wikiSlug model =
+    if contributorRouteNeedsSessionRefresh wikiSlug model.route then
+        case model.route of
+            Route.WikiLogin routeWikiSlug maybeRedirect ->
+                if routeWikiSlug == wikiSlug && contributorLoggedInOnWikiSlug wikiSlug model then
+                    Effect.Browser.Navigation.replaceUrl model.key
+                        (maybeRedirect |> Maybe.withDefault (Wiki.wikiHomeUrlPath wikiSlug))
+
+                else
+                    Command.none
+
+            Route.WikiRegister routeWikiSlug ->
+                if routeWikiSlug == wikiSlug && contributorLoggedInOnWikiSlug wikiSlug model then
+                    Effect.Browser.Navigation.replaceUrl model.key (Wiki.wikiHomeUrlPath wikiSlug)
+
+                else
+                    Command.none
+
+            _ ->
+                case RouteAccess.contributorForcedRedirect model.contributorWikiSessions (currentRouteUrl model.route) model.route of
+                    Just (RouteAccess.ToContributorLogin routeWikiSlug ret) ->
+                        if routeWikiSlug == wikiSlug then
+                            Effect.Browser.Navigation.replaceUrl model.key (Wiki.loginUrlPathWithRedirect routeWikiSlug ret)
+
+                        else
+                            Command.none
+
+                    Just (RouteAccess.AwayFromMySubmissions routeWikiSlug) ->
+                        if routeWikiSlug == wikiSlug then
+                            Effect.Browser.Navigation.replaceUrl model.key (Wiki.wikiHomeUrlPath routeWikiSlug)
+
+                        else
+                            Command.none
+
+                    Nothing ->
+                        Command.none
+
+    else
+        Command.none
+
+
 wikiSessionTrustedOnWiki : Wiki.Slug -> Model -> Bool
 wikiSessionTrustedOnWiki wikiSlug model =
     model.contributorWikiSessions
@@ -4172,6 +4259,10 @@ updateFromBackend msg model =
                 store =
                     model.store
 
+                nextContributorWikiSessions : Dict Wiki.Slug ContributorWikiSession
+                nextContributorWikiSessions =
+                    syncContributorWikiSessionFromFrontendDetails wikiSlug maybeDetails model.contributorWikiSessions
+
                 newStore : Store
                 newStore =
                     case maybeDetails of
@@ -4188,8 +4279,15 @@ updateFromBackend msg model =
                                     store.wikiDetails
                                         |> Dict.insert wikiSlug (RemoteData.Failure ())
                             }
+
+                nextModel : Model
+                nextModel =
+                    { model
+                        | store = newStore
+                        , contributorWikiSessions = nextContributorWikiSessions
+                    }
             in
-            ( { model | store = newStore }, Command.none )
+            ( nextModel, contributorRouteRefreshCmd wikiSlug nextModel )
                 |> runRouteStoreActions
 
         PageFrontendDetailsResponse wikiSlug pageSlug maybeDetails ->
@@ -6820,7 +6918,11 @@ wikiScopeSideNavItems wikiSlug model =
                         [ Html.button
                             [ Attr.type_ "button"
                             , Attr.id "wiki-logout-button"
-                            , TW.cls "text-left underline"
+                            , TW.cls
+                                ("text-left bg-transparent border-0 p-0 font-inherit cursor-pointer "
+                                    ++ "text-[var(--link)] hover:text-[var(--link-hover)] hover:bg-[var(--link-bg-hover)] rounded-[2px] underline underline-offset-[2px] "
+                                    ++ UI.focusVisibleRingClass
+                                )
                             , Events.onClick (ContributorLogoutWiki wikiSlug)
                             ]
                             [ Html.text "Log out" ]
@@ -7433,6 +7535,87 @@ viewHostAdminAuditLoading =
         [ Html.text "Loading audit log…" ]
 
 
+auditTableBaseClass : String
+auditTableBaseClass =
+    "w-full table-fixed border-separate border-spacing-0 text-[0.94rem] leading-[1.35] border-[var(--border)] [&_th+th]:border-l [&_th+th]:border-[var(--border-dash)] [&_td+td]:border-l [&_td+td]:border-[var(--border-dash)] [&_tbody_tr:hover]:bg-[var(--table-row-hover)]"
+
+
+auditTableHeaderTableClass : String
+auditTableHeaderTableClass =
+    auditTableBaseClass ++ " border-t border-b"
+
+
+auditTableBodyTableClass : String
+auditTableBodyTableClass =
+    auditTableBaseClass ++ " border-b border-t-0"
+
+
+auditTableHeaderCellClass : String
+auditTableHeaderCellClass =
+    "px-[0.55rem] py-[0.22rem] text-left align-top bg-[var(--chrome-bg)] font-semibold border-b border-[var(--border)]"
+
+
+viewAuditTableColGroup : List String -> Html msg
+viewAuditTableColGroup columnClasses =
+    Html.node "colgroup" []
+        (List.map
+            (\columnClass ->
+                Html.node "col" [ Attr.class columnClass ] []
+            )
+            columnClasses
+        )
+
+
+viewAuditTableHeaderRow : List String -> Html msg
+viewAuditTableHeaderRow labels =
+    Html.tr []
+        (List.map
+            (\labelText ->
+                Html.th
+                    [ Attr.scope "col"
+                    , TW.cls auditTableHeaderCellClass
+                    ]
+                    [ Html.text labelText ]
+            )
+            labels
+        )
+
+
+viewAuditTable :
+    { tableId : String
+    , tbodyId : String
+    , columnClasses : List String
+    , headers : List String
+    , rows : List (Html msg)
+    }
+    -> Html msg
+viewAuditTable config =
+    Html.div
+        [ TW.cls "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" ]
+        [ Html.div
+            [ TW.cls "shrink-0" ]
+            [ Html.table
+                [ TW.cls auditTableHeaderTableClass ]
+                [ viewAuditTableColGroup config.columnClasses
+                , Html.thead []
+                    [ viewAuditTableHeaderRow config.headers ]
+                ]
+            ]
+        , Html.div
+            [ TW.cls "min-h-0 min-w-0 flex-1 overflow-auto" ]
+            [ Html.table
+                [ Attr.id config.tableId
+                , TW.cls auditTableBodyTableClass
+                ]
+                [ viewAuditTableColGroup config.columnClasses
+                , Html.tbody
+                    [ Attr.id config.tbodyId ]
+                    config.rows
+                ]
+            ]
+        ]
+
+
 viewHostAdminAuditBody :
     RemoteData () (Result HostAdmin.ProtectedError (List WikiAuditLog.ScopedAuditEvent))
     -> Html Msg
@@ -7461,18 +7644,21 @@ viewHostAdminAuditBody remote =
                     [ Html.text "No audit events yet." ]
 
             else
-                UI.table UI.TableFull
-                    [ Attr.id "host-admin-audit-list" ]
-                    { theadAttrs = []
-                    , headerRowAttrs = []
-                    , headerAlign = UI.TableAlignTop
-                    , headers =
-                        [ { extraAttrs = [ Attr.scope "col" ], children = [ Html.text "Time (UTC)" ] }
-                        , { extraAttrs = [ Attr.scope "col" ], children = [ Html.text "Wiki" ] }
-                        , { extraAttrs = [ Attr.scope "col" ], children = [ Html.text "Actor" ] }
-                        , { extraAttrs = [ Attr.scope "col" ], children = [ Html.text "Event" ] }
+                viewAuditTable
+                    { tableId = "host-admin-audit-list"
+                    , tbodyId = "host-admin-audit-tbody"
+                    , columnClasses =
+                        [ "w-[13rem]"
+                        , "w-[10rem]"
+                        , "w-[10rem]"
+                        , "w-auto"
                         ]
-                    , tbodyAttrs = [ Attr.id "host-admin-audit-tbody" ]
+                    , headers =
+                        [ "Time (UTC)"
+                        , "Wiki"
+                        , "Actor"
+                        , "Event"
+                        ]
                     , rows =
                         events
                             |> List.indexedMap
@@ -7637,7 +7823,7 @@ viewHostAdminAudit model =
                 [ viewHostAdminAuditFilters model
                 , Html.div
                     [ Attr.id "host-admin-audit-table-region"
-                    , TW.cls "flex min-h-0 min-w-0 flex-1 flex-col overflow-auto"
+                    , TW.cls "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
                     ]
                     [ viewHostAdminAuditBody model.hostAdminAuditLog ]
                 ]
@@ -10054,17 +10240,19 @@ viewWikiAdminAuditBody wikiSlug remote =
                     [ Html.text "No audit events yet." ]
 
             else
-                UI.table UI.TableFull
-                    [ Attr.id "wiki-admin-audit-list" ]
-                    { theadAttrs = []
-                    , headerRowAttrs = []
-                    , headerAlign = UI.TableAlignTop
-                    , headers =
-                        [ { extraAttrs = [ Attr.scope "col" ], children = [ Html.text "Time (UTC)" ] }
-                        , { extraAttrs = [ Attr.scope "col" ], children = [ Html.text "Actor" ] }
-                        , { extraAttrs = [ Attr.scope "col" ], children = [ Html.text "Event" ] }
+                viewAuditTable
+                    { tableId = "wiki-admin-audit-list"
+                    , tbodyId = "wiki-admin-audit-tbody"
+                    , columnClasses =
+                        [ "w-[13rem]"
+                        , "w-[10rem]"
+                        , "w-auto"
                         ]
-                    , tbodyAttrs = [ Attr.id "wiki-admin-audit-tbody" ]
+                    , headers =
+                        [ "Time (UTC)"
+                        , "Actor"
+                        , "Event"
+                        ]
                     , rows =
                         events
                             |> List.indexedMap
@@ -10169,7 +10357,7 @@ viewWikiAdminAuditLoaded wikiSlug model =
         [ viewWikiAdminAuditFilters model
         , Html.div
             [ Attr.id "wiki-admin-audit-table-region"
-            , TW.cls "flex min-h-0 min-w-0 flex-1 flex-col overflow-auto"
+            , TW.cls "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
             ]
             [ viewWikiAdminAuditBody wikiSlug (Store.getWikiAuditLog wikiSlug model.wikiAdminAuditAppliedFilter model.store) ]
         ]
