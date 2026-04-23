@@ -6756,21 +6756,17 @@ themeToggleIconSystem =
 viewThemeToggle : Model -> Html Msg
 viewThemeToggle model =
     let
-        nextPreference : ColorTheme.ColorThemePreference
-        nextPreference =
-            ColorTheme.cyclePreference model.colorThemePreference
-
         ariaLabel : String
         ariaLabel =
-            case nextPreference of
+            case model.colorThemePreference of
                 ColorTheme.FollowSystem ->
-                    "Match system color theme"
+                    "Using system color theme"
 
                 ColorTheme.Fixed ColorTheme.Light ->
-                    "Use light theme"
+                    "Using light theme"
 
                 ColorTheme.Fixed ColorTheme.Dark ->
-                    "Use dark theme"
+                    "Using dark theme"
     in
     Html.button
         [ Attr.type_ "button"
@@ -6784,10 +6780,10 @@ viewThemeToggle model =
                 themeToggleIconSystem
 
             ColorTheme.Fixed ColorTheme.Light ->
-                themeToggleIconMoon
+                themeToggleIconSun
 
             ColorTheme.Fixed ColorTheme.Dark ->
-                themeToggleIconSun
+                themeToggleIconMoon
         ]
 
 
