@@ -1,4 +1,4 @@
-module PageGraph exposing (Edge, EdgeKind(..), Summary, dot, summary)
+module PageGraph exposing (Edge, EdgeDirection(..), EdgeKind(..), Summary, dot, summary)
 
 import Dict exposing (Dict)
 import Page
@@ -10,9 +10,15 @@ import Wiki
 type alias Edge =
     { fromPageSlug : Page.Slug
     , toPageSlug : Page.Slug
+    , direction : EdgeDirection
     , targetPublished : Bool
     , kind : EdgeKind
     }
+
+
+type EdgeDirection
+    = Directed
+    | Undirected
 
 
 type EdgeKind
@@ -78,6 +84,7 @@ summary wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags =
                     (\outgoingSlug ->
                         { fromPageSlug = targetPageSlug
                         , toPageSlug = outgoingSlug
+                        , direction = Directed
                         , targetPublished = Set.member (String.toLower outgoingSlug) publishedSlugSet
                         , kind = WikiLinkEdge
                         }
@@ -90,6 +97,7 @@ summary wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags =
                     (\backlinkSlug ->
                         { fromPageSlug = backlinkSlug
                         , toPageSlug = targetPageSlug
+                        , direction = Directed
                         , targetPublished = True
                         , kind = WikiLinkEdge
                         }
@@ -109,6 +117,7 @@ summary wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags =
                     (\tagSlug ->
                         { fromPageSlug = targetPageSlug
                         , toPageSlug = tagSlug
+                        , direction = Directed
                         , targetPublished = Set.member (String.toLower tagSlug) publishedSlugSet
                         , kind = TagEdge
                         }
@@ -138,6 +147,7 @@ summary wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags =
                     (\sourceSlug ->
                         { fromPageSlug = sourceSlug
                         , toPageSlug = targetPageSlug
+                        , direction = Directed
                         , targetPublished = True
                         , kind = TagEdge
                         }
@@ -146,6 +156,7 @@ summary wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags =
         edges : List Edge
         edges =
             List.concat [ backlinkEdges, outgoingEdges, incomingTagEdges, targetTagEdges ]
+                |> normalizeEdges
 
         missingPageSlugs : List Page.Slug
         missingPageSlugs =
@@ -237,14 +248,25 @@ dot wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags =
                 ++ dotString edge.toPageSlug
                 ++ (case edge.kind of
                         WikiLinkEdge ->
-                            ";"
+                            case edge.direction of
+                                Directed ->
+                                    ";"
+
+                                Undirected ->
+                                    " [dir=none];"
 
                         TagEdge ->
                             " [style="
                                 ++ dotString "dashed"
                                 ++ ", color="
                                 ++ dotString "#7c3aed"
-                                ++ "];"
+                                ++ (case edge.direction of
+                                        Directed ->
+                                            "];"
+
+                                        Undirected ->
+                                            ", dir=none];"
+                                   )
                    )
 
         linkedPublishedNodes : List Page.Slug
@@ -316,3 +338,138 @@ dotString raw =
                 |> String.replace "\n" "\\n"
            )
         ++ "\""
+
+
+normalizeEdges : List Edge -> List Edge
+normalizeEdges rawEdges =
+    let
+        rawLookup : Dict String Edge
+        rawLookup =
+            rawEdges
+                |> List.sortBy edgeSortKey
+                |> List.foldl
+                    (\edge acc -> Dict.insert (directedEdgeKey edge) edge acc)
+                    Dict.empty
+
+        normalizedLookup : Dict String Edge
+        normalizedLookup =
+            rawLookup
+                |> Dict.values
+                |> List.sortBy edgeSortKey
+                |> List.foldl
+                    (\edge acc ->
+                        let
+                            normalizedEdge : Edge
+                            normalizedEdge =
+                                if edge.fromPageSlug /= edge.toPageSlug && Dict.member (reverseDirectedEdgeKey edge) rawLookup then
+                                    undirectedEdge edge
+
+                                else
+                                    edge
+
+                            normalizedKey : String
+                            normalizedKey =
+                                case normalizedEdge.direction of
+                                    Directed ->
+                                        directedEdgeKey normalizedEdge
+
+                                    Undirected ->
+                                        undirectedEdgeKey normalizedEdge
+                        in
+                        Dict.insert normalizedKey normalizedEdge acc
+                    )
+                    Dict.empty
+    in
+    normalizedLookup
+        |> Dict.values
+        |> List.sortBy edgeSortKey
+
+
+undirectedEdge : Edge -> Edge
+undirectedEdge edge =
+    let
+        ( canonicalFrom, canonicalTo ) =
+            canonicalPair edge.fromPageSlug edge.toPageSlug
+    in
+    { fromPageSlug = canonicalFrom
+    , toPageSlug = canonicalTo
+    , direction = Undirected
+    , targetPublished = True
+    , kind = edge.kind
+    }
+
+
+canonicalPair : Page.Slug -> Page.Slug -> ( Page.Slug, Page.Slug )
+canonicalPair left right =
+    if slugSortKey left <= slugSortKey right then
+        ( left, right )
+
+    else
+        ( right, left )
+
+
+edgeSortKey : Edge -> String
+edgeSortKey edge =
+    kindSortKey edge.kind
+        ++ "|"
+        ++ slugSortKey edge.fromPageSlug
+        ++ "|"
+        ++ slugSortKey edge.toPageSlug
+        ++ "|"
+        ++ directionSortKey edge.direction
+
+
+kindSortKey : EdgeKind -> String
+kindSortKey kind =
+    case kind of
+        WikiLinkEdge ->
+            "0"
+
+        TagEdge ->
+            "1"
+
+
+directionSortKey : EdgeDirection -> String
+directionSortKey direction =
+    case direction of
+        Directed ->
+            "0"
+
+        Undirected ->
+            "1"
+
+
+slugSortKey : Page.Slug -> String
+slugSortKey pageSlug =
+    String.toLower pageSlug ++ "|" ++ pageSlug
+
+
+directedEdgeKey : Edge -> String
+directedEdgeKey edge =
+    kindSortKey edge.kind
+        ++ "|"
+        ++ slugSortKey edge.fromPageSlug
+        ++ "|"
+        ++ slugSortKey edge.toPageSlug
+
+
+reverseDirectedEdgeKey : Edge -> String
+reverseDirectedEdgeKey edge =
+    kindSortKey edge.kind
+        ++ "|"
+        ++ slugSortKey edge.toPageSlug
+        ++ "|"
+        ++ slugSortKey edge.fromPageSlug
+
+
+undirectedEdgeKey : Edge -> String
+undirectedEdgeKey edge =
+    let
+        ( canonicalFrom, canonicalTo ) =
+            canonicalPair edge.fromPageSlug edge.toPageSlug
+    in
+    kindSortKey edge.kind
+        ++ "|"
+        ++ slugSortKey canonicalFrom
+        ++ "|"
+        ++ slugSortKey canonicalTo
