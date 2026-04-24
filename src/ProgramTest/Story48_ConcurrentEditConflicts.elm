@@ -137,15 +137,9 @@ endToEndTests =
                 , steps =
                     \client ->
                         List.concat
-                            [ ProgramTest.Actions.loginToWiki
-                                { wikiSlug = "Demo"
-                                , username = "story48b"
-                                , password = "password12"
-                                }
-                                client
-                            , [ client.clickLink 100 (Wiki.mySubmissionsUrlPath "Demo")
-                              , client.clickLink 100 (Wiki.submissionDetailUrlPath "Demo" "sub_2")
-                              , client.checkView 500
+                            [ ProgramTest.Actions.navigateToPath (Wiki.mySubmissionsUrlPath "Demo") client
+                            , ProgramTest.Actions.navigateToPath (Wiki.submissionDetailUrlPath "Demo" "sub_2") client
+                            , [ client.checkView 500
                                     (ProgramTest.Query.withinId "wiki-submission-detail-status"
                                         (ProgramTest.Query.expectHasText "Needs revision")
                                     )

@@ -42,7 +42,9 @@ config =
     , NoDebug.TodoOrToString.rule
         |> Rule.ignoreErrorsForDirectories [ "tests/" ]
     , NoExposingEverything.rule
+        |> Rule.ignoreErrorsForDirectories [ "src/Evergreen/" ]
     , NoImportingEverything.rule []
+        |> Rule.ignoreErrorsForDirectories [ "src/Evergreen/" ]
     , NoMissingTypeAnnotation.rule
     , NoMissingTypeAnnotationInLetIn.rule
     , NoMissingTypeExpose.rule
@@ -53,16 +55,22 @@ config =
             [ "src/Types.elm"
             , "src/Backend.elm"
             ]
+        |> Rule.ignoreErrorsForDirectories [ "src/Evergreen/" ]
     , NoUnused.CustomTypeConstructorArgs.rule
     , NoUnused.Exports.rule
         |> Rule.ignoreErrorsForFiles
             [ "src/Env.elm"
             , "src/Store.elm"
+            , "src/WikiRole.elm" -- type mustn't be opaque
             ]
+        |> Rule.ignoreErrorsForDirectories [ "src/Evergreen/" ]
     , NoUnused.Parameters.rule
+        |> Rule.ignoreErrorsForDirectories [ "src/Evergreen/" ]
     , NoUnused.Patterns.rule
     , NoUnused.Variables.rule
+        |> Rule.ignoreErrorsForDirectories [ "src/Evergreen/" ]
     , Simplify.rule Simplify.defaults
+        |> Rule.ignoreErrorsForDirectories [ "src/Evergreen/" ]
     , NoTestValuesInProductionCode.rule
         (NoTestValuesInProductionCode.startsWith "test_")
     ]

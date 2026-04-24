@@ -2,7 +2,6 @@ module PageGraphTest exposing (suite)
 
 import Dict
 import Expect
-import Fuzz
 import Fuzzers
 import Page
 import PageGraph
@@ -153,10 +152,22 @@ suite =
                     Expect.all
                         [ \() ->
                             graphSummary.outgoingPageSlugs
-                                |> Expect.equal (if neighborhood.outgoingPageLink then [ "OutgoingPage" ] else [])
+                                |> Expect.equal
+                                    (if neighborhood.outgoingPageLink then
+                                        [ "OutgoingPage" ]
+
+                                     else
+                                        []
+                                    )
                         , \() ->
                             graphSummary.backlinkPageSlugs
-                                |> Expect.equal (if neighborhood.incomingPageLink then [ "IncomingPage" ] else [])
+                                |> Expect.equal
+                                    (if neighborhood.incomingPageLink then
+                                        [ "IncomingPage" ]
+
+                                     else
+                                        []
+                                    )
                         , \() ->
                             edgeVisible PageGraph.WikiLinkEdge "Target" "OutgoingPage" graphSummary.edges
                                 |> Expect.equal neighborhood.outgoingPageLink
@@ -334,7 +345,8 @@ edgeVisible edgeKind fromPageSlug toPageSlug edges =
     edges
         |> List.any
             (\edge ->
-                edge.kind == edgeKind
+                edge.kind
+                    == edgeKind
                     && (case edge.direction of
                             PageGraph.Directed ->
                                 edge.fromPageSlug == fromPageSlug && edge.toPageSlug == toPageSlug
