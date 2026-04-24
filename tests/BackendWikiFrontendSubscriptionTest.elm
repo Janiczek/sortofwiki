@@ -86,6 +86,7 @@ suite =
                         viewerSessionKey =
                             "wiki-details-viewer-session"
 
+                        viewerClient : Effect.Lamdera.ClientId
                         viewerClient =
                             Effect.Lamdera.clientIdFromString "wiki-details-viewer-client"
 
@@ -133,12 +134,15 @@ suite =
                         trustedEditorSession =
                             "trusted-editor-session"
 
+                        trustedEditorClient : Effect.Lamdera.ClientId
                         trustedEditorClient =
                             Effect.Lamdera.clientIdFromString "trusted-editor-client"
 
+                        demoListenerClient : Effect.Lamdera.ClientId
                         demoListenerClient =
                             Effect.Lamdera.clientIdFromString "demo-listener-client"
 
+                        otherWikiListenerClient : Effect.Lamdera.ClientId
                         otherWikiListenerClient =
                             Effect.Lamdera.clientIdFromString "other-listener-client"
 
@@ -199,12 +203,15 @@ suite =
                         logoutSessionKey =
                             "logout-session"
 
+                        logoutClient : Effect.Lamdera.ClientId
                         logoutClient =
                             Effect.Lamdera.clientIdFromString "logout-client"
 
+                        demoListenerClient : Effect.Lamdera.ClientId
                         demoListenerClient =
                             Effect.Lamdera.clientIdFromString "logout-demo-listener-client"
 
+                        elmTipsListenerClient : Effect.Lamdera.ClientId
                         elmTipsListenerClient =
                             Effect.Lamdera.clientIdFromString "logout-elmtips-listener-client"
 

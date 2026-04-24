@@ -2614,6 +2614,7 @@ update msg model =
                         d =
                             model.pageDeleteSubmitDraft
 
+                        validationErr : Submission.DeleteReasonError -> ( Model, Command FrontendOnly ToBackend Msg )
                         validationErr ve =
                             ( { model
                                 | pageDeleteSubmitDraft =

@@ -60,9 +60,9 @@ module UI exposing
     , markdownTableClass
     , markdownTableHeaderCellClass
     , markdownTableRowClass
-    , markdownTodoClass
     , markdownTextareaClass
     , markdownThematicBreakClass
+    , markdownTodoClass
     , markdownUnorderedListClass
     , markdownWikiLinkMissingClass
     , sideNavListClass
@@ -312,11 +312,6 @@ tableFullWidthMax72Class =
     "w-full max-w-[72rem] " ++ tableBaseClass
 
 
-tableFullWidthClass : String
-tableFullWidthClass =
-    "w-full " ++ tableBaseClass
-
-
 tableHeaderCellClass : String
 tableHeaderCellClass =
     "px-[0.55rem] py-[0.22rem] text-left align-top bg-[var(--chrome-bg)] font-semibold border-b border-[var(--border)]"
@@ -351,7 +346,6 @@ tableStripedRowClass =
 type TableWidth
     = TableAuto
     | TableFullMax72
-    | TableFull
 
 
 {-| Chooses top- vs middle-aligned table cell classes for `table` header cells and for `tableTd`.
@@ -386,9 +380,6 @@ tableWidthClass width =
 
         TableFullMax72 ->
             tableFullWidthMax72Class
-
-        TableFull ->
-            tableFullWidthClass
 
 
 headerClassForVerticalAlign : TableCellVerticalAlign -> String

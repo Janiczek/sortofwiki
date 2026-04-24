@@ -57,6 +57,10 @@ config =
             ]
         |> Rule.ignoreErrorsForDirectories [ "src/Evergreen/" ]
     , NoUnused.CustomTypeConstructorArgs.rule
+        |> Rule.ignoreErrorsForDirectories [ "src/Evergreen/" ]
+        |> Rule.ignoreErrorsForFiles
+            [ "src/WikiRole.elm" -- type mustn't be opaque
+            ]
     , NoUnused.Exports.rule
         |> Rule.ignoreErrorsForFiles
             [ "src/Env.elm"
