@@ -4,10 +4,11 @@ import Html exposing (Html)
 import Html.Attributes as Attr
 import Markdown.Block as Block
 import Page
-import TW
 import UI
 import Wiki
 import WikiPageMarkdownParse
+import UI.Link
+import UI.Heading
 
 
 {-| One heading line in the in-page table of contents.
@@ -67,19 +68,19 @@ view tocEntries =
                     |> Maybe.withDefault 1
         in
         Html.nav
-            [ TW.cls "font-serif"
+            [ UI.classAttr "font-serif"
             , Attr.id "page-article-toc"
             , Attr.attribute "aria-label" "On this page"
             ]
-            [ UI.sidebarHeading "On this page"
-            , Html.div [ TW.cls UI.sidebarNavSectionBodyClass ]
-                [ Html.ul [ TW.cls (UI.sideNavListClass ++ " leading-[1.3]") ]
+            [ UI.Heading.sidebarHeading "On this page"
+            , Html.div [ UI.sidebarNavSectionBodyAttr ]
+                [ Html.ul [ UI.classAttr (UI.sideNavListClass ++ " leading-[1.3]") ]
                     (tocEntries
                         |> List.map
                             (\e ->
                                 Html.li
-                                    [ TW.cls ("m-0 " ++ entryIndentClass minHeadingInt e.level) ]
-                                    [ UI.sidebarTocEntryLink
+                                    [ UI.classAttr ("m-0 " ++ entryIndentClass minHeadingInt e.level) ]
+                                    [ UI.Link.sidebarLink
                                         [ Attr.href ("#" ++ e.slug) ]
                                         [ Html.text e.label ]
                                     ]

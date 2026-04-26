@@ -6,10 +6,12 @@ import Markdown.Block as Block
 import Markdown.Html
 import Markdown.Renderer as MarkdownRenderer
 import Page
-import TW
 import UI
+import UI.FocusVisible
 import Wiki
 import WikiPageMarkdownParse
+import UI.Link
+import UI.Heading
 
 
 {-| Render markdown source as HTML using [dillonkearns/elm-markdown](https://package.elm-lang.org/packages/dillonkearns/elm-markdown/latest/).
@@ -34,10 +36,10 @@ viewPreview containerId wikiSlug publishedSlugExists markdownSource =
     in
     Html.div
         [ Attr.id containerId
-        , TW.cls UI.markdownContainerClass
+        , UI.markdownContainerAttr
         ]
         [ Html.div
-            [ TW.cls "min-w-0" ]
+            [ UI.minW0Attr ]
             body
         ]
 
@@ -61,88 +63,75 @@ htmlRendererWithHeadingIds maybeSlug =
         base =
             MarkdownRenderer.defaultHtmlRenderer
 
-        headingAttrs : Block.HeadingLevel -> List (Html.Attribute msg)
-        headingAttrs level =
-            let
-                levelClass : String
-                levelClass =
-                    case level of
-                        Block.H1 ->
-                            UI.markdownHeading1Class
-
-                        Block.H2 ->
-                            UI.markdownHeading2Class
-
-                        Block.H3 ->
-                            UI.markdownHeading3Class
-
-                        Block.H4 ->
-                            UI.markdownHeading4Class
-
-                        Block.H5 ->
-                            UI.markdownHeading5Class
-
-                        Block.H6 ->
-                            UI.markdownHeading6Class
-            in
-            TW.cls levelClass
-                :: (maybeSlug
-                        |> Maybe.map Attr.id
-                        |> Maybe.map List.singleton
-                        |> Maybe.withDefault []
-                   )
+        headingAttrs : List (Html.Attribute msg)
+        headingAttrs =
+            maybeSlug
+                |> Maybe.map Attr.id
+                |> Maybe.map List.singleton
+                |> Maybe.withDefault []
     in
     { base
         | heading =
             \{ level, children } ->
-                headingHtml (headingAttrs level) level children
+                case level of
+                    Block.H1 ->
+                        UI.Heading.markdownHeading1 headingAttrs children
+
+                    Block.H2 ->
+                        UI.Heading.markdownHeading2 headingAttrs children
+
+                    Block.H3 ->
+                        UI.Heading.markdownHeading3 headingAttrs children
+
+                    Block.H4 ->
+                        UI.Heading.markdownHeading4 headingAttrs children
+
+                    Block.H5 ->
+                        UI.Heading.markdownHeading5 headingAttrs children
+
+                    Block.H6 ->
+                        UI.Heading.markdownHeading6 headingAttrs children
         , paragraph =
             \children ->
-                Html.p [ TW.cls UI.markdownParagraphClass ] children
+                Html.p [ UI.markdownParagraphAttr ] children
         , blockQuote =
             \children ->
-                Html.blockquote [ TW.cls UI.markdownBlockQuoteClass ] children
+                Html.blockquote [ UI.markdownBlockQuoteAttr ] children
         , codeSpan =
             \code ->
-                Html.code [ TW.cls UI.markdownCodeSpanClass ] [ Html.text code ]
+                Html.code [ UI.markdownCodeSpanAttr ] [ Html.text code ]
         , link =
             \{ title, destination } children ->
-                let
-                    ( linkClass, titleAttr ) =
-                        case title of
-                            Just "sortofwiki:missing" ->
-                                ( UI.markdownWikiLinkMissingClass, Nothing )
+                case title of
+                    Just "sortofwiki:missing" ->
+                        UI.Link.missingLink [ Attr.href destination ] children
 
-                            _ ->
-                                ( UI.markdownLinkClass, title )
-                in
-                Html.a
-                    ([ TW.cls linkClass
-                     , Attr.href destination
-                     ]
-                        ++ (titleAttr
-                                |> Maybe.map Attr.title
-                                |> Maybe.map List.singleton
-                                |> Maybe.withDefault []
-                           )
-                    )
-                    children
+                    _ ->
+                        UI.Link.contentLink
+                            ([ Attr.href destination ]
+                                ++ (title
+                                        |> Maybe.map Attr.title
+                                        |> Maybe.map List.singleton
+                                        |> Maybe.withDefault []
+                                   )
+                            )
+                            children
         , unorderedList =
             \items ->
-                Html.ul [ TW.cls UI.markdownUnorderedListClass ]
+                Html.ul [ UI.markdownUnorderedListAttr ]
                     (List.map markdownListItemHtml items)
         , orderedList =
             \startIndex items ->
                 Html.ol
-                    [ TW.cls UI.markdownOrderedListClass
+                    [ UI.markdownOrderedListAttr
                     , Attr.start startIndex
                     ]
                     (items
-                        |> List.map (\children -> Html.li [ TW.cls UI.markdownListItemClass ] children)
+                        |> List.map (\children -> Html.li [ UI.markdownListItemAttr ] children)
                     )
         , table =
             \children ->
-                Html.table [ TW.cls UI.markdownTableClass ] children
+                Html.table [ UI.markdownTableAttr ] children
         , tableHeader =
             \children ->
                 Html.thead [] children
@@ -151,21 +140,21 @@ htmlRendererWithHeadingIds maybeSlug =
                 Html.tbody [] children
         , tableRow =
             \children ->
-                Html.tr [ TW.cls UI.markdownTableRowClass ] children
+                Html.tr [ UI.markdownTableRowAttr ] children
         , tableHeaderCell =
             \alignment children ->
                 Html.th
-                    (TW.cls UI.markdownTableHeaderCellClass :: tableAlignmentAttrs alignment)
+                    (UI.markdownTableHeaderCellAttr :: tableAlignmentAttrs alignment)
                     children
         , tableCell =
             \alignment children ->
                 Html.td
-                    (TW.cls UI.markdownTableCellClass :: tableAlignmentAttrs alignment)
+                    (UI.markdownTableCellAttr :: tableAlignmentAttrs alignment)
                     children
         , codeBlock =
             \{ body } ->
-                Html.pre [ TW.cls UI.markdownCodeBlockPreClass ]
-                    [ Html.code [ TW.cls UI.markdownCodeBlockCodeClass ] [ Html.text body ] ]
+                Html.pre [ UI.markdownCodeBlockPreAttr ]
+                    [ Html.code [ UI.markdownCodeBlockCodeAttr ] [ Html.text body ] ]
         , html =
             Markdown.Html.oneOf
                 [ Markdown.Html.tag "inline-equation" inlineEquationHtml
@@ -176,7 +165,7 @@ htmlRendererWithHeadingIds maybeSlug =
                     |> Markdown.Html.withAttribute "data-todo"
                 ]
         , thematicBreak =
-            Html.hr [ TW.cls UI.markdownThematicBreakClass ] []
+            Html.hr [ UI.markdownThematicBreakAttr ] []
     }
 
 
@@ -224,29 +213,31 @@ markdownListItemHtml listItem =
         Block.ListItem task children ->
             case task of
                 Block.NoTask ->
-                    Html.li [ TW.cls UI.markdownListItemClass ] children
+                    Html.li [ UI.markdownListItemAttr ] children
 
                 Block.IncompleteTask ->
-                    Html.li [ TW.cls UI.markdownListItemClass ]
+                    Html.li [ UI.markdownListItemAttr ]
                         [ Html.input
-                            [ Attr.type_ "checkbox"
-                            , Attr.checked False
-                            , Attr.disabled True
-                            , TW.cls UI.focusVisibleRingClass
-                            ]
+                            ([ Attr.type_ "checkbox"
+                             , Attr.checked False
+                             , Attr.disabled True
+                             ]
+                                |> UI.FocusVisible.on
+                            )
                             []
                         , Html.text " "
                         , Html.span [] children
                         ]
 
                 Block.CompletedTask ->
-                    Html.li [ TW.cls UI.markdownListItemClass ]
+                    Html.li [ UI.markdownListItemAttr ]
                         [ Html.input
-                            [ Attr.type_ "checkbox"
-                            , Attr.checked True
-                            , Attr.disabled True
-                            , TW.cls UI.focusVisibleRingClass
-                            ]
+                            ([ Attr.type_ "checkbox"
+                             , Attr.checked True
+                             , Attr.disabled True
+                             ]
+                                |> UI.FocusVisible.on
+                            )
                             []
                         , Html.text " "
                         , Html.span [] children
@@ -270,7 +261,7 @@ blockEquationHtml equation _ =
 todoHtml : String -> List (Html msg) -> Html msg
 todoHtml todoText _ =
     Html.em
-        [ TW.cls UI.markdownTodoClass
+        [ UI.markdownTodoAttr
         , Attr.attribute "data-todo-text" todoText
         ]
         [ Html.text ("TODO: " ++ todoText) ]

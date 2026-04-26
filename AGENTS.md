@@ -82,9 +82,23 @@ case bar of
 
 `lamdera live` _REQUIRES_ that there exist `Types.FrontendModel`, `Types.BackendModel`, `Types.FrontendMsg` and `Types.BackendMsg`, and that `Types.ToFrontend` and `Types.ToBackend` aren't aliases.
 
+---------------
+
+`Frontend.elm` _MUSTN'T_ use `Attr.class` or the TW module by itself. It needs to use the UI* modules.
+
+UI.* modules mustn't expose attributes (Tailwind class strings). They should expose `view` functions that can be used for various usages, and aren't specific to an usage.
+
+Each UI.* module needs to have its own elm-book chapter module that's referred to from book/src/Book.elm
+
+Minimize UI module (definitions, usages) in favor of UI.* modules.
+
+UI.Foo modules shouldn't import from UI at all. They should own their styles.
+
 ---------------------------------
 
 # Caveman Mode
+
+Always turned on.
 
 ## Core Rule
 

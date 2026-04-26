@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UI.elm Book</title>
+
+    <script src="/public/tailwind_browser_4.2.2.min.js"></script>
+
+    <style>
+      @font-face {
+        font-family: "JetBrains Mono";
+        font-style: normal;
+        font-weight: 100 800;
+        font-display: swap;
+        src: url("/public/JetBrainsMono-VariableFont_wght.ttf") format("truetype");
+      }
+
+      @font-face {
+        font-family: "JetBrains Mono";
+        font-style: italic;
+        font-weight: 100 800;
+        font-display: swap;
+        src: url("/public/JetBrainsMono-Italic-VariableFont_wght.ttf") format("truetype");
+      }
+
+      @font-face {
+        font-family: "Manrope";
+        font-style: normal;
+        font-weight: 100 900;
+        font-display: swap;
+        src: url("/public/Manrope-VariableFont_wght.ttf") format("truetype");
+      }
+
+      @font-face {
+        font-family: "Newsreader";
+        font-style: normal;
+        font-weight: 200 800;
+        font-display: swap;
+        src: url("/public/Newsreader-VariableFont_opsz,wght.ttf") format("truetype");
+      }
+
+      @font-face {
+        font-family: "Newsreader";
+        font-style: italic;
+        font-weight: 200 800;
+        font-display: swap;
+        src: url("/public/Newsreader-Italic-VariableFont_opsz,wght.ttf") format("truetype");
+      }
+
+      :root {
+        --font-ui: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        --font-serif: "Newsreader", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+        --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        --bg: #fafaf2;
+        --fg: #1a1c18;
+        --fg-muted: #44483d;
+        --link: #36521f;
+        --link-hover: #243713;
+        --link-bg-hover: #e3e8d0;
+        --border: #74796c;
+        --border-subtle: #c4c8ba;
+        --border-dash: #929d6c;
+        --chrome-bg: #f4f4ec;
+        --btn-bg: #496731;
+        --btn-fg: #ffffff;
+        --btn-border: #324e1b;
+        --danger: #6b1010;
+        --danger-link-bg-hover: #f7cdcd;
+        --danger-bg: #ffdad6;
+        --danger-btn-bg: #6b1010;
+        --danger-btn-fg: #ffffff;
+        --code-bg: #eeeee6;
+        --focus-ring: #496731;
+        --input-bg: #ffffff;
+        --table-stripe: #e9e9e1;
+        --table-row-hover: #e3e3db;
+        --chip-off-bg: var(--input-bg);
+        --chip-off-fg: var(--fg-muted);
+        --chip-off-border: var(--border);
+        --chip-on-bg: #5c7a34;
+        --chip-on-fg: #fcfdf6;
+        --chip-on-border: #3a4f20;
+        /* Botanical tag pills: buttery yellow accent */
+        --tag-bg: #ece3b5;
+        --tag-fg: #4c4725;
+        --tag-border: #cfc79b;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #fafaf2;
+      }
+    </style>
+
+    <script>
+      window.MathJax = {
+        options: {
+          enableMenu: false,
+          /* Combined bundles include a11y; disable enrichment/speech so no SRE worker (no /sre/ on our server). */
+          enableEnrichment: false,
+          enableSpeech: false,
+          enableBraille: false,
+          enableComplexity: false,
+          enableExplorer: false,
+          menuOptions: {
+            settings: {
+              enrich: false,
+              speech: false,
+              braille: false,
+              collapsible: false,
+              assistiveMml: false,
+            },
+          },
+        },
+        svg: { fontCache: "local" },
+        output: {
+          font: "mathjax-pagella",
+          fontPath: "/mathjax-pagella-font_4.1.1",
+        },
+      };
+    </script>
+    <script defer src="/public/mathjax_tex-svg-nofont_4.1.1.min.js"></script>
+    <script defer src="/public/graphviz-component_2.0.0_graph-bundled.min.js"></script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script src="/book/book.js"></script>
+    <script>
+      Elm.Book.init({ node: document.getElementById("app") });
+    </script>
+  </body>
+</html>

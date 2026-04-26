@@ -47,6 +47,7 @@ suite =
                                 , { fromPageSlug = "About", toPageSlug = "TodoGap", direction = WikiGraph.Directed, targetPublished = False, kind = WikiGraph.WikiLinkEdge }
                                 , { fromPageSlug = "About", toPageSlug = "Meta", direction = WikiGraph.Directed, targetPublished = False, kind = WikiGraph.TagEdge }
                                 ]
+                            , globalInboundCounts = Dict.fromList [ ( "about", 1 ), ( "home", 1 ), ( "meta", 1 ), ( "todogap", 1 ) ]
                             }
             , Test.test "keeps reciprocal page links undirected while one-way tags stay directed" <|
                 \() ->
@@ -165,9 +166,10 @@ suite =
                                     ]
                                 )
                     in
-                    [ String.contains "\"About\" [href=\"/w/Demo/pg/About\"];" graphDot
-                    , String.contains "\"Home\" [href=\"/w/Demo/pg/Home\"];" graphDot
-                    , String.contains "\"TodoGap\" [href=\"/w/Demo/pg/TodoGap\", style=\"dashed\", color=\"#dc2626\", fontcolor=\"#dc2626\"];" graphDot
+                    [ String.contains "\"About\" [href=\"/w/Demo/pg/About\"" graphDot
+                    , String.contains "\"Home\" [href=\"/w/Demo/pg/Home\"" graphDot
+                    , String.contains "\"TodoGap\" [href=\"/w/Demo/p/TodoGap\"" graphDot
+                    , String.contains "style=\"dashed\", color=\"#dc2626\", fontcolor=\"#dc2626\"" graphDot
                     , String.contains "\"About\" -> \"Home\" [dir=none];" graphDot
                     , String.contains "\"About\" -> \"TodoGap\";" graphDot
                     , String.contains "\"About\" -> \"Meta\" [style=\"dashed\", color=\"#7c3aed\"];" graphDot
@@ -273,7 +275,8 @@ edgeVisible edgeKind fromPageSlug toPageSlug edges =
     edges
         |> List.any
             (\edge ->
-                edge.kind == edgeKind
+                edge.kind
+                    == edgeKind
                     && (case edge.direction of
                             WikiGraph.Directed ->
                                 edge.fromPageSlug == fromPageSlug && edge.toPageSlug == toPageSlug

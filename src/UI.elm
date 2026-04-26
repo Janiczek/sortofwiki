@@ -2,98 +2,336 @@ module UI exposing
     ( TableCellVerticalAlign(..)
     , TableHeaderCell
     , TableWidth(..)
+    , appHeaderBarAttr
     , appHeaderBarClass
+    , appHeaderDividerAttr
     , appHeaderDividerClass
+    , appHeaderH1Attr
     , appHeaderH1Class
-    , appHeaderPrimaryLinkClass
+    , appHeaderPrimaryPlainAttr
     , appHeaderPrimaryPlainClass
+    , appHeaderSecondaryAfterDividerAttr
     , appHeaderSecondaryAfterDividerClass
+    , appHeaderSecondaryBracketAttr
     , appHeaderSecondaryBracketClass
+    , appHeaderSecondaryMetaAttr
     , appHeaderSecondaryMetaClass
+    , appHeaderSecondaryWikiLabelEmAttr
     , appHeaderSecondaryWikiLabelEmClass
+    , appHeaderSecondaryWikiWrapAttr
     , appHeaderSecondaryWikiWrapClass
+    , appHeaderTitleRowAttr
     , appHeaderTitleRowClass
     , appMainScrollRegionId
     , appRootClass
+    , appRootClassAttr
+    , auditFilterLegendTextAttr
+    , auditFilterTypeGroupAttr
+    , auditLogCol
+    , auditLogColGroup
+    , auditLogHeaderRow
+    , auditLogTableView
+    , auditMainColumnBodyInnerAttr
+    , auditTableBaseClass
+    , auditTableBodyTableClass
+    , auditTableHeaderCellClass
+    , auditTableHeaderTableClass
+    , backlinksListAttr
     , backlinksListClass
+    , backlinksSectionAttr
     , backlinksSectionClass
-    , button
-    , contentHeading2
+    , cellClassForVerticalAlign
+    , classAttr
+    , clusterAttr
     , contentLabel
-    , contentLink
+    , contentLabelClass
     , contentParagraph
-    , dangerButton
-    , focusVisibleRingClass
+    , contentParagraphClass
+    , flexColMin0Gap3Attr
+    , flexRowMin0Attr
+    , flexWrapGap1Attr
+    , flexWrapGap2Attr
+    , flexWrapGap2Mt3Attr
+    , formCenteredCardAttr
+    , formCenteredCardClass
+    , formFeedbackRowAttr
+    , formFeedbackTextSmAttr
+    , formFieldLabelBlockAttr
+    , formFieldMinW0Attr
+    , formStackMb3Attr
+    , formTextInputAttr
+    , formTextInputAuditFilterAttr
+    , formTextInputAuditFilterClass
     , formTextInputClass
-    , formTextareaClass
-    , formTextareaCompactClass
+    , formTextInputHostAdminSlugAttr
+    , formTextInputHostAdminSlugClass
+    , gridCellCol2Row2Attr
+    , gridCellStackCol1Row3Attr
+    , gridCellStackCol2Row3Attr
+    , gridTwoByTwoDiffStrAttr
+    , gridTwoColEditorStrAttr
+    , headerClassForVerticalAlign
+    , holyGrailLayout
+    , hostAdminAuditDiffPageShellAttr
+    , hostAdminAuditFiltersCardAttr
+    , hostAdminAuditFiltersGridAttr
+    , hostAdminAuditPageShellAttr
+    , hostAdminBackupCardAttr
+    , hostAdminCardParagraphTightAttr
+    , hostAdminDangerBlurbAttr
+    , hostAdminDeleteFormStackAttr
+    , hostAdminStatusParaAttr
+    , hostAdminWikiDetailCardAttr
     , hostAdminWikiDetailCardClass
+    , hostAdminWikiDetailDangerCardAttr
     , hostAdminWikiDetailDangerCardClass
+    , hostAdminWikiDetailFormStackAttr
+    , hostAdminWikiDetailGridAttr
     , hostAdminWikiDetailGridClass
+    , hostAdminWikiDetailMainStackAttr
     , hostAdminWikiDetailMainStackClass
+    , hostAdminWikiDetailPageTitleAttr
     , hostAdminWikiDetailPageTitleClass
+    , hostAdminWikiDetailShellAttr
     , hostAdminWikiDetailShellClass
+    , hostAdminWikiDetailSideStackAttr
     , hostAdminWikiDetailSideStackClass
+    , hostAdminWikiListSlugAttr
     , hostAdminWikiSlugClass
-    , hostAdminWikiStatusBadgeActiveClass
-    , hostAdminWikiStatusBadgeInactiveClass
+    , inputTextAttr
+    , inputTextFullAttr
+    , layoutHolyGrailAttr
     , layoutHolyGrailClass
+    , layoutLeftNavAsideAttr
     , layoutLeftNavAsideClass
     , layoutMainColumnClass
     , layoutMainColumnClassAuditFill
+    , layoutMainColumnForRouteAttr
+    , markdownBlockQuoteAttr
     , markdownBlockQuoteClass
+    , markdownCodeBlockCodeAttr
     , markdownCodeBlockCodeClass
+    , markdownCodeBlockPreAttr
     , markdownCodeBlockPreClass
+    , markdownCodeSpanAttr
     , markdownCodeSpanClass
+    , markdownContainerAttr
     , markdownContainerClass
-    , markdownHeading1Class
-    , markdownHeading2Class
-    , markdownHeading3Class
-    , markdownHeading4Class
-    , markdownHeading5Class
-    , markdownHeading6Class
-    , markdownLinkClass
+    , markdownListItemAttr
     , markdownListItemClass
+    , markdownOrderedListAttr
     , markdownOrderedListClass
+    , markdownParagraphAttr
     , markdownParagraphClass
+    , markdownPreviewScrollClass
+    , markdownPreviewScrollMinFlexAttr
+    , markdownPreviewScrollMinFlexFullHeightAttr
+    , markdownTableAttr
+    , markdownTableCellAttr
     , markdownTableCellClass
     , markdownTableClass
+    , markdownTableHeaderCellAttr
     , markdownTableHeaderCellClass
+    , markdownTableRowAttr
     , markdownTableRowClass
-    , markdownTextareaClass
+    , markdownThematicBreakAttr
     , markdownThematicBreakClass
+    , markdownTodoAttr
     , markdownTodoClass
+    , markdownUnorderedListAttr
     , markdownUnorderedListClass
-    , markdownWikiLinkMissingClass
+    , mainContentPaddingAttr
+    , mb2Attr
+    , mb3Attr
+    , minW0Attr
+    , mt3Mb3Attr
+    , newPageEditorMarkdownPreviewCellAttr
+    , newPageEditorMarkdownPreviewCellClass
+    , pageActionsSidebarStackAttr
+    , pageActionsTopBorderBlockAttr
+    , reviewDeletePagePreviewTitleAttr
+    , reviewDiffNewPagePreviewColShellAttr
+    , reviewFieldsetAttr
+    , reviewLegendAttr
+    , reviewNestedNoteColumnAttr
+    , reviewOptionLabelStrongAttr
+    , reviewRadioColumnAttr
+    , reviewRadioRowAttr
+    , rightRailSectionCards
+    , sideNavListAttr
     , sideNavListClass
+    , sideNavBottomSectionAttr
+    , sideNavBottomSectionClass
+    , sideNavMainSectionAttr
+    , sideNavMainSectionClass
+    , sideNavNavAttr
     , sideNavNavClass
-    , sideNavPublicAdminLinkClass
+    , sideNavStackAttr
     , sideNavStackClass
+    , sidebarContainerAttr
     , sidebarContainerClass
+    , sidebarDesktopOnlyAttr
     , sidebarDesktopOnlyClass
-    , sidebarHeading
-    , sidebarLink
+    , sidebarM0Attr
+    , sidebarNavSectionBodyAttr
     , sidebarNavSectionBodyClass
-    , sidebarTocEntryLink
+    , sidebarNavSectionBodyStackAttr
+    , sidebarNavHorizontalIndentAttr
+    , sidebarTocListIndentAttr
+    , sidebarTocListRootAttr
+    , stackAttr
+    , stackTightAttr
+    , submissionGridTight2ColAttr
+    , submissionStatusDangerLineAttr
+    , submitActionsBarAttr
+    , submitSummaryParagraphAttr
+    , surfaceCardAttr
     , table
+    , tableAutoClass
+    , tableBaseClass
     , tableCellClass
+    , tableCellMiddleClass
+    , tableCellMonoTimestampAttr
+    , tableCellMonoTimestampClass
+    , tableFullWidthMax72Class
+    , tableHeaderCellClass
+    , tableHeaderCellMiddleClass
     , tableHeaderText
+    , tableStripedRowClass
     , tableTd
-    , themeToggleButtonClass
-    , togglableChip
+    , tableTdSerif
+    , tableWidthClass
+    , tagPillAttr
+    , tagPillClass
+    , tagPillsListAttr
+    , todosListDiscAttr
     , trStriped
+    , viewDiffKindInlineAttr
+    , wikiAdminAuditFiltersGridAttr
+    , wikiAdminAuditPageShellAttr
+    , wikiCatalogCardAttr
     , wikiCatalogCardClass
+    , wikiCatalogCardSlugEmAttr
     , wikiCatalogCardSlugEmClass
+    , wikiCatalogCardSummaryAttr
     , wikiCatalogCardSummaryClass
+    , wikiCatalogCardTitleAttr
     , wikiCatalogCardTitleClass
-    , wikiCatalogCardTitleLinkClass
+    , wikiCatalogGridAttr
     , wikiCatalogGridClass
+    , wikiRightRailSectionCardAttr
+    , wikiRightRailSectionCardClass
+    , wikiRightRailTocNudgeAttr
     )
 
 import Html exposing (Attribute, Html)
 import Html.Attributes as Attr
-import Html.Events as Events
 import TW
+
+
+classAttr : String -> Attribute msg
+classAttr =
+    TW.cls
+
+
+minW0Attr : Attribute msg
+minW0Attr =
+    TW.cls "min-w-0"
+
+
+markdownContainerAttr : Attribute msg
+markdownContainerAttr =
+    TW.cls markdownContainerClass
+
+
+markdownParagraphAttr : Attribute msg
+markdownParagraphAttr =
+    TW.cls markdownParagraphClass
+
+
+markdownBlockQuoteAttr : Attribute msg
+markdownBlockQuoteAttr =
+    TW.cls markdownBlockQuoteClass
+
+
+markdownOrderedListAttr : Attribute msg
+markdownOrderedListAttr =
+    TW.cls markdownOrderedListClass
+
+
+markdownListItemAttr : Attribute msg
+markdownListItemAttr =
+    TW.cls markdownListItemClass
+
+
+markdownTableAttr : Attribute msg
+markdownTableAttr =
+    TW.cls markdownTableClass
+
+
+markdownTableRowAttr : Attribute msg
+markdownTableRowAttr =
+    TW.cls markdownTableRowClass
+
+
+markdownTableHeaderCellAttr : Attribute msg
+markdownTableHeaderCellAttr =
+    TW.cls markdownTableHeaderCellClass
+
+
+markdownTableCellAttr : Attribute msg
+markdownTableCellAttr =
+    TW.cls markdownTableCellClass
+
+
+markdownCodeBlockPreAttr : Attribute msg
+markdownCodeBlockPreAttr =
+    TW.cls markdownCodeBlockPreClass
+
+
+markdownCodeBlockCodeAttr : Attribute msg
+markdownCodeBlockCodeAttr =
+    TW.cls markdownCodeBlockCodeClass
+
+
+markdownThematicBreakAttr : Attribute msg
+markdownThematicBreakAttr =
+    TW.cls markdownThematicBreakClass
+
+
+markdownTodoAttr : Attribute msg
+markdownTodoAttr =
+    TW.cls markdownTodoClass
+
+
+stackAttr : Attribute msg
+stackAttr =
+    TW.cls "flex flex-col gap-3 min-w-0"
+
+
+stackTightAttr : Attribute msg
+stackTightAttr =
+    TW.cls "flex flex-col gap-1.5 min-w-0"
+
+
+clusterAttr : Attribute msg
+clusterAttr =
+    TW.cls "flex flex-wrap gap-2"
+
+
+surfaceCardAttr : Attribute msg
+surfaceCardAttr =
+    TW.cls "border border-[var(--border-subtle)] bg-[var(--chrome-bg)] rounded-xl p-3"
+
+
+inputTextAttr : Attribute msg
+inputTextAttr =
+    formTextInputAttr
+
+
+inputTextFullAttr : Attribute msg
+inputTextFullAttr =
+    TW.cls (formTextInputClass ++ " w-full max-w-full")
 
 
 {-| `Html.main_` in the app shell: overflow-y scroll region for article content. Used for in-page fragment scrolling (window scroll is not used; see `Frontend` Dom tasks).
@@ -103,9 +341,16 @@ appMainScrollRegionId =
     "app-main-scroll"
 
 
-appRootClass : String
-appRootClass =
-    "app-root flex flex-col h-dvh max-h-dvh min-h-0 overflow-hidden px-[0.5rem] pt-[0.25rem] pb-0 font-serif bg-[var(--bg)] text-[var(--fg)] leading-[1.35]"
+appRootClass : Bool -> String
+appRootClass trimHorizontalPadding =
+    "app-root flex flex-col h-dvh max-h-dvh min-h-0 overflow-hidden "
+        ++ (if trimHorizontalPadding then
+                "px-0 "
+
+            else
+                "px-[0.5rem] "
+           )
+        ++ "pb-0 [font-family:var(--font-ui)] bg-[var(--bg)] text-[var(--fg)] leading-[1.35]"
 
 
 focusVisibleRingClass : String
@@ -113,30 +358,9 @@ focusVisibleRingClass =
     "focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-offset-2"
 
 
-contentLinkClass : String
-contentLinkClass =
-    "text-[var(--link)] hover:text-[var(--link-hover)] hover:bg-[var(--link-bg-hover)] underline underline-offset-[2px] "
-        ++ focusVisibleRingClass
-
-
-contentLink : List (Attribute msg) -> List (Html msg) -> Html msg
-contentLink attrs children =
-    Html.a (TW.cls contentLinkClass :: attrs) children
-
-
-contentHeading2Class : String
-contentHeading2Class =
-    "mt-[0.35rem] mb-[0.2rem] font-semibold leading-[1.2] text-[1.1rem]"
-
-
-contentHeading2 : List (Attribute msg) -> List (Html msg) -> Html msg
-contentHeading2 attrs children =
-    Html.h2 (TW.cls contentHeading2Class :: attrs) children
-
-
 contentParagraphClass : String
 contentParagraphClass =
-    "my-[1rem]"
+    "my-[1rem] leading-[1.6] [font-family:var(--font-serif)] first:mt-0"
 
 
 contentParagraph : List (Attribute msg) -> List (Html msg) -> Html msg
@@ -146,7 +370,7 @@ contentParagraph attrs children =
 
 contentLabelClass : String
 contentLabelClass =
-    "block mt-[0.25rem] text-[1rem] text-[var(--fg-muted)]"
+    "block mt-[0.25rem] text-[0.8125rem] text-[var(--fg-muted)] [font-family:var(--font-ui)]"
 
 
 contentLabel : List (Attribute msg) -> List (Html msg) -> Html msg
@@ -158,119 +382,13 @@ contentLabel attrs children =
 -}
 formTextInputClass : String
 formTextInputClass =
-    "font-inherit text-[1rem] px-[0.3rem] py-[0.15rem] mt-[0.1rem] mb-[0.2rem] border border-[var(--border)] bg-[var(--input-bg)] text-[var(--fg)] max-w-full box-border "
+    "[font-family:var(--font-ui)] text-[0.8125rem] px-[0.5rem] py-[0.3rem] mt-[0.1rem] mb-[0.2rem] rounded-lg border border-[var(--border-subtle)] bg-[var(--input-bg)] text-[var(--fg)] max-w-full box-border "
         ++ focusVisibleRingClass
-
-
-{-| Border, spacing, and width shared by `formTextareaClass` and `markdownBodyTextareaClass`.
--}
-formTextareaChromeClass : String
-formTextareaChromeClass =
-    "box-border px-[0.3rem] py-[0.15rem] mt-[0.1rem] mb-[0.2rem] border border-[var(--border)] bg-[var(--input-bg)] text-[var(--fg)] max-w-full w-full max-w-[48rem] "
-        ++ focusVisibleRingClass
-
-
-{-| Serif body typography plus `formTextareaChromeClass`.
--}
-formTextareaShellClass : String
-formTextareaShellClass =
-    "font-inherit text-[1rem] " ++ formTextareaChromeClass
-
-
-{-| Default tall multi-line control.
--}
-formTextareaClass : String
-formTextareaClass =
-    formTextareaShellClass ++ " min-h-[5rem]"
-
-
-{-| Short textarea inside flex layouts (e.g. review decision notes).
--}
-formTextareaCompactClass : String
-formTextareaCompactClass =
-    formTextareaShellClass ++ " min-h-0"
-
-
-buttonClass : String
-buttonClass =
-    "[font-family:inherit] text-[1rem] px-[0.45rem] py-[0.2rem] mt-[0.1rem] mr-[0.15rem] mb-[0.1rem] ml-0 bg-[var(--btn-bg)] text-[var(--btn-fg)] border border-[var(--btn-border)] cursor-pointer hover:brightness-[1.08] dark:hover:brightness-[1.12] dark:hover:border-[var(--border-dash)] disabled:opacity-[0.55] disabled:cursor-not-allowed "
-        ++ focusVisibleRingClass
-
-
-{-| Filled destructive control. Uses `--danger-btn-bg` / `--danger-btn-fg` (not `--danger`) so class-based `.dark` matches CSS variables; see `head.html`.
--}
-buttonDangerClass : String
-buttonDangerClass =
-    "[font-family:inherit] text-[1rem] px-[0.45rem] py-[0.2rem] mt-[0.1rem] mr-[0.15rem] mb-[0.1rem] ml-0 bg-[var(--danger-btn-bg)] text-[var(--danger-btn-fg)] border border-[var(--danger-btn-bg)] cursor-pointer hover:brightness-[1.12] disabled:opacity-[0.55] disabled:cursor-not-allowed "
-        ++ focusVisibleRingClass
-
-
-button : List (Attribute msg) -> List (Html msg) -> Html msg
-button attrs children =
-    Html.button (TW.cls buttonClass :: attrs) children
-
-
-dangerButton : List (Attribute msg) -> List (Html msg) -> Html msg
-dangerButton attrs children =
-    Html.button (TW.cls buttonDangerClass :: attrs) children
-
-
-{-| Badge-style toggle (e.g. filter chips). Inactive = muted surface; active = green chip tokens in `head.html`.
--}
-togglableChip : List (Attribute msg) -> { pressed : Bool, onClick : msg, label : String } -> Html msg
-togglableChip extraAttrs { pressed, onClick, label } =
-    let
-        stateClass : String
-        stateClass =
-            if pressed then
-                "bg-[var(--chip-on-bg)] text-[var(--chip-on-fg)] border-[var(--chip-on-border)] shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
-
-            else
-                "bg-[var(--chip-off-bg)] text-[var(--chip-off-fg)] border-[var(--chip-off-border)] hover:bg-[var(--chrome-bg)]"
-    in
-    Html.button
-        (TW.cls
-            ("[font-family:inherit] inline-flex items-center text-[0.8125rem] leading-snug px-[0.55rem] py-[0.28rem] border font-medium "
-                ++ "transition-[background-color,border-color,color] duration-100 cursor-pointer "
-                ++ "focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--focus-ring)] focus-visible:outline-offset-2 "
-                ++ stateClass
-            )
-            :: Attr.type_ "button"
-            :: Attr.attribute "aria-pressed"
-                (if pressed then
-                    "true"
-
-                 else
-                    "false"
-                )
-            :: Events.onClick onClick
-            :: extraAttrs
-        )
-        [ Html.text label ]
 
 
 sidebarContainerClass : String
 sidebarContainerClass =
-    "min-h-0 self-stretch overflow-y-auto overscroll-contain flex flex-col gap-y-[0.9rem] leading-[1.35] text-[var(--fg-muted)] bg-transparent border-0 text-[1rem] py-[0.85rem] pl-[0.85rem] pr-0 font-serif"
-
-
-{-| Matches letter-spacing on sidebar section titles (`sidebarHeading`); reuse for ToC lines and markdown headings.
--}
-sidebarSubheadingTrackingClass : String
-sidebarSubheadingTrackingClass =
-    "tracking-[0.04em]"
-
-
-sidebarHeadingClass : String
-sidebarHeadingClass =
-    "m-0 mb-[0.35rem] text-[0.82rem] font-semibold "
-        ++ sidebarSubheadingTrackingClass
-        ++ " text-[var(--fg-muted)]"
-
-
-sidebarHeading : String -> Html msg
-sidebarHeading label =
-    Html.h2 [ TW.cls sidebarHeadingClass ] [ Html.text label ]
+    "min-h-0 self-stretch overflow-y-auto overscroll-contain flex flex-col gap-y-[0.9rem] bg-[var(--chrome-bg)] border-0 py-[0.85rem] px-[0.85rem] pr-0"
 
 
 {-| Indents block content under `sidebarHeading` (same inset as the first ToC heading tier in `PageToc`).
@@ -278,23 +396,6 @@ sidebarHeading label =
 sidebarNavSectionBodyClass : String
 sidebarNavSectionBodyClass =
     "pl-[0.35rem]"
-
-
-sidebarLinkClass : String
-sidebarLinkClass =
-    "text-[var(--link)] hover:text-[var(--link-hover)] hover:bg-[var(--link-bg-hover)] underline underline-offset-[2px]"
-
-
-sidebarLink : List (Attribute msg) -> List (Html msg) -> Html msg
-sidebarLink attrs children =
-    Html.a (TW.cls sidebarLinkClass :: attrs) children
-
-
-{-| Right-rail list links under section headings (ToC, backlinks): same as `sidebarLink`. Section titles use `sidebarHeading` for letter-spacing, not these links.
--}
-sidebarTocEntryLink : List (Attribute msg) -> List (Html msg) -> Html msg
-sidebarTocEntryLink =
-    sidebarLink
 
 
 tableBaseClass : String
@@ -448,14 +549,21 @@ tableTd align extraAttrs children =
     Html.td (TW.cls (cellClassForVerticalAlign align) :: extraAttrs) children
 
 
+{-| Table body cell using reading serif (`--font-serif`), with the same vertical alignment as `tableTd`. For prose-like columns (e.g. wiki TODOs item text) while sibling cells stay UI sans.
+-}
+tableTdSerif : TableCellVerticalAlign -> List (Attribute msg) -> List (Html msg) -> Html msg
+tableTdSerif align extraAttrs children =
+    Html.td (TW.cls (cellClassForVerticalAlign align ++ " [font-family:var(--font-serif)]") :: extraAttrs) children
+
+
 appHeaderSecondaryMetaClass : String
 appHeaderSecondaryMetaClass =
-    "text-[var(--fg-muted)] font-normal max-w-full"
+    "text-[var(--fg-muted)] font-normal italic max-w-full gap-x-[0.9rem] flex flex-row"
 
 
 appHeaderSecondaryAfterDividerClass : String
 appHeaderSecondaryAfterDividerClass =
-    "italic min-w-0"
+    "min-w-0"
 
 
 appHeaderSecondaryBracketClass : String
@@ -474,12 +582,6 @@ appHeaderSecondaryWikiLabelEmClass =
     "text-[var(--fg-muted)] font-normal"
 
 
-appHeaderPrimaryLinkClass : String
-appHeaderPrimaryLinkClass =
-    "font-semibold text-[var(--fg)] hover:bg-[var(--link-bg-hover)] underline underline-offset-[2px] "
-        ++ focusVisibleRingClass
-
-
 appHeaderPrimaryPlainClass : String
 appHeaderPrimaryPlainClass =
     "font-semibold"
@@ -487,51 +589,47 @@ appHeaderPrimaryPlainClass =
 
 appHeaderTitleRowClass : String
 appHeaderTitleRowClass =
-    "inline-flex items-center flex-wrap gap-x-[0.65rem] gap-y-[0.35rem] max-w-full"
+    "inline-flex items-center flex-wrap gap-x-[0.9rem] gap-y-[0.35rem] max-w-full"
 
 
 appHeaderDividerClass : String
 appHeaderDividerClass =
-    "self-stretch w-0 my-0 border-l-2 border-[var(--border)] min-h-[1.15em]"
+    "self-center w-0 h-[0.95em] my-0 border-l-2 border-[var(--border)]"
 
 
 appHeaderBarClass : String
 appHeaderBarClass =
-    "shrink-0 flex flex-row flex-wrap items-center justify-between gap-y-[0.5rem] gap-x-[0.75rem] -mx-[0.5rem] px-[0.5rem] pt-[0.2rem] pb-[0.5rem] border-b border-dashed border-[var(--border-dash)]"
+    "shrink-0 flex flex-row flex-wrap items-center justify-between gap-y-[0.5rem] gap-x-[0.75rem] px-[0.75rem] py-[0.55rem] border-b border-[var(--border-subtle)] shadow-[0_4px_20px_rgba(73,103,49,0.08)] backdrop-blur-sm"
 
 
 appHeaderH1Class : String
 appHeaderH1Class =
-    "m-0 text-[1.35rem] font-semibold leading-[1.2] text-[var(--fg)] flex-1 min-w-0 font-serif"
-
-
-themeToggleButtonClass : String
-themeToggleButtonClass =
-    "shrink-0 inline-flex items-center justify-center w-[2.35rem] h-[2.35rem] p-0 m-0 border-0 bg-transparent text-[var(--fg)] cursor-pointer hover:bg-[var(--chrome-bg)] "
-        ++ focusVisibleRingClass
+    "m-0 text-[1.5rem] font-semibold leading-[1.2] text-[var(--fg)] flex-1 min-w-0 [font-family:var(--font-serif)]"
 
 
 sideNavNavClass : String
 sideNavNavClass =
-    "w-full"
+    "w-full h-full min-h-0 flex flex-col"
 
 
 sideNavStackClass : String
 sideNavStackClass =
-    "flex flex-col gap-y-[0.9rem] w-full text-[var(--fg-muted)] text-[1rem] font-serif leading-[1.35]"
+    "flex flex-col gap-y-[0.9rem] w-full text-[var(--fg-muted)] text-[0.8125rem] [font-family:var(--font-ui)] leading-[1.35]"
 
 
 sideNavListClass : String
 sideNavListClass =
-    "list-none m-0 p-0 flex flex-col gap-[0.35rem] items-start"
+    "list-none m-0 p-0 flex flex-col w-full"
 
 
-{-| Overrides app-root link color for the public `/admin` entry (host login), so it reads as secondary nav.
--}
-sideNavPublicAdminLinkClass : String
-sideNavPublicAdminLinkClass =
-    "!text-[var(--fg-muted)] hover:!text-[var(--link)] hover:bg-[var(--link-bg-hover)] underline underline-offset-[2px] "
-        ++ focusVisibleRingClass
+sideNavBottomSectionClass : String
+sideNavBottomSectionClass =
+    "shrink-0"
+
+
+sideNavMainSectionClass : String
+sideNavMainSectionClass =
+    "flex-1 min-h-0"
 
 
 wikiCatalogGridClass : String
@@ -551,7 +649,7 @@ hostAdminWikiDetailGridClass =
 
 hostAdminWikiDetailMainStackClass : String
 hostAdminWikiDetailMainStackClass =
-    "flex flex-col gap-3 min-w-0"
+    "flex flex-col gap-3 min-w-0 max-w-[40rem]"
 
 
 hostAdminWikiDetailSideStackClass : String
@@ -561,12 +659,12 @@ hostAdminWikiDetailSideStackClass =
 
 hostAdminWikiDetailCardClass : String
 hostAdminWikiDetailCardClass =
-    "border border-[var(--border)] bg-[var(--chrome-bg)] p-3 shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
+    "border border-[var(--border-subtle)] bg-[var(--chrome-bg)] rounded-xl p-4 shadow-[0_4px_16px_rgba(73,103,49,0.07)]"
 
 
 hostAdminWikiDetailDangerCardClass : String
 hostAdminWikiDetailDangerCardClass =
-    "border border-[var(--danger)] bg-[var(--danger-bg)] p-3 shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+    "border border-[var(--danger)] bg-[var(--danger-bg)] rounded-xl p-4 shadow-[0_4px_16px_rgba(0,0,0,0.06)]"
 
 
 hostAdminWikiDetailPageTitleClass : String
@@ -579,29 +677,19 @@ hostAdminWikiSlugClass =
     "[font-family:var(--font-mono)] text-[0.95rem] text-[var(--fg-muted)] break-all"
 
 
-hostAdminWikiStatusBadgeActiveClass : String
-hostAdminWikiStatusBadgeActiveClass =
-    "inline-block text-[0.82rem] font-semibold tracking-wide uppercase px-[0.4rem] py-[0.12rem] border border-[var(--border)] bg-[var(--input-bg)] text-[var(--fg)]"
-
-
-hostAdminWikiStatusBadgeInactiveClass : String
-hostAdminWikiStatusBadgeInactiveClass =
-    "inline-block text-[0.82rem] font-semibold tracking-wide uppercase px-[0.4rem] py-[0.12rem] border border-[var(--border-dash)] bg-[var(--bg)] text-[var(--fg-muted)]"
+hostAdminWikiListSlugAttr : Attribute msg
+hostAdminWikiListSlugAttr =
+    TW.cls (hostAdminWikiSlugClass ++ " text-[0.8125rem]")
 
 
 wikiCatalogCardClass : String
 wikiCatalogCardClass =
-    "border border-[var(--border)] bg-[var(--chrome-bg)] p-3 font-serif"
+    "block cursor-pointer border border-[var(--border-subtle)] bg-[var(--chrome-bg)] rounded-xl p-4 [font-family:var(--font-serif)] text-[inherit] no-underline shadow-[0_4px_16px_rgba(73,103,49,0.07)] hover:bg-[var(--bg)] hover:shadow-[0_8px_24px_rgba(73,103,49,0.12)] transition-[background-color,box-shadow] duration-200"
 
 
 wikiCatalogCardTitleClass : String
 wikiCatalogCardTitleClass =
     "m-0 text-[1.1rem] font-semibold"
-
-
-wikiCatalogCardTitleLinkClass : String
-wikiCatalogCardTitleLinkClass =
-    "no-underline hover:underline underline-offset-[0.2em]"
 
 
 wikiCatalogCardSlugEmClass : String
@@ -616,54 +704,12 @@ wikiCatalogCardSummaryClass =
 
 markdownContainerClass : String
 markdownContainerClass =
-    "markdown-body block max-w-[52rem] text-[0.95rem] font-serif"
-
-
-markdownHeading1Class : String
-markdownHeading1Class =
-    "mt-[1rem] mb-[0.25rem] font-semibold "
-        ++ sidebarSubheadingTrackingClass
-        ++ " text-[var(--fg)] text-[1.3rem]"
-
-
-markdownHeading2Class : String
-markdownHeading2Class =
-    "mt-[1rem] mb-[0.25rem] font-semibold "
-        ++ sidebarSubheadingTrackingClass
-        ++ " text-[var(--fg)] text-[1.12rem]"
-
-
-markdownHeading3Class : String
-markdownHeading3Class =
-    "mt-[1rem] mb-[0.25rem] font-semibold "
-        ++ sidebarSubheadingTrackingClass
-        ++ " text-[var(--fg)] text-[1.02rem]"
-
-
-markdownHeading4Class : String
-markdownHeading4Class =
-    "mt-[1rem] mb-[0.25rem] font-semibold "
-        ++ sidebarSubheadingTrackingClass
-        ++ " text-[var(--fg)] text-[0.98rem]"
-
-
-markdownHeading5Class : String
-markdownHeading5Class =
-    "mt-[1rem] mb-[0.25rem] font-semibold "
-        ++ sidebarSubheadingTrackingClass
-        ++ " text-[var(--fg)] text-[0.98rem]"
-
-
-markdownHeading6Class : String
-markdownHeading6Class =
-    "mt-[1rem] mb-[0.25rem] font-semibold "
-        ++ sidebarSubheadingTrackingClass
-        ++ " text-[var(--fg)] text-[0.98rem]"
+    "markdown-body block max-w-[52rem] text-[1.125rem] leading-[1.6] [font-family:var(--font-serif)] [&>*:first-child]:mt-0 [&>*:first-child]:pt-0"
 
 
 markdownParagraphClass : String
 markdownParagraphClass =
-    contentParagraphClass
+    contentParagraphClass ++ " leading-[1.6]"
 
 
 markdownTableClass : String
@@ -693,32 +739,22 @@ markdownTodoClass =
 
 markdownBlockQuoteClass : String
 markdownBlockQuoteClass =
-    "my-[0.35rem] px-[0.5rem] py-[0.2rem] border-l-[3px] border-l-[var(--border)] text-[var(--fg-muted)]"
-
-
-markdownLinkClass : String
-markdownLinkClass =
-    contentLinkClass
-
-
-markdownWikiLinkMissingClass : String
-markdownWikiLinkMissingClass =
-    "!text-red-700 dark:!text-red-400 hover:!bg-[var(--danger-link-bg-hover)] underline underline-offset-[2px]"
+    "my-[0.8rem] first:mt-0 px-[0.75rem] py-[0.5rem] bg-[var(--chrome-bg)] border border-[var(--border-subtle)] rounded-lg italic text-[var(--fg-muted)] [font-family:var(--font-serif)]"
 
 
 markdownUnorderedListClass : String
 markdownUnorderedListClass =
-    "my-[0.25rem] pl-[1.35rem] list-disc"
+    "my-[0.25rem] first:mt-0 pl-[1.35rem] list-disc [font-family:var(--font-serif)]"
 
 
 markdownOrderedListClass : String
 markdownOrderedListClass =
-    "my-[0.25rem] pl-[1.35rem] list-decimal"
+    "my-[0.25rem] first:mt-0 pl-[1.35rem] list-decimal [font-family:var(--font-serif)]"
 
 
 markdownListItemClass : String
 markdownListItemClass =
-    "my-[0.1rem]"
+    "my-[0.1rem] [font-family:var(--font-serif)]"
 
 
 markdownCodeSpanClass : String
@@ -728,7 +764,7 @@ markdownCodeSpanClass =
 
 markdownCodeBlockPreClass : String
 markdownCodeBlockPreClass =
-    "[font-family:var(--font-mono)] my-[0.35rem] px-[0.45rem] py-[0.35rem] overflow-x-auto bg-[var(--code-bg)] border border-[var(--border)] text-[0.85rem] leading-[1.4]"
+    "[font-family:var(--font-mono)] my-[0.35rem] first:mt-0 px-[0.45rem] py-[0.35rem] overflow-x-auto bg-[var(--code-bg)] border border-[var(--border)] text-[0.85rem] leading-[1.4]"
 
 
 markdownCodeBlockCodeClass : String
@@ -736,16 +772,9 @@ markdownCodeBlockCodeClass =
     "[font-family:var(--font-mono)] border-0 p-0 bg-transparent"
 
 
-{-| Markdown source `textarea` typography: matches fenced code blocks (`markdownCodeBlockPreClass`).
--}
-markdownTextareaClass : String
-markdownTextareaClass =
-    "[font-family:var(--font-mono)] [font-variant-ligatures:none] text-[0.85rem] leading-[1.4]"
-
-
 markdownThematicBreakClass : String
 markdownThematicBreakClass =
-    "my-[0.35rem] border-0 border-t border-[var(--border)]"
+    "my-[0.35rem] first:mt-0 border-0 border-t border-[var(--border)]"
 
 
 backlinksSectionClass : String
@@ -755,7 +784,21 @@ backlinksSectionClass =
 
 backlinksListClass : String
 backlinksListClass =
-    "list-none m-0 p-0 flex flex-col gap-[0.25rem]"
+    "list-none m-0 p-0 flex flex-col"
+
+
+{-| Pill-shaped tag link for the right-rail tags section.
+-}
+tagPillClass : Bool -> String
+tagPillClass slugExists =
+    "inline-block px-[0.35rem] py-[0.15rem] rounded-full border text-[0.8125rem] no-underline transition-colors duration-150 [font-family:var(--font-ui)] font-semibold "
+        ++ (if slugExists then
+                "border-[var(--tag-border)] bg-[var(--tag-bg)] text-[var(--tag-fg)] hover:brightness-[0.96] "
+
+            else
+                "border-[var(--danger)] border-dashed bg-[var(--bg)] text-[var(--danger)] cursor-pointer hover:bg-[var(--danger-link-bg-hover)] "
+           )
+        ++ focusVisibleRingClass
 
 
 sidebarDesktopOnlyClass : String
@@ -763,35 +806,778 @@ sidebarDesktopOnlyClass =
     ""
 
 
+{-| Centered card wrapper for auth/login/register forms. Provides max-width, rounded corners, and subtle organic shadow.
+-}
+formCenteredCardClass : String
+formCenteredCardClass =
+    "mx-auto mt-[3rem] mb-[3rem] max-w-[28rem] border border-[var(--border-subtle)] bg-[var(--auth-card-bg)] text-[var(--auth-card-fg)] rounded-2xl p-8 shadow-[0_8px_40px_rgba(0,0,0,0.2)]"
+
+
 layoutLeftNavAsideClass : String
 layoutLeftNavAsideClass =
-    "self-stretch min-h-0 overflow-y-auto overscroll-contain leading-[1.35] text-[var(--fg)] text-[1rem] border-r border-dashed border-[var(--border-dash)] py-[0.85rem] pr-[0.85rem] pl-0"
+    "self-stretch min-h-0 overflow-y-auto overscroll-contain leading-[1.35] text-[var(--fg)] text-[0.8125rem] bg-[var(--chrome-bg)] border-r border-[var(--border-subtle)] py-[0.85rem] pl-[0.85rem]"
 
 
-layoutHolyGrailClass : Bool -> String
-layoutHolyGrailClass hasRightColumn =
+layoutHolyGrailClass : Bool -> Bool -> String
+layoutHolyGrailClass hasRightColumn trimHorizontalGutter =
+    let
+        horizontalGutterClass : String
+        horizontalGutterClass =
+            if trimHorizontalGutter then
+                ""
+
+            else
+                " px-[0.5rem] -mx-[0.5rem]"
+    in
     if hasRightColumn then
-        "grid min-h-0 min-w-0 h-full w-full flex-1 overflow-hidden items-stretch gap-y-[0.65rem] px-[0.5rem] -mx-[0.5rem] max-w-none grid-rows-[minmax(0,1fr)] auto-rows-[minmax(0,1fr)] grid-cols-[minmax(11rem,16rem)_minmax(0,1fr)_minmax(10rem,14rem)]"
+        "grid min-h-0 min-w-0 h-full w-full flex-1 overflow-hidden items-stretch gap-y-[0.65rem] max-w-none grid-rows-[minmax(0,1fr)] auto-rows-[minmax(0,1fr)] grid-cols-[12.5rem_minmax(0,1fr)_minmax(10rem,14rem)]"
+            ++ horizontalGutterClass
 
     else
-        "grid min-h-0 min-w-0 h-full w-full flex-1 overflow-hidden items-stretch gap-y-[0.65rem] px-[0.5rem] -mx-[0.5rem] max-w-none grid-rows-[minmax(0,1fr)] auto-rows-[minmax(0,1fr)] grid-cols-[minmax(11rem,16rem)_minmax(0,1fr)]"
+        "grid min-h-0 min-w-0 h-full w-full flex-1 overflow-hidden items-stretch gap-y-[0.65rem] max-w-none grid-rows-[minmax(0,1fr)] auto-rows-[minmax(0,1fr)] grid-cols-[12.5rem_minmax(0,1fr)]"
+            ++ horizontalGutterClass
 
 
-layoutMainColumnClass : Bool -> String
-layoutMainColumnClass hasRightColumn =
+layoutMainColumnClass : Bool -> Bool -> Bool -> String
+layoutMainColumnClass hasRightColumn trimRightPadding trimVerticalPadding =
+    let
+        verticalPaddingClass : String
+        verticalPaddingClass =
+            if trimVerticalPadding then
+                "py-0"
+
+            else
+                "py-[0.85rem]"
+    in
     if hasRightColumn then
-        "min-h-0 min-w-0 overflow-y-auto overscroll-contain px-[0.85rem] py-[0.85rem] border-r border-dashed border-[var(--border-dash)]"
+        if trimRightPadding then
+            "min-h-0 min-w-0 overflow-y-auto overscroll-contain bg-[var(--bg)] px-0 border-r border-[var(--border-subtle)] "
+                ++ verticalPaddingClass
+
+        else
+            "min-h-0 min-w-0 overflow-y-auto overscroll-contain bg-[var(--bg)] px-[0.85rem] border-r border-[var(--border-subtle)] "
+                ++ verticalPaddingClass
 
     else
-        "min-h-0 min-w-0 overflow-y-auto overscroll-contain py-[0.85rem] pl-[0.85rem] pr-0 border-r-0"
+        if trimRightPadding then
+            "min-h-0 min-w-0 overflow-y-auto overscroll-contain bg-[var(--bg)] px-0 border-r-0 "
+                ++ verticalPaddingClass
+
+        else
+            "min-h-0 min-w-0 overflow-y-auto overscroll-contain bg-[var(--bg)] pl-[0.85rem] pr-0 border-r-0 "
+                ++ verticalPaddingClass
 
 
 {-| Main column when the route owns internal scrolling (audit log: filters fixed, table scrolls). Replaces outer `overflow-y-auto` with `overflow-hidden flex flex-col`.
 -}
-layoutMainColumnClassAuditFill : Bool -> String
-layoutMainColumnClassAuditFill hasRightColumn =
+layoutMainColumnClassAuditFill : Bool -> Bool -> Bool -> String
+layoutMainColumnClassAuditFill hasRightColumn trimRightPadding trimVerticalPadding =
+    let
+        verticalPaddingClass : String
+        verticalPaddingClass =
+            if trimVerticalPadding then
+                "py-0"
+
+            else
+                "py-[0.85rem]"
+    in
     if hasRightColumn then
-        "min-h-0 min-w-0 flex flex-col overflow-hidden overscroll-contain px-[0.85rem] py-[0.85rem] border-r border-dashed border-[var(--border-dash)]"
+        if trimRightPadding then
+            "min-h-0 min-w-0 flex flex-col overflow-hidden overscroll-contain bg-[var(--bg)] px-0 border-r border-[var(--border-subtle)] "
+                ++ verticalPaddingClass
+
+        else
+            "min-h-0 min-w-0 flex flex-col overflow-hidden overscroll-contain bg-[var(--bg)] px-[0.85rem] border-r border-[var(--border-subtle)] "
+                ++ verticalPaddingClass
 
     else
-        "min-h-0 min-w-0 flex flex-col overflow-hidden overscroll-contain py-[0.85rem] pl-[0.85rem] pr-0 border-r-0"
+        if trimRightPadding then
+            "min-h-0 min-w-0 flex flex-col overflow-hidden overscroll-contain bg-[var(--bg)] px-0 border-r-0 "
+                ++ verticalPaddingClass
+
+        else
+            "min-h-0 min-w-0 flex flex-col overflow-hidden overscroll-contain bg-[var(--bg)] pl-[0.85rem] pr-0 border-r-0 "
+                ++ verticalPaddingClass
+
+
+markdownPreviewScrollClass : String
+markdownPreviewScrollClass =
+    "max-h-[24rem] min-w-0 overflow-scroll [scrollbar-gutter:stable] bg-[var(--bg)] px-2 pb-2 pt-0 [font-family:var(--font-serif)]"
+
+
+auditTableBaseClass : String
+auditTableBaseClass =
+    "w-full table-auto border-separate border-spacing-0 text-[0.8125rem] leading-[1.35] border-[var(--border)] [&_th+th]:border-l [&_th+th]:border-[var(--border-dash)] [&_td+td]:border-l [&_td+td]:border-[var(--border-dash)] [&_tbody_tr:hover]:bg-[var(--table-row-hover)]"
+
+
+auditTableHeaderTableClass : String
+auditTableHeaderTableClass =
+    auditTableBaseClass ++ " border-t border-b"
+
+
+auditTableBodyTableClass : String
+auditTableBodyTableClass =
+    auditTableBaseClass ++ " border-b border-t-0"
+
+
+auditTableHeaderCellClass : String
+auditTableHeaderCellClass =
+    "sticky top-0 z-[1] px-[0.55rem] py-[0.22rem] text-left align-top bg-[var(--chrome-bg)] font-semibold border-b border-[var(--border)]"
+
+
+newPageEditorMarkdownPreviewCellClass : String
+newPageEditorMarkdownPreviewCellClass =
+    "flex min-h-0 min-w-0 flex-col gap-1 h-full"
+
+
+appRootClassAttr : { isDark : Bool, trimHorizontalPadding : Bool } -> Attribute msg
+appRootClassAttr { isDark, trimHorizontalPadding } =
+    TW.cls
+        (if isDark then
+            appRootClass trimHorizontalPadding ++ " dark"
+
+         else
+            appRootClass trimHorizontalPadding
+        )
+
+
+layoutHolyGrailAttr : { hasRightColumn : Bool, trimHorizontalGutter : Bool } -> Attribute msg
+layoutHolyGrailAttr { hasRightColumn, trimHorizontalGutter } =
+    TW.cls (layoutHolyGrailClass hasRightColumn trimHorizontalGutter)
+
+
+layoutMainColumnForRouteAttr : { hasRightColumn : Bool, auditFill : Bool, trimRightPadding : Bool, trimVerticalPadding : Bool } -> Attribute msg
+layoutMainColumnForRouteAttr { hasRightColumn, auditFill, trimRightPadding, trimVerticalPadding } =
+    TW.cls
+        (if auditFill then
+            layoutMainColumnClassAuditFill hasRightColumn trimRightPadding trimVerticalPadding
+
+         else
+            layoutMainColumnClass hasRightColumn trimRightPadding trimVerticalPadding
+        )
+
+
+mainContentPaddingAttr : Attribute msg
+mainContentPaddingAttr =
+    TW.cls "px-[0.85rem] py-[0.85rem]"
+
+
+holyGrailLayout :
+    { hasRightColumn : Bool
+    , trimHorizontalGutter : Bool
+    , leftNav : Html msg
+    , mainAttributes : List (Attribute msg)
+    , mainBody : Html msg
+    , rightRailSections : List (Html msg)
+    }
+    -> Html msg
+holyGrailLayout config =
+    Html.div
+        [ layoutHolyGrailAttr
+            { hasRightColumn = config.hasRightColumn
+            , trimHorizontalGutter = config.trimHorizontalGutter
+            }
+        ]
+        (List.concat
+            [ [ Html.aside [ layoutLeftNavAsideAttr ] [ config.leftNav ]
+              , Html.main_ config.mainAttributes [ config.mainBody ]
+              ]
+            , if List.isEmpty config.rightRailSections then
+                []
+
+              else
+                [ Html.aside [ sidebarContainerAttr ] (rightRailSectionCards config.rightRailSections) ]
+            ]
+        )
+
+
+rightRailSectionCards : List (Html msg) -> List (Html msg)
+rightRailSectionCards sections =
+    List.map
+        (\section ->
+            Html.div
+                [ wikiRightRailSectionCardAttr ]
+                [ section ]
+        )
+        sections
+
+
+auditMainColumnBodyInnerAttr : Attribute msg
+auditMainColumnBodyInnerAttr =
+    TW.cls "flex min-h-0 min-w-0 flex-1 flex-col"
+
+
+auditLogCol : String -> Html msg
+auditLogCol columnClass =
+    Html.node "col" [ TW.cls columnClass ] []
+
+
+auditLogColGroup : List String -> Html msg
+auditLogColGroup columnClasses =
+    Html.node "colgroup" [] (List.map auditLogCol columnClasses)
+
+
+auditLogHeaderRow : List String -> Html msg
+auditLogHeaderRow labels =
+    Html.tr []
+        (List.map
+            (\labelText ->
+                Html.th
+                    [ Attr.scope "col"
+                    , TW.cls auditTableHeaderCellClass
+                    ]
+                    [ Html.text labelText ]
+            )
+            labels
+        )
+
+
+{-| Sticky filter + scrollable body pattern for wiki/host audit tables.
+-}
+auditLogTableView :
+    { tableId : String
+    , tbodyId : String
+    , columnClasses : List String
+    , headers : List String
+    , rows : List (Html msg)
+    }
+    -> Html msg
+auditLogTableView config =
+    Html.div
+        [ TW.cls "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" ]
+        [ Html.div
+            [ TW.cls "min-h-0 min-w-0 flex-1 overflow-auto overscroll-none" ]
+            [ Html.table
+                [ Attr.id config.tableId
+                , TW.cls auditTableBaseClass
+                ]
+                [ auditLogColGroup config.columnClasses
+                , Html.thead [] [ auditLogHeaderRow config.headers ]
+                , Html.tbody [ Attr.id config.tbodyId ] config.rows
+                ]
+            ]
+        ]
+
+
+formTextInputAuditFilterClass : String
+formTextInputAuditFilterClass =
+    formTextInputClass ++ " mt-0 w-full max-w-full"
+
+
+formTextInputHostAdminSlugClass : String
+formTextInputHostAdminSlugClass =
+    formTextInputClass ++ " " ++ hostAdminWikiSlugClass ++ " w-full max-w-full"
+
+
+tableCellMonoTimestampClass : String
+tableCellMonoTimestampClass =
+    tableCellClass ++ " [font-family:var(--font-mono)] whitespace-nowrap text-[0.8125rem]"
+
+
+viewDiffKindInlineAttr : Attribute msg
+viewDiffKindInlineAttr =
+    TW.cls "inline-flex flex-wrap items-center gap-2"
+
+
+hostAdminBackupCardAttr : Attribute msg
+hostAdminBackupCardAttr =
+    TW.cls "mb-8 max-w-3xl"
+
+
+formFeedbackTextSmAttr : Attribute msg
+formFeedbackTextSmAttr =
+    TW.cls "mb-3 text-[0.8125rem] leading-[1.4] text-[var(--fg-muted)]"
+
+
+formStackMb3Attr : Attribute msg
+formStackMb3Attr =
+    TW.cls "mb-3"
+
+
+mb3Attr : Attribute msg
+mb3Attr =
+    TW.cls "mb-3"
+
+
+mb2Attr : Attribute msg
+mb2Attr =
+    TW.cls "mb-2"
+
+
+mt3Mb3Attr : Attribute msg
+mt3Mb3Attr =
+    TW.cls "mt-3 mb-3"
+
+
+flexWrapGap1Attr : Attribute msg
+flexWrapGap1Attr =
+    TW.cls "flex flex-wrap gap-1"
+
+
+flexWrapGap2Attr : Attribute msg
+flexWrapGap2Attr =
+    TW.cls "flex flex-wrap gap-2"
+
+
+flexWrapGap2Mt3Attr : Attribute msg
+flexWrapGap2Mt3Attr =
+    TW.cls "flex flex-wrap gap-2 mt-3"
+
+
+flexRowMin0Attr : Attribute msg
+flexRowMin0Attr =
+    TW.cls "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+
+
+flexColMin0Gap3Attr : Attribute msg
+flexColMin0Gap3Attr =
+    TW.cls "flex min-h-0 flex-1 flex-col gap-3"
+
+
+hostAdminAuditPageShellAttr : Attribute msg
+hostAdminAuditPageShellAttr =
+    flexColMin0Gap3Attr
+
+
+wikiAdminAuditPageShellAttr : Attribute msg
+wikiAdminAuditPageShellAttr =
+    TW.cls "flex min-h-0 flex-1 flex-col"
+
+
+hostAdminAuditDiffPageShellAttr : Attribute msg
+hostAdminAuditDiffPageShellAttr =
+    TW.cls "flex min-h-0 flex-1 flex-col gap-3 overflow-auto"
+
+
+hostAdminAuditFiltersCardAttr : Attribute msg
+hostAdminAuditFiltersCardAttr =
+    TW.cls "shrink-0 border-b border-[var(--border-subtle)] bg-[var(--bg)] px-4 py-3"
+
+
+hostAdminAuditFiltersGridAttr : Attribute msg
+hostAdminAuditFiltersGridAttr =
+    TW.cls "grid grid-cols-3 gap-3"
+
+
+wikiAdminAuditFiltersGridAttr : Attribute msg
+wikiAdminAuditFiltersGridAttr =
+    TW.cls "grid grid-cols-2 gap-3"
+
+
+formFieldMinW0Attr : Attribute msg
+formFieldMinW0Attr =
+    TW.cls "min-w-0"
+
+
+formFieldLabelBlockAttr : Attribute msg
+formFieldLabelBlockAttr =
+    TW.cls "block text-[0.82rem] font-medium text-[var(--fg-muted)]"
+
+
+auditFilterTypeGroupAttr : Attribute msg
+auditFilterTypeGroupAttr =
+    TW.cls "mt-1.5 pt-1.5"
+
+
+auditFilterLegendTextAttr : Attribute msg
+auditFilterLegendTextAttr =
+    TW.cls "m-0 mb-2 text-[0.82rem] text-[var(--fg-muted)]"
+
+
+hostAdminWikiDetailFormStackAttr : Attribute msg
+hostAdminWikiDetailFormStackAttr =
+    TW.cls "mt-1.5 flex flex-col gap-1 min-w-0"
+
+
+hostAdminCardParagraphTightAttr : Attribute msg
+hostAdminCardParagraphTightAttr =
+    TW.cls "m-0 mb-1.5 text-[0.95rem] leading-[1.4] text-[var(--fg)]"
+
+
+hostAdminStatusParaAttr : Attribute msg
+hostAdminStatusParaAttr =
+    TW.cls "m-0 mb-1.5 text-[0.95rem] leading-[1.4] text-[var(--fg)]"
+
+
+hostAdminDangerBlurbAttr : Attribute msg
+hostAdminDangerBlurbAttr =
+    TW.cls "m-0 mb-2 text-[0.95rem] leading-[1.4] text-[var(--fg)]"
+
+
+hostAdminDeleteFormStackAttr : Attribute msg
+hostAdminDeleteFormStackAttr =
+    TW.cls "flex flex-col gap-1.5 min-w-0"
+
+
+gridTwoColEditorStrAttr : Attribute msg
+gridTwoColEditorStrAttr =
+    TW.cls "grid min-w-0 grid-cols-2 gap-4 items-stretch"
+
+
+gridTwoByTwoDiffStrAttr : Attribute msg
+gridTwoByTwoDiffStrAttr =
+    TW.cls "grid min-w-0 grid-cols-2 grid-rows-2 gap-4 items-stretch"
+
+
+gridCellCol2Row2Attr : Attribute msg
+gridCellCol2Row2Attr =
+    TW.cls "min-w-0 col-start-2 row-start-2"
+
+
+gridCellStackCol1Row3Attr : Attribute msg
+gridCellStackCol1Row3Attr =
+    TW.cls "flex min-h-0 min-w-0 flex-col gap-1 col-start-1 row-start-3"
+
+
+gridCellStackCol2Row3Attr : Attribute msg
+gridCellStackCol2Row3Attr =
+    TW.cls "flex min-h-0 min-w-0 flex-col gap-1 col-start-2 row-start-3"
+
+
+markdownPreviewScrollMinFlexAttr : Attribute msg
+markdownPreviewScrollMinFlexAttr =
+    TW.cls (markdownPreviewScrollClass ++ " min-h-0 flex-1")
+
+
+markdownPreviewScrollMinFlexFullHeightAttr : Attribute msg
+markdownPreviewScrollMinFlexFullHeightAttr =
+    TW.cls (markdownPreviewScrollClass ++ " min-h-0 h-full flex-1")
+
+
+newPageEditorMarkdownPreviewCellAttr : Attribute msg
+newPageEditorMarkdownPreviewCellAttr =
+    TW.cls newPageEditorMarkdownPreviewCellClass
+
+
+sidebarNavSectionBodyStackAttr : Attribute msg
+sidebarNavSectionBodyStackAttr =
+    TW.cls (sidebarNavSectionBodyClass ++ " flex flex-col gap-[0.25rem]")
+
+
+sidebarNavHorizontalIndentAttr : Attribute msg
+sidebarNavHorizontalIndentAttr =
+    TW.cls "pl-[0.35rem]"
+
+
+tableCellMonoTimestampAttr : Attribute msg
+tableCellMonoTimestampAttr =
+    TW.cls tableCellMonoTimestampClass
+
+
+formCenteredCardAttr : Attribute msg
+formCenteredCardAttr =
+    TW.cls formCenteredCardClass
+
+
+formTextInputAttr : Attribute msg
+formTextInputAttr =
+    TW.cls formTextInputClass
+
+
+formTextInputAuditFilterAttr : Attribute msg
+formTextInputAuditFilterAttr =
+    TW.cls formTextInputAuditFilterClass
+
+
+formTextInputHostAdminSlugAttr : Attribute msg
+formTextInputHostAdminSlugAttr =
+    TW.cls formTextInputHostAdminSlugClass
+
+
+
+-- | `TW.cls` aliases for `Frontend` (no `import TW` there).
+
+
+appHeaderBarAttr : Attribute msg
+appHeaderBarAttr =
+    TW.cls appHeaderBarClass
+
+
+appHeaderDividerAttr : Attribute msg
+appHeaderDividerAttr =
+    TW.cls appHeaderDividerClass
+
+
+appHeaderH1Attr : Attribute msg
+appHeaderH1Attr =
+    TW.cls appHeaderH1Class
+
+
+appHeaderPrimaryPlainAttr : Attribute msg
+appHeaderPrimaryPlainAttr =
+    TW.cls appHeaderPrimaryPlainClass
+
+
+appHeaderSecondaryAfterDividerAttr : Attribute msg
+appHeaderSecondaryAfterDividerAttr =
+    TW.cls appHeaderSecondaryAfterDividerClass
+
+
+appHeaderSecondaryBracketAttr : Attribute msg
+appHeaderSecondaryBracketAttr =
+    TW.cls appHeaderSecondaryBracketClass
+
+
+appHeaderSecondaryMetaAttr : Attribute msg
+appHeaderSecondaryMetaAttr =
+    TW.cls appHeaderSecondaryMetaClass
+
+
+appHeaderSecondaryWikiLabelEmAttr : Attribute msg
+appHeaderSecondaryWikiLabelEmAttr =
+    TW.cls appHeaderSecondaryWikiLabelEmClass
+
+
+appHeaderSecondaryWikiWrapAttr : Attribute msg
+appHeaderSecondaryWikiWrapAttr =
+    TW.cls appHeaderSecondaryWikiWrapClass
+
+
+appHeaderTitleRowAttr : Attribute msg
+appHeaderTitleRowAttr =
+    TW.cls appHeaderTitleRowClass
+
+
+backlinksListAttr : Attribute msg
+backlinksListAttr =
+    TW.cls backlinksListClass
+
+
+backlinksSectionAttr : Attribute msg
+backlinksSectionAttr =
+    TW.cls backlinksSectionClass
+
+
+hostAdminWikiDetailCardAttr : Attribute msg
+hostAdminWikiDetailCardAttr =
+    TW.cls hostAdminWikiDetailCardClass
+
+
+hostAdminWikiDetailDangerCardAttr : Attribute msg
+hostAdminWikiDetailDangerCardAttr =
+    TW.cls hostAdminWikiDetailDangerCardClass
+
+
+hostAdminWikiDetailGridAttr : Attribute msg
+hostAdminWikiDetailGridAttr =
+    TW.cls hostAdminWikiDetailGridClass
+
+
+hostAdminWikiDetailMainStackAttr : Attribute msg
+hostAdminWikiDetailMainStackAttr =
+    TW.cls hostAdminWikiDetailMainStackClass
+
+
+hostAdminWikiDetailPageTitleAttr : Attribute msg
+hostAdminWikiDetailPageTitleAttr =
+    TW.cls hostAdminWikiDetailPageTitleClass
+
+
+hostAdminWikiDetailShellAttr : Attribute msg
+hostAdminWikiDetailShellAttr =
+    TW.cls hostAdminWikiDetailShellClass
+
+
+hostAdminWikiDetailSideStackAttr : Attribute msg
+hostAdminWikiDetailSideStackAttr =
+    TW.cls hostAdminWikiDetailSideStackClass
+
+
+layoutLeftNavAsideAttr : Attribute msg
+layoutLeftNavAsideAttr =
+    TW.cls layoutLeftNavAsideClass
+
+
+markdownCodeSpanAttr : Attribute msg
+markdownCodeSpanAttr =
+    TW.cls markdownCodeSpanClass
+
+
+markdownUnorderedListAttr : Attribute msg
+markdownUnorderedListAttr =
+    TW.cls markdownUnorderedListClass
+
+
+pageActionsSidebarStackAttr : Attribute msg
+pageActionsSidebarStackAttr =
+    TW.cls "flex flex-col"
+
+
+formFeedbackRowAttr : Attribute msg
+formFeedbackRowAttr =
+    TW.cls "mb-3 text-[0.9rem] leading-[1.4] text-[var(--fg-muted)]"
+
+
+tagPillAttr : Bool -> Attribute msg
+tagPillAttr slugExists =
+    TW.cls (tagPillClass slugExists)
+
+
+tagPillsListAttr : Attribute msg
+tagPillsListAttr =
+    TW.cls "list-none m-0 p-0 flex flex-wrap gap-[0.35rem]"
+
+
+sidebarM0Attr : Attribute msg
+sidebarM0Attr =
+    TW.cls "m-0 [font-family:var(--font-ui)] text-[0.8125rem] leading-[1.35] text-[var(--fg-muted)]"
+
+
+todosListDiscAttr : Attribute msg
+todosListDiscAttr =
+    TW.cls "m-0 pl-[1.15rem] list-disc [font-family:var(--font-ui)] text-[0.8125rem] leading-[1.35]"
+
+
+wikiRightRailTocNudgeAttr : Attribute msg
+wikiRightRailTocNudgeAttr =
+    TW.cls "-mx-[0.85rem] px-[0.85rem]"
+
+
+wikiRightRailSectionCardClass : String
+wikiRightRailSectionCardClass =
+    "-ml-[0.85rem] w-[calc(100%+0.85rem)] px-[0.85rem] pt-3 border-t border-[var(--border-subtle)] first:border-t-0 first:pt-0"
+
+
+wikiRightRailSectionCardAttr : Attribute msg
+wikiRightRailSectionCardAttr =
+    TW.cls wikiRightRailSectionCardClass
+
+
+pageActionsTopBorderBlockAttr : Attribute msg
+pageActionsTopBorderBlockAttr =
+    TW.cls "mt-4 -mx-[0.85rem] px-[0.85rem] border-t border-[var(--border)] pt-4"
+
+
+sidebarTocListRootAttr : Attribute msg
+sidebarTocListRootAttr =
+    TW.cls "my-0"
+
+
+sidebarTocListIndentAttr : Attribute msg
+sidebarTocListIndentAttr =
+    TW.cls "flex flex-col"
+
+
+submissionGridTight2ColAttr : Attribute msg
+submissionGridTight2ColAttr =
+    TW.cls "grid min-w-0 grid-cols-2 gap-x-3 gap-y-2"
+
+
+reviewDiffNewPagePreviewColShellAttr : Attribute msg
+reviewDiffNewPagePreviewColShellAttr =
+    TW.cls "flex min-h-0 min-w-0 h-full col-start-2 row-start-2"
+
+
+reviewDeletePagePreviewTitleAttr : Attribute msg
+reviewDeletePagePreviewTitleAttr =
+    TW.cls "m-0 text-sm font-semibold text-[var(--fg-muted)]"
+
+
+reviewFieldsetAttr : Attribute msg
+reviewFieldsetAttr =
+    TW.cls "mt-4 flex flex-col gap-3 border border-[var(--border)] p-3 max-w-[42rem]"
+
+
+reviewLegendAttr : Attribute msg
+reviewLegendAttr =
+    TW.cls "px-1 text-[var(--fg)]"
+
+
+reviewRadioColumnAttr : Attribute msg
+reviewRadioColumnAttr =
+    TW.cls "flex flex-col gap-3"
+
+
+reviewRadioRowAttr : Attribute msg
+reviewRadioRowAttr =
+    TW.cls "flex items-start gap-2 cursor-pointer"
+
+
+reviewOptionLabelStrongAttr : Attribute msg
+reviewOptionLabelStrongAttr =
+    TW.cls "font-medium"
+
+
+reviewNestedNoteColumnAttr : Attribute msg
+reviewNestedNoteColumnAttr =
+    TW.cls "flex flex-col gap-1.5"
+
+
+submissionStatusDangerLineAttr : Attribute msg
+submissionStatusDangerLineAttr =
+    TW.cls "text-[var(--danger)] m-0 mt-2"
+
+
+submitActionsBarAttr : Attribute msg
+submitActionsBarAttr =
+    mt3Mb3Attr
+
+
+submitSummaryParagraphAttr : Attribute msg
+submitSummaryParagraphAttr =
+    TW.cls "m-0 text-[0.95rem] leading-[1.45]"
+
+
+sidebarContainerAttr : Attribute msg
+sidebarContainerAttr =
+    TW.cls sidebarContainerClass
+
+
+sidebarDesktopOnlyAttr : Attribute msg
+sidebarDesktopOnlyAttr =
+    TW.cls sidebarDesktopOnlyClass
+
+
+sidebarNavSectionBodyAttr : Attribute msg
+sidebarNavSectionBodyAttr =
+    TW.cls sidebarNavSectionBodyClass
+
+
+sideNavListAttr : Attribute msg
+sideNavListAttr =
+    TW.cls sideNavListClass
+
+
+sideNavBottomSectionAttr : Attribute msg
+sideNavBottomSectionAttr =
+    TW.cls sideNavBottomSectionClass
+
+
+sideNavMainSectionAttr : Attribute msg
+sideNavMainSectionAttr =
+    TW.cls sideNavMainSectionClass
+
+
+sideNavNavAttr : Attribute msg
+sideNavNavAttr =
+    TW.cls sideNavNavClass
+
+
+sideNavStackAttr : Attribute msg
+sideNavStackAttr =
+    TW.cls sideNavStackClass
+
+
+wikiCatalogCardAttr : Attribute msg
+wikiCatalogCardAttr =
+    TW.cls wikiCatalogCardClass
+
+
+wikiCatalogCardSlugEmAttr : Attribute msg
+wikiCatalogCardSlugEmAttr =
+    TW.cls wikiCatalogCardSlugEmClass
+
+
+wikiCatalogCardSummaryAttr : Attribute msg
+wikiCatalogCardSummaryAttr =
+    TW.cls wikiCatalogCardSummaryClass
+
+
+wikiCatalogCardTitleAttr : Attribute msg
+wikiCatalogCardTitleAttr =
+    TW.cls wikiCatalogCardTitleClass
+
+
+wikiCatalogGridAttr : Attribute msg
+wikiCatalogGridAttr =
+    TW.cls wikiCatalogGridClass

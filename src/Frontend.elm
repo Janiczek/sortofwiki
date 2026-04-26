@@ -23,11 +23,15 @@ import Effect.Lamdera
 import Effect.Subscription as Subscription exposing (Subscription)
 import Effect.Task
 import HostAdmin
-import Html exposing (Html)
+import Html exposing (Attribute, Html)
 import Html.Attributes as Attr
 import Html.Events as Events
 import Json.Decode
 import Lamdera
+import Markdown.Block as Block
+import Markdown.Html
+import Markdown.Parser as MarkdownParser
+import Markdown.Renderer as MarkdownRenderer
 import Page
 import PageGraph
 import PageMarkdown
@@ -45,16 +49,31 @@ import Submission
 import SubmissionReviewDetail
 import Svg
 import Svg.Attributes as SvgAttr
-import TW
 import Time
 import Types exposing (FrontendModel, FrontendMsg(..), HostAdminCreateWikiDraft, HostAdminLoginDraft, HostAdminWikiDetailDraft, LoginDraft, NewPageSubmitDraft, PageDeleteSubmitDraft, PageEditSubmitDraft, RegisterDraft, ReviewApproveDraft, ReviewDecision(..), ReviewRejectDraft, ReviewRequestChangesDraft, SubmissionDetailEditDraft, ToBackend(..), ToFrontend(..), emptySubmissionDetailEditDraft)
 import UI
+import UI.AsyncState
+import UI.Button
+import UI.EditorShell
+import UI.EmptyState
+import UI.FormActionFooter
+import UI.Graph
+import UI.Heading
+import UI.Link
+import UI.PanelHeader
+import UI.ResultNotice
+import UI.SidebarSection
+import UI.StatusBadge
+import UI.SubmissionActions
+import UI.Textarea
 import Url exposing (Url)
+import Url.Builder as UrlBuilder
 import Wiki
 import WikiAdminUsers
 import WikiAuditLog
 import WikiGraph
 import WikiRole exposing (WikiRole)
+import WikiSearch
 import WikiTodos
 
 
@@ -81,10 +100,13 @@ type alias AppHeaderTitle =
 
 
 wikiLoadedHeaderTitle : Wiki.CatalogEntry -> Maybe AppHeaderSecondary -> AppHeaderTitle
-wikiLoadedHeaderTitle summary secondary =
-    { primary = summary.name
-    , primaryHref = Just (Wiki.catalogUrlPath summary)
-    , secondary = secondary
+wikiLoadedHeaderTitle summary maybeSecondary =
+    { primary = "SortOfWiki"
+    , primaryHref = Just Wiki.wikiListUrlPath
+    , secondary =
+        maybeSecondary
+            |> Maybe.withDefault (AppHeaderSecondaryPlain summary.name)
+            |> Just
     }
 
 
@@ -213,6 +235,11 @@ splitQueryPair pair =
 
 pageParamFromQuery : Maybe String -> Maybe String
 pageParamFromQuery maybeQuery =
+    queryParamFromQuery "page" maybeQuery
+
+
+queryParamFromQuery : String -> Maybe String -> Maybe String
+queryParamFromQuery wantedKey maybeQuery =
     maybeQuery
         |> Maybe.andThen
             (\q ->
@@ -222,7 +249,7 @@ pageParamFromQuery maybeQuery =
                         (\pair ->
                             case splitQueryPair pair of
                                 Just ( k, v ) ->
-                                    if k == "page" then
+                                    if k == wantedKey then
                                         Url.percentDecode v
 
                                     else
@@ -233,6 +260,27 @@ pageParamFromQuery maybeQuery =
                         )
                     |> List.head
             )
+
+
+searchParamFromQuery : Maybe String -> String
+searchParamFromQuery maybeQuery =
+    queryParamFromQuery "q" maybeQuery
+        |> Maybe.withDefault ""
+
+
+searchUrlWithQuery : Wiki.Slug -> String -> String
+searchUrlWithQuery wikiSlug query =
+    let
+        trimmed : String
+        trimmed =
+            String.trim query
+    in
+    if String.isEmpty trimmed then
+        Wiki.searchUrlPath wikiSlug
+
+    else
+        Wiki.searchUrlPath wikiSlug
+            ++ UrlBuilder.toQuery [ UrlBuilder.string "q" trimmed ]
 
 
 newPageSubmitDraftForRoute : Route -> Url -> NewPageSubmitDraft
@@ -282,33 +330,6 @@ publishedSlugExistsFromWikiDetails details refSlug =
     List.any (\s -> String.toLower s == String.toLower refSlug) details.pageSlugs
 
 
-submissionDetailMarkdownTextareaBaseClass : String
-submissionDetailMarkdownTextareaBaseClass =
-    UI.markdownTextareaClass
-        ++ " box-border m-0 min-h-[12rem] max-h-[24rem] w-full flex-1 overflow-auto border border-[var(--border)] bg-[var(--input-bg)] p-2 whitespace-pre-wrap break-words"
-
-
-submissionDetailMarkdownTextareaReadonlyClass : String
-submissionDetailMarkdownTextareaReadonlyClass =
-    submissionDetailMarkdownTextareaBaseClass
-        ++ " cursor-default resize-none text-[color:color-mix(in_srgb,var(--fg)_50%,transparent)]"
-
-
-submissionDetailMarkdownTextareaEditableClass : String
-submissionDetailMarkdownTextareaEditableClass =
-    submissionDetailMarkdownTextareaBaseClass ++ " resize-y text-[var(--fg)]"
-
-
-submissionDetailMarkdownTextareaDiffCellClass : String
-submissionDetailMarkdownTextareaDiffCellClass =
-    " h-full min-h-0 flex-1"
-
-
-markdownPreviewScrollClass : String
-markdownPreviewScrollClass =
-    "max-h-[24rem] min-w-0 overflow-auto border border-[var(--border)] bg-[var(--bg)] p-2"
-
-
 wikiSideNavSlugIfActive : Model -> Maybe Wiki.Slug
 wikiSideNavSlugIfActive model =
     let
@@ -328,6 +349,9 @@ wikiSideNavSlugIfActive model =
                     Just s
 
                 Route.WikiGraph s ->
+                    Just s
+
+                Route.WikiSearch s ->
                     Just s
 
                 Route.WikiRegister s ->
@@ -675,6 +699,9 @@ runRouteStoreActions ( model, cmd ) =
                 Route.HostAdminAudit ->
                     Effect.Lamdera.sendToBackend (RequestHostAuditLog model.hostAdminAuditAppliedFilter)
 
+                Route.HostAdminAuditDiff _ _ ->
+                    Effect.Lamdera.sendToBackend (RequestHostAuditLog model.hostAdminAuditAppliedFilter)
+
                 Route.WikiHome _ ->
                     Command.none
 
@@ -688,6 +715,9 @@ runRouteStoreActions ( model, cmd ) =
                     Command.none
 
                 Route.WikiGraph _ ->
+                    Command.none
+
+                Route.WikiSearch _ ->
                     Command.none
 
                 Route.WikiRegister _ ->
@@ -721,6 +751,9 @@ runRouteStoreActions ( model, cmd ) =
                     Command.none
 
                 Route.WikiAdminAudit _ ->
+                    Command.none
+
+                Route.WikiAdminAuditDiff _ _ ->
                     Command.none
 
                 Route.NotFound _ ->
@@ -990,6 +1023,9 @@ hostAdminSectionNavVisible model =
         Route.HostAdminAudit ->
             True
 
+        Route.HostAdminAuditDiff _ _ ->
+            True
+
         Route.HostAdminBackup ->
             True
 
@@ -1007,33 +1043,20 @@ hostAdminSectionNavVisible model =
 
 sideNavLinkLi : SideNavMenu.Link -> Html Msg
 sideNavLinkLi link =
-    let
-        maybeBoldClass : List (Html.Attribute Msg)
-        maybeBoldClass =
-            if link.linkEmphasized then
-                [ TW.cls "font-bold" ]
-
-            else
-                []
-    in
     case link.linkRoute of
         Route.HostAdmin Nothing ->
             Html.li []
-                [ Html.a
-                    ([ Attr.href (Route.navUrlPath link.linkRoute)
-                     , TW.cls UI.sideNavPublicAdminLinkClass
-                     ]
-                        ++ maybeBoldClass
-                    )
+                [ UI.Link.navListItemMuted link.linkEmphasized
+                    [ Attr.href (Route.navUrlPath link.linkRoute)
+                    ]
                     [ Html.text link.linkLabel ]
                 ]
 
         _ ->
             Html.li []
-                [ UI.contentLink
-                    (Attr.href (Route.navUrlPath link.linkRoute)
-                        :: maybeBoldClass
-                    )
+                [ UI.Link.navListItem link.linkEmphasized
+                    [ Attr.href (Route.navUrlPath link.linkRoute)
+                    ]
                     [ Html.text link.linkLabel ]
                 ]
 
@@ -1126,21 +1149,46 @@ viewSideNavSections sections =
         |> List.map
             (\section ->
                 Html.div []
-                    [ UI.sidebarHeading section.heading
-                    , Html.div [ TW.cls UI.sidebarNavSectionBodyClass ]
-                        [ Html.ul [ TW.cls UI.sideNavListClass ] section.items ]
+                    [ UI.Heading.sidebarHeading section.heading
+                    , Html.div [ UI.sidebarNavSectionBodyAttr ]
+                        [ Html.ul [ UI.sideNavListAttr ] section.items ]
                     ]
             )
 
 
+viewSideNavBottomLinks : List (SideNavSection Msg) -> List (Html Msg)
+viewSideNavBottomLinks sections =
+    sections
+        |> List.concatMap .items
+        |> Html.ul [ UI.sideNavListAttr ]
+        |> List.singleton
+
+
 viewSideNav : String -> List (SideNavSection Msg) -> Html Msg
 viewSideNav ariaLabel sections =
+    let
+        ( topSections, bottomSections ) =
+            List.partition (\section -> section.heading /= "Site") sections
+
+        navChildren : List (Html Msg)
+        navChildren =
+            [ Html.div [ UI.sideNavMainSectionAttr ]
+                [ Html.div [ UI.sideNavStackAttr ] (viewSideNavSections topSections) ]
+            ]
+                ++ (if List.isEmpty bottomSections then
+                        []
+
+                    else
+                        [ Html.div [ UI.sideNavBottomSectionAttr ]
+                            [ Html.div [ UI.sideNavStackAttr ] (viewSideNavBottomLinks bottomSections) ]
+                        ]
+                   )
+    in
     Html.nav
-        [ TW.cls UI.sideNavNavClass
+        [ UI.sideNavNavAttr
         , Attr.attribute "aria-label" ariaLabel
         ]
-        [ Html.div [ TW.cls UI.sideNavStackClass ] (viewSideNavSections sections)
-        ]
+        navChildren
 
 
 viewSortOfWikiSideNavSections : Model -> List (SideNavSection Msg)
@@ -1168,6 +1216,8 @@ init url key =
             , contributorWikiSessions = Dict.empty
             , registerDraft = emptyRegisterDraft
             , loginDraft = emptyLoginDraft
+            , headerSearchQuery = ""
+            , wikiSearchPageQuery = ""
             , newPageSubmitDraft = emptyNewPageSubmitDraft
             , pageEditSubmitDraft = emptyPageEditSubmitDraft
             , pageDeleteSubmitDraft = emptyPageDeleteSubmitDraft
@@ -1224,6 +1274,20 @@ init url key =
             , contributorWikiSessions = Dict.empty
             , registerDraft = emptyRegisterDraft
             , loginDraft = emptyLoginDraft
+            , headerSearchQuery =
+                case route of
+                    Route.WikiSearch _ ->
+                        searchParamFromQuery url.query
+
+                    _ ->
+                        ""
+            , wikiSearchPageQuery =
+                case route of
+                    Route.WikiSearch _ ->
+                        searchParamFromQuery url.query
+
+                    _ ->
+                        ""
             , newPageSubmitDraft = newPageSubmitDraftForRoute route url
             , pageEditSubmitDraft = pageEditSubmitDraftForRoute route Store.empty
             , pageDeleteSubmitDraft = emptyPageDeleteSubmitDraft
@@ -1248,6 +1312,9 @@ init url key =
             , hostAdminAuditLog =
                 case route of
                     Route.HostAdminAudit ->
+                        RemoteData.Loading
+
+                    Route.HostAdminAuditDiff _ _ ->
                         RemoteData.Loading
 
                     _ ->
@@ -1321,6 +1388,9 @@ routeUsesAuditLogFillLayout route =
         Route.HostAdminAudit ->
             True
 
+        Route.HostAdminAuditDiff _ _ ->
+            True
+
         Route.HostAdminBackup ->
             False
 
@@ -1339,6 +1409,9 @@ routeUsesAuditLogFillLayout route =
         Route.WikiGraph _ ->
             False
 
+        Route.WikiSearch _ ->
+            False
+
         Route.WikiLogin _ _ ->
             False
 
@@ -1346,10 +1419,10 @@ routeUsesAuditLogFillLayout route =
             False
 
         Route.WikiSubmitNew _ ->
-            False
+            True
 
         Route.WikiSubmitEdit _ _ ->
-            False
+            True
 
         Route.WikiSubmitDelete _ _ ->
             False
@@ -1370,6 +1443,9 @@ routeUsesAuditLogFillLayout route =
             False
 
         Route.WikiAdminAudit _ ->
+            True
+
+        Route.WikiAdminAuditDiff _ _ ->
             True
 
         Route.NotFound _ ->
@@ -1395,6 +1471,9 @@ applyWikiAdminAuditFilterFromModel model =
             storeInModel ( withApplied, Command.none )
                 (Store.perform storeConfig (Store.RefreshWikiAuditLog wikiSlug applied) withApplied.store)
 
+        Route.WikiAdminAuditDiff _ _ ->
+            ( model, Command.none )
+
         Route.WikiList ->
             ( model, Command.none )
 
@@ -1413,6 +1492,9 @@ applyWikiAdminAuditFilterFromModel model =
         Route.HostAdminAudit ->
             ( model, Command.none )
 
+        Route.HostAdminAuditDiff _ _ ->
+            ( model, Command.none )
+
         Route.HostAdminBackup ->
             ( model, Command.none )
 
@@ -1429,6 +1511,9 @@ applyWikiAdminAuditFilterFromModel model =
             ( model, Command.none )
 
         Route.WikiGraph _ ->
+            ( model, Command.none )
+
+        Route.WikiSearch _ ->
             ( model, Command.none )
 
         Route.WikiLogin _ _ ->
@@ -1489,6 +1574,9 @@ applyHostAdminAuditFilterFromModel model =
                 , Effect.Lamdera.sendToBackend (RequestHostAuditLog applied)
                 )
 
+        Route.HostAdminAuditDiff _ _ ->
+            ( model, Command.none )
+
         Route.WikiList ->
             ( model, Command.none )
 
@@ -1522,6 +1610,9 @@ applyHostAdminAuditFilterFromModel model =
         Route.WikiGraph _ ->
             ( model, Command.none )
 
+        Route.WikiSearch _ ->
+            ( model, Command.none )
+
         Route.WikiLogin _ _ ->
             ( model, Command.none )
 
@@ -1553,6 +1644,9 @@ applyHostAdminAuditFilterFromModel model =
             ( model, Command.none )
 
         Route.WikiAdminAudit _ ->
+            ( model, Command.none )
+
+        Route.WikiAdminAuditDiff _ _ ->
             ( model, Command.none )
 
         Route.NotFound _ ->
@@ -1784,6 +1878,20 @@ update msg model =
                         , store = storeForRoute
                         , registerDraft = emptyRegisterDraft
                         , loginDraft = emptyLoginDraft
+                        , headerSearchQuery =
+                            case route of
+                                Route.WikiSearch _ ->
+                                    searchParamFromQuery url.query
+
+                                _ ->
+                                    ""
+                        , wikiSearchPageQuery =
+                            case route of
+                                Route.WikiSearch _ ->
+                                    searchParamFromQuery url.query
+
+                                _ ->
+                                    ""
                         , newPageSubmitDraft = newPageSubmitDraftForRoute route url
                         , pageEditSubmitDraft = pageEditSubmitDraftForRoute route storeForRoute
                         , pageDeleteSubmitDraft = emptyPageDeleteSubmitDraft
@@ -1821,6 +1929,9 @@ update msg model =
                                 Route.HostAdminAudit ->
                                     RemoteData.NotAsked
 
+                                Route.HostAdminAuditDiff _ _ ->
+                                    RemoteData.NotAsked
+
                                 Route.WikiHome _ ->
                                     RemoteData.NotAsked
 
@@ -1834,6 +1945,9 @@ update msg model =
                                     RemoteData.NotAsked
 
                                 Route.WikiGraph _ ->
+                                    RemoteData.NotAsked
+
+                                Route.WikiSearch _ ->
                                     RemoteData.NotAsked
 
                                 Route.WikiRegister _ ->
@@ -1869,6 +1983,9 @@ update msg model =
                                 Route.WikiAdminAudit _ ->
                                     RemoteData.NotAsked
 
+                                Route.WikiAdminAuditDiff _ _ ->
+                                    RemoteData.NotAsked
+
                                 Route.NotFound _ ->
                                     RemoteData.NotAsked
                         , hostAdminWikiDetailDraft =
@@ -1881,6 +1998,9 @@ update msg model =
                         , hostAdminAuditLog =
                             case route of
                                 Route.HostAdminAudit ->
+                                    RemoteData.Loading
+
+                                Route.HostAdminAuditDiff _ _ ->
                                     RemoteData.Loading
 
                                 _ ->
@@ -1905,6 +2025,9 @@ update msg model =
                                 , wikiAdminAuditAppliedFilter = WikiAuditLog.emptyAuditLogFilter
                             }
 
+                        Route.WikiAdminAuditDiff _ _ ->
+                            baseNext
+
                         Route.HostAdminAudit ->
                             { baseNext
                                 | hostAdminAuditFilterWikiDraft = ""
@@ -1913,6 +2036,9 @@ update msg model =
                                 , hostAdminAuditFilterSelectedKindTags = []
                                 , hostAdminAuditAppliedFilter = WikiAuditLog.emptyHostAuditLogFilter
                             }
+
+                        Route.HostAdminAuditDiff _ _ ->
+                            baseNext
 
                         _ ->
                             baseNext
@@ -1967,6 +2093,9 @@ update msg model =
                 Route.WikiGraph _ ->
                     ( model, Command.none )
 
+                Route.WikiSearch _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -1997,7 +2126,13 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
+                Route.WikiAdminAuditDiff _ _ ->
+                    ( model, Command.none )
+
                 Route.HostAdminAudit ->
+                    ( model, Command.none )
+
+                Route.HostAdminAuditDiff _ _ ->
                     ( model, Command.none )
 
                 Route.HostAdmin _ ->
@@ -2069,26 +2204,11 @@ update msg model =
             )
 
         LoginFormSubmitted ->
-            case model.route of
-                Route.WikiList ->
+            case wikiSideNavSlugIfActive model of
+                Nothing ->
                     ( model, Command.none )
 
-                Route.WikiHome _ ->
-                    ( model, Command.none )
-
-                Route.WikiPage _ _ ->
-                    ( model, Command.none )
-
-                Route.WikiPageGraph _ _ ->
-                    ( model, Command.none )
-
-                Route.WikiTodos _ ->
-                    ( model, Command.none )
-
-                Route.WikiGraph _ ->
-                    ( model, Command.none )
-
-                Route.WikiLogin wikiSlug _ ->
+                Just wikiSlug ->
                     let
                         d : LoginDraft
                         d =
@@ -2118,56 +2238,30 @@ update msg model =
                                 (LoginContributor wikiSlug { username = d.username, password = d.password })
                             )
 
-                Route.WikiRegister _ ->
+        HeaderSearchQueryChanged value ->
+            ( { model | headerSearchQuery = value }
+            , Command.none
+            )
+
+        HeaderSearchSubmitted ->
+            case wikiSideNavSlugIfActive model of
+                Just wikiSlug ->
+                    case model.route of
+                        Route.WikiSearch _ ->
+                            ( model, Command.none )
+
+                        _ ->
+                            ( model
+                            , Effect.Browser.Navigation.pushUrl model.key (searchUrlWithQuery wikiSlug model.headerSearchQuery)
+                            )
+
+                Nothing ->
                     ( model, Command.none )
 
-                Route.WikiSubmitNew _ ->
-                    ( model, Command.none )
-
-                Route.WikiSubmitEdit _ _ ->
-                    ( model, Command.none )
-
-                Route.WikiSubmitDelete _ _ ->
-                    ( model, Command.none )
-
-                Route.WikiSubmissionDetail _ _ ->
-                    ( model, Command.none )
-
-                Route.WikiMySubmissions _ ->
-                    ( model, Command.none )
-
-                Route.WikiReview _ ->
-                    ( model, Command.none )
-
-                Route.WikiReviewDetail _ _ ->
-                    ( model, Command.none )
-
-                Route.WikiAdminUsers _ ->
-                    ( model, Command.none )
-
-                Route.WikiAdminAudit _ ->
-                    ( model, Command.none )
-
-                Route.HostAdminAudit ->
-                    ( model, Command.none )
-
-                Route.HostAdmin _ ->
-                    ( model, Command.none )
-
-                Route.HostAdminWikis ->
-                    ( model, Command.none )
-
-                Route.HostAdminBackup ->
-                    ( model, Command.none )
-
-                Route.HostAdminWikiNew ->
-                    ( model, Command.none )
-
-                Route.HostAdminWikiDetail _ ->
-                    ( model, Command.none )
-
-                Route.NotFound _ ->
-                    ( model, Command.none )
+        WikiSearchPageQueryChanged value ->
+            ( { model | wikiSearchPageQuery = value }
+            , Command.none
+            )
 
         NewPageSubmitMarkdownChanged value ->
             let
@@ -2221,6 +2315,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiGraph _ ->
+                    ( model, Command.none )
+
+                Route.WikiSearch _ ->
                     ( model, Command.none )
 
                 Route.WikiLogin _ _ ->
@@ -2314,7 +2411,13 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
+                Route.WikiAdminAuditDiff _ _ ->
+                    ( model, Command.none )
+
                 Route.HostAdminAudit ->
+                    ( model, Command.none )
+
+                Route.HostAdminAuditDiff _ _ ->
                     ( model, Command.none )
 
                 Route.HostAdmin _ ->
@@ -2417,6 +2520,9 @@ update msg model =
                 Route.WikiGraph _ ->
                     ( model, Command.none )
 
+                Route.WikiSearch _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -2503,7 +2609,13 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
+                Route.WikiAdminAuditDiff _ _ ->
+                    ( model, Command.none )
+
                 Route.HostAdminAudit ->
+                    ( model, Command.none )
+
+                Route.HostAdminAuditDiff _ _ ->
                     ( model, Command.none )
 
                 Route.HostAdmin _ ->
@@ -2596,6 +2708,9 @@ update msg model =
                 Route.WikiGraph _ ->
                     ( model, Command.none )
 
+                Route.WikiSearch _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -2685,7 +2800,13 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
+                Route.WikiAdminAuditDiff _ _ ->
+                    ( model, Command.none )
+
                 Route.HostAdminAudit ->
+                    ( model, Command.none )
+
+                Route.HostAdminAuditDiff _ _ ->
                     ( model, Command.none )
 
                 Route.HostAdmin _ ->
@@ -2763,6 +2884,9 @@ update msg model =
                 Route.WikiGraph _ ->
                     ( model, Command.none )
 
+                Route.WikiSearch _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -2793,7 +2917,13 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
+                Route.WikiAdminAuditDiff _ _ ->
+                    ( model, Command.none )
+
                 Route.HostAdminAudit ->
+                    ( model, Command.none )
+
+                Route.HostAdminAuditDiff _ _ ->
                     ( model, Command.none )
 
                 Route.HostAdmin _ ->
@@ -3152,6 +3282,9 @@ update msg model =
                 Route.WikiGraph _ ->
                     ( model, Command.none )
 
+                Route.WikiSearch _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -3182,7 +3315,13 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
+                Route.WikiAdminAuditDiff _ _ ->
+                    ( model, Command.none )
+
                 Route.HostAdminAudit ->
+                    ( model, Command.none )
+
+                Route.HostAdminAuditDiff _ _ ->
                     ( model, Command.none )
 
                 Route.HostAdmin _ ->
@@ -3248,6 +3387,9 @@ update msg model =
                 Route.WikiGraph _ ->
                     ( model, Command.none )
 
+                Route.WikiSearch _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -3278,7 +3420,13 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
+                Route.WikiAdminAuditDiff _ _ ->
+                    ( model, Command.none )
+
                 Route.HostAdminAudit ->
+                    ( model, Command.none )
+
+                Route.HostAdminAuditDiff _ _ ->
                     ( model, Command.none )
 
                 Route.HostAdmin _ ->
@@ -3324,6 +3472,9 @@ update msg model =
                 Route.WikiGraph _ ->
                     ( model, Command.none )
 
+                Route.WikiSearch _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -3354,7 +3505,13 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
+                Route.WikiAdminAuditDiff _ _ ->
+                    ( model, Command.none )
+
                 Route.HostAdminAudit ->
+                    ( model, Command.none )
+
+                Route.HostAdminAuditDiff _ _ ->
                     ( model, Command.none )
 
                 Route.HostAdmin _ ->
@@ -3400,6 +3557,9 @@ update msg model =
                 Route.WikiGraph _ ->
                     ( model, Command.none )
 
+                Route.WikiSearch _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -3430,7 +3590,13 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
+                Route.WikiAdminAuditDiff _ _ ->
+                    ( model, Command.none )
+
                 Route.HostAdminAudit ->
+                    ( model, Command.none )
+
+                Route.HostAdminAuditDiff _ _ ->
                     ( model, Command.none )
 
                 Route.HostAdmin _ ->
@@ -3476,6 +3642,9 @@ update msg model =
                 Route.WikiGraph _ ->
                     ( model, Command.none )
 
+                Route.WikiSearch _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -3506,7 +3675,13 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
+                Route.WikiAdminAuditDiff _ _ ->
+                    ( model, Command.none )
+
                 Route.HostAdminAudit ->
+                    ( model, Command.none )
+
+                Route.HostAdminAuditDiff _ _ ->
                     ( model, Command.none )
 
                 Route.HostAdmin _ ->
@@ -3832,6 +4007,9 @@ update msg model =
                 Route.WikiGraph _ ->
                     ( model, Command.none )
 
+                Route.WikiSearch _ ->
+                    ( model, Command.none )
+
                 Route.WikiRegister _ ->
                     ( model, Command.none )
 
@@ -3865,7 +4043,13 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
+                Route.WikiAdminAuditDiff _ _ ->
+                    ( model, Command.none )
+
                 Route.HostAdminAudit ->
+                    ( model, Command.none )
+
+                Route.HostAdminAuditDiff _ _ ->
                     ( model, Command.none )
 
                 Route.NotFound _ ->
@@ -4002,6 +4186,9 @@ update msg model =
                 Route.WikiGraph _ ->
                     ( model, Command.none )
 
+                Route.WikiSearch _ ->
+                    ( model, Command.none )
+
                 Route.WikiRegister _ ->
                     ( model, Command.none )
 
@@ -4035,7 +4222,13 @@ update msg model =
                 Route.WikiAdminAudit _ ->
                     ( model, Command.none )
 
+                Route.WikiAdminAuditDiff _ _ ->
+                    ( model, Command.none )
+
                 Route.HostAdminAudit ->
+                    ( model, Command.none )
+
+                Route.HostAdminAuditDiff _ _ ->
                     ( model, Command.none )
 
                 Route.NotFound _ ->
@@ -4178,6 +4371,9 @@ update msg model =
                 Route.HostAdminAudit ->
                     ( model, Command.none )
 
+                Route.HostAdminAuditDiff _ _ ->
+                    ( model, Command.none )
+
                 Route.WikiHome _ ->
                     ( model, Command.none )
 
@@ -4191,6 +4387,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiGraph _ ->
+                    ( model, Command.none )
+
+                Route.WikiSearch _ ->
                     ( model, Command.none )
 
                 Route.WikiRegister _ ->
@@ -4224,6 +4423,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiAdminAudit _ ->
+                    ( model, Command.none )
+
+                Route.WikiAdminAuditDiff _ _ ->
                     ( model, Command.none )
 
                 Route.NotFound _ ->
@@ -6105,6 +6307,39 @@ updateFromBackend msg model =
                                 , Command.none
                                 )
 
+                Route.HostAdminAuditDiff _ _ ->
+                    let
+                        filterKey : String
+                        filterKey =
+                            WikiAuditLog.hostAuditLogFilterCacheKey filter
+
+                        appliedKey : String
+                        appliedKey =
+                            WikiAuditLog.hostAuditLogFilterCacheKey model.hostAdminAuditAppliedFilter
+                    in
+                    if filterKey /= appliedKey then
+                        ( model, Command.none )
+
+                    else
+                        case result of
+                            Err HostAdmin.NotHostAuthenticated ->
+                                ( { model
+                                    | hostAdminAuditLog = RemoteData.Success result
+                                    , hostAdminSessionAuthenticated = False
+                                    , route = Route.HostAdmin (Just Wiki.hostAdminAuditUrlPath)
+                                  }
+                                , Effect.Browser.Navigation.replaceUrl model.key
+                                    (Wiki.hostAdminLoginUrlPathWithRedirect Wiki.hostAdminAuditUrlPath)
+                                )
+
+                            Ok _ ->
+                                ( { model
+                                    | hostAdminAuditLog = RemoteData.Success result
+                                    , hostAdminSessionAuthenticated = True
+                                  }
+                                , Command.none
+                                )
+
                 _ ->
                     ( model, Command.none )
 
@@ -6601,7 +6836,7 @@ viewWikiList wikis =
         [ Attr.id "catalog-page"
         ]
         [ Html.div
-            [ TW.cls UI.wikiCatalogGridClass
+            [ UI.wikiCatalogGridAttr
             , Attr.id "wiki-catalog"
             ]
             (wikis
@@ -6639,12 +6874,7 @@ viewWikiListEmpty =
     Html.div
         [ Attr.id "catalog-page"
         ]
-        [ Html.div
-            [ Attr.id "catalog-empty"
-            , Attr.attribute "role" "status"
-            ]
-            [ UI.contentParagraph [] [ Html.text "There are no wikis yet." ] ]
-        ]
+        [ UI.AsyncState.empty { id = "catalog-empty", text = "There are no wikis yet." } ]
 
 
 viewWikiListLoading : Html Msg
@@ -6652,31 +6882,28 @@ viewWikiListLoading =
     Html.div
         [ Attr.id "catalog-loading"
         ]
-        [ UI.contentParagraph [] [ Html.text "Loading…" ] ]
+        [ UI.AsyncState.loading "Loading…" ]
 
 
 viewWikiRow : Wiki.CatalogEntry -> Html Msg
 viewWikiRow entry =
-    Html.article
-        [ TW.cls UI.wikiCatalogCardClass
+    Html.a
+        [ UI.wikiCatalogCardAttr
+        , Attr.href (Wiki.catalogUrlPath entry)
         , Attr.attribute "data-wiki-slug" entry.slug
         ]
         [ Html.h3
-            [ TW.cls UI.wikiCatalogCardTitleClass
+            [ UI.wikiCatalogCardTitleAttr
             ]
-            [ Html.a
-                [ Attr.href (Wiki.catalogUrlPath entry)
-                , TW.cls UI.wikiCatalogCardTitleLinkClass
-                ]
-                [ Html.text entry.name ]
+            [ Html.text entry.name
             , Html.text " "
             , Html.em
-                [ TW.cls UI.wikiCatalogCardSlugEmClass
+                [ UI.wikiCatalogCardSlugEmAttr
                 ]
                 [ Html.text ("/w/" ++ entry.slug) ]
             ]
         , Html.p
-            [ TW.cls UI.wikiCatalogCardSummaryClass
+            [ UI.wikiCatalogCardSummaryAttr
             ]
             [ if String.isEmpty entry.summary then
                 Html.text ""
@@ -6696,7 +6923,7 @@ viewWikiHomeLoading =
     Html.div
         [ Attr.id "wiki-home-loading"
         ]
-        [ UI.contentParagraph [] [ Html.text "Loading…" ]
+        [ UI.AsyncState.loading "Loading…"
         ]
 
 
@@ -6705,7 +6932,7 @@ viewWikiRegisterLoading =
     Html.div
         [ Attr.id "wiki-register-loading"
         ]
-        [ UI.contentParagraph [] [ Html.text "Loading…" ] ]
+        [ UI.AsyncState.loading "Loading…" ]
 
 
 viewWikiLoginLoading : Html Msg
@@ -6713,21 +6940,21 @@ viewWikiLoginLoading =
     Html.div
         [ Attr.id "wiki-login-loading"
         ]
-        [ UI.contentParagraph [] [ Html.text "Loading…" ] ]
+        [ UI.AsyncState.loading "Loading…" ]
 
 
 viewWikiPublishedSlugList : String -> Wiki.Slug -> List Page.Slug -> Html Msg
 viewWikiPublishedSlugList listId wikiSlug pageSlugs =
     Html.ul
         [ Attr.id listId
-        , TW.cls UI.markdownUnorderedListClass
+        , UI.markdownUnorderedListAttr
         ]
         (pageSlugs
             |> List.sort
             |> List.map
                 (\pageSlug ->
                     Html.li []
-                        [ UI.contentLink
+                        [ UI.Link.contentLink
                             [ Attr.href (Wiki.publishedPageUrlPath wikiSlug pageSlug)
                             , Attr.attribute "data-page-slug" pageSlug
                             ]
@@ -6748,7 +6975,7 @@ viewWikiHome wikiSlug summary details =
 
           else
             UI.contentParagraph [] [ Html.text summary.summary ]
-        , UI.contentHeading2 [] [ Html.text "Pages" ]
+        , UI.Heading.contentHeading2 [] [ Html.text "Pages" ]
         , if List.isEmpty details.pageSlugs then
             UI.contentParagraph
                 [ Attr.id "wiki-home-no-pages"
@@ -6778,7 +7005,7 @@ viewWikiNotFound slug =
         ]
         [ UI.contentParagraph []
             [ Html.text "The wiki "
-            , Html.code [ TW.cls UI.markdownCodeSpanClass ] [ Html.text slug ]
+            , Html.code [ UI.markdownCodeSpanAttr ] [ Html.text slug ]
             , Html.text " doesn't exist."
             ]
         ]
@@ -6867,10 +7094,9 @@ viewThemeToggle model =
                 ColorTheme.Fixed ColorTheme.Dark ->
                     "Using dark theme"
     in
-    Html.button
+    UI.Button.iconGhostButton
         [ Attr.type_ "button"
         , Attr.id "color-theme-toggle"
-        , TW.cls UI.themeToggleButtonClass
         , Events.onClick ColorThemeToggled
         , Attr.attribute "aria-label" ariaLabel
         ]
@@ -6910,25 +7136,8 @@ wikiScopeSideNavItems wikiSlug model =
         authChrome : List (Html Msg)
         authChrome =
             case maybeCw of
-                Just cw ->
-                    [ Html.li []
-                        [ Html.span []
-                            [ Html.text ("Logged in as " ++ cw.displayUsername) ]
-                        ]
-                    , Html.li []
-                        [ Html.button
-                            [ Attr.type_ "button"
-                            , Attr.id "wiki-logout-button"
-                            , TW.cls
-                                ("text-left bg-transparent border-0 p-0 font-inherit cursor-pointer "
-                                    ++ "text-[var(--link)] hover:text-[var(--link-hover)] hover:bg-[var(--link-bg-hover)] underline underline-offset-[2px] "
-                                    ++ UI.focusVisibleRingClass
-                                )
-                            , Events.onClick (ContributorLogoutWiki wikiSlug)
-                            ]
-                            [ Html.text "Log out" ]
-                        ]
-                    ]
+                Just _ ->
+                    []
 
                 Nothing ->
                     []
@@ -7007,6 +7216,9 @@ appHeaderTitle ({ store, route } as model) =
         Route.HostAdminAudit ->
             sortOfWikiAppHeaderTitle (Just (AppHeaderSecondaryPlain "Admin: Platform audit log"))
 
+        Route.HostAdminAuditDiff _ _ ->
+            sortOfWikiAppHeaderTitle (Just (AppHeaderSecondaryPlain "Admin: Platform audit log diff"))
+
         Route.HostAdminBackup ->
             sortOfWikiAppHeaderTitle (Just (AppHeaderSecondaryPlain "Admin: Backup"))
 
@@ -7025,47 +7237,21 @@ appHeaderTitle ({ store, route } as model) =
                 \summary ->
                     wikiLoadedHeaderTitle summary (Just (AppHeaderSecondaryPlain "Graph"))
 
+        Route.WikiSearch slug ->
+            wikiScopeHeaderTitle store slug <|
+                \summary ->
+                    wikiLoadedHeaderTitle summary (Just (AppHeaderSecondaryPlain "Search"))
+
         Route.WikiPage wikiSlug pageSlug ->
             wikiScopeHeaderTitle store wikiSlug <|
                 \summary ->
                     wikiLoadedHeaderTitle summary <|
-                        case Store.get_ ( wikiSlug, pageSlug ) store.publishedPages of
-                            RemoteData.Success details ->
-                                case details.maybeMarkdownSource of
-                                    Just _ ->
-                                        Just (AppHeaderSecondaryWikiLink pageSlug)
-
-                                    Nothing ->
-                                        Just
-                                            (AppHeaderSecondaryWikiLinkThenPlain
-                                                { wikiLabel = pageSlug
-                                                , plainSuffix = ": Create?"
-                                                }
-                                            )
-
-                            RemoteData.Failure _ ->
-                                Just
-                                    (AppHeaderSecondaryWikiLinkThenPlain
-                                        { wikiLabel = pageSlug
-                                        , plainSuffix = ": Create?"
-                                        }
-                                    )
-
-                            RemoteData.Loading ->
-                                Just
-                                    (AppHeaderSecondaryPlainThenWikiLink
-                                        { plainPrefix = "Loading "
-                                        , wikiLabel = pageSlug
-                                        }
-                                    )
-
-                            RemoteData.NotAsked ->
-                                Just
-                                    (AppHeaderSecondaryPlainThenWikiLink
-                                        { plainPrefix = "Loading "
-                                        , wikiLabel = pageSlug
-                                        }
-                                    )
+                        Just
+                            (AppHeaderSecondaryPlainThenWikiLink
+                                { plainPrefix = summary.name ++ " "
+                                , wikiLabel = pageSlug
+                                }
+                            )
 
         Route.WikiPageGraph wikiSlug pageSlug ->
             wikiScopeHeaderTitle store wikiSlug <|
@@ -7170,6 +7356,11 @@ appHeaderTitle ({ store, route } as model) =
                 \summary ->
                     wikiLoadedHeaderTitle summary (Just (AppHeaderSecondaryPlain "Users"))
 
+        Route.WikiAdminAuditDiff slug _ ->
+            wikiScopeHeaderTitle store slug <|
+                \summary ->
+                    wikiLoadedHeaderTitle summary (Just (AppHeaderSecondaryPlain "Audit diff"))
+
         Route.WikiAdminAudit slug ->
             wikiScopeHeaderTitle store slug <|
                 \summary ->
@@ -7183,25 +7374,25 @@ viewAppHeaderSecondary : AppHeaderSecondary -> Html Msg
 viewAppHeaderSecondary secondary =
     case secondary of
         AppHeaderSecondaryPlain label ->
-            Html.span [ TW.cls UI.appHeaderSecondaryMetaClass ]
+            Html.span [ UI.appHeaderSecondaryMetaAttr ]
                 [ Html.text label
                 ]
 
         AppHeaderSecondaryWikiLink label ->
-            Html.span [ TW.cls UI.appHeaderSecondaryWikiWrapClass ]
-                [ Html.span [ TW.cls UI.appHeaderSecondaryBracketClass ] [ Html.text "[[" ]
-                , Html.span [ TW.cls UI.appHeaderSecondaryWikiLabelEmClass ] [ Html.text label ]
-                , Html.span [ TW.cls UI.appHeaderSecondaryBracketClass ] [ Html.text "]]" ]
+            Html.span [ UI.appHeaderSecondaryWikiWrapAttr ]
+                [ Html.span
+                    [ UI.appHeaderSecondaryBracketAttr ]
+                    [ Html.text <| "[[" ++ label ++ "]]" ]
                 ]
 
         AppHeaderSecondaryPlainThenWikiLink { plainPrefix, wikiLabel } ->
-            Html.span [ TW.cls UI.appHeaderSecondaryMetaClass ]
+            Html.span [ UI.appHeaderSecondaryMetaAttr ]
                 [ Html.text plainPrefix
                 , viewAppHeaderSecondary (AppHeaderSecondaryWikiLink wikiLabel)
                 ]
 
         AppHeaderSecondaryWikiLinkThenPlain { wikiLabel, plainSuffix } ->
-            Html.span [ TW.cls UI.appHeaderSecondaryMetaClass ]
+            Html.span [ UI.appHeaderSecondaryMetaAttr ]
                 [ viewAppHeaderSecondary (AppHeaderSecondaryWikiLink wikiLabel)
                 , Html.text plainSuffix
                 ]
@@ -7214,14 +7405,13 @@ viewAppHeaderTitleInner t =
         primaryEl =
             case t.primaryHref of
                 Just href ->
-                    Html.a
+                    UI.Link.navPrimary
                         [ Attr.href href
-                        , TW.cls UI.appHeaderPrimaryLinkClass
                         ]
                         [ Html.text t.primary ]
 
                 Nothing ->
-                    Html.span [ TW.cls UI.appHeaderPrimaryPlainClass ]
+                    Html.span [ UI.appHeaderPrimaryPlainAttr ]
                         [ Html.text t.primary ]
     in
     case t.secondary of
@@ -7229,45 +7419,242 @@ viewAppHeaderTitleInner t =
             primaryEl
 
         Just sec ->
-            Html.span [ TW.cls UI.appHeaderTitleRowClass ]
-                [ primaryEl
+            Html.span [ UI.appHeaderTitleRowAttr ]
+                [ Html.span [ Attr.class "inline-flex items-center" ] [ primaryEl ]
                 , Html.span
-                    [ TW.cls UI.appHeaderDividerClass
-                    , Attr.attribute "aria-hidden" "true"
+                    [ UI.appHeaderSecondaryAfterDividerAttr
+                    , Attr.class "inline-flex items-center"
                     ]
-                    []
-                , Html.span [ TW.cls UI.appHeaderSecondaryAfterDividerClass ]
                     [ viewAppHeaderSecondary sec ]
                 ]
 
 
 viewAppHeader : Model -> Html Msg
 viewAppHeader model =
+    let
+        wikiAuthChrome : Html Msg
+        wikiAuthChrome =
+            case wikiSideNavSlugIfActive model of
+                Just wikiSlug ->
+                    if contributorLoggedInOnWikiSlug wikiSlug model then
+                        case Dict.get wikiSlug model.contributorWikiSessions of
+                            Just session ->
+                                viewHeaderAccountArea wikiSlug (Just session.displayUsername)
+
+                            Nothing ->
+                                Html.text ""
+
+                    else
+                        viewHeaderAccountArea wikiSlug Nothing
+
+                Nothing ->
+                    Html.text ""
+
+        maybeSearchWikiSlug : Maybe Wiki.Slug
+        maybeSearchWikiSlug =
+            wikiSideNavSlugIfActive model
+
+        hasSearchScope : Bool
+        hasSearchScope =
+            maybeSearchWikiSlug /= Nothing
+
+        headerSearchMarkdownSources : Dict Page.Slug String
+        headerSearchMarkdownSources =
+            case maybeSearchWikiSlug of
+                Just wikiSlug ->
+                    case Store.get_ wikiSlug model.store.wikiDetails of
+                        Success details ->
+                            details.publishedPageMarkdownSources
+
+                        _ ->
+                            Dict.empty
+
+                Nothing ->
+                    Dict.empty
+
+        headerSearchResults : List WikiSearch.ResultItem
+        headerSearchResults =
+            WikiSearch.search model.headerSearchQuery headerSearchMarkdownSources
+
+        showHeaderSearch : Bool
+        showHeaderSearch =
+            model.route /= Route.WikiList
+
+        maybeSearchForm : Maybe (Html Msg)
+        maybeSearchForm =
+            if showHeaderSearch then
+                Just
+                    (Html.form
+                        [ Attr.id "header-search-form"
+                        , Attr.class "hidden md:flex items-center relative min-w-[12rem] max-w-[18rem] flex-1"
+                        , Events.onSubmit HeaderSearchSubmitted
+                        ]
+                        [ Html.span
+                            [ Attr.class "absolute left-[0.65rem] top-1/2 -translate-y-1/2 text-[var(--fg-muted)] opacity-80 text-[1.35rem] leading-none"
+                            , Attr.attribute "aria-hidden" "true"
+                            ]
+                            [ Html.text "⌕" ]
+                        , Html.input
+                            [ Attr.id "header-search-input"
+                            , Attr.type_ "search"
+                            , Attr.placeholder "Search..."
+                            , Attr.value model.headerSearchQuery
+                            , Events.onInput HeaderSearchQueryChanged
+                            , Attr.disabled (not hasSearchScope)
+                            , Attr.class
+                                (if hasSearchScope then
+                                    "w-full rounded-full border border-[var(--border-subtle)] bg-[var(--chrome-bg)] text-[0.8125rem] text-[var(--fg)] pl-[1.8rem] pr-[0.85rem] py-[0.35rem]"
+
+                                 else
+                                    "w-full rounded-full border border-[var(--border-subtle)] bg-[var(--chrome-bg)] text-[0.8125rem] text-[var(--fg-muted)] pl-[1.8rem] pr-[0.85rem] py-[0.35rem] opacity-80 cursor-not-allowed"
+                                )
+                            ]
+                            []
+                        , case maybeSearchWikiSlug of
+                            Just wikiSlug ->
+                                if String.isEmpty (String.trim model.headerSearchQuery) then
+                                    Html.text ""
+
+                                else
+                                    Html.div
+                                        [ Attr.id "header-search-popup"
+                                        , Attr.class "absolute left-0 top-[calc(100%+0.45rem)] z-20 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg)] p-2 shadow-lg [font-family:var(--font-serif)]"
+                                        ]
+                                        [ if List.isEmpty headerSearchResults then
+                                            Html.p
+                                                [ Attr.id "header-search-popup-empty"
+                                                , Attr.class "m-1 text-[0.8rem] text-[var(--fg-muted)] [font-family:var(--font-ui)]"
+                                                ]
+                                                [ Html.text "No matches." ]
+
+                                          else
+                                            Html.ul
+                                                [ Attr.id "header-search-popup-results"
+                                                , Attr.class "m-0 p-0 list-none"
+                                                ]
+                                                (headerSearchResults
+                                                    |> List.take 5
+                                                    |> List.map
+                                                        (\result ->
+                                                            Html.li
+                                                                [ Attr.class "m-0 -mx-2 px-2 border-b border-[var(--border-subtle)] pb-2 mb-2 last:mb-0 last:pb-0 last:border-b-0" ]
+                                                                [ UI.Link.subtleLink
+                                                                    [ Attr.href (Wiki.publishedPageUrlPath wikiSlug result.pageSlug)
+                                                                    , Attr.attribute "data-search-page-slug" result.pageSlug
+                                                                    ]
+                                                                    [ Html.span
+                                                                        [ Attr.class "block text-[0.8125rem]" ]
+                                                                        [ Html.text result.pageSlug ]
+                                                                    ]
+                                                                , Html.p
+                                                                    [ Attr.class "mt-0.5 mb-0 text-[0.76rem] text-[var(--fg-muted)] leading-snug" ]
+                                                                    [ Dict.get result.pageSlug headerSearchMarkdownSources
+                                                                        |> Maybe.withDefault ""
+                                                                        |> excerptFromMarkdown model.headerSearchQuery
+                                                                        |> viewSearchExcerpt
+                                                                    ]
+                                                                ]
+                                                        )
+                                                )
+                                        , Html.div [ Attr.class "mt-2 -mx-2 px-2 border-t border-[var(--border-subtle)] pt-2" ]
+                                            [ UI.Link.subtleLink
+                                                [ Attr.id "header-search-open-page"
+                                                , Attr.href (searchUrlWithQuery wikiSlug model.headerSearchQuery)
+                                                , Attr.class "text-[0.8125rem] [font-family:var(--font-ui)]"
+                                                , Events.onClick (HeaderSearchQueryChanged "")
+                                                ]
+                                                [ Html.text "Show all results" ]
+                                            ]
+                                        ]
+
+                            Nothing ->
+                                Html.text ""
+                        ]
+                    )
+
+            else
+                Nothing
+    in
     Html.header
-        [ TW.cls UI.appHeaderBarClass
+        [ UI.appHeaderBarAttr
         , Attr.attribute "data-context" "layout-header"
         ]
-        [ Html.h1 [ TW.cls UI.appHeaderH1Class ]
-            [ viewAppHeaderTitleInner (appHeaderTitle model) ]
-        , viewThemeToggle model
+        ([ Html.div [ Attr.class "min-w-0 flex-1 flex items-center gap-[0.7rem] flex-wrap" ]
+            [ Html.h1 [ UI.appHeaderH1Attr ]
+                [ viewAppHeaderTitleInner (appHeaderTitle model) ]
+            ]
+         ]
+            ++ (maybeSearchForm |> Maybe.map List.singleton |> Maybe.withDefault [])
+            ++ [ Html.div [ Attr.class "shrink-0 flex items-center gap-2" ]
+                    [ wikiAuthChrome
+                    , Html.span
+                        [ Attr.class "hidden md:inline h-7 w-px bg-[var(--border-subtle)]"
+                        , Attr.attribute "aria-hidden" "true"
+                        ]
+                        []
+                    , viewThemeToggle model
+                    ]
+               ]
+        )
+
+
+siteAdminRoute : Model -> Route
+siteAdminRoute model =
+    if hostAdminAuthenticated model then
+        Route.HostAdminWikis
+
+    else
+        Route.HostAdmin Nothing
+
+
+viewWikiListBottomSiteAdminLink : Model -> Html Msg
+viewWikiListBottomSiteAdminLink model =
+    Html.footer
+        [ Attr.class "shrink-0 border-t border-[var(--border-subtle)] bg-[var(--bg)] px-[0.85rem] py-[0.75rem] text-right shadow-[inset_0_8px_14px_-12px_rgba(73,103,49,0.3)]" ]
+        [ UI.Link.subtleLink
+            [ Attr.id "wiki-list-site-admin-link"
+            , Attr.href (Route.navUrlPath (siteAdminRoute model))
+            ]
+            [ Html.text "Site admin" ]
         ]
 
 
-viewHostAdminLoginFeedback : Maybe (Result HostAdmin.LoginError ()) -> Html Msg
-viewHostAdminLoginFeedback maybeResult =
-    case maybeResult of
+viewHeaderAccountArea : Wiki.Slug -> Maybe String -> Html Msg
+viewHeaderAccountArea wikiSlug maybeUsername =
+    case maybeUsername of
+        Just username ->
+            Html.div
+                [ Attr.class "flex items-center gap-2 text-[0.8125rem]" ]
+                [ Html.span
+                    [ Attr.id "wiki-header-account-link"
+                    , Attr.class "text-[var(--fg-muted)]"
+                    ]
+                    [ Html.text ("@" ++ username) ]
+                , UI.Button.inlineLinkButton
+                    [ Attr.type_ "button"
+                    , Attr.id "wiki-logout-button"
+                    , Attr.class "text-[0.8125rem]"
+                    , Events.onClick (ContributorLogoutWiki wikiSlug)
+                    ]
+                    [ Html.text "Logout" ]
+                ]
+
         Nothing ->
-            Html.text ""
+            UI.Link.subtleLink
+                [ Attr.id "wiki-header-login-link"
+                , Attr.href (Wiki.loginUrlPath wikiSlug)
+                ]
+                [ Html.text "Login" ]
 
-        Just (Ok ()) ->
-            Html.div
-                [ Attr.id "host-admin-login-success" ]
-                [ UI.contentParagraph [] [ Html.text "Signed in as platform host admin." ] ]
 
-        Just (Err e) ->
-            Html.div
-                [ Attr.id "host-admin-login-error" ]
-                [ UI.contentParagraph [] [ Html.text (HostAdmin.loginErrorToUserText e) ] ]
+viewHostAdminLoginFeedback : Result HostAdmin.LoginError () -> Html Msg
+viewHostAdminLoginFeedback result =
+    UI.ResultNotice.fromResult
+        { id = "host-admin-login"
+        , okText = "Signed in as platform host admin."
+        , errToText = HostAdmin.loginErrorToUserText
+        }
+        result
 
 
 viewHostAdminLogin : Model -> Html Msg
@@ -7278,32 +7665,60 @@ viewHostAdminLogin model =
             model.hostAdminLoginDraft
     in
     Html.div
-        [ Attr.id "host-admin-login-page" ]
-        [ Html.form
-            [ Attr.id "host-admin-login-form"
-            , Events.onSubmit HostAdminLoginSubmitted
-            ]
-            [ Html.div []
-                [ UI.contentLabel [ Attr.for "host-admin-login-password" ]
-                    [ Html.text "Password" ]
-                , Html.input
-                    [ Attr.id "host-admin-login-password"
-                    , Attr.type_ "password"
-                    , Attr.value draft.password
-                    , Events.onInput HostAdminLoginPasswordChanged
-                    , Attr.disabled draft.inFlight
-                    , TW.cls UI.formTextInputClass
+        [ Attr.id "host-admin-login-page"
+        , Attr.class "login-shell-page"
+        ]
+        [ Html.div [ Attr.class "login-shell-bg" ] []
+        , Html.main_
+            [ Attr.class "login-shell-main" ]
+            [ Html.div [ Attr.class "login-shell-brand" ]
+                [ Html.h1 [ Attr.class "m-0 text-[2.2rem] leading-[1.2] text-[var(--auth-card-heading)] [font-family:var(--font-serif)]" ]
+                    [ Html.text "SortOfWiki Admin" ]
+                , Html.p [ Attr.class "m-0 text-[var(--auth-card-fg-muted)] [font-family:var(--font-ui)]" ]
+                    [ Html.text "Platform administration login" ]
+                ]
+            , Html.div [ Attr.class "login-shell-card" ]
+                [ Html.form
+                    [ Attr.id "host-admin-login-form"
+                    , Attr.class "flex flex-col"
+                    , Events.onSubmit HostAdminLoginSubmitted
                     ]
-                    []
+                    [ Html.div [ Attr.class "mb-2" ]
+                        [ UI.contentLabel
+                            [ Attr.for "host-admin-login-password"
+                            , Attr.class "ml-[0.15rem] text-[0.92rem]"
+                            , Attr.style "color" "var(--auth-card-fg-muted)"
+                            ]
+                            [ Html.text "Admin password" ]
+                        , Html.input
+                            [ Attr.id "host-admin-login-password"
+                            , Attr.type_ "password"
+                            , Attr.value draft.password
+                            , Events.onInput HostAdminLoginPasswordChanged
+                            , Attr.disabled draft.inFlight
+                            , UI.classAttr
+                                (UI.formTextInputClass
+                                    ++ " w-full bg-[var(--auth-card-bg)] text-[var(--auth-card-fg)] border-[var(--border-subtle)]"
+                                )
+                            ]
+                            []
+                        ]
+                    , UI.Button.button
+                        [ Attr.id "host-admin-login-submit"
+                        , Attr.type_ "submit"
+                        , Attr.disabled draft.inFlight
+                        , Attr.class "w-full mt-1"
+                        ]
+                        [ Html.text "Sign in" ]
+                    ]
+                , case draft.lastResult of
+                    Nothing ->
+                        Html.text ""
+
+                    Just lastResult ->
+                        Html.div [ Attr.class "mt-3" ] [ viewHostAdminLoginFeedback lastResult ]
                 ]
-            , UI.button
-                [ Attr.id "host-admin-login-submit"
-                , Attr.type_ "submit"
-                , Attr.disabled draft.inFlight
-                ]
-                [ Html.text "Sign in" ]
             ]
-        , viewHostAdminLoginFeedback draft.lastResult
         ]
 
 
@@ -7319,7 +7734,7 @@ viewHostAdminWikis model =
                 Html.p
                     [ Attr.id "host-admin-wikis-notice"
                     , Attr.attribute "role" "status"
-                    , TW.cls "mb-3 text-sm"
+                    , UI.formFeedbackRowAttr
                     ]
                     [ Html.text noticeText ]
         , case model.hostAdminWikis of
@@ -7327,9 +7742,9 @@ viewHostAdminWikis model =
                 UI.contentParagraph [] [ Html.text "…" ]
 
             RemoteData.Loading ->
-                UI.contentParagraph
+                Html.div
                     [ Attr.id "host-admin-wikis-loading" ]
-                    [ Html.text "Loading…" ]
+                    [ UI.AsyncState.loading "Loading…" ]
 
             RemoteData.Failure () ->
                 UI.contentParagraph [] [ Html.text "Could not load." ]
@@ -7356,8 +7771,8 @@ viewHostAdminWikis model =
                             List.map (viewHostAdminWikiRow model) summaries
                 in
                 Html.div []
-                    [ Html.div [ TW.cls "mb-3" ]
-                        [ UI.button
+                    [ Html.div [ UI.formStackMb3Attr ]
+                        [ UI.Button.button
                             [ Attr.id "host-admin-import-json"
                             , Attr.type_ "button"
                             , Events.onClick HostAdminWikisDataImportPickRequested
@@ -7368,7 +7783,7 @@ viewHostAdminWikis model =
                                     "Importing…"
 
                                  else
-                                    "Import wiki JSON…"
+                                    "Import new…"
                                 )
                             ]
                         ]
@@ -7416,16 +7831,15 @@ viewHostAdminBackupPanel model =
     Html.section
         [ Attr.id "host-admin-backup-panel"
         , Attr.attribute "data-context" "host-admin-backup"
-        , TW.cls "mb-8 max-w-3xl border border-[var(--border-subtle)] p-4"
+        , UI.hostAdminBackupCardAttr
         ]
-        [ Html.h2 [ TW.cls "text-lg font-semibold mb-2" ] [ Html.text "Backup and restore" ]
-        , UI.contentParagraph [ TW.cls "text-sm mb-3" ]
+        [ UI.contentParagraph []
             [ Html.text
                 "Export all wiki data as JSON, or import a file from a previous export. Import replaces all server-side data except your current host admin sign-in. Contributor sign-ins are not included in the backup; contributors must sign in again after import."
             ]
         , notice
-        , Html.div [ TW.cls "flex flex-wrap gap-2" ]
-            [ UI.button
+        , Html.div [ UI.flexWrapGap2Attr ]
+            [ UI.Button.button
                 [ Attr.id "host-admin-export-json"
                 , Attr.type_ "button"
                 , Events.onClick HostAdminDataExportClicked
@@ -7436,7 +7850,21 @@ viewHostAdminBackupPanel model =
                         "Exporting…"
 
                      else
-                        "Download JSON export"
+                        "Export JSON"
+                    )
+                ]
+            , UI.Button.button
+                [ Attr.id "host-admin-backup-import-json"
+                , Attr.type_ "button"
+                , Events.onClick HostAdminDataImportPickRequested
+                , Attr.disabled (model.hostAdminExportInFlight || model.hostAdminImportInFlight)
+                ]
+                [ Html.text
+                    (if model.hostAdminImportInFlight then
+                        "Importing…"
+
+                     else
+                        "Import JSON"
                     )
                 ]
             ]
@@ -7474,29 +7902,33 @@ viewHostAdminWikiRow model summary =
         ]
         [ UI.tableTd UI.TableAlignMiddle
             []
-            [ UI.contentLink
+            [ UI.Link.contentLink
                 [ Attr.href (Wiki.hostAdminWikiDetailUrlPath summary.slug) ]
                 [ Html.text summary.name ]
             ]
-        , UI.tableTd UI.TableAlignMiddle [] [ Html.text summary.slug ]
+        , UI.tableTd UI.TableAlignMiddle
+            []
+            [ Html.span [ UI.hostAdminWikiListSlugAttr ] [ Html.text summary.slug ] ]
         , UI.tableTd UI.TableAlignMiddle
             []
             [ Html.span
                 [ Attr.attribute "data-context" "host-admin-wiki-status" ]
-                [ Html.text
-                    (if summary.active then
-                        "Active"
+                [ UI.StatusBadge.view
+                    { isActive = summary.active
+                    , text =
+                        if summary.active then
+                            "Active"
 
-                     else
-                        "Deactivated"
-                    )
+                        else
+                            "Deactivated"
+                    }
                 ]
             ]
         , UI.tableTd UI.TableAlignMiddle
             []
             [ Html.div
-                [ TW.cls "flex flex-wrap gap-1" ]
-                [ UI.button
+                [ UI.flexWrapGap1Attr ]
+                [ UI.Button.button
                     [ Attr.id ("host-admin-wiki-export-" ++ summary.slug)
                     , Attr.type_ "button"
                     , Events.onClick (HostAdminWikiDataExportClicked summary.slug)
@@ -7510,7 +7942,7 @@ viewHostAdminWikiRow model summary =
                             "Export JSON"
                         )
                     ]
-                , UI.button
+                , UI.Button.button
                     [ Attr.id ("host-admin-wiki-import-" ++ summary.slug)
                     , Attr.type_ "button"
                     , Events.onClick (HostAdminWikiDataImportPickRequested summary.slug)
@@ -7521,7 +7953,7 @@ viewHostAdminWikiRow model summary =
                             "Importing…"
 
                          else
-                            "Import JSON…"
+                            "Import (replace)"
                         )
                     ]
                 ]
@@ -7531,90 +7963,73 @@ viewHostAdminWikiRow model summary =
 
 viewHostAdminAuditLoading : Html Msg
 viewHostAdminAuditLoading =
+    viewAuditLoading "host-admin-audit-loading"
+
+
+viewAuditLoading : String -> Html Msg
+viewAuditLoading loadingId =
     Html.div
-        [ Attr.id "host-admin-audit-loading" ]
-        [ Html.text "Loading audit log…" ]
+        [ Attr.id loadingId ]
+        [ UI.AsyncState.loading "Loading audit log…" ]
 
 
-auditTableBaseClass : String
-auditTableBaseClass =
-    "w-full table-fixed border-separate border-spacing-0 text-[0.94rem] leading-[1.35] border-[var(--border)] [&_th+th]:border-l [&_th+th]:border-[var(--border-dash)] [&_td+td]:border-l [&_td+td]:border-[var(--border-dash)] [&_tbody_tr:hover]:bg-[var(--table-row-hover)]"
+viewAuditError : String -> String -> Html Msg
+viewAuditError errorId message =
+    Html.div
+        [ Attr.id errorId ]
+        [ UI.contentParagraph [] [ Html.text message ] ]
 
 
-auditTableHeaderTableClass : String
-auditTableHeaderTableClass =
-    auditTableBaseClass ++ " border-t border-b"
+type alias AuditTableRow =
+    { wikiSlug : Wiki.Slug
+    , at : Time.Posix
+    , actorUsername : String
+    , kind : WikiAuditLog.AuditEventKind
+    , utcTimestamp : String
+    }
 
 
-auditTableBodyTableClass : String
-auditTableBodyTableClass =
-    auditTableBaseClass ++ " border-b border-t-0"
-
-
-auditTableHeaderCellClass : String
-auditTableHeaderCellClass =
-    "px-[0.55rem] py-[0.22rem] text-left align-top bg-[var(--chrome-bg)] font-semibold border-b border-[var(--border)]"
-
-
-viewAuditTableColGroup : List String -> Html msg
-viewAuditTableColGroup columnClasses =
-    Html.node "colgroup" []
-        (List.map
-            (\columnClass ->
-                Html.node "col" [ Attr.class columnClass ] []
-            )
-            columnClasses
-        )
-
-
-viewAuditTableHeaderRow : List String -> Html msg
-viewAuditTableHeaderRow labels =
-    Html.tr []
-        (List.map
-            (\labelText ->
-                Html.th
-                    [ Attr.scope "col"
-                    , TW.cls auditTableHeaderCellClass
-                    ]
-                    [ Html.text labelText ]
-            )
-            labels
-        )
-
-
-viewAuditTable :
+viewAuditEventsTable :
     { tableId : String
     , tbodyId : String
     , columnClasses : List String
     , headers : List String
-    , rows : List (Html msg)
+    , includeWikiColumn : Bool
+    , isHostAuditView : Bool
     }
-    -> Html msg
-viewAuditTable config =
-    Html.div
-        [ TW.cls "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" ]
-        [ Html.div
-            [ TW.cls "shrink-0" ]
-            [ Html.table
-                [ TW.cls auditTableHeaderTableClass ]
-                [ viewAuditTableColGroup config.columnClasses
-                , Html.thead []
-                    [ viewAuditTableHeaderRow config.headers ]
-                ]
-            ]
-        , Html.div
-            [ TW.cls "min-h-0 min-w-0 flex-1 overflow-auto" ]
-            [ Html.table
-                [ Attr.id config.tableId
-                , TW.cls auditTableBodyTableClass
-                ]
-                [ viewAuditTableColGroup config.columnClasses
-                , Html.tbody
-                    [ Attr.id config.tbodyId ]
-                    config.rows
-                ]
-            ]
-        ]
+    -> List AuditTableRow
+    -> Html Msg
+viewAuditEventsTable config rows =
+    UI.auditLogTableView
+        { tableId = config.tableId
+        , tbodyId = config.tbodyId
+        , columnClasses = config.columnClasses
+        , headers = config.headers
+        , rows =
+            rows
+                |> List.indexedMap
+                    (\i row ->
+                        UI.trStriped
+                            [ Attr.attribute "data-audit-event" (String.fromInt i)
+                            , Attr.attribute "data-wiki-slug" row.wikiSlug
+                            ]
+                            (List.concat
+                                [ [ Html.td
+                                        [ UI.tableCellMonoTimestampAttr ]
+                                        [ Html.text row.utcTimestamp ]
+                                  ]
+                                , if config.includeWikiColumn then
+                                    [ UI.tableTd UI.TableAlignTop [] [ Html.text row.wikiSlug ] ]
+
+                                  else
+                                    []
+                                , [ UI.tableTd UI.TableAlignTop [] [ Html.text row.actorUsername ]
+                                  , UI.tableTd UI.TableAlignTop [] [ viewAuditEventKindCell config.isHostAuditView i row.wikiSlug row.kind ]
+                                  ]
+                                ]
+                            )
+                    )
+        }
 
 
 viewHostAdminAuditBody :
@@ -7629,80 +8044,58 @@ viewHostAdminAuditBody remote =
             viewHostAdminAuditLoading
 
         RemoteData.Failure _ ->
-            Html.div
-                [ Attr.id "host-admin-audit-error" ]
-                [ UI.contentParagraph [] [ Html.text "Could not load audit log." ] ]
+            viewAuditError "host-admin-audit-error" "Could not load audit log."
 
         RemoteData.Success (Err HostAdmin.NotHostAuthenticated) ->
-            Html.div
-                [ Attr.id "host-admin-audit-forbidden" ]
-                [ UI.contentParagraph [] [ Html.text "Redirecting to host admin sign-in…" ] ]
+            viewAuditError "host-admin-audit-forbidden" "Redirecting to host admin sign-in…"
 
         RemoteData.Success (Ok events) ->
-            if List.isEmpty events then
-                UI.contentParagraph
-                    [ Attr.id "host-admin-audit-empty" ]
-                    [ Html.text "No audit events yet." ]
-
-            else
-                viewAuditTable
-                    { tableId = "host-admin-audit-list"
-                    , tbodyId = "host-admin-audit-tbody"
-                    , columnClasses =
-                        [ "w-[13rem]"
-                        , "w-[10rem]"
-                        , "w-[10rem]"
-                        , "w-auto"
-                        ]
-                    , headers =
-                        [ "Time (UTC)"
-                        , "Wiki"
-                        , "Actor"
-                        , "Event"
-                        ]
-                    , rows =
-                        events
-                            |> List.indexedMap
-                                (\i ev ->
-                                    UI.trStriped
-                                        [ Attr.attribute "data-audit-event" (String.fromInt i)
-                                        , Attr.attribute "data-wiki-slug" ev.wikiSlug
-                                        ]
-                                        [ UI.tableTd UI.TableAlignTop
-                                            [ TW.cls "[font-family:var(--font-mono)] whitespace-nowrap text-[0.9rem]" ]
-                                            [ Html.text (WikiAuditLog.eventUtcTimestampStringScoped ev) ]
-                                        , UI.tableTd UI.TableAlignTop [] [ Html.text ev.wikiSlug ]
-                                        , UI.tableTd UI.TableAlignTop [] [ Html.text ev.actorUsername ]
-                                        , UI.tableTd UI.TableAlignTop [] [ viewAuditEventKindCell True ev.wikiSlug ev.at ev.kind ]
-                                        ]
-                                )
-                    }
+            viewAuditEventsTable
+                { tableId = "host-admin-audit-list"
+                , tbodyId = "host-admin-audit-tbody"
+                , columnClasses =
+                    [ "w-[calc(19ch+1.1rem)]"
+                    , "w-auto"
+                    , "w-auto"
+                    , "w-full"
+                    ]
+                , headers =
+                    [ "Time (UTC)"
+                    , "Wiki"
+                    , "Actor"
+                    , "Event"
+                    ]
+                , includeWikiColumn = True
+                , isHostAuditView = True
+                }
+                (events
+                    |> List.map
+                        (\ev ->
+                            { wikiSlug = ev.wikiSlug
+                            , at = ev.at
+                            , actorUsername = ev.actorUsername
+                            , kind = ev.kind
+                            , utcTimestamp = WikiAuditLog.eventUtcTimestampStringScoped ev
+                            }
+                        )
+                )
 
 
-viewAuditEventKindCell : Bool -> Wiki.Slug -> Time.Posix -> WikiAuditLog.AuditEventKind -> Html Msg
-viewAuditEventKindCell isHostAuditView wikiSlug at kind =
+viewAuditEventKindCell : Bool -> Int -> Wiki.Slug -> WikiAuditLog.AuditEventKind -> Html Msg
+viewAuditEventKindCell isHostAuditView eventIndex wikiSlug kind =
     case kind of
         WikiAuditLog.TrustedPublishedNewPage { pageSlug, markdown } ->
             let
                 diffHref : String
                 diffHref =
-                    let
-                        atMillis : Int
-                        atMillis =
-                            Time.posixToMillis at
-
-                        fragment : String
-                        fragment =
-                            "#audit-diff:" ++ wikiSlug ++ ":" ++ String.fromInt atMillis
-                    in
                     if isHostAuditView then
-                        Wiki.hostAdminAuditUrlPath ++ fragment
+                        Wiki.hostAdminAuditDiffUrlPath wikiSlug eventIndex
 
                     else
-                        Wiki.adminAuditUrlPath wikiSlug ++ fragment
+                        Wiki.adminAuditDiffUrlPath wikiSlug eventIndex
             in
             Html.span
-                [ TW.cls "inline-flex flex-wrap items-center gap-2" ]
+                [ UI.viewDiffKindInlineAttr ]
                 [ Html.text
                     ("Trusted publish: created page "
                         ++ pageSlug
@@ -7710,10 +8103,9 @@ viewAuditEventKindCell isHostAuditView wikiSlug at kind =
                         ++ String.fromInt (String.length markdown)
                         ++ " chars)"
                     )
-                , Html.a
+                , UI.Link.subtleLink
                     [ Attr.href diffHref
                     , Attr.id ("wiki-audit-view-diff-create-" ++ pageSlug)
-                    , TW.cls "text-[var(--link)] underline underline-offset-2"
                     ]
                     [ Html.text "View diff" ]
                 ]
@@ -7722,23 +8114,14 @@ viewAuditEventKindCell isHostAuditView wikiSlug at kind =
             let
                 diffHref : String
                 diffHref =
-                    let
-                        atMillis : Int
-                        atMillis =
-                            Time.posixToMillis at
-
-                        fragment : String
-                        fragment =
-                            "#audit-diff:" ++ wikiSlug ++ ":" ++ String.fromInt atMillis
-                    in
                     if isHostAuditView then
-                        Wiki.hostAdminAuditUrlPath ++ fragment
+                        Wiki.hostAdminAuditDiffUrlPath wikiSlug eventIndex
 
                     else
-                        Wiki.adminAuditUrlPath wikiSlug ++ fragment
+                        Wiki.adminAuditDiffUrlPath wikiSlug eventIndex
             in
             Html.span
-                [ TW.cls "inline-flex flex-wrap items-center gap-2" ]
+                [ UI.viewDiffKindInlineAttr ]
                 [ Html.text
                     ("Trusted publish: edited page "
                         ++ pageSlug
@@ -7748,10 +8131,8 @@ viewAuditEventKindCell isHostAuditView wikiSlug at kind =
                         ++ String.fromInt (String.length afterMarkdown)
                         ++ " chars)"
                     )
-                , Html.a
-                    [ Attr.href diffHref
-                    , TW.cls "text-[var(--link)] underline underline-offset-2"
-                    ]
+                , UI.Link.subtleLink
+                    [ Attr.href diffHref ]
                     [ Html.text "View diff" ]
                 ]
 
@@ -7761,109 +8142,169 @@ viewAuditEventKindCell isHostAuditView wikiSlug at kind =
 
 viewHostAdminAuditKindChip : Model -> ( WikiAuditLog.AuditEventKindFilterTag, String ) -> Html Msg
 viewHostAdminAuditKindChip model ( tag, labelText ) =
+    viewAuditKindChip
+        { idPrefix = "host-admin-audit-filter-type-"
+        , selectedTags = model.hostAdminAuditFilterSelectedKindTags
+        , onToggle = HostAdminAuditFilterTypeTagToggled
+        }
+        ( tag, labelText )
+
+
+type alias AuditKindChipConfig =
+    { idPrefix : String
+    , selectedTags : List WikiAuditLog.AuditEventKindFilterTag
+    , onToggle : WikiAuditLog.AuditEventKindFilterTag -> Bool -> Msg
+    }
+
+
+viewAuditKindChip : AuditKindChipConfig -> ( WikiAuditLog.AuditEventKindFilterTag, String ) -> Html Msg
+viewAuditKindChip config ( tag, labelText ) =
     let
         isOn : Bool
         isOn =
-            List.member tag model.hostAdminAuditFilterSelectedKindTags
+            List.member tag config.selectedTags
     in
-    UI.togglableChip
-        [ Attr.id ("host-admin-audit-filter-type-" ++ WikiAuditLog.eventKindFilterTagToString tag) ]
+    UI.Button.toggleChip
+        [ Attr.id (config.idPrefix ++ WikiAuditLog.eventKindFilterTagToString tag) ]
         { pressed = isOn
-        , onClick = HostAdminAuditFilterTypeTagToggled tag (not isOn)
+        , onClick = config.onToggle tag (not isOn)
         , label = labelText
         }
 
 
-viewHostAdminAuditFilters : Model -> Html Msg
-viewHostAdminAuditFilters model =
+type alias AuditFiltersConfig =
+    { context : String
+    , gridAttr : Html.Attribute Msg
+    , maybeWikiFilter : Maybe { inputId : String, value : String, onInput : String -> Msg }
+    , actorInputId : String
+    , actorValue : String
+    , actorOnInput : String -> Msg
+    , pageInputId : String
+    , pageValue : String
+    , pageOnInput : String -> Msg
+    , kindFilterGroupId : String
+    , kindFilterLegendId : String
+    , kindChipView : ( WikiAuditLog.AuditEventKindFilterTag, String ) -> Html Msg
+    }
+
+
+viewAuditFilters : AuditFiltersConfig -> Html Msg
+viewAuditFilters config =
     Html.div
-        [ Attr.attribute "data-context" "host-admin-audit-filters"
-        , TW.cls "shrink-0 border border-[var(--border)] bg-[var(--chrome-bg)] p-3"
+        [ Attr.attribute "data-context" config.context
+        , UI.hostAdminAuditFiltersCardAttr
         ]
         [ Html.div
-            [ TW.cls "grid grid-cols-3 gap-3" ]
-            [ Html.div [ TW.cls "min-w-0" ]
-                [ Html.label
-                    [ Attr.for "host-admin-audit-filter-wiki"
-                    , TW.cls "block text-[0.82rem] font-medium text-[var(--fg-muted)]"
-                    ]
-                    [ Html.text "Wiki slug contains" ]
-                , Html.input
-                    [ Attr.id "host-admin-audit-filter-wiki"
-                    , Attr.type_ "text"
-                    , Attr.value model.hostAdminAuditFilterWikiDraft
-                    , Events.onInput HostAdminAuditFilterWikiChanged
-                    , TW.cls (UI.formTextInputClass ++ " mt-0 w-full max-w-full")
-                    ]
-                    []
+            [ config.gridAttr ]
+            (List.concat
+                [ case config.maybeWikiFilter of
+                    Just wikiFilter ->
+                        [ Html.div [ UI.formFieldMinW0Attr ]
+                            [ Html.label
+                                [ Attr.for wikiFilter.inputId
+                                , UI.formFieldLabelBlockAttr
+                                ]
+                                [ Html.text "Wiki slug contains" ]
+                            , Html.input
+                                [ Attr.id wikiFilter.inputId
+                                , Attr.type_ "text"
+                                , Attr.value wikiFilter.value
+                                , Events.onInput wikiFilter.onInput
+                                , UI.formTextInputAuditFilterAttr
+                                ]
+                                []
+                            ]
+                        ]
+
+                    Nothing ->
+                        []
+                , [ Html.div [ UI.formFieldMinW0Attr ]
+                        [ Html.label
+                            [ Attr.for config.actorInputId
+                            , UI.formFieldLabelBlockAttr
+                            ]
+                            [ Html.text "Actor contains" ]
+                        , Html.input
+                            [ Attr.id config.actorInputId
+                            , Attr.type_ "text"
+                            , Attr.value config.actorValue
+                            , Events.onInput config.actorOnInput
+                            , UI.formTextInputAuditFilterAttr
+                            ]
+                            []
+                        ]
+                  , Html.div [ UI.formFieldMinW0Attr ]
+                        [ Html.label
+                            [ Attr.for config.pageInputId
+                            , UI.formFieldLabelBlockAttr
+                            ]
+                            [ Html.text "Page slug contains" ]
+                        , Html.input
+                            [ Attr.id config.pageInputId
+                            , Attr.type_ "text"
+                            , Attr.value config.pageValue
+                            , Events.onInput config.pageOnInput
+                            , UI.formTextInputAuditFilterAttr
+                            ]
+                            []
+                        ]
+                  ]
                 ]
-            , Html.div [ TW.cls "min-w-0" ]
-                [ Html.label
-                    [ Attr.for "host-admin-audit-filter-actor"
-                    , TW.cls "block text-[0.82rem] font-medium text-[var(--fg-muted)]"
-                    ]
-                    [ Html.text "Actor contains" ]
-                , Html.input
-                    [ Attr.id "host-admin-audit-filter-actor"
-                    , Attr.type_ "text"
-                    , Attr.value model.hostAdminAuditFilterActorDraft
-                    , Events.onInput HostAdminAuditFilterActorChanged
-                    , TW.cls (UI.formTextInputClass ++ " mt-0 w-full max-w-full")
-                    ]
-                    []
-                ]
-            , Html.div [ TW.cls "min-w-0" ]
-                [ Html.label
-                    [ Attr.for "host-admin-audit-filter-page"
-                    , TW.cls "block text-[0.82rem] font-medium text-[var(--fg-muted)]"
-                    ]
-                    [ Html.text "Page slug contains" ]
-                , Html.input
-                    [ Attr.id "host-admin-audit-filter-page"
-                    , Attr.type_ "text"
-                    , Attr.value model.hostAdminAuditFilterPageDraft
-                    , Events.onInput HostAdminAuditFilterPageChanged
-                    , TW.cls (UI.formTextInputClass ++ " mt-0 w-full max-w-full")
-                    ]
-                    []
-                ]
-            ]
+            )
         , Html.div
-            [ Attr.id "host-admin-audit-filter-type"
+            [ Attr.id config.kindFilterGroupId
             , Attr.attribute "role" "group"
-            , Attr.attribute "aria-labelledby" "host-admin-audit-filter-type-legend"
-            , TW.cls "mt-3 border-t border-dashed border-[var(--border-dash)] pt-3"
+            , Attr.attribute "aria-labelledby" config.kindFilterLegendId
+            , UI.auditFilterTypeGroupAttr
             ]
             [ Html.p
-                [ Attr.id "host-admin-audit-filter-type-legend"
-                , TW.cls "m-0 mb-2 text-[0.82rem] text-[var(--fg-muted)]"
+                [ Attr.id config.kindFilterLegendId
+                , UI.auditFilterLegendTextAttr
                 ]
-                [ Html.text "Event types — none selected means all" ]
+                [ Html.text "Event types" ]
             , Html.div
-                [ TW.cls "flex flex-wrap gap-2" ]
-                (List.map (viewHostAdminAuditKindChip model) WikiAuditLog.eventKindFilterTagOptions)
+                [ UI.flexWrapGap2Attr ]
+                (List.map config.kindChipView WikiAuditLog.eventKindFilterTagOptions)
             ]
         ]
+
+
+viewHostAdminAuditFilters : Model -> Html Msg
+viewHostAdminAuditFilters model =
+    viewAuditFilters
+        { context = "host-admin-audit-filters"
+        , gridAttr = UI.hostAdminAuditFiltersGridAttr
+        , maybeWikiFilter =
+            Just
+                { inputId = "host-admin-audit-filter-wiki"
+                , value = model.hostAdminAuditFilterWikiDraft
+                , onInput = HostAdminAuditFilterWikiChanged
+                }
+        , actorInputId = "host-admin-audit-filter-actor"
+        , actorValue = model.hostAdminAuditFilterActorDraft
+        , actorOnInput = HostAdminAuditFilterActorChanged
+        , pageInputId = "host-admin-audit-filter-page"
+        , pageValue = model.hostAdminAuditFilterPageDraft
+        , pageOnInput = HostAdminAuditFilterPageChanged
+        , kindFilterGroupId = "host-admin-audit-filter-type"
+        , kindFilterLegendId = "host-admin-audit-filter-type-legend"
+        , kindChipView = viewHostAdminAuditKindChip model
+        }
 
 
 viewHostAdminAudit : Model -> Html Msg
 viewHostAdminAudit model =
-    case auditDiffRefFromFragment model.navigationFragment of
-        Just ( wikiSlug, atMillis ) ->
-            viewHostAdminAuditDiffRoute wikiSlug atMillis model
-
-        Nothing ->
-            Html.div
-                [ Attr.id "host-admin-audit-page"
-                , TW.cls "flex min-h-0 flex-1 flex-col gap-3"
-                ]
-                [ viewHostAdminAuditFilters model
-                , Html.div
-                    [ Attr.id "host-admin-audit-table-region"
-                    , TW.cls "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-                    ]
-                    [ viewHostAdminAuditBody model.hostAdminAuditLog ]
-                ]
+    Html.div
+        [ Attr.id "host-admin-audit-page"
+        , UI.wikiAdminAuditPageShellAttr
+        ]
+        [ viewHostAdminAuditFilters model
+        , Html.div
+            [ Attr.id "host-admin-audit-table-region"
+            , UI.flexRowMin0Attr
+            ]
+            [ viewHostAdminAuditBody model.hostAdminAuditLog ]
+        ]
 
 
 viewHostAdminCreateWikiFeedback : Maybe (Result HostAdmin.CreateHostedWikiError Wiki.CatalogEntry) -> Html Msg
@@ -7899,12 +8340,7 @@ viewHostAdminCreateWiki model =
 
                     formBody : List (Html Msg)
                     formBody =
-                        [ UI.contentParagraph []
-                            [ UI.contentLink
-                                [ Attr.href Wiki.hostAdminWikisUrlPath ]
-                                [ Html.text "Back to wiki list" ]
-                            ]
-                        , Html.form
+                        [ Html.form
                             [ Attr.id "host-admin-create-wiki-form"
                             , Events.onSubmit HostAdminCreateWikiSubmitted
                             ]
@@ -7922,7 +8358,7 @@ viewHostAdminCreateWiki model =
                                     , Attr.title Submission.pageSlugConstraintTitle
                                     , Events.onInput HostAdminCreateWikiSlugChanged
                                     , Attr.disabled draft.inFlight
-                                    , TW.cls UI.formTextInputClass
+                                    , UI.formTextInputAttr
                                     ]
                                     []
                                 ]
@@ -7935,7 +8371,7 @@ viewHostAdminCreateWiki model =
                                     , Attr.value draft.name
                                     , Events.onInput HostAdminCreateWikiNameChanged
                                     , Attr.disabled draft.inFlight
-                                    , TW.cls UI.formTextInputClass
+                                    , UI.formTextInputAttr
                                     ]
                                     []
                                 ]
@@ -7948,7 +8384,7 @@ viewHostAdminCreateWiki model =
                                     , Attr.value draft.initialAdminUsername
                                     , Events.onInput HostAdminCreateWikiInitialAdminUsernameChanged
                                     , Attr.disabled draft.inFlight
-                                    , TW.cls UI.formTextInputClass
+                                    , UI.formTextInputAttr
                                     ]
                                     []
                                 ]
@@ -7961,11 +8397,11 @@ viewHostAdminCreateWiki model =
                                     , Attr.value draft.initialAdminPassword
                                     , Events.onInput HostAdminCreateWikiInitialAdminPasswordChanged
                                     , Attr.disabled draft.inFlight
-                                    , TW.cls UI.formTextInputClass
+                                    , UI.formTextInputAttr
                                     ]
                                     []
                                 ]
-                            , UI.button
+                            , UI.Button.button
                                 [ Attr.id "host-admin-create-wiki-submit"
                                 , Attr.type_ "submit"
                                 , Attr.disabled draft.inFlight
@@ -7978,14 +8414,14 @@ viewHostAdminCreateWiki model =
                 Html.div [] formBody
 
             RemoteData.Loading ->
-                UI.contentParagraph
+                Html.div
                     [ Attr.id "host-admin-create-wiki-session-loading" ]
-                    [ Html.text "Loading…" ]
+                    [ UI.AsyncState.loading "Loading…" ]
 
             RemoteData.NotAsked ->
-                UI.contentParagraph
+                Html.div
                     [ Attr.id "host-admin-create-wiki-session-loading" ]
-                    [ Html.text "Loading…" ]
+                    [ UI.AsyncState.loading "Loading…" ]
 
             RemoteData.Failure () ->
                 UI.contentParagraph [] [ Html.text "Could not verify host session." ]
@@ -8057,9 +8493,9 @@ viewHostAdminWikiDetail model =
                 UI.contentParagraph [] [ Html.text "…" ]
 
             RemoteData.Loading ->
-                UI.contentParagraph
+                Html.div
                     [ Attr.id "host-admin-wiki-detail-loading" ]
-                    [ Html.text "Loading…" ]
+                    [ UI.AsyncState.loading "Loading…" ]
 
             RemoteData.Failure _ ->
                 UI.contentParagraph [] [ Html.text "Could not load." ]
@@ -8075,16 +8511,16 @@ viewHostAdminWikiDetail model =
                     busy =
                         d.saveInFlight || d.lifecycleInFlight || d.deleteInFlight
                 in
-                Html.div [ TW.cls UI.hostAdminWikiDetailShellClass ]
-                    [ Html.div [ TW.cls UI.hostAdminWikiDetailGridClass ]
-                        [ Html.div [ TW.cls UI.hostAdminWikiDetailMainStackClass ]
-                            [ Html.div [ TW.cls UI.hostAdminWikiDetailCardClass ]
-                                [ Html.h1 [ TW.cls UI.hostAdminWikiDetailPageTitleClass ]
+                Html.div [ UI.hostAdminWikiDetailShellAttr ]
+                    [ Html.div [ UI.hostAdminWikiDetailGridAttr ]
+                        [ Html.div [ UI.hostAdminWikiDetailMainStackAttr ]
+                            [ Html.div [ UI.hostAdminWikiDetailCardAttr ]
+                                [ Html.h1 [ UI.hostAdminWikiDetailPageTitleAttr ]
                                     [ Html.text entry.name ]
                                 , Html.form
                                     [ Attr.id "host-admin-wiki-detail-form"
                                     , Events.onSubmit HostAdminWikiDetailSaveClicked
-                                    , TW.cls "mt-1.5 flex flex-col gap-1 min-w-0"
+                                    , UI.hostAdminWikiDetailFormStackAttr
                                     ]
                                     [ Html.div []
                                         [ UI.contentLabel [ Attr.for "host-admin-wiki-detail-slug" ]
@@ -8097,7 +8533,7 @@ viewHostAdminWikiDetail model =
                                             , Attr.disabled busy
                                             , Attr.spellcheck False
                                             , Attr.autocomplete False
-                                            , TW.cls (UI.formTextInputClass ++ " " ++ UI.hostAdminWikiSlugClass ++ " w-full max-w-full")
+                                            , UI.inputTextFullAttr
                                             ]
                                             []
                                         ]
@@ -8110,7 +8546,7 @@ viewHostAdminWikiDetail model =
                                             , Attr.value d.nameDraft
                                             , Events.onInput HostAdminWikiDetailNameChanged
                                             , Attr.disabled busy
-                                            , TW.cls UI.formTextInputClass
+                                            , UI.inputTextFullAttr
                                             ]
                                             []
                                         ]
@@ -8118,15 +8554,17 @@ viewHostAdminWikiDetail model =
                                         [ UI.contentLabel [ Attr.for "host-admin-wiki-detail-summary" ]
                                             [ Html.text "Public summary" ]
                                         , Html.textarea
-                                            [ Attr.id "host-admin-wiki-detail-summary"
-                                            , Attr.value d.summaryDraft
-                                            , Events.onInput HostAdminWikiDetailSummaryChanged
-                                            , Attr.disabled busy
-                                            , TW.cls UI.formTextareaClass
-                                            ]
+                                            (UI.Textarea.form
+                                                [ Attr.id "host-admin-wiki-detail-summary"
+                                                , Attr.value d.summaryDraft
+                                                , Events.onInput HostAdminWikiDetailSummaryChanged
+                                                , Attr.disabled busy
+                                                , Attr.style "resize" "none"
+                                                ]
+                                            )
                                             []
                                         ]
-                                    , UI.button
+                                    , UI.Button.button
                                         [ Attr.id "host-admin-wiki-detail-save"
                                         , Attr.type_ "submit"
                                         , Attr.disabled busy
@@ -8136,11 +8574,10 @@ viewHostAdminWikiDetail model =
                                 , viewHostAdminWikiDetailSaveFeedback d.lastSaveResult
                                 ]
                             ]
-                        , Html.div [ TW.cls UI.hostAdminWikiDetailSideStackClass ]
-                            [ Html.div [ TW.cls UI.hostAdminWikiDetailCardClass ]
-                                [ Html.h2 [ TW.cls "m-0 mb-2 text-[1rem] font-semibold text-[var(--fg)]" ]
-                                    [ Html.text "Lifecycle" ]
-                                , Html.p [ TW.cls "m-0 mb-1.5" ]
+                        , Html.div [ UI.hostAdminWikiDetailSideStackAttr ]
+                            [ Html.div [ UI.hostAdminWikiDetailCardAttr ]
+                                [ UI.Heading.cardHeadingSm [] [ Html.text "Lifecycle" ]
+                                , Html.p [ UI.hostAdminStatusParaAttr ]
                                     [ Html.span
                                         [ Attr.id "host-admin-wiki-detail-status"
                                         , Attr.attribute "data-wiki-active"
@@ -8150,25 +8587,20 @@ viewHostAdminWikiDetail model =
                                              else
                                                 "false"
                                             )
-                                        , TW.cls
-                                            (if entry.active then
-                                                UI.hostAdminWikiStatusBadgeActiveClass
-
-                                             else
-                                                UI.hostAdminWikiStatusBadgeInactiveClass
-                                            )
                                         ]
-                                        [ Html.text
-                                            (if entry.active then
-                                                "Active"
+                                        [ UI.StatusBadge.view
+                                            { isActive = entry.active
+                                            , text =
+                                                if entry.active then
+                                                    "Active"
 
-                                             else
-                                                "Deactivated"
-                                            )
+                                                else
+                                                    "Deactivated"
+                                            }
                                         ]
                                     ]
                                 , if entry.active then
-                                    UI.button
+                                    UI.Button.button
                                         [ Attr.id "host-admin-wiki-detail-deactivate"
                                         , Attr.type_ "button"
                                         , Events.onClick HostAdminWikiDetailDeactivateClicked
@@ -8177,7 +8609,7 @@ viewHostAdminWikiDetail model =
                                         [ Html.text "Deactivate wiki" ]
 
                                   else
-                                    UI.button
+                                    UI.Button.button
                                         [ Attr.id "host-admin-wiki-detail-reactivate"
                                         , Attr.type_ "button"
                                         , Events.onClick HostAdminWikiDetailReactivateClicked
@@ -8186,10 +8618,9 @@ viewHostAdminWikiDetail model =
                                         [ Html.text "Reactivate wiki" ]
                                 , viewHostAdminWikiDetailLifecycleFeedback d.lastLifecycleResult
                                 ]
-                            , Html.div [ TW.cls UI.hostAdminWikiDetailDangerCardClass ]
-                                [ Html.h2 [ TW.cls "m-0 mb-1.5 text-[1rem] font-semibold text-[var(--danger)]" ]
-                                    [ Html.text "Delete wiki" ]
-                                , UI.contentParagraph [ TW.cls "m-0 mb-2 text-[0.95rem] leading-[1.4] text-[var(--fg)]" ]
+                            , Html.div [ UI.hostAdminWikiDetailDangerCardAttr ]
+                                [ UI.Heading.cardHeadingDanger [] [ Html.text "Delete wiki" ]
+                                , UI.contentParagraph [ UI.hostAdminDangerBlurbAttr ]
                                     [ Html.text
                                         ("This permanently removes the wiki, its pages, submissions, and audit log. Type the slug "
                                             ++ d.wikiSlug
@@ -8198,7 +8629,7 @@ viewHostAdminWikiDetail model =
                                     ]
                                 , Html.div
                                     [ Attr.id "host-admin-delete-wiki-form"
-                                    , TW.cls "flex flex-col gap-1.5 min-w-0"
+                                    , UI.hostAdminDeleteFormStackAttr
                                     ]
                                     [ Html.div []
                                         [ UI.contentLabel [ Attr.for "host-admin-delete-wiki-confirm" ]
@@ -8210,11 +8641,11 @@ viewHostAdminWikiDetail model =
                                             , Events.onInput HostAdminWikiDetailDeleteConfirmChanged
                                             , Attr.disabled busy
                                             , Attr.autocomplete False
-                                            , TW.cls UI.formTextInputClass
+                                            , UI.formTextInputAttr
                                             ]
                                             []
                                         ]
-                                    , UI.dangerButton
+                                    , UI.Button.dangerButton
                                         [ Attr.id "host-admin-delete-wiki-submit"
                                         , Attr.type_ "button"
                                         , Events.onClick HostAdminWikiDetailDeleteSubmitted
@@ -8251,6 +8682,9 @@ documentTitle ({ store, route } as model) =
         Route.HostAdminAudit ->
             "Platform audit log — SortOfWiki"
 
+        Route.HostAdminAuditDiff _ _ ->
+            "Platform audit diff — SortOfWiki"
+
         Route.HostAdminBackup ->
             "Backup and restore — SortOfWiki"
 
@@ -8286,6 +8720,20 @@ documentTitle ({ store, route } as model) =
             case Store.get wikiSlug store.wikiCatalog of
                 RemoteData.Success summary ->
                     "Graph — " ++ summary.name ++ " — SortOfWiki"
+
+                RemoteData.Failure _ ->
+                    "404 — SortOfWiki"
+
+                RemoteData.Loading ->
+                    "Loading - SortOfWiki"
+
+                RemoteData.NotAsked ->
+                    "Loading - SortOfWiki"
+
+        Route.WikiSearch wikiSlug ->
+            case Store.get wikiSlug store.wikiCatalog of
+                RemoteData.Success summary ->
+                    "Search — " ++ summary.name ++ " — SortOfWiki"
 
                 RemoteData.Failure _ ->
                     "404 — SortOfWiki"
@@ -8522,6 +8970,20 @@ documentTitle ({ store, route } as model) =
                 RemoteData.NotAsked ->
                     "Loading - SortOfWiki"
 
+        Route.WikiAdminAuditDiff slug _ ->
+            case Store.get slug store.wikiCatalog of
+                RemoteData.Success summary ->
+                    "Admin audit diff — " ++ summary.name ++ " — SortOfWiki"
+
+                RemoteData.Failure _ ->
+                    "404 — SortOfWiki"
+
+                RemoteData.Loading ->
+                    "Loading - SortOfWiki"
+
+                RemoteData.NotAsked ->
+                    "Loading - SortOfWiki"
+
         Route.NotFound _ ->
             "404 — SortOfWiki"
 
@@ -8555,42 +9017,22 @@ viewWikiHomeRoute { store } slug =
 
 viewRegisterFeedback : Maybe (Result ContributorAccount.RegisterContributorError ()) -> Html Msg
 viewRegisterFeedback maybeResult =
-    case maybeResult of
-        Nothing ->
-            Html.text ""
-
-        Just (Ok ()) ->
-            Html.div
-                [ Attr.id "wiki-register-success" ]
-                [ Html.text "Registration complete." ]
-
-        Just (Err e) ->
-            Html.div
-                [ Attr.id "wiki-register-error" ]
-                [ Html.span
-                    [ Attr.id "wiki-register-error-text" ]
-                    [ Html.text (ContributorAccount.registerErrorToUserText e) ]
-                ]
+    UI.ResultNotice.fromMaybeResult
+        { id = "wiki-register"
+        , okText = "Registration complete."
+        , errToText = ContributorAccount.registerErrorToUserText
+        }
+        maybeResult
 
 
 viewLoginFeedback : Maybe (Result ContributorAccount.LoginContributorError ()) -> Html Msg
 viewLoginFeedback maybeResult =
-    case maybeResult of
-        Nothing ->
-            Html.text ""
-
-        Just (Ok ()) ->
-            Html.div
-                [ Attr.id "wiki-login-success" ]
-                [ Html.text "You are logged in." ]
-
-        Just (Err e) ->
-            Html.div
-                [ Attr.id "wiki-login-error" ]
-                [ Html.span
-                    [ Attr.id "wiki-login-error-text" ]
-                    [ Html.text (ContributorAccount.loginErrorToUserText e) ]
-                ]
+    UI.ResultNotice.fromMaybeResult
+        { id = "wiki-login"
+        , okText = "You are logged in."
+        , errToText = ContributorAccount.loginErrorToUserText
+        }
+        maybeResult
 
 
 viewRegisterLoaded : Wiki.Slug -> RegisterDraft -> Html Msg
@@ -8598,6 +9040,7 @@ viewRegisterLoaded wikiSlug draft =
     Html.div
         [ Attr.id "wiki-register-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
+        , UI.formCenteredCardAttr
         ]
         [ Html.form
             [ Attr.id "wiki-register-form"
@@ -8612,7 +9055,7 @@ viewRegisterLoaded wikiSlug draft =
                     , Attr.value draft.username
                     , Events.onInput RegisterFormUsernameChanged
                     , Attr.disabled draft.inFlight
-                    , TW.cls UI.formTextInputClass
+                    , UI.formTextInputAttr
                     ]
                     []
                 ]
@@ -8625,11 +9068,11 @@ viewRegisterLoaded wikiSlug draft =
                     , Attr.value draft.password
                     , Events.onInput RegisterFormPasswordChanged
                     , Attr.disabled draft.inFlight
-                    , TW.cls UI.formTextInputClass
+                    , UI.formTextInputAttr
                     ]
                     []
                 ]
-            , UI.button
+            , UI.Button.button
                 [ Attr.id "wiki-register-submit"
                 , Attr.type_ "submit"
                 , Attr.disabled draft.inFlight
@@ -8638,7 +9081,7 @@ viewRegisterLoaded wikiSlug draft =
             ]
         , UI.contentParagraph []
             [ Html.text "Already have an account? "
-            , UI.contentLink
+            , UI.Link.contentLink
                 [ Attr.id "wiki-register-login-link"
                 , Attr.href (Wiki.loginUrlPath wikiSlug)
                 ]
@@ -8675,58 +9118,87 @@ viewRegisterRoute model wikiSlug =
             viewWikiRegisterLoading
 
 
-viewLoginLoaded : Wiki.Slug -> LoginDraft -> Html Msg
-viewLoginLoaded wikiSlug draft =
+viewLoginLoaded : Wiki.Slug -> String -> LoginDraft -> Html Msg
+viewLoginLoaded wikiSlug wikiName draft =
     Html.div
         [ Attr.id "wiki-login-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
+        , UI.formCenteredCardAttr
         ]
-        [ Html.form
-            [ Attr.id "wiki-login-form"
-            , Events.onSubmit LoginFormSubmitted
-            ]
-            [ Html.div []
-                [ UI.contentLabel [ Attr.for "wiki-login-username" ]
-                    [ Html.text "Username" ]
-                , Html.input
-                    [ Attr.id "wiki-login-username"
-                    , Attr.type_ "text"
-                    , Attr.value draft.username
-                    , Events.onInput LoginFormUsernameChanged
-                    , Attr.disabled draft.inFlight
-                    , TW.cls UI.formTextInputClass
+        [ Html.div [ Attr.class "login-shell-bg" ] []
+        , Html.main_
+            [ Attr.class "login-shell-main" ]
+            [ Html.div [ Attr.class "login-shell-brand" ]
+                [ Html.h1 [ Attr.class "m-0 text-[2.2rem] leading-[1.2] text-[var(--auth-card-heading)] [font-family:var(--font-serif)]" ]
+                    [ Html.text wikiName ]
+                , Html.p [ Attr.class "m-0 text-[var(--auth-card-fg-muted)] [font-family:var(--font-ui)]" ]
+                    [ Html.text "Part of SortOfWiki" ]
+                ]
+            , Html.div [ Attr.class "login-shell-card" ]
+                [ Html.form
+                    [ Attr.id "wiki-login-form"
+                    , Attr.class "flex flex-col"
+                    , Events.onSubmit LoginFormSubmitted
                     ]
-                    []
-                ]
-            , Html.div []
-                [ UI.contentLabel [ Attr.for "wiki-login-password" ]
-                    [ Html.text "Password" ]
-                , Html.input
-                    [ Attr.id "wiki-login-password"
-                    , Attr.type_ "password"
-                    , Attr.value draft.password
-                    , Events.onInput LoginFormPasswordChanged
-                    , Attr.disabled draft.inFlight
-                    , TW.cls UI.formTextInputClass
+                    [ Html.div [ Attr.class "mb-2" ]
+                        [ UI.contentLabel
+                            [ Attr.for "wiki-login-username"
+                            , Attr.class "ml-[0.15rem] text-[0.92rem]"
+                            , Attr.style "color" "var(--auth-card-fg-muted)"
+                            ]
+                            [ Html.text "Username" ]
+                        , Html.input
+                            [ Attr.id "wiki-login-username"
+                            , Attr.type_ "text"
+                            , Attr.value draft.username
+                            , Events.onInput LoginFormUsernameChanged
+                            , Attr.disabled draft.inFlight
+                            , UI.classAttr (UI.formTextInputClass ++ " w-full")
+                            ]
+                            []
+                        ]
+                    , Html.div [ Attr.class "mb-2" ]
+                        [ UI.contentLabel
+                            [ Attr.for "wiki-login-password"
+                            , Attr.class "ml-[0.15rem] text-[0.92rem]"
+                            , Attr.style "color" "var(--auth-card-fg-muted)"
+                            ]
+                            [ Html.text "Password" ]
+                        , Html.input
+                            [ Attr.id "wiki-login-password"
+                            , Attr.type_ "password"
+                            , Attr.value draft.password
+                            , Events.onInput LoginFormPasswordChanged
+                            , Attr.disabled draft.inFlight
+                            , UI.classAttr (UI.formTextInputClass ++ " w-full")
+                            ]
+                            []
+                        ]
+                    , UI.Button.button
+                        [ Attr.id "wiki-login-submit"
+                        , Attr.type_ "submit"
+                        , Attr.disabled draft.inFlight
+                        , Attr.class "w-full mt-1"
+                        ]
+                        [ Html.text "Log in" ]
                     ]
-                    []
+                , Html.div [ Attr.class "mt-3" ] [ viewLoginFeedback draft.lastResult ]
                 ]
-            , UI.button
-                [ Attr.id "wiki-login-submit"
-                , Attr.type_ "submit"
-                , Attr.disabled draft.inFlight
+            , Html.footer [ Attr.class "mt-4 text-[0.78rem] text-[var(--auth-card-fg-muted)] [font-family:var(--font-ui)]" ]
+                [ Html.div [ Attr.class "flex items-center justify-between gap-3 px-1" ]
+                    [ Html.div []
+                        [ Html.text "Need an account? "
+                        , UI.Link.subtleLink
+                            [ Attr.id "wiki-login-register-link"
+                            , Attr.href (Wiki.registerUrlPath wikiSlug)
+                            ]
+                            [ Html.text "Register" ]
+                        ]
+                    , Html.a [ Attr.class "text-[var(--link)] no-underline hover:underline", Attr.href "https://github.com/janiczek/sortofwiki" ]
+                        [ Html.text "Source" ]
+                    ]
                 ]
-                [ Html.text "Log in" ]
             ]
-        , UI.contentParagraph []
-            [ Html.text "Need an account? "
-            , UI.contentLink
-                [ Attr.id "wiki-login-register-link"
-                , Attr.href (Wiki.registerUrlPath wikiSlug)
-                ]
-                [ Html.text "Register" ]
-            ]
-        , viewLoginFeedback draft.lastResult
         ]
 
 
@@ -8735,8 +9207,8 @@ viewLoginRoute model wikiSlug =
     case Store.get_ wikiSlug model.store.wikiDetails of
         RemoteData.Success _ ->
             case Store.get wikiSlug model.store.wikiCatalog of
-                RemoteData.Success _ ->
-                    viewLoginLoaded wikiSlug model.loginDraft
+                RemoteData.Success catalogEntry ->
+                    viewLoginLoaded wikiSlug catalogEntry.name model.loginDraft
 
                 RemoteData.Failure _ ->
                     viewNotFound
@@ -8762,27 +9234,17 @@ viewWikiSubmitNewLoading =
     Html.div
         [ Attr.id "wiki-submit-new-loading"
         ]
-        [ UI.contentParagraph [] [ Html.text "Loading…" ] ]
+        [ UI.AsyncState.loading "Loading…" ]
 
 
 viewNewPageSaveDraftFeedback : NewPageSubmitDraft -> Html Msg
 viewNewPageSaveDraftFeedback draft =
-    case draft.lastSaveDraftResult of
-        Nothing ->
-            Html.text ""
-
-        Just (Ok _) ->
-            Html.div
-                [ Attr.id "wiki-submit-new-save-draft-success" ]
-                [ Html.text "Draft saved." ]
-
-        Just (Err e) ->
-            Html.div
-                [ Attr.id "wiki-submit-new-save-draft-error" ]
-                [ Html.span
-                    [ Attr.id "wiki-submit-new-save-draft-error-text" ]
-                    [ Html.text (Submission.saveNewPageDraftErrorToUserText e) ]
-                ]
+    UI.ResultNotice.fromMaybeResult
+        { id = "wiki-submit-new-save-draft"
+        , okText = "Draft saved."
+        , errToText = Submission.saveNewPageDraftErrorToUserText
+        }
+        draft.lastSaveDraftResult
 
 
 viewNewPageSubmitFeedback : Wiki.Slug -> NewPageSubmitDraft -> Html Msg
@@ -8810,7 +9272,7 @@ viewNewPageSubmitFeedback wikiSlug draft =
                             ]
                             [ UI.contentParagraph []
                                 [ Html.text "Submitted for review." ]
-                            , UI.contentLink
+                            , UI.Link.contentLink
                                 [ Attr.id "wiki-submit-new-success-link"
                                 , Attr.href (Wiki.submissionDetailUrlPath wikiSlug idStr)
                                 ]
@@ -8833,110 +9295,111 @@ viewSubmitNewLoaded wikiSlug publishedSlugExists showUntrustedContributorDisclai
         formBusy : Bool
         formBusy =
             draft.inFlight || draft.saveDraftInFlight
-
-        newPageMarkdownHeadingClass : String
-        newPageMarkdownHeadingClass =
-            "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)]"
-
-        newPagePreviewHeadingClass : String
-        newPagePreviewHeadingClass =
-            "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg-muted)]"
-
-        newPageMarkdownPreviewCellClass : String
-        newPageMarkdownPreviewCellClass =
-            "flex min-h-0 min-w-0 flex-col gap-1 h-full"
     in
     Html.div
         [ Attr.id "wiki-submit-new-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
         , Attr.attribute "data-page-slug" draft.pageSlug
+        , Attr.class "h-full min-h-0 flex flex-col"
         ]
         [ Html.form
             [ Attr.id "wiki-submit-new-form"
             , Events.onSubmit NewPageSubmitFormSubmitted
+            , Attr.class "h-full min-h-0 flex-1 flex flex-col overflow-hidden"
             ]
-            [ Html.div []
-                [ UI.contentLabel [ Attr.for "slug-input" ]
-                    [ Html.text "Page slug" ]
-                , Html.input
-                    ([ Attr.id "slug-input"
-                     , Attr.type_ "text"
-                     , Attr.value draft.pageSlug
-                     , Attr.disabled formBusy
-                     , TW.cls UI.formTextInputClass
-                     ]
-                        ++ (if draft.pageSlugLockedFromQuery then
-                                [ Attr.readonly True ]
+            [ UI.EditorShell.view
+                { containerAttrs = [ Attr.class "flex-1 min-h-0" ]
+                , controlsAttrs = []
+                , controlsChildren =
+                    [ Html.div [ Attr.class "shrink-0" ]
+                        [ UI.contentLabel [ Attr.for "slug-input" ] [ Html.text "Page slug" ]
+                        , Html.input
+                            ([ Attr.id "slug-input"
+                             , Attr.type_ "text"
+                             , Attr.value draft.pageSlug
+                             , Attr.disabled formBusy
+                             , UI.formTextInputAttr
+                             ]
+                                ++ (if draft.pageSlugLockedFromQuery then
+                                        [ Attr.readonly True
+                                        , Attr.style "background-color" "var(--chrome-bg)"
+                                        , Attr.style "color" "var(--fg-muted)"
+                                        , Attr.style "cursor" "not-allowed"
+                                        ]
+
+                                    else
+                                        [ Events.onInput NewPageSubmitSlugChanged ]
+                                   )
+                            )
+                            []
+                        ]
+                    , Html.div [ Attr.class "shrink-0" ]
+                        [ UI.contentLabel [ Attr.for "tags-input" ] [ Html.text "Tags (comma-separated page slugs)" ]
+                        , Html.input
+                            [ Attr.id "tags-input"
+                            , Attr.type_ "text"
+                            , Attr.value draft.tagsInput
+                            , Events.onInput NewPageSubmitTagsChanged
+                            , Attr.disabled formBusy
+                            , UI.formTextInputAttr
+                            ]
+                            []
+                        ]
+                    ]
+                , contentAttrs = []
+                , contentChildren =
+                    [ Html.section [ Attr.class "min-w-0 min-h-0 flex flex-col bg-[var(--input-bg)]" ]
+                        [ UI.PanelHeader.view { kind = UI.PanelHeader.Primary, text = "EDITOR" }
+                        , Html.div [ Attr.class "min-h-0 flex-1" ]
+                            [ Html.textarea
+                                (UI.Textarea.markdownEditableCell
+                                    [ Attr.id "content-markdown-textarea"
+                                    , Attr.value draft.markdownBody
+                                    , Events.onInput NewPageSubmitMarkdownChanged
+                                    , Attr.disabled formBusy
+                                    , Attr.rows 12
+                                    , Attr.class "h-full max-h-none"
+                                    ]
+                                )
+                                []
+                            ]
+                        ]
+                    , Html.section [ Attr.class "min-w-0 min-h-0 flex flex-col bg-[var(--bg)]" ]
+                        [ UI.PanelHeader.view { kind = UI.PanelHeader.Secondary, text = "LIVE PREVIEW" }
+                        , Html.div [ Attr.class "min-h-0 flex-1 p-3" ]
+                            [ Html.div
+                                [ Attr.class "h-full max-h-none"
+                                , UI.markdownPreviewScrollMinFlexFullHeightAttr
+                                ]
+                                [ PageMarkdown.viewPreview "content-preview" wikiSlug publishedSlugExists draft.markdownBody ]
+                            ]
+                        ]
+                    ]
+                }
+            , UI.FormActionFooter.sticky
+                { align = UI.FormActionFooter.AlignEnd
+                , left = []
+                , right =
+                    UI.SubmissionActions.primaryPairButtons
+                        { saveDraftAttrs =
+                            [ Attr.id "wiki-submit-new-save-draft"
+                            , Attr.type_ "button"
+                            , Events.onClick NewPageSaveDraftClicked
+                            , Attr.disabled formBusy
+                            ]
+                        , submitAttrs =
+                            [ Attr.id "wiki-submit-new-submit"
+                            , Attr.type_ "submit"
+                            , Attr.disabled formBusy
+                            ]
+                        , submitLabel =
+                            if showUntrustedContributorDisclaimer then
+                                "Submit for review"
 
                             else
-                                [ Events.onInput NewPageSubmitSlugChanged ]
-                           )
-                    )
-                    []
-                ]
-            , Html.div []
-                [ UI.contentLabel [ Attr.for "tags-input" ]
-                    [ Html.text "Tags (comma-separated page slugs)" ]
-                , Html.input
-                    [ Attr.id "tags-input"
-                    , Attr.type_ "text"
-                    , Attr.value draft.tagsInput
-                    , Events.onInput NewPageSubmitTagsChanged
-                    , Attr.disabled formBusy
-                    , TW.cls UI.formTextInputClass
-                    ]
-                    []
-                ]
-            , Html.div
-                [ TW.cls "grid min-w-0 grid-cols-2 gap-4 items-stretch" ]
-                [ Html.div
-                    [ TW.cls newPageMarkdownPreviewCellClass ]
-                    [ Html.h2
-                        [ TW.cls newPageMarkdownHeadingClass ]
-                        [ Html.text "Markdown body" ]
-                    , Html.textarea
-                        [ Attr.id "content-markdown-textarea"
-                        , Attr.value draft.markdownBody
-                        , Events.onInput NewPageSubmitMarkdownChanged
-                        , Attr.disabled formBusy
-                        , Attr.rows 12
-                        , TW.cls (submissionDetailMarkdownTextareaEditableClass ++ submissionDetailMarkdownTextareaDiffCellClass)
-                        ]
-                        []
-                    ]
-                , Html.div
-                    [ TW.cls newPageMarkdownPreviewCellClass ]
-                    [ Html.h3
-                        [ TW.cls newPagePreviewHeadingClass ]
-                        [ Html.text "Preview" ]
-                    , Html.div
-                        [ TW.cls (markdownPreviewScrollClass ++ " min-h-0 flex-1") ]
-                        [ PageMarkdown.viewPreview "content-preview" wikiSlug publishedSlugExists draft.markdownBody ]
-                    ]
-                ]
-            , Html.div
-                [ TW.cls "flex flex-wrap gap-2" ]
-                [ UI.button
-                    [ Attr.id "wiki-submit-new-save-draft"
-                    , Attr.type_ "button"
-                    , Events.onClick NewPageSaveDraftClicked
-                    , Attr.disabled formBusy
-                    ]
-                    [ Html.text "Save draft" ]
-                , UI.button
-                    [ Attr.id "wiki-submit-new-submit"
-                    , Attr.type_ "submit"
-                    , Attr.disabled formBusy
-                    ]
-                    [ Html.text
-                        (if showUntrustedContributorDisclaimer then
-                            "Submit for review"
-
-                         else
-                            "Create"
-                        )
-                    ]
-                ]
+                                "Create"
+                        }
+                }
             ]
         , viewNewPageSubmitFeedback wikiSlug draft
         ]
@@ -8974,22 +9437,12 @@ viewSubmitNewRoute model wikiSlug =
 
 viewPageEditSaveDraftFeedback : PageEditSubmitDraft -> Html Msg
 viewPageEditSaveDraftFeedback draft =
-    case draft.lastSaveDraftResult of
-        Nothing ->
-            Html.text ""
-
-        Just (Ok _) ->
-            Html.div
-                [ Attr.id "wiki-submit-edit-save-draft-success" ]
-                [ Html.text "Draft saved." ]
-
-        Just (Err e) ->
-            Html.div
-                [ Attr.id "wiki-submit-edit-save-draft-error" ]
-                [ Html.span
-                    [ Attr.id "wiki-submit-edit-save-draft-error-text" ]
-                    [ Html.text (Submission.savePageEditDraftErrorToUserText e) ]
-                ]
+    UI.ResultNotice.fromMaybeResult
+        { id = "wiki-submit-edit-save-draft"
+        , okText = "Draft saved."
+        , errToText = Submission.savePageEditDraftErrorToUserText
+        }
+        draft.lastSaveDraftResult
 
 
 viewPageEditSubmitFeedback : Wiki.Slug -> Page.Slug -> PageEditSubmitDraft -> Html Msg
@@ -9007,7 +9460,7 @@ viewPageEditSubmitFeedback wikiSlug pageSlug draft =
                             [ Attr.id "wiki-submit-edit-success" ]
                             [ UI.contentParagraph []
                                 [ Html.text "Published. Your edit is live. " ]
-                            , UI.contentLink
+                            , UI.Link.contentLink
                                 [ Attr.id "wiki-submit-edit-success-published-link"
                                 , Attr.href (Wiki.publishedPageUrlPath wikiSlug pageSlug)
                                 ]
@@ -9026,7 +9479,7 @@ viewPageEditSubmitFeedback wikiSlug pageSlug draft =
                             ]
                             [ UI.contentParagraph []
                                 [ Html.text "Submitted for review." ]
-                            , UI.contentLink
+                            , UI.Link.contentLink
                                 [ Attr.id "wiki-submit-edit-success-link"
                                 , Attr.href (Wiki.submissionDetailUrlPath wikiSlug idStr)
                                 ]
@@ -9061,133 +9514,131 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
         originalMarkdown =
             pageDetails.maybeMarkdownSource |> Maybe.withDefault ""
 
-        submitEditDiffCellShellClass : String
-        submitEditDiffCellShellClass =
-            "flex min-h-0 min-w-0 flex-col gap-1 h-full"
-
-        submitEditMarkdownHeadingClass : String
-        submitEditMarkdownHeadingClass =
-            "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)]"
-
-        submitEditPreviewHeadingClass : String
-        submitEditPreviewHeadingClass =
-            "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg-muted)]"
-
         submitEditReadonlyTextarea : String -> String -> String -> Html Msg
         submitEditReadonlyTextarea elementId markdown extraClass =
             Html.textarea
-                [ Attr.id elementId
-                , Attr.readonly True
-                , Attr.rows 12
-                , Attr.value markdown
-                , TW.cls (submissionDetailMarkdownTextareaReadonlyClass ++ extraClass)
-                ]
+                ([ Attr.id elementId
+                 , Attr.readonly True
+                 , Attr.rows 12
+                 , Attr.value markdown
+                 ]
+                    |> UI.Textarea.markdownReadonlyWithExtra extraClass
+                )
                 []
-
-        submitEditPreviewInCell : String -> String -> Html Msg
-        submitEditPreviewInCell previewId markdown =
-            Html.div
-                [ TW.cls (markdownPreviewScrollClass ++ " min-h-0 flex-1") ]
-                [ PageMarkdown.viewPreview previewId wikiSlug publishedSlugExists markdown ]
     in
     Html.div
         [ Attr.id "wiki-submit-edit-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
         , Attr.attribute "data-page-slug" pageSlug
+        , Attr.class "h-full min-h-0 flex flex-col"
         ]
-        (List.concat
-            [ if showUntrustedContributorDisclaimer then
-                [ UI.contentParagraph []
-                    [ Html.text "Published content stays unchanged until a reviewer approves this proposal." ]
-                ]
-
-              else
-                []
-            , [ Html.form
-                    [ Attr.id "wiki-submit-edit-form"
-                    , Events.onSubmit PageEditSubmitFormSubmitted
-                    ]
-                    [ Html.div
-                        [ TW.cls "mb-3" ]
-                        [ UI.contentLabel [ Attr.for "wiki-submit-edit-tags" ]
-                            [ Html.text "Tags (comma-separated page slugs)" ]
+        [ Html.form
+            [ Attr.id "wiki-submit-edit-form"
+            , Events.onSubmit PageEditSubmitFormSubmitted
+            , Attr.class "h-full min-h-0 flex-1 flex flex-col overflow-hidden"
+            ]
+            [ UI.EditorShell.view
+                { containerAttrs = [ Attr.class "flex-1 min-h-0" ]
+                , controlsAttrs = []
+                , controlsChildren =
+                    [ Html.div [ Attr.class "min-w-[14rem] flex-1" ]
+                        [ UI.contentLabel [ Attr.for "wiki-submit-edit-tags" ] [ Html.text "Tags (comma-separated page slugs)" ]
                         , Html.input
                             [ Attr.id "wiki-submit-edit-tags"
                             , Attr.type_ "text"
                             , Attr.value draft.tagsInput
                             , Events.onInput PageEditSubmitTagsChanged
                             , Attr.disabled formBusy
-                            , TW.cls UI.formTextInputClass
+                            , UI.formTextInputAttr
                             ]
                             []
                         ]
-                    , Html.div
-                        [ TW.cls "grid min-w-0 grid-cols-2 grid-rows-2 gap-4 items-stretch" ]
-                        [ Html.div
-                            [ TW.cls submitEditDiffCellShellClass ]
-                            [ Html.h2
-                                [ TW.cls submitEditMarkdownHeadingClass ]
-                                [ Html.text "Published" ]
-                            , submitEditReadonlyTextarea "wiki-submit-edit-original-markdown" originalMarkdown submissionDetailMarkdownTextareaDiffCellClass
-                            ]
-                        , Html.div
-                            [ TW.cls submitEditDiffCellShellClass ]
-                            [ Html.h2
-                                [ TW.cls submitEditMarkdownHeadingClass ]
-                                [ Html.text "Your edit" ]
-                            , Html.textarea
-                                [ Attr.id "wiki-submit-edit-markdown"
-                                , Attr.value draft.markdownBody
-                                , Events.onInput PageEditSubmitMarkdownChanged
-                                , Attr.disabled formBusy
-                                , Attr.rows 12
-                                , TW.cls (submissionDetailMarkdownTextareaEditableClass ++ submissionDetailMarkdownTextareaDiffCellClass)
+                    ]
+                , contentAttrs = []
+                , contentChildren =
+                    [ Html.section [ Attr.class "min-w-0 min-h-0 flex flex-col bg-[var(--input-bg)]" ]
+                        [ UI.PanelHeader.view { kind = UI.PanelHeader.Primary, text = "EDITOR" }
+                        , Html.div [ Attr.class "min-h-0 flex-1 grid grid-rows-2 gap-3" ]
+                            [ Html.div [ UI.newPageEditorMarkdownPreviewCellAttr ]
+                                [ UI.Heading.panelHeadingSecondary [ Attr.class "px-4 py-1 mb-2 border-b border-[var(--border-subtle)]" ] [ Html.text "Published" ]
+                                , submitEditReadonlyTextarea "wiki-submit-edit-original-markdown" originalMarkdown " h-full max-h-none px-4"
                                 ]
-                                []
-                            ]
-                        , Html.div
-                            [ TW.cls submitEditDiffCellShellClass ]
-                            [ Html.h3
-                                [ TW.cls submitEditPreviewHeadingClass ]
-                                [ Html.text "Preview" ]
-                            , submitEditPreviewInCell "wiki-submit-edit-original-preview" originalMarkdown
-                            ]
-                        , Html.div
-                            [ TW.cls submitEditDiffCellShellClass ]
-                            [ Html.h3
-                                [ TW.cls submitEditPreviewHeadingClass ]
-                                [ Html.text "Preview" ]
-                            , submitEditPreviewInCell "wiki-submit-edit-new-preview" draft.markdownBody
+                            , Html.div [ UI.newPageEditorMarkdownPreviewCellAttr, Attr.class "border-t border-[var(--border-subtle)]" ]
+                                [ UI.Heading.panelHeadingSecondary [ Attr.class "px-4 py-1 mb-2 border-b border-[var(--border-subtle)]" ] [ Html.text "Your edit" ]
+                                , Html.textarea
+                                    (UI.Textarea.markdownEditableCell
+                                        [ Attr.id "wiki-submit-edit-markdown"
+                                        , Attr.value draft.markdownBody
+                                        , Events.onInput PageEditSubmitMarkdownChanged
+                                        , Attr.disabled formBusy
+                                        , Attr.rows 12
+                                        , Attr.class "h-full max-h-none px-4"
+                                        ]
+                                    )
+                                    []
+                                ]
                             ]
                         ]
-                    , Html.div
-                        [ TW.cls "flex flex-wrap gap-2" ]
-                        [ UI.button
+                    , Html.section [ Attr.class "min-w-0 min-h-0 flex flex-col bg-[var(--bg)]" ]
+                        [ UI.PanelHeader.view { kind = UI.PanelHeader.Secondary, text = "LIVE PREVIEW" }
+                        , Html.div [ Attr.class "min-h-0 flex-1 grid grid-rows-2 gap-3" ]
+                            [ Html.div [ UI.newPageEditorMarkdownPreviewCellAttr ]
+                                [ UI.Heading.panelHeadingSecondary [ Attr.class "px-4 py-1 mb-2 border-b border-[var(--border-subtle)]" ] [ Html.text "Published preview" ]
+                                , Html.div
+                                    [ Attr.class "h-full max-h-none opacity-75"
+                                    , UI.markdownPreviewScrollMinFlexFullHeightAttr
+                                    , Attr.class "px-4 pt-2"
+                                    ]
+                                    [ PageMarkdown.viewPreview "wiki-submit-edit-original-preview" wikiSlug publishedSlugExists originalMarkdown ]
+                                ]
+                            , Html.div [ UI.newPageEditorMarkdownPreviewCellAttr, Attr.class "border-t border-[var(--border-subtle)]" ]
+                                [ UI.Heading.panelHeadingSecondary [ Attr.class "px-4 py-1 mb-2 border-b border-[var(--border-subtle)]" ] [ Html.text "Your preview" ]
+                                , Html.div
+                                    [ Attr.class "h-full max-h-none"
+                                    , UI.markdownPreviewScrollMinFlexFullHeightAttr
+                                    , Attr.class "px-4 pt-2"
+                                    ]
+                                    [ PageMarkdown.viewPreview "wiki-submit-edit-new-preview" wikiSlug publishedSlugExists draft.markdownBody ]
+                                ]
+                            ]
+                        ]
+                    ]
+                }
+            , UI.FormActionFooter.sticky
+                { align = UI.FormActionFooter.AlignBetween
+                , left =
+                    [ if showUntrustedContributorDisclaimer then
+                        Html.p [ Attr.class "m-0 text-[0.84rem] text-[var(--fg-muted)]" ]
+                            [ Html.text "Published content stays unchanged until a reviewer approves this proposal." ]
+
+                      else
+                        Html.span [] []
+                    ]
+                , right =
+                    [ UI.SubmissionActions.primaryPairRow
+                        { saveDraftAttrs =
                             [ Attr.id "wiki-submit-edit-save-draft"
                             , Attr.type_ "button"
                             , Events.onClick PageEditSaveDraftClicked
                             , Attr.disabled formBusy
                             ]
-                            [ Html.text "Save draft" ]
-                        , UI.button
+                        , submitAttrs =
                             [ Attr.id "wiki-submit-edit-submit"
                             , Attr.type_ "submit"
                             , Attr.disabled formBusy
                             ]
-                            [ Html.text
-                                (if showUntrustedContributorDisclaimer then
-                                    "Submit for review"
+                        , submitLabel =
+                            if showUntrustedContributorDisclaimer then
+                                "Submit for review"
 
-                                 else
-                                    "Save"
-                                )
-                            ]
-                        ]
+                            else
+                                "Save"
+                        }
                     ]
-              , viewPageEditSubmitFeedback wikiSlug pageSlug draft
-              ]
+                }
             ]
-        )
+        , viewPageEditSubmitFeedback wikiSlug pageSlug draft
+        ]
 
 
 viewSubmitEditRoute : Model -> Wiki.Slug -> Page.Slug -> Html Msg
@@ -9240,22 +9691,12 @@ viewSubmitEditRoute model wikiSlug pageSlug =
 
 viewPageDeleteSaveDraftFeedback : PageDeleteSubmitDraft -> Html Msg
 viewPageDeleteSaveDraftFeedback draft =
-    case draft.lastSaveDraftResult of
-        Nothing ->
-            Html.text ""
-
-        Just (Ok _) ->
-            Html.div
-                [ Attr.id "wiki-submit-delete-save-draft-success" ]
-                [ Html.text "Draft saved." ]
-
-        Just (Err e) ->
-            Html.div
-                [ Attr.id "wiki-submit-delete-save-draft-error" ]
-                [ Html.span
-                    [ Attr.id "wiki-submit-delete-save-draft-error-text" ]
-                    [ Html.text (Submission.savePageDeleteDraftErrorToUserText e) ]
-                ]
+    UI.ResultNotice.fromMaybeResult
+        { id = "wiki-submit-delete-save-draft"
+        , okText = "Draft saved."
+        , errToText = Submission.savePageDeleteDraftErrorToUserText
+        }
+        draft.lastSaveDraftResult
 
 
 viewPageDeleteSubmitFeedback : Wiki.Slug -> Page.Slug -> PageDeleteSubmitDraft -> Html Msg
@@ -9287,7 +9728,7 @@ viewPageDeleteSubmitFeedback wikiSlug pageSlug draft =
                             ]
                             [ UI.contentParagraph []
                                 [ Html.text "Submitted for review." ]
-                            , UI.contentLink
+                            , UI.Link.contentLink
                                 [ Attr.id "wiki-submit-delete-success-link"
                                 , Attr.href (Wiki.submissionDetailUrlPath wikiSlug idStr)
                                 ]
@@ -9326,7 +9767,7 @@ viewSubmitDeleteLoaded trustedModeratorSession submitMsg wikiSlug pageSlug draft
         actionButtons : List (Html Msg)
         actionButtons =
             if trustedModeratorSession then
-                [ UI.button
+                [ UI.Button.button
                     [ Attr.id "wiki-submit-delete-submit"
                     , Attr.type_ "button"
                     , Events.onClick submitMsg
@@ -9336,21 +9777,21 @@ viewSubmitDeleteLoaded trustedModeratorSession submitMsg wikiSlug pageSlug draft
                 ]
 
             else
-                [ UI.button
-                    [ Attr.id "wiki-submit-delete-save-draft"
-                    , Attr.type_ "button"
-                    , Events.onClick PageDeleteSaveDraftClicked
-                    , Attr.disabled formBusy
-                    ]
-                    [ Html.text "Save draft" ]
-                , UI.button
-                    [ Attr.id "wiki-submit-delete-submit"
-                    , Attr.type_ "button"
-                    , Events.onClick submitMsg
-                    , Attr.disabled formBusy
-                    ]
-                    [ Html.text "Submit for review" ]
-                ]
+                UI.SubmissionActions.primaryPairButtons
+                    { saveDraftAttrs =
+                        [ Attr.id "wiki-submit-delete-save-draft"
+                        , Attr.type_ "button"
+                        , Events.onClick PageDeleteSaveDraftClicked
+                        , Attr.disabled formBusy
+                        ]
+                    , submitAttrs =
+                        [ Attr.id "wiki-submit-delete-submit"
+                        , Attr.type_ "button"
+                        , Events.onClick submitMsg
+                        , Attr.disabled formBusy
+                        ]
+                    , submitLabel = "Submit for review"
+                    }
     in
     Html.div
         [ Attr.id "wiki-submit-delete-page"
@@ -9366,18 +9807,19 @@ viewSubmitDeleteLoaded trustedModeratorSession submitMsg wikiSlug pageSlug draft
                 [ UI.contentLabel [ Attr.for "wiki-submit-delete-reason" ]
                     [ Html.text "Reason for deletion (required)" ]
                 , Html.textarea
-                    [ Attr.id "wiki-submit-delete-reason"
-                    , Attr.value draft.reasonText
-                    , Events.onInput PageDeleteSubmitReasonChanged
-                    , Attr.disabled formBusy
-                    , Attr.rows 4
-                    , Attr.placeholder "Explain why this page is being removed"
-                    , TW.cls UI.formTextareaClass
-                    ]
+                    (UI.Textarea.form
+                        [ Attr.id "wiki-submit-delete-reason"
+                        , Attr.value draft.reasonText
+                        , Events.onInput PageDeleteSubmitReasonChanged
+                        , Attr.disabled formBusy
+                        , Attr.rows 4
+                        , Attr.placeholder "Explain why this page is being removed"
+                        ]
+                    )
                     []
                 ]
             , Html.div
-                [ TW.cls "flex flex-wrap gap-2" ]
+                [ UI.flexWrapGap2Attr ]
                 actionButtons
             ]
         , viewPageDeleteSubmitFeedback wikiSlug pageSlug draft
@@ -9488,14 +9930,14 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
                 comparePreview : String -> String -> Html Msg
                 comparePreview previewId markdown =
                     Html.div
-                        [ TW.cls markdownPreviewScrollClass ]
+                        [ UI.classAttr UI.markdownPreviewScrollClass ]
                         [ PageMarkdown.viewPreview previewId wikiSlug publishedSlugExists markdown ]
 
                 newPageSlugField : Html Msg
                 newPageSlugField =
                     if detail.status == Submission.Draft && detail.contributionKind == Submission.ContributorKindNewPage then
                         Html.div
-                            [ TW.cls "mb-2" ]
+                            [ UI.mb2Attr ]
                             [ UI.contentLabel
                                 [ Attr.for "wiki-submission-detail-new-page-slug" ]
                                 [ Html.text "Page slug" ]
@@ -9505,7 +9947,7 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
                                 , Attr.value interaction.newPageSlug
                                 , Events.onInput SubmissionDetailNewPageSlugChanged
                                 , Attr.disabled anyBusy
-                                , TW.cls UI.formTextInputClass
+                                , UI.formTextInputAttr
                                 ]
                                 []
                             ]
@@ -9517,23 +9959,25 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
                 newMarkdownField =
                     if detail.status == Submission.Draft then
                         Html.textarea
-                            [ Attr.id "new-markdown-editable-textarea"
-                            , Attr.value interaction.markdownBody
-                            , Events.onInput SubmissionDetailNewMarkdownChanged
-                            , Attr.readonly anyBusy
-                            , Attr.rows 14
-                            , TW.cls (submissionDetailMarkdownTextareaEditableClass ++ submissionDetailMarkdownTextareaDiffCellClass)
-                            ]
+                            ([ Attr.id "new-markdown-editable-textarea"
+                             , Attr.value interaction.markdownBody
+                             , Events.onInput SubmissionDetailNewMarkdownChanged
+                             , Attr.readonly anyBusy
+                             , Attr.rows 14
+                             ]
+                                |> UI.Textarea.markdownEditableCell
+                            )
                             []
 
                     else
                         Html.textarea
-                            [ Attr.id "new-markdown-readonly-textarea"
-                            , Attr.readonly True
-                            , Attr.rows 14
-                            , Attr.value detail.compareNewMarkdown
-                            , TW.cls (submissionDetailMarkdownTextareaReadonlyClass ++ submissionDetailMarkdownTextareaDiffCellClass)
-                            ]
+                            ([ Attr.id "new-markdown-readonly-textarea"
+                             , Attr.readonly True
+                             , Attr.rows 14
+                             , Attr.value detail.compareNewMarkdown
+                             ]
+                                |> UI.Textarea.markdownReadonlyCell
+                            )
                             []
 
                 withdrawDeleteRow : Html Msg
@@ -9541,15 +9985,15 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
                     case detail.status of
                         Submission.Pending ->
                             Html.div
-                                [ TW.cls "flex flex-wrap gap-2 mt-3" ]
-                                [ UI.button
+                                [ UI.flexWrapGap2Mt3Attr ]
+                                [ UI.Button.button
                                     [ Attr.id "wiki-submission-detail-withdraw"
                                     , Attr.type_ "button"
                                     , Attr.disabled (anyBusy || interaction.withdrawInFlight)
                                     , Events.onClick SubmissionDetailWithdrawClicked
                                     ]
                                     [ Html.text "Withdraw (edit)" ]
-                                , UI.button
+                                , UI.Button.button
                                     [ Attr.id "wiki-submission-detail-delete"
                                     , Attr.type_ "button"
                                     , Attr.disabled (anyBusy || interaction.deleteInFlight)
@@ -9560,15 +10004,15 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
 
                         Submission.NeedsRevision ->
                             Html.div
-                                [ TW.cls "flex flex-wrap gap-2 mt-3" ]
-                                [ UI.button
+                                [ UI.flexWrapGap2Mt3Attr ]
+                                [ UI.Button.button
                                     [ Attr.id "wiki-submission-detail-withdraw"
                                     , Attr.type_ "button"
                                     , Attr.disabled (anyBusy || interaction.withdrawInFlight)
                                     , Events.onClick SubmissionDetailWithdrawClicked
                                     ]
                                     [ Html.text "Withdraw (edit)" ]
-                                , UI.button
+                                , UI.Button.button
                                     [ Attr.id "wiki-submission-detail-delete"
                                     , Attr.type_ "button"
                                     , Attr.disabled (anyBusy || interaction.deleteInFlight)
@@ -9579,8 +10023,8 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
 
                         Submission.Rejected ->
                             Html.div
-                                [ TW.cls "flex flex-wrap gap-2 mt-3" ]
-                                [ UI.button
+                                [ UI.flexWrapGap2Mt3Attr ]
+                                [ UI.Button.button
                                     [ Attr.id "wiki-submission-detail-delete"
                                     , Attr.type_ "button"
                                     , Attr.disabled (anyBusy || interaction.deleteInFlight)
@@ -9591,29 +10035,31 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
 
                         Submission.Draft ->
                             Html.div
-                                [ TW.cls "flex flex-wrap gap-2 mt-3" ]
-                                [ UI.button
-                                    [ Attr.id "wiki-submission-detail-save-draft"
-                                    , Attr.type_ "button"
-                                    , Attr.disabled (anyBusy || interaction.saveDraftInFlight)
-                                    , Events.onClick SubmissionDetailSaveDraftClicked
-                                    ]
-                                    [ Html.text "Save draft" ]
-                                , UI.button
-                                    [ Attr.id "wiki-submission-detail-submit-for-review"
-                                    , Attr.type_ "button"
-                                    , Attr.disabled (anyBusy || interaction.submitForReviewInFlight)
-                                    , Events.onClick SubmissionDetailSubmitForReviewClicked
-                                    ]
-                                    [ Html.text "Submit for review" ]
-                                , UI.button
-                                    [ Attr.id "wiki-submission-detail-delete"
-                                    , Attr.type_ "button"
-                                    , Attr.disabled (anyBusy || interaction.deleteInFlight)
-                                    , Events.onClick SubmissionDetailDeleteClicked
-                                    ]
-                                    [ Html.text "Delete" ]
-                                ]
+                                [ UI.flexWrapGap2Mt3Attr ]
+                                (UI.SubmissionActions.primaryPairButtons
+                                    { saveDraftAttrs =
+                                        [ Attr.id "wiki-submission-detail-save-draft"
+                                        , Attr.type_ "button"
+                                        , Attr.disabled (anyBusy || interaction.saveDraftInFlight)
+                                        , Events.onClick SubmissionDetailSaveDraftClicked
+                                        ]
+                                    , submitAttrs =
+                                        [ Attr.id "wiki-submission-detail-submit-for-review"
+                                        , Attr.type_ "button"
+                                        , Attr.disabled (anyBusy || interaction.submitForReviewInFlight)
+                                        , Events.onClick SubmissionDetailSubmitForReviewClicked
+                                        ]
+                                    , submitLabel = "Submit for review"
+                                    }
+                                    ++ [ UI.Button.button
+                                            [ Attr.id "wiki-submission-detail-delete"
+                                            , Attr.type_ "button"
+                                            , Attr.disabled (anyBusy || interaction.deleteInFlight)
+                                            , Events.onClick SubmissionDetailDeleteClicked
+                                            ]
+                                            [ Html.text "Delete" ]
+                                       ]
+                                )
 
                         Submission.Approved ->
                             Html.text ""
@@ -9627,7 +10073,7 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
                         Just errText ->
                             Html.p
                                 [ Attr.id "wiki-submission-detail-action-error"
-                                , TW.cls "text-[var(--danger)] m-0 mt-2"
+                                , UI.submissionStatusDangerLineAttr
                                 ]
                                 [ Html.text errText ]
             in
@@ -9651,40 +10097,37 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
                             [ Attr.id "wiki-submission-detail-reviewer-note"
                             , Attr.attribute "data-has-reviewer-note" "true"
                             ]
-                            [ UI.contentHeading2 [] [ Html.text "Reviewer note" ]
+                            [ UI.Heading.contentHeading2 [] [ Html.text "Reviewer note" ]
                             , UI.contentParagraph [] [ Html.text noteText ]
                             ]
                 , Html.section
                     [ Attr.id "wiki-submission-detail-next-steps"
-                    , TW.cls "mt-3 mb-3"
+                    , UI.submitActionsBarAttr
                     ]
-                    [ UI.contentParagraph [ TW.cls "m-0 text-[0.95rem] leading-[1.45]" ]
+                    [ UI.contentParagraph [ UI.submitSummaryParagraphAttr ]
                         [ Html.text (submissionDetailNextStepsText detail.status) ]
                     ]
                 , newPageSlugField
                 , Html.div
-                    [ TW.cls "grid min-w-0 grid-cols-2 gap-x-3 gap-y-2" ]
+                    [ UI.submissionGridTight2ColAttr ]
                     [ Html.label
                         [ Attr.for "original-markdown-readonly-textarea"
-                        , TW.cls "col-start-1 row-start-1"
+                        , UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)] col-start-1 row-start-1"
                         ]
                         [ Html.text "Original" ]
                     , Html.textarea
-                        [ Attr.id "original-markdown-readonly-textarea"
-                        , Attr.readonly True
-                        , Attr.rows 14
-                        , Attr.value detail.compareOriginalMarkdown
-                        , TW.cls
-                            (submissionDetailMarkdownTextareaReadonlyClass
-                                ++ submissionDetailMarkdownTextareaDiffCellClass
-                                ++ " min-w-0 col-start-1 row-start-2"
-                            )
-                        ]
+                        ([ Attr.id "original-markdown-readonly-textarea"
+                         , Attr.readonly True
+                         , Attr.rows 14
+                         , Attr.value detail.compareOriginalMarkdown
+                         ]
+                            |> UI.Textarea.markdownReadonlyCol1Row2
+                        )
                         []
                     , Html.div
-                        [ Attr.id "original-preview"
-                        , TW.cls "min-h-0 min-w-0 col-start-1 row-start-3"
-                        ]
+                        ([ Attr.id "original-preview" ]
+                            |> UI.Textarea.positionedGridCol1Row3
+                        )
                         [ comparePreview "original-preview-inner" detail.compareOriginalMarkdown ]
                     , Html.label
                         [ Attr.for
@@ -9694,7 +10137,7 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
                              else
                                 "new-markdown-readonly-textarea"
                             )
-                        , TW.cls "col-start-2 row-start-1"
+                        , UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)] col-start-2 row-start-1"
                         ]
                         [ Html.text
                             (if detail.contributionKind == Submission.ContributorKindDeletePage then
@@ -9705,12 +10148,12 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
                             )
                         ]
                     , Html.div
-                        [ TW.cls "min-w-0 col-start-2 row-start-2" ]
+                        [ UI.gridCellCol2Row2Attr ]
                         [ newMarkdownField ]
                     , Html.div
-                        [ Attr.id "new-preview"
-                        , TW.cls "min-h-0 min-w-0 col-start-2 row-start-3"
-                        ]
+                        ([ Attr.id "new-preview" ]
+                            |> UI.Textarea.positionedGridCol2Row3
+                        )
                         [ comparePreview "new-preview-inner" newMarkdownForPreview ]
                     ]
                 , withdrawDeleteRow
@@ -9723,7 +10166,7 @@ viewWikiReviewQueueLoading =
     Html.div
         [ Attr.id "wiki-review-queue-loading"
         ]
-        [ UI.contentParagraph [] [ Html.text "Loading…" ] ]
+        [ UI.AsyncState.loading "Loading…" ]
 
 
 viewReviewQueueBody :
@@ -9750,9 +10193,7 @@ viewReviewQueueBody wikiSlug remote =
 
         RemoteData.Success (Ok items) ->
             if List.isEmpty items then
-                UI.contentParagraph
-                    [ Attr.id "wiki-review-queue-empty" ]
-                    [ Html.text "No pending submissions." ]
+                UI.EmptyState.paragraph { id = "wiki-review-queue-empty", text = "No pending submissions." }
 
             else
                 UI.table UI.TableFullMax72
@@ -9781,7 +10222,7 @@ viewReviewQueueBody wikiSlug remote =
                                         ]
                                         [ UI.tableTd UI.TableAlignTop
                                             []
-                                            [ UI.contentLink
+                                            [ UI.Link.contentLink
                                                 [ Attr.href (Wiki.reviewDetailUrlPath wikiSlug idStr)
                                                 , Attr.attribute "data-submission-id" idStr
                                                 ]
@@ -9860,7 +10301,7 @@ viewWikiMySubmissionsLoading =
     Html.div
         [ Attr.id "wiki-my-submissions-loading"
         ]
-        [ UI.contentParagraph [] [ Html.text "Loading…" ] ]
+        [ UI.AsyncState.loading "Loading…" ]
 
 
 viewMySubmissionsBody :
@@ -9887,9 +10328,7 @@ viewMySubmissionsBody wikiSlug remote =
 
         RemoteData.Success (Ok items) ->
             if List.isEmpty items then
-                UI.contentParagraph
-                    [ Attr.id "wiki-my-submissions-empty" ]
-                    [ Html.text "No submissions to show here yet." ]
+                UI.EmptyState.paragraph { id = "wiki-my-submissions-empty", text = "No submissions to show here yet." }
 
             else
                 UI.table UI.TableFullMax72
@@ -9918,7 +10357,7 @@ viewMySubmissionsBody wikiSlug remote =
                                         ]
                                         [ UI.tableTd UI.TableAlignTop
                                             []
-                                            [ UI.contentLink
+                                            [ UI.Link.contentLink
                                                 [ Attr.href (Wiki.submissionDetailUrlPath wikiSlug idStr)
                                                 , Attr.attribute "data-submission-id" idStr
                                                 ]
@@ -9990,7 +10429,7 @@ viewWikiAdminUsersLoading =
     Html.div
         [ Attr.id "wiki-admin-users-loading"
         ]
-        [ UI.contentParagraph [] [ Html.text "Loading…" ] ]
+        [ UI.AsyncState.loading "Loading…" ]
 
 
 viewWikiAdminUsersBody :
@@ -10057,7 +10496,7 @@ viewWikiAdminUsersPromoteCell : WikiAdminUsers.ListedUser -> Html Msg
 viewWikiAdminUsersPromoteCell u =
     case u.role of
         WikiRole.UntrustedContributor _ ->
-            UI.button
+            UI.Button.button
                 [ Attr.type_ "button"
                 , Attr.attribute "data-context" "wiki-admin-promote-trusted"
                 , Attr.id ("wiki-admin-promote-trusted-" ++ u.username)
@@ -10080,7 +10519,7 @@ viewWikiAdminUsersDemoteCell u =
             Html.text ""
 
         WikiRole.TrustedContributor ->
-            UI.button
+            UI.Button.button
                 [ Attr.type_ "button"
                 , Attr.attribute "data-context" "wiki-admin-demote-trusted"
                 , Attr.id ("wiki-admin-demote-trusted-" ++ u.username)
@@ -10100,7 +10539,7 @@ viewWikiAdminUsersGrantAdminCell u =
             Html.text ""
 
         WikiRole.TrustedContributor ->
-            UI.button
+            UI.Button.button
                 [ Attr.type_ "button"
                 , Attr.attribute "data-context" "wiki-admin-grant-admin"
                 , Attr.id ("wiki-admin-grant-admin-" ++ u.username)
@@ -10127,7 +10566,7 @@ viewWikiAdminUsersRevokeAdminCell maybeSelfUsername u =
                 Html.text ""
 
             else
-                UI.button
+                UI.Button.button
                     [ Attr.type_ "button"
                     , Attr.attribute "data-context" "wiki-admin-revoke-admin"
                     , Attr.id ("wiki-admin-revoke-admin-" ++ u.username)
@@ -10243,9 +10682,7 @@ viewWikiAdminUsersRoute model wikiSlug =
 
 viewWikiAdminAuditLoading : Html Msg
 viewWikiAdminAuditLoading =
-    Html.div
-        [ Attr.id "wiki-admin-audit-loading" ]
-        [ Html.text "Loading audit log…" ]
+    viewAuditLoading "wiki-admin-audit-loading"
 
 
 viewWikiAdminAuditBody :
@@ -10261,127 +10698,67 @@ viewWikiAdminAuditBody wikiSlug remote =
             viewWikiAdminAuditLoading
 
         RemoteData.Failure _ ->
-            Html.div
-                [ Attr.id "wiki-admin-audit-error" ]
-                [ UI.contentParagraph [] [ Html.text "Could not load audit log." ] ]
+            viewAuditError "wiki-admin-audit-error" "Could not load audit log."
 
         RemoteData.Success (Err e) ->
-            Html.div
-                [ Attr.id "wiki-admin-audit-error" ]
-                [ UI.contentParagraph [] [ Html.text (WikiAuditLog.errorToUserText e) ] ]
+            viewAuditError "wiki-admin-audit-error" (WikiAuditLog.errorToUserText e)
 
         RemoteData.Success (Ok events) ->
-            if List.isEmpty events then
-                UI.contentParagraph
-                    [ Attr.id "wiki-admin-audit-empty" ]
-                    [ Html.text "No audit events yet." ]
-
-            else
-                viewAuditTable
-                    { tableId = "wiki-admin-audit-list"
-                    , tbodyId = "wiki-admin-audit-tbody"
-                    , columnClasses =
-                        [ "w-[13rem]"
-                        , "w-[10rem]"
-                        , "w-auto"
-                        ]
-                    , headers =
-                        [ "Time (UTC)"
-                        , "Actor"
-                        , "Event"
-                        ]
-                    , rows =
-                        events
-                            |> List.indexedMap
-                                (\i ev ->
-                                    UI.trStriped
-                                        [ Attr.attribute "data-audit-event" (String.fromInt i)
-                                        , Attr.attribute "data-wiki-slug" wikiSlug
-                                        ]
-                                        [ Html.td
-                                            [ TW.cls
-                                                (UI.tableCellClass
-                                                    ++ " [font-family:var(--font-mono)] whitespace-nowrap text-[0.9rem]"
-                                                )
-                                            ]
-                                            [ Html.text (WikiAuditLog.eventUtcTimestampString ev) ]
-                                        , UI.tableTd UI.TableAlignTop [] [ Html.text ev.actorUsername ]
-                                        , UI.tableTd UI.TableAlignTop [] [ viewAuditEventKindCell False wikiSlug ev.at ev.kind ]
-                                        ]
-                                )
-                    }
+            viewAuditEventsTable
+                { tableId = "wiki-admin-audit-list"
+                , tbodyId = "wiki-admin-audit-tbody"
+                , columnClasses =
+                    [ "w-[calc(19ch+1.1rem)]"
+                    , "w-auto"
+                    , "w-full"
+                    ]
+                , headers =
+                    [ "Time (UTC)"
+                    , "Actor"
+                    , "Event"
+                    ]
+                , includeWikiColumn = False
+                , isHostAuditView = False
+                }
+                (events
+                    |> List.map
+                        (\ev ->
+                            { wikiSlug = wikiSlug
+                            , at = ev.at
+                            , actorUsername = ev.actorUsername
+                            , kind = ev.kind
+                            , utcTimestamp = WikiAuditLog.eventUtcTimestampString ev
+                            }
+                        )
+                )
 
 
 viewWikiAdminAuditFilters : Model -> Html Msg
 viewWikiAdminAuditFilters model =
-    Html.div
-        [ Attr.attribute "data-context" "wiki-admin-audit-filters"
-        , TW.cls "shrink-0 border border-[var(--border)] bg-[var(--chrome-bg)] p-3"
-        ]
-        [ Html.div
-            [ TW.cls "grid grid-cols-2 gap-3" ]
-            [ Html.div [ TW.cls "min-w-0" ]
-                [ Html.label
-                    [ Attr.for "wiki-admin-audit-filter-actor"
-                    , TW.cls "block text-[0.82rem] font-medium text-[var(--fg-muted)]"
-                    ]
-                    [ Html.text "Actor contains" ]
-                , Html.input
-                    [ Attr.id "wiki-admin-audit-filter-actor"
-                    , Attr.type_ "text"
-                    , Attr.value model.wikiAdminAuditFilterActorDraft
-                    , Events.onInput WikiAdminAuditFilterActorChanged
-                    , TW.cls (UI.formTextInputClass ++ " mt-0 w-full max-w-full")
-                    ]
-                    []
-                ]
-            , Html.div [ TW.cls "min-w-0" ]
-                [ Html.label
-                    [ Attr.for "wiki-admin-audit-filter-page"
-                    , TW.cls "block text-[0.82rem] font-medium text-[var(--fg-muted)]"
-                    ]
-                    [ Html.text "Page slug contains" ]
-                , Html.input
-                    [ Attr.id "wiki-admin-audit-filter-page"
-                    , Attr.type_ "text"
-                    , Attr.value model.wikiAdminAuditFilterPageDraft
-                    , Events.onInput WikiAdminAuditFilterPageChanged
-                    , TW.cls (UI.formTextInputClass ++ " mt-0 w-full max-w-full")
-                    ]
-                    []
-                ]
-            ]
-        , Html.div
-            [ Attr.id "wiki-admin-audit-filter-type"
-            , Attr.attribute "role" "group"
-            , Attr.attribute "aria-labelledby" "wiki-admin-audit-filter-type-legend"
-            , TW.cls "mt-3 border-t border-dashed border-[var(--border-dash)] pt-3"
-            ]
-            [ Html.p
-                [ Attr.id "wiki-admin-audit-filter-type-legend"
-                , TW.cls "m-0 mb-2 text-[0.82rem] text-[var(--fg-muted)]"
-                ]
-                [ Html.text "Event types — none selected means all" ]
-            , Html.div
-                [ TW.cls "flex flex-wrap gap-2" ]
-                (List.map (viewWikiAdminAuditKindChip model) WikiAuditLog.eventKindFilterTagOptions)
-            ]
-        ]
+    viewAuditFilters
+        { context = "wiki-admin-audit-filters"
+        , gridAttr = UI.wikiAdminAuditFiltersGridAttr
+        , maybeWikiFilter = Nothing
+        , actorInputId = "wiki-admin-audit-filter-actor"
+        , actorValue = model.wikiAdminAuditFilterActorDraft
+        , actorOnInput = WikiAdminAuditFilterActorChanged
+        , pageInputId = "wiki-admin-audit-filter-page"
+        , pageValue = model.wikiAdminAuditFilterPageDraft
+        , pageOnInput = WikiAdminAuditFilterPageChanged
+        , kindFilterGroupId = "wiki-admin-audit-filter-type"
+        , kindFilterLegendId = "wiki-admin-audit-filter-type-legend"
+        , kindChipView = viewWikiAdminAuditKindChip model
+        }
 
 
 viewWikiAdminAuditKindChip : Model -> ( WikiAuditLog.AuditEventKindFilterTag, String ) -> Html Msg
 viewWikiAdminAuditKindChip model ( tag, labelText ) =
-    let
-        isOn : Bool
-        isOn =
-            List.member tag model.wikiAdminAuditFilterSelectedKindTags
-    in
-    UI.togglableChip
-        [ Attr.id ("wiki-admin-audit-filter-type-" ++ WikiAuditLog.eventKindFilterTagToString tag) ]
-        { pressed = isOn
-        , onClick = WikiAdminAuditFilterTypeTagToggled tag (not isOn)
-        , label = labelText
+    viewAuditKindChip
+        { idPrefix = "wiki-admin-audit-filter-type-"
+        , selectedTags = model.wikiAdminAuditFilterSelectedKindTags
+        , onToggle = WikiAdminAuditFilterTypeTagToggled
         }
+        ( tag, labelText )
 
 
 viewWikiAdminAuditLoaded : Wiki.Slug -> Model -> Html Msg
@@ -10389,12 +10766,12 @@ viewWikiAdminAuditLoaded wikiSlug model =
     Html.div
         [ Attr.id "wiki-admin-audit-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
-        , TW.cls "flex min-h-0 flex-1 flex-col gap-3"
+        , UI.wikiAdminAuditPageShellAttr
         ]
         [ viewWikiAdminAuditFilters model
         , Html.div
             [ Attr.id "wiki-admin-audit-table-region"
-            , TW.cls "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+            , UI.flexRowMin0Attr
             ]
             [ viewWikiAdminAuditBody wikiSlug (Store.getWikiAuditLog wikiSlug model.wikiAdminAuditAppliedFilter model.store) ]
         ]
@@ -10406,16 +10783,7 @@ viewWikiAdminAuditRoute model wikiSlug =
         RemoteData.Success wikiDetails ->
             case Store.get wikiSlug model.store.wikiCatalog of
                 RemoteData.Success _ ->
-                    case auditDiffRefFromFragment model.navigationFragment of
-                        Just ( fragmentWikiSlug, atMillis ) ->
-                            if fragmentWikiSlug == wikiSlug then
-                                viewWikiAdminAuditDiffRoute wikiSlug wikiDetails atMillis model
-
-                            else
-                                viewWikiAdminAuditLoaded wikiSlug model
-
-                        Nothing ->
-                            viewWikiAdminAuditLoaded wikiSlug model
+                    viewWikiAdminAuditLoaded wikiSlug model
 
                 RemoteData.Failure _ ->
                     viewNotFound
@@ -10436,25 +10804,6 @@ viewWikiAdminAuditRoute model wikiSlug =
             viewWikiAdminAuditLoading
 
 
-auditDiffRefFromFragment : Maybe String -> Maybe ( Wiki.Slug, Int )
-auditDiffRefFromFragment maybeFragment =
-    maybeFragment
-        |> Maybe.andThen
-            (\fragment ->
-                if String.startsWith "audit-diff:" fragment then
-                    case String.split ":" fragment of
-                        [ "audit-diff", wikiSlug, atMillisRaw ] ->
-                            String.toInt atMillisRaw
-                                |> Maybe.map (\atMillis -> ( wikiSlug, atMillis ))
-
-                        _ ->
-                            Nothing
-
-                else
-                    Nothing
-            )
-
-
 type alias TrustedAuditEditDiffBody =
     { pageSlug : Page.Slug
     , beforeMarkdown : String
@@ -10467,95 +10816,86 @@ type TrustedAuditDiffBody
         { pageSlug : Page.Slug
         , markdown : String
         }
-    | TrustedAuditEditDiffBody_
-        TrustedAuditEditDiffBody
+    | TrustedAuditEditDiffBody_ TrustedAuditEditDiffBody
 
 
-trustedAuditDiffFromEvent : Int -> WikiAuditLog.AuditEvent -> Maybe TrustedAuditDiffBody
-trustedAuditDiffFromEvent atMillis ev =
-    if Time.posixToMillis ev.at /= atMillis then
-        Nothing
+trustedAuditDiffFromEvent : WikiAuditLog.AuditEvent -> Maybe TrustedAuditDiffBody
+trustedAuditDiffFromEvent ev =
+    case ev.kind of
+        WikiAuditLog.TrustedPublishedNewPage { pageSlug, markdown } ->
+            Just
+                (TrustedAuditNewPageDiffBody
+                    { pageSlug = pageSlug
+                    , markdown = markdown
+                    }
+                )
 
-    else
-        case ev.kind of
-            WikiAuditLog.TrustedPublishedNewPage { pageSlug, markdown } ->
-                Just
-                    (TrustedAuditNewPageDiffBody
-                        { pageSlug = pageSlug
-                        , markdown = markdown
-                        }
+        WikiAuditLog.TrustedPublishedPageEdit { pageSlug, beforeMarkdown, afterMarkdown } ->
+            Just
+                (TrustedAuditEditDiffBody_
+                    { pageSlug = pageSlug
+                    , beforeMarkdown = beforeMarkdown
+                    , afterMarkdown = afterMarkdown
+                    }
+                )
+
+        _ ->
+            Nothing
+
+
+trustedAuditDiffFromScopedEvent : WikiAuditLog.ScopedAuditEvent -> Maybe TrustedAuditDiffBody
+trustedAuditDiffFromScopedEvent ev =
+    trustedAuditDiffFromEvent
+        { at = ev.at
+        , actorUsername = ev.actorUsername
+        , kind = ev.kind
+        }
+
+
+findWikiAuditDiffByIndex : Model -> Wiki.Slug -> Int -> Maybe TrustedAuditDiffBody
+findWikiAuditDiffByIndex model wikiSlug eventIndex =
+    case Store.getWikiAuditLog wikiSlug model.wikiAdminAuditAppliedFilter model.store of
+        Success (Ok events) ->
+            events
+                |> List.drop eventIndex
+                |> List.head
+                |> Maybe.andThen trustedAuditDiffFromEvent
+
+        _ ->
+            Nothing
+
+
+findHostAuditDiffByIndex : Model -> Int -> Maybe ( Wiki.Slug, TrustedAuditDiffBody )
+findHostAuditDiffByIndex model eventIndex =
+    case model.hostAdminAuditLog of
+        Success (Ok scopedEvents) ->
+            scopedEvents
+                |> List.drop eventIndex
+                |> List.head
+                |> Maybe.andThen
+                    (\ev ->
+                        trustedAuditDiffFromScopedEvent ev
+                            |> Maybe.map (\body -> ( ev.wikiSlug, body ))
                     )
 
-            WikiAuditLog.TrustedPublishedPageEdit { pageSlug, beforeMarkdown, afterMarkdown } ->
-                Just
-                    (TrustedAuditEditDiffBody_
-                        { pageSlug = pageSlug
-                        , beforeMarkdown = beforeMarkdown
-                        , afterMarkdown = afterMarkdown
-                        }
-                    )
-
-            _ ->
-                Nothing
-
-
-findTrustedAuditDiff : Model -> Wiki.Slug -> Int -> Maybe TrustedAuditDiffBody
-findTrustedAuditDiff model wikiSlug atMillis =
-    let
-        fromWikiAudit : Maybe TrustedAuditDiffBody
-        fromWikiAudit =
-            case Store.getWikiAuditLog wikiSlug WikiAuditLog.emptyAuditLogFilter model.store of
-                Success (Ok events) ->
-                    List.filterMap (trustedAuditDiffFromEvent atMillis) events
-                        |> List.head
-
-                _ ->
-                    Nothing
-    in
-    case fromWikiAudit of
-        Just body ->
-            Just body
-
-        Nothing ->
-            case model.hostAdminAuditLog of
-                Success (Ok scopedEvents) ->
-                    scopedEvents
-                        |> List.filter (\ev -> ev.wikiSlug == wikiSlug)
-                        |> List.filterMap
-                            (\ev ->
-                                trustedAuditDiffFromEvent atMillis
-                                    { at = ev.at
-                                    , actorUsername = ev.actorUsername
-                                    , kind = ev.kind
-                                    }
-                            )
-                        |> List.head
-
-                _ ->
-                    Nothing
+        _ ->
+            Nothing
 
 
 viewWikiAdminAuditDiffRoute : Wiki.Slug -> Wiki.FrontendDetails -> Int -> Model -> Html Msg
-viewWikiAdminAuditDiffRoute wikiSlug wikiDetails atMillis model =
+viewWikiAdminAuditDiffRoute wikiSlug wikiDetails eventIndex model =
     let
         maybeDiffBody : Maybe TrustedAuditDiffBody
         maybeDiffBody =
-            findTrustedAuditDiff model wikiSlug atMillis
+            findWikiAuditDiffByIndex model wikiSlug eventIndex
     in
     case maybeDiffBody of
         Just (TrustedAuditNewPageDiffBody diffBody) ->
             Html.div
                 [ Attr.id "wiki-admin-audit-diff-page"
-                , TW.cls "flex min-h-0 flex-1 flex-col gap-3 overflow-auto"
+                , UI.hostAdminAuditDiffPageShellAttr
                 ]
-                [ UI.contentParagraph []
-                    [ Html.a
-                        [ Attr.href (Wiki.adminAuditUrlPath wikiSlug)
-                        , TW.cls "text-[var(--link)] underline underline-offset-2"
-                        ]
-                        [ Html.text "Back to audit log" ]
-                    ]
-                , viewSubmissionReviewDiff
+                [ viewAuditLogDiffReadonly
                     wikiSlug
                     (publishedSlugExistsFromWikiDetails wikiDetails)
                     (SubmissionReviewDetail.NewPageDiff
@@ -10568,16 +10908,11 @@ viewWikiAdminAuditDiffRoute wikiSlug wikiDetails atMillis model =
         Just (TrustedAuditEditDiffBody_ diffBody) ->
             Html.div
                 [ Attr.id "wiki-admin-audit-diff-page"
-                , TW.cls "flex min-h-0 flex-1 flex-col gap-3 overflow-auto"
+                , UI.hostAdminAuditDiffPageShellAttr
                 ]
                 [ UI.contentParagraph []
-                    [ Html.a
-                        [ Attr.href (Wiki.adminAuditUrlPath wikiSlug)
-                        , TW.cls "text-[var(--link)] underline underline-offset-2"
-                        ]
-                        [ Html.text "Back to audit log" ]
-                    ]
-                , viewSubmissionReviewDiff
+                    [ UI.Link.subtleLink [ Attr.href (Wiki.adminAuditUrlPath wikiSlug) ] [ Html.text "Back to audit log" ] ]
+                , viewAuditLogDiffReadonly
                     wikiSlug
                     (publishedSlugExistsFromWikiDetails wikiDetails)
                     (SubmissionReviewDetail.EditPageDiff diffBody)
@@ -10592,14 +10927,14 @@ viewWikiAdminAuditDiffRoute wikiSlug wikiDetails atMillis model =
 
 
 viewHostAdminAuditDiffRoute : Wiki.Slug -> Int -> Model -> Html Msg
-viewHostAdminAuditDiffRoute wikiSlug atMillis model =
+viewHostAdminAuditDiffRoute _ eventIndex model =
     let
-        maybeDiffBody : Maybe TrustedAuditDiffBody
+        maybeDiffBody : Maybe ( Wiki.Slug, TrustedAuditDiffBody )
         maybeDiffBody =
-            findTrustedAuditDiff model wikiSlug atMillis
+            findHostAuditDiffByIndex model eventIndex
     in
     case maybeDiffBody of
-        Just (TrustedAuditNewPageDiffBody diffBody) ->
+        Just ( wikiSlug, TrustedAuditNewPageDiffBody diffBody ) ->
             let
                 publishedSlugExists : Page.Slug -> Bool
                 publishedSlugExists =
@@ -10612,16 +10947,9 @@ viewHostAdminAuditDiffRoute wikiSlug atMillis model =
             in
             Html.div
                 [ Attr.id "host-admin-audit-diff-page"
-                , TW.cls "flex min-h-0 flex-1 flex-col gap-3 overflow-auto"
+                , UI.hostAdminAuditDiffPageShellAttr
                 ]
-                [ UI.contentParagraph []
-                    [ Html.a
-                        [ Attr.href Wiki.hostAdminAuditUrlPath
-                        , TW.cls "text-[var(--link)] underline underline-offset-2"
-                        ]
-                        [ Html.text "Back to platform audit log" ]
-                    ]
-                , viewSubmissionReviewDiff
+                [ viewAuditLogDiffReadonly
                     wikiSlug
                     publishedSlugExists
                     (SubmissionReviewDetail.NewPageDiff
@@ -10631,7 +10959,7 @@ viewHostAdminAuditDiffRoute wikiSlug atMillis model =
                     )
                 ]
 
-        Just (TrustedAuditEditDiffBody_ diffBody) ->
+        Just ( wikiSlug, TrustedAuditEditDiffBody_ diffBody ) ->
             let
                 publishedSlugExists : Page.Slug -> Bool
                 publishedSlugExists =
@@ -10644,16 +10972,9 @@ viewHostAdminAuditDiffRoute wikiSlug atMillis model =
             in
             Html.div
                 [ Attr.id "host-admin-audit-diff-page"
-                , TW.cls "flex min-h-0 flex-1 flex-col gap-3 overflow-auto"
+                , UI.hostAdminAuditDiffPageShellAttr
                 ]
-                [ UI.contentParagraph []
-                    [ Html.a
-                        [ Attr.href Wiki.hostAdminAuditUrlPath
-                        , TW.cls "text-[var(--link)] underline underline-offset-2"
-                        ]
-                        [ Html.text "Back to platform audit log" ]
-                    ]
-                , viewSubmissionReviewDiff
+                [ viewAuditLogDiffReadonly
                     wikiSlug
                     publishedSlugExists
                     (SubmissionReviewDetail.EditPageDiff diffBody)
@@ -10677,83 +10998,75 @@ viewSubmissionReviewDiff wikiSlug publishedSlugExists detail =
         reviewPreview : String -> String -> Html Msg
         reviewPreview previewId markdown =
             Html.div
-                [ TW.cls markdownPreviewScrollClass ]
+                [ UI.classAttr UI.markdownPreviewScrollClass ]
                 [ PageMarkdown.viewPreview previewId wikiSlug publishedSlugExists markdown ]
 
         reviewPreviewInDiffCell : String -> String -> Html Msg
         reviewPreviewInDiffCell previewId markdown =
             Html.div
-                [ TW.cls (markdownPreviewScrollClass ++ " min-h-0 h-full flex-1") ]
+                [ UI.markdownPreviewScrollMinFlexFullHeightAttr ]
                 [ PageMarkdown.viewPreview previewId wikiSlug publishedSlugExists markdown ]
 
-        reviewReadonlyTextarea : String -> String -> String -> Html Msg
-        reviewReadonlyTextarea elementId markdown extraClass =
+        reviewReadonlyTextarea : String -> String -> List (Attribute Msg) -> Html Msg
+        reviewReadonlyTextarea elementId markdown extraAttrs =
             Html.textarea
-                [ Attr.id elementId
-                , Attr.readonly True
-                , Attr.rows 12
-                , Attr.value markdown
-                , TW.cls (submissionDetailMarkdownTextareaReadonlyClass ++ extraClass)
-                ]
+                ([ Attr.id elementId
+                 , Attr.readonly True
+                 , Attr.rows 12
+                 , Attr.value markdown
+                 ]
+                    ++ extraAttrs
+                )
                 []
     in
     case detail of
         SubmissionReviewDetail.NewPageDiff body ->
             Html.div
                 [ Attr.id "wiki-review-diff-summary"
-                , TW.cls "grid min-w-0 grid-cols-2 gap-x-4 gap-y-2"
+                , UI.gridTwoByTwoDiffStrAttr
                 ]
                 [ Html.h3
-                    [ TW.cls "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)] col-start-1 row-start-1" ]
+                    [ UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)] col-start-1 row-start-1" ]
                     [ Html.text "Proposed markdown" ]
                 , reviewReadonlyTextarea "wiki-review-diff-new"
                     body.proposedMarkdown
-                    (submissionDetailMarkdownTextareaDiffCellClass ++ " min-w-0 col-start-1 row-start-2")
+                    (UI.Textarea.markdownReadonlyCol1Row2 [])
                 , Html.h3
-                    [ TW.cls "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg-muted)] col-start-2 row-start-1" ]
+                    [ UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg-muted)] col-start-2 row-start-1" ]
                     [ Html.text "Preview" ]
                 , Html.div
-                    [ TW.cls "flex min-h-0 min-w-0 h-full col-start-2 row-start-2" ]
+                    [ UI.reviewDiffNewPagePreviewColShellAttr ]
                     [ reviewPreviewInDiffCell "wiki-review-diff-new-preview" body.proposedMarkdown ]
                 ]
 
         SubmissionReviewDetail.EditPageDiff body ->
-            let
-                reviewDiffCellHeadingClass : String
-                reviewDiffCellHeadingClass =
-                    "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)]"
-
-                reviewDiffCellPreviewHeadingClass : String
-                reviewDiffCellPreviewHeadingClass =
-                    "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg-muted)]"
-            in
             Html.div
                 [ Attr.id "wiki-review-diff-summary"
-                , TW.cls "grid min-w-0 grid-cols-2 gap-x-4 gap-y-2"
+                , UI.gridTwoByTwoDiffStrAttr
                 ]
                 [ Html.h2
-                    [ TW.cls (reviewDiffCellHeadingClass ++ " col-start-1 row-start-1") ]
+                    [ UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)] col-start-1 row-start-1" ]
                     [ Html.text "Before (published)" ]
                 , reviewReadonlyTextarea "wiki-review-diff-old"
                     body.beforeMarkdown
-                    (submissionDetailMarkdownTextareaDiffCellClass ++ " min-w-0 col-start-1 row-start-2")
+                    (UI.Textarea.markdownReadonlyCol1Row2 [])
                 , Html.div
-                    [ TW.cls "flex min-h-0 min-w-0 flex-col gap-1 col-start-1 row-start-3" ]
+                    [ UI.gridCellStackCol1Row3Attr ]
                     [ Html.h3
-                        [ TW.cls reviewDiffCellPreviewHeadingClass ]
+                        [ UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg-muted)]" ]
                         [ Html.text "Preview" ]
                     , reviewPreviewInDiffCell "wiki-review-diff-old-preview" body.beforeMarkdown
                     ]
                 , Html.h2
-                    [ TW.cls (reviewDiffCellHeadingClass ++ " col-start-2 row-start-1") ]
+                    [ UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)] col-start-2 row-start-1 border-t border-[var(--border-subtle)] pt-3" ]
                     [ Html.text "After (proposed)" ]
                 , reviewReadonlyTextarea "wiki-review-diff-new"
                     body.afterMarkdown
-                    (submissionDetailMarkdownTextareaDiffCellClass ++ " min-w-0 col-start-2 row-start-2")
+                    (UI.Textarea.markdownReadonlyGridCol2Row2 [ Attr.class "border-t border-[var(--border-subtle)] pt-3" ])
                 , Html.div
-                    [ TW.cls "flex min-h-0 min-w-0 flex-col gap-1 col-start-2 row-start-3" ]
+                    [ UI.gridCellStackCol2Row3Attr, Attr.class "border-t border-[var(--border-subtle)] pt-3" ]
                     [ Html.h3
-                        [ TW.cls reviewDiffCellPreviewHeadingClass ]
+                        [ UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg-muted)]" ]
                         [ Html.text "Preview" ]
                     , reviewPreviewInDiffCell "wiki-review-diff-new-preview" body.afterMarkdown
                     ]
@@ -10762,9 +11075,11 @@ viewSubmissionReviewDiff wikiSlug publishedSlugExists detail =
         SubmissionReviewDetail.DeletePageDiff body ->
             Html.div
                 [ Attr.id "wiki-review-diff-summary" ]
-                [ reviewReadonlyTextarea "wiki-review-diff-published" body.publishedSnapshotMarkdown ""
+                [ reviewReadonlyTextarea "wiki-review-diff-published"
+                    body.publishedSnapshotMarkdown
+                    (UI.Textarea.markdownReadonly [])
                 , Html.h3
-                    [ TW.cls "m-0 text-sm font-semibold text-[var(--fg-muted)]" ]
+                    [ UI.reviewDeletePagePreviewTitleAttr ]
                     [ Html.text "Preview" ]
                 , reviewPreview "wiki-review-diff-published-preview" body.publishedSnapshotMarkdown
                 , case body.reason of
@@ -10776,6 +11091,174 @@ viewSubmissionReviewDiff wikiSlug publishedSlugExists detail =
                             [ Attr.id "wiki-review-diff-reason" ]
                             [ Html.text r ]
                 ]
+
+
+viewAuditLogDiffReadonly :
+    Wiki.Slug
+    -> (Page.Slug -> Bool)
+    -> SubmissionReviewDetail.SubmissionReviewDetail
+    -> Html Msg
+viewAuditLogDiffReadonly wikiSlug publishedSlugExists detail =
+    let
+        readonlyTextarea : String -> String -> String -> Html Msg
+        readonlyTextarea elementId markdown extraClass =
+            Html.textarea
+                ([ Attr.id elementId
+                 , Attr.readonly True
+                 , Attr.rows 12
+                 , Attr.value markdown
+                 ]
+                    |> UI.Textarea.markdownReadonlyWithExtra extraClass
+                )
+                []
+
+        previewBox : String -> String -> Bool -> Html Msg
+        previewBox previewId markdown faded =
+            Html.div
+                [ Attr.class
+                    (if faded then
+                        "h-full max-h-none opacity-75"
+
+                     else
+                        "h-full max-h-none"
+                    )
+                , UI.markdownPreviewScrollMinFlexFullHeightAttr
+                , Attr.class "px-4 pt-2"
+                ]
+                [ PageMarkdown.viewPreview previewId wikiSlug publishedSlugExists markdown ]
+
+        sectionCell : String -> Html Msg -> Html Msg
+        sectionCell heading body =
+            Html.div [ UI.newPageEditorMarkdownPreviewCellAttr ]
+                [ UI.Heading.panelHeadingSecondary
+                    [ Attr.class "px-4 py-1 mb-2 border-b border-[var(--border-subtle)] min-h-7 leading-5" ]
+                    [ Html.text
+                        (if String.isEmpty heading then
+                            " "
+
+                         else
+                            heading
+                        )
+                    ]
+                , body
+                ]
+
+        sectionCellWithTopBorder : String -> Html Msg -> Html Msg
+        sectionCellWithTopBorder heading body =
+            Html.div [ UI.newPageEditorMarkdownPreviewCellAttr, Attr.class "border-t border-[var(--border-subtle)]" ]
+                [ UI.Heading.panelHeadingSecondary
+                    [ Attr.class "px-4 py-1 mb-2 border-b border-[var(--border-subtle)] min-h-7 leading-5" ]
+                    [ Html.text
+                        (if String.isEmpty heading then
+                            " "
+
+                         else
+                            heading
+                        )
+                    ]
+                , body
+                ]
+    in
+    case detail of
+        SubmissionReviewDetail.NewPageDiff body ->
+            UI.EditorShell.view
+                { containerAttrs = [ Attr.id "wiki-review-diff-summary", Attr.class "min-h-[28rem]" ]
+                , controlsAttrs = [ Attr.class "justify-between" ]
+                , controlsChildren =
+                    [ Html.div [ Attr.class "min-w-[14rem] flex-1" ]
+                        [ UI.contentLabel [ Attr.for "wiki-review-diff-new" ] [ Html.text "Page" ]
+                        , Html.input
+                            [ Attr.type_ "text"
+                            , Attr.readonly True
+                            , Attr.value body.pageSlug
+                            , UI.formTextInputAttr
+                            , Attr.style "background-color" "var(--chrome-bg)"
+                            , Attr.style "color" "var(--fg-muted)"
+                            , Attr.style "cursor" "not-allowed"
+                            ]
+                            []
+                        ]
+                    ]
+                , contentAttrs = []
+                , contentChildren =
+                    [ Html.section [ Attr.class "min-w-0 min-h-0 flex flex-col bg-[var(--input-bg)]" ]
+                        [ UI.PanelHeader.view { kind = UI.PanelHeader.Primary, text = "MARKDOWN" }
+                        , Html.div [ Attr.class "min-h-0 flex-1" ]
+                            [ sectionCell "After"
+                                (readonlyTextarea "wiki-review-diff-new" body.proposedMarkdown " h-full max-h-none px-4")
+                            ]
+                        ]
+                    , Html.section [ Attr.class "min-w-0 min-h-0 flex flex-col bg-[var(--bg)]" ]
+                        [ UI.PanelHeader.view { kind = UI.PanelHeader.Secondary, text = "LIVE PREVIEW" }
+                        , Html.div [ Attr.class "min-h-0 flex-1" ]
+                            [ sectionCell ""
+                                (previewBox "wiki-review-diff-new-preview" body.proposedMarkdown False)
+                            ]
+                        ]
+                    ]
+                }
+
+        SubmissionReviewDetail.EditPageDiff body ->
+            UI.EditorShell.view
+                { containerAttrs = [ Attr.id "wiki-review-diff-summary", Attr.class "min-h-[28rem]" ]
+                , controlsAttrs = [ Attr.class "justify-between" ]
+                , controlsChildren = []
+                , contentAttrs = []
+                , contentChildren =
+                    [ Html.section [ Attr.class "min-w-0 min-h-0 flex flex-col bg-[var(--input-bg)]" ]
+                        [ UI.PanelHeader.view { kind = UI.PanelHeader.Primary, text = "EDITOR" }
+                        , Html.div [ Attr.class "min-h-0 flex-1 grid grid-rows-2 gap-3" ]
+                            [ sectionCell "Before"
+                                (readonlyTextarea "wiki-review-diff-old" body.beforeMarkdown " h-full max-h-none px-4")
+                            , sectionCellWithTopBorder "After"
+                                (readonlyTextarea "wiki-review-diff-new" body.afterMarkdown " h-full max-h-none px-4")
+                            ]
+                        ]
+                    , Html.section [ Attr.class "min-w-0 min-h-0 flex flex-col bg-[var(--bg)]" ]
+                        [ UI.PanelHeader.view { kind = UI.PanelHeader.Secondary, text = "LIVE PREVIEW" }
+                        , Html.div [ Attr.class "min-h-0 flex-1 grid grid-rows-2 gap-3" ]
+                            [ sectionCell ""
+                                (previewBox "wiki-review-diff-old-preview" body.beforeMarkdown True)
+                            , sectionCellWithTopBorder ""
+                                (previewBox "wiki-review-diff-new-preview" body.afterMarkdown False)
+                            ]
+                        ]
+                    ]
+                }
+
+        SubmissionReviewDetail.DeletePageDiff body ->
+            UI.EditorShell.view
+                { containerAttrs = [ Attr.id "wiki-review-diff-summary", Attr.class "min-h-[28rem]" ]
+                , controlsAttrs = []
+                , controlsChildren =
+                    [ case body.reason of
+                        Nothing ->
+                            Html.span [] []
+
+                        Just r ->
+                            Html.div [ Attr.class "min-w-[14rem] flex-1" ]
+                                [ UI.contentLabel [] [ Html.text "Deletion reason" ]
+                                , Html.div [ Attr.id "wiki-review-diff-reason", Attr.class "text-sm text-[var(--fg-muted)]" ] [ Html.text r ]
+                                ]
+                    ]
+                , contentAttrs = []
+                , contentChildren =
+                    [ Html.section [ Attr.class "min-w-0 min-h-0 flex flex-col bg-[var(--input-bg)]" ]
+                        [ UI.PanelHeader.view { kind = UI.PanelHeader.Primary, text = "MARKDOWN" }
+                        , Html.div [ Attr.class "min-h-0 flex-1" ]
+                            [ sectionCell "Before"
+                                (readonlyTextarea "wiki-review-diff-published" body.publishedSnapshotMarkdown " h-full max-h-none px-4")
+                            ]
+                        ]
+                    , Html.section [ Attr.class "min-w-0 min-h-0 flex flex-col bg-[var(--bg)]" ]
+                        [ UI.PanelHeader.view { kind = UI.PanelHeader.Secondary, text = "LIVE PREVIEW" }
+                        , Html.div [ Attr.class "min-h-0 flex-1" ]
+                            [ sectionCell ""
+                                (previewBox "wiki-review-diff-published-preview" body.publishedSnapshotMarkdown True)
+                            ]
+                        ]
+                    ]
+                }
 
 
 viewReviewSubmissionDetailBody :
@@ -10852,54 +11335,56 @@ viewReviewDecisionForm model wikiSlug submissionId =
             in
             Html.fieldset
                 [ Attr.id "wiki-review-decision"
-                , TW.cls "mt-4 flex flex-col gap-3 border border-dashed border-[var(--border-dash)] p-3 max-w-[42rem]"
+                , UI.reviewFieldsetAttr
                 ]
                 [ Html.legend
-                    [ TW.cls "px-1 text-[var(--fg)]" ]
+                    [ UI.reviewLegendAttr ]
                     [ Html.text "Decision" ]
                 , Html.div
-                    [ TW.cls "flex flex-col gap-3" ]
+                    [ UI.reviewRadioColumnAttr ]
                     [ Html.label
-                        [ TW.cls "flex items-start gap-2 cursor-pointer" ]
+                        [ UI.reviewRadioRowAttr ]
                         [ radio "wiki-review-decision-approve" ReviewDecisionApprove
-                        , Html.span [ TW.cls "font-medium" ] [ Html.text "Approve" ]
+                        , Html.span [ UI.reviewOptionLabelStrongAttr ] [ Html.text "Approve" ]
                         ]
                     , Html.div
-                        [ TW.cls "flex flex-col gap-1.5" ]
+                        [ UI.reviewNestedNoteColumnAttr ]
                         [ Html.label
-                            [ TW.cls "flex items-start gap-2 cursor-pointer" ]
+                            [ UI.reviewRadioRowAttr ]
                             [ radio "wiki-review-decision-request-changes" ReviewDecisionRequestChanges
-                            , Html.span [ TW.cls "font-medium" ] [ Html.text "Request changes" ]
+                            , Html.span [ UI.reviewOptionLabelStrongAttr ] [ Html.text "Request changes" ]
                             ]
                         , Html.textarea
-                            [ Attr.id "wiki-review-request-changes-note"
-                            , Events.onInput ReviewRequestChangesNoteChanged
-                            , Attr.disabled (busy || not requestSelected)
-                            , Attr.value requestDraft.guidanceText
-                            , Attr.placeholder "Guidance for the contributor (required for this action)"
-                            , TW.cls UI.formTextareaCompactClass
-                            ]
+                            (UI.Textarea.formCompact
+                                [ Attr.id "wiki-review-request-changes-note"
+                                , Events.onInput ReviewRequestChangesNoteChanged
+                                , Attr.disabled (busy || not requestSelected)
+                                , Attr.value requestDraft.guidanceText
+                                , Attr.placeholder "Guidance for the contributor (required for this action)"
+                                ]
+                            )
                             []
                         ]
                     , Html.div
-                        [ TW.cls "flex flex-col gap-1.5" ]
+                        [ UI.reviewNestedNoteColumnAttr ]
                         [ Html.label
-                            [ TW.cls "flex items-start gap-2 cursor-pointer" ]
+                            [ UI.reviewRadioRowAttr ]
                             [ radio "wiki-review-decision-reject" ReviewDecisionReject
-                            , Html.span [ TW.cls "font-medium" ] [ Html.text "Reject" ]
+                            , Html.span [ UI.reviewOptionLabelStrongAttr ] [ Html.text "Reject" ]
                             ]
                         , Html.textarea
-                            [ Attr.id "wiki-review-reject-reason"
-                            , Events.onInput ReviewRejectReasonChanged
-                            , Attr.disabled (busy || not rejectSelected)
-                            , Attr.value rejectDraft.reasonText
-                            , Attr.placeholder "Rejection reason (required for this action)"
-                            , TW.cls UI.formTextareaCompactClass
-                            ]
+                            (UI.Textarea.formCompact
+                                [ Attr.id "wiki-review-reject-reason"
+                                , Events.onInput ReviewRejectReasonChanged
+                                , Attr.disabled (busy || not rejectSelected)
+                                , Attr.value rejectDraft.reasonText
+                                , Attr.placeholder "Rejection reason (required for this action)"
+                                ]
+                            )
                             []
                         ]
                     ]
-                , UI.button
+                , UI.Button.button
                     [ Attr.id "wiki-review-decision-submit"
                     , Attr.type_ "button"
                     , Events.onClick ReviewDecisionSubmitted
@@ -11027,97 +11512,86 @@ viewSubmissionDetailRoute model wikiSlug submissionId =
 
 viewBacklinks : Wiki.Slug -> List Page.Slug -> Html Msg
 viewBacklinks wikiSlug backlinks =
-    Html.section
-        [ Attr.id "page-backlinks"
-        , TW.cls UI.backlinksSectionClass
-        ]
-        [ UI.sidebarHeading "Backlinks"
-        , Html.div [ TW.cls UI.sidebarNavSectionBodyClass ]
-            [ if List.isEmpty backlinks then
+    UI.SidebarSection.section
+        { id = "page-backlinks"
+        , title = "Backlinks"
+        , body =
+            if List.isEmpty backlinks then
                 Html.p
                     [ Attr.id "page-backlinks-empty"
-                    , TW.cls "m-0"
+                    , UI.sidebarM0Attr
                     ]
                     [ Html.text "No backlinks." ]
 
-              else
+            else
                 Html.ul
                     [ Attr.id "page-backlinks-list"
-                    , TW.cls UI.backlinksListClass
+                    , UI.backlinksListAttr
+                    , UI.sidebarNavHorizontalIndentAttr
                     ]
                     (backlinks
                         |> List.map
                             (\slug ->
-                                Html.li [ TW.cls "m-0 leading-[1.3]" ]
-                                    [ UI.sidebarTocEntryLink
+                                UI.Link.listItemTight []
+                                    [ UI.Link.sidebarLink
                                         [ Attr.href (Wiki.publishedPageUrlPath wikiSlug slug)
                                         , Attr.attribute "data-backlink-page-slug" slug
-                                        , TW.cls "break-all"
                                         ]
-                                        [ Html.text slug ]
+                                        [ UI.Link.breakAllSpan [] [ Html.text slug ] ]
                                     ]
                             )
                     )
-            ]
-        ]
+        }
 
 
 viewPageTags : Wiki.Slug -> (Page.Slug -> Bool) -> List Page.Slug -> Html Msg
 viewPageTags wikiSlug publishedSlugExists tags =
-    Html.section
-        [ Attr.id "page-tags"
-        , TW.cls UI.backlinksSectionClass
-        ]
-        [ UI.sidebarHeading "Tags"
-        , Html.div [ TW.cls UI.sidebarNavSectionBodyClass ]
-            [ if List.isEmpty tags then
+    UI.SidebarSection.section
+        { id = "page-tags"
+        , title = "Tags"
+        , body =
+            if List.isEmpty tags then
                 Html.p
                     [ Attr.id "page-tags-empty"
-                    , TW.cls "m-0"
+                    , UI.sidebarM0Attr
                     ]
                     [ Html.text "No tags." ]
 
-              else
+            else
                 Html.ul
                     [ Attr.id "page-tags-list"
-                    , TW.cls UI.backlinksListClass
+                    , UI.tagPillsListAttr
                     ]
                     (tags
                         |> List.map
                             (\slug ->
-                                Html.li [ TW.cls "m-0 leading-[1.3]" ]
-                                    [ UI.sidebarTocEntryLink
+                                let
+                                    exists : Bool
+                                    exists =
+                                        publishedSlugExists slug
+                                in
+                                UI.Link.listItemTight []
+                                    [ Html.a
                                         [ Attr.href (Wiki.publishedPageUrlPath wikiSlug slug)
                                         , Attr.attribute "data-tag-page-slug" slug
-                                        , TW.cls
-                                            ("break-all"
-                                                ++ (if publishedSlugExists slug then
-                                                        ""
-
-                                                    else
-                                                        " " ++ UI.markdownWikiLinkMissingClass
-                                                   )
-                                            )
+                                        , UI.tagPillAttr exists
                                         ]
                                         [ Html.text slug ]
                                     ]
                             )
                     )
-            ]
-        ]
+        }
 
 
 viewPageTodos : List String -> Html Msg
 viewPageTodos todoTexts =
-    Html.section
-        [ Attr.id "page-todos"
-        , TW.cls UI.backlinksSectionClass
-        ]
-        [ UI.sidebarHeading "TODOs:"
-        , Html.div [ TW.cls UI.sidebarNavSectionBodyClass ]
-            [ Html.ul
+    UI.SidebarSection.section
+        { id = "page-todos"
+        , title = "TODOs:"
+        , body =
+            Html.ul
                 [ Attr.id "page-todos-list"
-                , TW.cls "m-0 pl-[1.15rem] list-disc"
+                , UI.todosListDiscAttr
                 ]
                 (todoTexts
                     |> List.indexedMap
@@ -11125,13 +11599,12 @@ viewPageTodos todoTexts =
                             Html.li
                                 [ Attr.attribute "data-page-todo-index" (String.fromInt index)
                                 , Attr.attribute "data-todo-text" todoText
-                                , TW.cls "m-0 leading-[1.3]"
+                                , UI.classAttr "m-0 leading-[1.3]"
                                 ]
                                 [ Html.text todoText ]
                         )
                 )
-            ]
-        ]
+        }
 
 
 maybeMySubmissionForMissingPublishedPage :
@@ -11251,7 +11724,7 @@ viewMissingPublishedPage wikiSlug pageSlug taggedPageSlugs maybeContributorWiki 
                                                   else
                                                     [ UI.contentParagraph [] [ Html.text line2 ] ]
                                                 , [ UI.contentParagraph []
-                                                        [ UI.contentLink
+                                                        [ UI.Link.contentLink
                                                             [ Attr.id "wiki-missing-published-open-submission-link"
                                                             , Attr.href (Wiki.submissionDetailUrlPath wikiSlug idStr)
                                                             ]
@@ -11286,7 +11759,7 @@ viewMissingPublishedPage wikiSlug pageSlug taggedPageSlugs maybeContributorWiki 
 
                         else
                             UI.contentParagraph []
-                                [ UI.contentLink
+                                [ UI.Link.contentLink
                                     [ Attr.id "wiki-missing-published-create-link"
                                     , Attr.href (Wiki.submitNewPageUrlPathWithSuggestedSlug wikiSlug pageSlug)
                                     ]
@@ -11296,7 +11769,7 @@ viewMissingPublishedPage wikiSlug pageSlug taggedPageSlugs maybeContributorWiki 
                     else
                         UI.contentParagraph []
                             [ Html.text "Log in on this wiki to create it. "
-                            , UI.contentLink
+                            , UI.Link.contentLink
                                 [ Attr.id "wiki-missing-published-login-link"
                                 , Attr.href (Wiki.loginUrlPath wikiSlug)
                                 ]
@@ -11305,7 +11778,7 @@ viewMissingPublishedPage wikiSlug pageSlug taggedPageSlugs maybeContributorWiki 
 
                 Nothing ->
                     UI.contentParagraph []
-                        [ UI.contentLink
+                        [ UI.Link.contentLink
                             [ Attr.id "wiki-missing-published-login-link"
                             , Attr.href
                                 (Wiki.loginUrlPathWithRedirect wikiSlug
@@ -11323,7 +11796,7 @@ viewMissingPublishedPage wikiSlug pageSlug taggedPageSlugs maybeContributorWiki 
         graphSection =
             Html.div
                 [ Attr.id "wiki-missing-published-page-graph"
-                , TW.cls "-mx-[0.85rem] px-[0.85rem]"
+                , UI.wikiRightRailTocNudgeAttr
                 ]
                 [ immediatePublishedPageGraphviz "wiki-missing-published-graphviz" wikiSlug pageSlug wikiDetails
                 ]
@@ -11333,8 +11806,11 @@ viewMissingPublishedPage wikiSlug pageSlug taggedPageSlugs maybeContributorWiki 
         , Attr.attribute "data-wiki-slug" wikiSlug
         , Attr.attribute "data-page-slug" pageSlug
         ]
-        [ UI.contentParagraph []
-            [ Html.text ("The page \"" ++ pageSlug ++ "\" does not exist yet.") ]
+        [ Html.h1
+            [ UI.classAttr "m-0 mb-[0.75rem] [font-family:var(--font-serif)] text-[2rem] leading-[1.2] font-semibold text-[var(--fg)] break-words" ]
+            [ Html.text pageSlug ]
+        , UI.contentParagraph []
+            [ Html.text "This page does not exist yet." ]
         , contributorCreateOrLogin
         , graphSection
         , pendingSection
@@ -11350,16 +11826,16 @@ viewTaggedPagesWithTag wikiSlug taggedPageSlugs =
     else
         Html.section
             [ Attr.id "page-tagged-pages"
-            , TW.cls "mt-4 -mx-[0.85rem] px-[0.85rem] border-t border-dashed border-[var(--border-dash)] pt-4"
+            , UI.pageActionsTopBorderBlockAttr
             ]
             [ UI.contentParagraph
-                [ TW.cls "my-0" ]
+                [ UI.sidebarTocListRootAttr ]
                 [ Html.text "Pages with this tag: "
                 , Html.span []
                     (taggedPageSlugs
                         |> List.map
                             (\slug ->
-                                UI.contentLink
+                                UI.Link.contentLink
                                     [ Attr.href (Wiki.publishedPageUrlPath wikiSlug slug)
                                     , Attr.attribute "data-tagged-page-slug" slug
                                     ]
@@ -11509,6 +11985,12 @@ viewWikiTodosPage wikiSlug wikiDetails =
                             }
                         )
                 , todoSummary.missingPages
+                    |> List.sortBy
+                        (\row ->
+                            ( negate (List.length row.linkedFromPageSlugs)
+                            , String.toLower row.missingPageSlug
+                            )
+                        )
                     |> List.map
                         (\row ->
                             { itemText = row.missingPageSlug
@@ -11521,7 +12003,7 @@ viewWikiTodosPage wikiSlug wikiDetails =
 
         pageLink : Page.Slug -> Html Msg
         pageLink pageSlug =
-            UI.contentLink
+            UI.Link.contentLink
                 [ Attr.href (Wiki.publishedPageUrlPath wikiSlug pageSlug) ]
                 [ Html.text pageSlug ]
 
@@ -11535,9 +12017,7 @@ viewWikiTodosPage wikiSlug wikiDetails =
         [ Attr.id "wiki-todos-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
         ]
-        [ UI.contentParagraph []
-            [ Html.text "Collected TODO markers and missing linked pages across published articles." ]
-        , if List.isEmpty combinedRows then
+        [ if List.isEmpty combinedRows then
             UI.contentParagraph
                 [ Attr.id "wiki-todos-empty" ]
                 [ Html.text "No TODOs or missing linked pages found." ]
@@ -11547,7 +12027,7 @@ viewWikiTodosPage wikiSlug wikiDetails =
                 [ Attr.id "wiki-todos-table" ]
                 { theadAttrs = []
                 , headerRowAttrs = []
-                , headerAlign = UI.TableAlignTop
+                , headerAlign = UI.TableAlignMiddle
                 , headers =
                     [ UI.tableHeaderText "Item"
                     , UI.tableHeaderText "Used in"
@@ -11568,20 +12048,18 @@ viewWikiTodosPage wikiSlug wikiDetails =
                                             |> Maybe.withDefault []
                                         ]
                                     )
-                                    [ UI.tableTd UI.TableAlignTop
+                                    [ UI.tableTdSerif UI.TableAlignMiddle
                                         []
                                         [ case row.maybeMissingPageSlug of
                                             Just missingPageSlug ->
-                                                Html.a
-                                                    [ TW.cls UI.markdownWikiLinkMissingClass
-                                                    , Attr.href (Wiki.publishedPageUrlPath wikiSlug missingPageSlug)
-                                                    ]
+                                                UI.Link.missingLink
+                                                    [ Attr.href (Wiki.publishedPageUrlPath wikiSlug missingPageSlug) ]
                                                     [ Html.text row.itemText ]
 
                                             Nothing ->
                                                 Html.text row.itemText
                                         ]
-                                    , UI.tableTd UI.TableAlignTop
+                                    , UI.tableTd UI.TableAlignMiddle
                                         []
                                         [ Html.span
                                             [ Attr.attribute "data-used-in" row.itemText ]
@@ -11591,6 +12069,291 @@ viewWikiTodosPage wikiSlug wikiDetails =
                             )
                 }
         ]
+
+
+type alias SearchExcerpt =
+    { before : String
+    , match : String
+    , after : String
+    }
+
+
+excerptFromMarkdown : String -> String -> SearchExcerpt
+excerptFromMarkdown rawQuery markdown =
+    let
+        query : String
+        query =
+            String.trim rawQuery |> String.toLower
+
+        plainText : String
+        plainText =
+            markdownToPlainText markdown
+
+        lowerPlainText : String
+        lowerPlainText =
+            String.toLower plainText
+    in
+    if String.isEmpty query then
+        if String.length plainText > 140 then
+            { before = String.left 140 plainText ++ "…"
+            , match = ""
+            , after = ""
+            }
+
+        else
+            { before = plainText
+            , match = ""
+            , after = ""
+            }
+
+    else
+        case String.indexes query lowerPlainText |> List.head of
+            Just start ->
+                let
+                    prefixStart : Int
+                    prefixStart =
+                        Basics.max 0 (start - 55)
+
+                    endPos : Int
+                    endPos =
+                        Basics.min (String.length plainText) (start + String.length query + 85)
+
+                    prefix : String
+                    prefix =
+                        if prefixStart > 0 then
+                            "…"
+
+                        else
+                            ""
+
+                    suffix : String
+                    suffix =
+                        if endPos < String.length plainText then
+                            "…"
+
+                        else
+                            ""
+                in
+                { before = prefix ++ String.slice prefixStart start plainText
+                , match = String.slice start (start + String.length query) plainText
+                , after = String.slice (start + String.length query) endPos plainText ++ suffix
+                }
+
+            Nothing ->
+                if String.length plainText > 140 then
+                    { before = String.left 140 plainText ++ "…"
+                    , match = ""
+                    , after = ""
+                    }
+
+                else
+                    { before = plainText
+                    , match = ""
+                    , after = ""
+                    }
+
+
+markdownToPlainText : String -> String
+markdownToPlainText markdown =
+    case
+        MarkdownParser.parse markdown
+            |> Result.mapError (List.map MarkdownParser.deadEndToString >> String.join "\n")
+            |> Result.andThen (MarkdownRenderer.render plainTextRenderer)
+    of
+        Ok lines ->
+            lines
+                |> String.join ""
+                |> String.words
+                |> String.join " "
+
+        Err _ ->
+            markdown
+                |> String.words
+                |> String.join " "
+
+
+plainTextRenderer : MarkdownRenderer.Renderer String
+plainTextRenderer =
+    { heading = \{ children } -> String.join "" children ++ " "
+    , paragraph = \children -> String.join "" children ++ " "
+    , blockQuote = \children -> String.join "" children ++ " "
+    , codeSpan = identity
+    , link = \_ children -> String.join "" children
+    , unorderedList =
+        \items ->
+            items
+                |> List.map
+                    (\item ->
+                        case item of
+                            Block.ListItem _ children ->
+                                String.join "" children
+                    )
+                |> String.join " "
+                |> (\s -> s ++ " ")
+    , orderedList =
+        \_ items ->
+            items
+                |> List.map (String.join "")
+                |> String.join " "
+                |> (\s -> s ++ " ")
+    , table =
+        \children ->
+            String.join " " children ++ " "
+    , tableHeader = String.join " "
+    , tableBody = String.join " "
+    , tableRow = String.join " "
+    , tableHeaderCell =
+        \_ children ->
+            String.join "" children
+    , tableCell =
+        \_ children ->
+            String.join "" children
+    , codeBlock =
+        \{ body } ->
+            body ++ " "
+    , html = Markdown.Html.oneOf []
+    , thematicBreak = " "
+    , text = identity
+    , strong = String.join ""
+    , emphasis = String.join ""
+    , strikethrough = String.join ""
+    , hardLineBreak = " "
+    , image = \image -> image.alt
+    }
+
+
+viewSearchExcerpt : SearchExcerpt -> Html Msg
+viewSearchExcerpt excerpt =
+    Html.span []
+        [ Html.text excerpt.before
+        , if String.isEmpty excerpt.match then
+            Html.text ""
+
+          else
+            Html.mark
+                [ Attr.class "bg-yellow-200 text-[inherit] px-[0.05rem] rounded-[0.1rem]" ]
+                [ Html.text excerpt.match ]
+        , Html.text excerpt.after
+        ]
+
+
+viewWikiSearchRoute : Model -> Wiki.Slug -> Html Msg
+viewWikiSearchRoute model wikiSlug =
+    case Store.get_ wikiSlug model.store.wikiDetails of
+        RemoteData.NotAsked ->
+            viewWikiHomeLoading
+
+        RemoteData.Loading ->
+            viewWikiHomeLoading
+
+        RemoteData.Failure _ ->
+            viewNotFound
+
+        RemoteData.Success wikiDetails ->
+            case Store.get wikiSlug model.store.wikiCatalog of
+                RemoteData.NotAsked ->
+                    viewWikiHomeLoading
+
+                RemoteData.Loading ->
+                    viewWikiHomeLoading
+
+                RemoteData.Failure _ ->
+                    viewNotFound
+
+                RemoteData.Success _ ->
+                    let
+                        query : String
+                        query =
+                            String.trim model.wikiSearchPageQuery
+
+                        results : List WikiSearch.ResultItem
+                        results =
+                            WikiSearch.search query wikiDetails.publishedPageMarkdownSources
+                    in
+                    Html.div
+                        [ Attr.id "wiki-search-page"
+                        , Attr.attribute "data-wiki-slug" wikiSlug
+                        ]
+                        [ if String.isEmpty query then
+                            Html.div [ Attr.class "space-y-3" ]
+                                [ Html.input
+                                    [ Attr.id "wiki-search-input"
+                                    , Attr.type_ "search"
+                                    , Attr.placeholder "Search this wiki..."
+                                    , Attr.value model.wikiSearchPageQuery
+                                    , Events.onInput WikiSearchPageQueryChanged
+                                    , Attr.class "w-full max-w-[28rem] rounded-md border border-[var(--border-subtle)] bg-[var(--bg)] px-3 py-2 text-[0.8125rem] text-[var(--fg)]"
+                                    ]
+                                    []
+                                ]
+
+                          else if List.isEmpty results then
+                            Html.div [ Attr.class "space-y-3" ]
+                                [ Html.input
+                                    [ Attr.id "wiki-search-input"
+                                    , Attr.type_ "search"
+                                    , Attr.placeholder "Search this wiki..."
+                                    , Attr.value model.wikiSearchPageQuery
+                                    , Events.onInput WikiSearchPageQueryChanged
+                                    , Attr.class "w-full max-w-[28rem] rounded-md border border-[var(--border-subtle)] bg-[var(--bg)] px-3 py-2 text-[0.8125rem] text-[var(--fg)]"
+                                    ]
+                                    []
+                                , UI.contentParagraph
+                                    [ Attr.id "wiki-search-no-results"
+                                    , Attr.class "[font-family:var(--font-ui)] text-[0.8125rem]"
+                                    ]
+                                    [ Html.text "No matching pages found." ]
+                                ]
+
+                          else
+                            Html.div [ Attr.class "space-y-3" ]
+                                [ Html.input
+                                    [ Attr.id "wiki-search-input"
+                                    , Attr.type_ "search"
+                                    , Attr.placeholder "Search this wiki..."
+                                    , Attr.value model.wikiSearchPageQuery
+                                    , Events.onInput WikiSearchPageQueryChanged
+                                    , Attr.class "w-full max-w-[28rem] rounded-md border border-[var(--border-subtle)] bg-[var(--bg)] px-3 py-2 text-[0.8125rem] text-[var(--fg)]"
+                                    ]
+                                    []
+                                , Html.p
+                                    [ Attr.id "wiki-search-count"
+                                    , UI.formFeedbackTextSmAttr
+                                    ]
+                                    [ Html.text
+                                        ("Found " ++ String.fromInt (List.length results) ++ " matching pages.")
+                                    ]
+                                , Html.ul
+                                    [ Attr.id "wiki-search-results"
+                                    , UI.markdownUnorderedListAttr
+                                    ]
+                                    (results
+                                        |> List.map
+                                            (\result ->
+                                                let
+                                                    markdown : String
+                                                    markdown =
+                                                        Dict.get result.pageSlug wikiDetails.publishedPageMarkdownSources
+                                                            |> Maybe.withDefault ""
+                                                in
+                                                Html.li
+                                                    [ Attr.attribute "data-search-page-slug" result.pageSlug
+                                                    , Attr.class "pb-3 mb-3 border-b border-[var(--border-subtle)] last:mb-0 last:pb-0 last:border-b-0"
+                                                    ]
+                                                    [ UI.Link.contentLink
+                                                        [ Attr.href (Wiki.publishedPageUrlPath wikiSlug result.pageSlug) ]
+                                                        [ Html.span [ Attr.class "text-[0.8125rem]" ] [ Html.text result.pageSlug ] ]
+                                                    , Html.p
+                                                        [ Attr.class "m-0 text-[0.85rem] text-[var(--fg-muted)]" ]
+                                                        [ excerptFromMarkdown query
+                                                            markdown
+                                                            |> viewSearchExcerpt
+                                                        ]
+                                                    ]
+                                            )
+                                    )
+                                ]
+                        ]
 
 
 viewWikiGraphRoute : Model -> Wiki.Slug -> Html Msg
@@ -11631,26 +12394,24 @@ viewWikiGraphPage wikiSlug wikiDetails =
         [ Attr.id "wiki-graph-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
         ]
-        [ UI.contentParagraph []
-            [ Html.text "Graph of published wiki pages with wiki-link and tag edges. Missing linked pages appear dashed in red; tag edges are purple dashed." ]
-        , if List.isEmpty graphSummary.publishedPageSlugs then
+        [ if List.isEmpty graphSummary.publishedPageSlugs then
             UI.contentParagraph
                 [ Attr.id "wiki-graph-empty" ]
                 [ Html.text "No published pages to graph yet." ]
 
           else
             let
-                graphDot : String
-                graphDot =
-                    WikiGraph.dot wikiSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags
+                graphData =
+                    WikiGraph.graph wikiSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags
             in
-            Html.node "graphviz-graph"
-                [ Attr.id "wiki-graphviz"
-                , Attr.attribute "graph" graphDot
-                , Attr.attribute "data-graphviz-pages" (String.fromInt (List.length graphSummary.publishedPageSlugs))
-                , Attr.attribute "data-graphviz-edges" (String.fromInt (List.length graphSummary.edges))
-                ]
-                []
+            UI.Graph.view
+                { id = "wiki-graphviz"
+                , graph = graphData
+                , attrs =
+                    [ Attr.attribute "data-graphviz-pages" (String.fromInt (List.length graphSummary.publishedPageSlugs))
+                    , Attr.attribute "data-graphviz-edges" (String.fromInt (List.length graphSummary.edges))
+                    ]
+                }
         ]
 
 
@@ -11702,11 +12463,15 @@ immediatePublishedPageGraphDescription =
 
 immediatePublishedPageGraphviz : String -> Wiki.Slug -> Page.Slug -> Wiki.FrontendDetails -> Html Msg
 immediatePublishedPageGraphviz graphvizId wikiSlug pageSlug wikiDetails =
-    Html.node "graphviz-graph"
-        [ Attr.id graphvizId
-        , Attr.attribute "graph" (PageGraph.dot wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags)
-        ]
-        []
+    let
+        graphData =
+            PageGraph.graph wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags
+    in
+    UI.Graph.view
+        { id = graphvizId
+        , graph = graphData
+        , attrs = []
+        }
 
 
 viewPublishedPageGraphPage : Wiki.Slug -> Page.Slug -> Wiki.FrontendDetails -> Html Msg
@@ -11716,7 +12481,10 @@ viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails =
         , Attr.attribute "data-wiki-slug" wikiSlug
         , Attr.attribute "data-page-slug" pageSlug
         ]
-        [ immediatePublishedPageGraphDescription
+        [ Html.h1
+            [ UI.classAttr "m-0 mb-[0.75rem] [font-family:var(--font-serif)] text-[2rem] leading-[1.2] font-semibold text-[var(--fg)] break-words" ]
+            [ Html.text pageSlug ]
+        , immediatePublishedPageGraphDescription
         , immediatePublishedPageGraphviz "page-immediate-graphviz" wikiSlug pageSlug wikiDetails
         ]
 
@@ -11742,6 +12510,9 @@ viewBody model =
         Route.HostAdminAudit ->
             viewHostAdminAudit model
 
+        Route.HostAdminAuditDiff wikiSlug atMillis ->
+            viewHostAdminAuditDiffRoute wikiSlug atMillis model
+
         Route.HostAdminBackup ->
             viewHostAdminBackupPage model
 
@@ -11753,6 +12524,9 @@ viewBody model =
 
         Route.WikiGraph wikiSlug ->
             viewWikiGraphRoute model wikiSlug
+
+        Route.WikiSearch wikiSlug ->
+            viewWikiSearchRoute model wikiSlug
 
         Route.WikiPage wikiSlug pageSlug ->
             viewPublishedPageRoute model wikiSlug pageSlug
@@ -11792,6 +12566,20 @@ viewBody model =
 
         Route.WikiAdminAudit wikiSlug ->
             viewWikiAdminAuditRoute model wikiSlug
+
+        Route.WikiAdminAuditDiff wikiSlug atMillis ->
+            case Store.get_ wikiSlug model.store.wikiDetails of
+                RemoteData.Success wikiDetails ->
+                    viewWikiAdminAuditDiffRoute wikiSlug wikiDetails atMillis model
+
+                RemoteData.Failure _ ->
+                    viewNotFound
+
+                RemoteData.Loading ->
+                    viewWikiAdminAuditLoading
+
+                RemoteData.NotAsked ->
+                    viewWikiAdminAuditLoading
 
         Route.NotFound _ ->
             viewNotFound
@@ -11911,13 +12699,16 @@ publishedPageImmediateGraphLink model =
             of
                 ( Success _, Success _, Success _ ) ->
                     Just
-                        (Html.div [ TW.cls UI.sidebarDesktopOnlyClass ]
-                            [ Html.div [ TW.cls UI.sidebarNavSectionBodyClass ]
-                                [ UI.sidebarLink
+                        (Html.div [ UI.sidebarDesktopOnlyAttr ]
+                            [ Html.div
+                                [ UI.sidebarNavSectionBodyAttr
+                                , UI.sidebarTocListIndentAttr
+                                ]
+                                [ UI.Link.sidebarLink
                                     [ Attr.id "page-immediate-graph-link"
                                     , Attr.href (Wiki.pageGraphUrlPath wikiSlug pageSlug)
                                     ]
-                                    [ Html.text "Graph" ]
+                                    [ Html.text "Page graph" ]
                                 ]
                             ]
                         )
@@ -11940,9 +12731,12 @@ pageGraphPublishedPageLink model =
             of
                 ( Success _, Success _ ) ->
                     Just
-                        (Html.div [ TW.cls UI.sidebarDesktopOnlyClass ]
-                            [ Html.div [ TW.cls UI.sidebarNavSectionBodyClass ]
-                                [ UI.sidebarLink
+                        (Html.div [ UI.sidebarDesktopOnlyAttr ]
+                            [ Html.div
+                                [ UI.sidebarNavSectionBodyAttr
+                                , UI.sidebarTocListIndentAttr
+                                ]
+                                [ UI.Link.sidebarLink
                                     [ Attr.id "page-graph-page-link"
                                     , Attr.href (Wiki.publishedPageUrlPath wikiSlug pageSlug)
                                     ]
@@ -11963,9 +12757,9 @@ publishedPageEditLink model =
     let
         sidebarPageActionLink : String -> String -> String -> Html Msg
         sidebarPageActionLink label hrefPath linkId =
-            Html.div [ TW.cls UI.sidebarDesktopOnlyClass ]
-                [ Html.div [ TW.cls UI.sidebarNavSectionBodyClass ]
-                    [ UI.sidebarLink
+            Html.div [ UI.sidebarDesktopOnlyAttr ]
+                [ Html.div [ UI.sidebarNavSectionBodyAttr ]
+                    [ UI.Link.sidebarLink
                         [ Attr.href hrefPath
                         , Attr.id linkId
                         ]
@@ -11979,21 +12773,21 @@ publishedPageEditLink model =
                 proposeOrEditLabel : String
                 proposeOrEditLabel =
                     if wikiSessionTrustedOnWiki wikiSlug model then
-                        "Edit"
+                        "Edit page"
 
                     else
                         "Propose edit"
             in
             Html.div
-                [ TW.cls UI.sidebarNavSectionBodyClass
-                , TW.cls "flex flex-col gap-[0.25rem]"
+                [ UI.sidebarNavSectionBodyAttr
+                , UI.sidebarTocListIndentAttr
                 ]
-                [ UI.sidebarLink
+                [ UI.Link.sidebarLink
                     [ Attr.href (Wiki.submitEditUrlPath wikiSlug pageSlug)
                     , Attr.id "wiki-page-propose-edit"
                     ]
                     [ Html.text proposeOrEditLabel ]
-                , UI.sidebarLink
+                , UI.Link.sidebarLink
                     [ Attr.href (Wiki.submitDeleteUrlPath wikiSlug pageSlug)
                     , Attr.id
                         (if wikiSessionTrustedOnWiki wikiSlug model then
@@ -12050,8 +12844,21 @@ publishedPageEditLink model =
             Nothing
 
 
-view : Model -> Effect.Browser.Document Msg
-view model =
+routeUsesAuthShell : Route -> Bool
+routeUsesAuthShell route =
+    case route of
+        Route.WikiLogin _ _ ->
+            True
+
+        Route.HostAdmin _ ->
+            True
+
+        _ ->
+            False
+
+
+viewWikiRightRail : Model -> { hasRightColumn : Bool, sections : List (Html Msg) }
+viewWikiRightRail model =
     let
         tocEntries : List PageToc.Entry
         tocEntries =
@@ -12069,24 +12876,27 @@ view model =
         maybeTodos =
             publishedPageTodos model
 
-        maybePageGraphLink : Maybe (Html Msg)
-        maybePageGraphLink =
-            publishedPageImmediateGraphLink model
-
-        maybePageFromGraphLink : Maybe (Html Msg)
-        maybePageFromGraphLink =
-            pageGraphPublishedPageLink model
-
-        maybeEditLink : Maybe (Html Msg)
-        maybeEditLink =
-            publishedPageEditLink model
-
         maybeTopActionLinks : Maybe (Html Msg)
         maybeTopActionLinks =
             let
+                maybePageGraphLink : Maybe (Html Msg)
+                maybePageGraphLink =
+                    publishedPageImmediateGraphLink model
+
+                maybePageFromGraphLink : Maybe (Html Msg)
+                maybePageFromGraphLink =
+                    pageGraphPublishedPageLink model
+
+                maybeEditLink : Maybe (Html Msg)
+                maybeEditLink =
+                    publishedPageEditLink model
+
                 actionLinks : List (Html Msg)
                 actionLinks =
-                    [ maybeEditLink, maybePageGraphLink, maybePageFromGraphLink ]
+                    [ maybeEditLink
+                    , maybePageGraphLink
+                    , maybePageFromGraphLink
+                    ]
                         |> List.filterMap identity
             in
             if List.isEmpty actionLinks then
@@ -12094,124 +12904,140 @@ view model =
 
             else
                 Just
-                    (Html.div [ TW.cls "flex flex-col gap-[0.35rem]" ]
+                    (Html.div [ UI.pageActionsSidebarStackAttr ]
                         actionLinks
                     )
 
-        hasRightColumn : Bool
-        hasRightColumn =
-            (case maybeEditLink of
-                Just _ ->
-                    True
-
-                Nothing ->
-                    False
-            )
-                || not (List.isEmpty tocEntries)
-                || (case maybeTodos of
-                        Just _ ->
-                            True
-
-                        Nothing ->
-                            False
-                   )
-                || (case maybePageGraphLink of
-                        Just _ ->
-                            True
-
-                        Nothing ->
-                            False
-                   )
-                || (case maybePageFromGraphLink of
-                        Just _ ->
-                            True
-
-                        Nothing ->
-                            False
-                   )
-                || (case maybeTags of
-                        Just _ ->
-                            True
-
-                        Nothing ->
-                            False
-                   )
-                || (case maybeBacklinks of
-                        Just _ ->
-                            True
-
-                        Nothing ->
-                            False
-                   )
-
-        rightColumnSections : List (Html Msg)
-        rightColumnSections =
-            [ maybeTopActionLinks
-            , if List.isEmpty tocEntries then
+        maybeTocSection : Maybe (Html Msg)
+        maybeTocSection =
+            if List.isEmpty tocEntries then
                 Nothing
 
-              else
+            else
                 Just
-                    (Html.div [ TW.cls UI.sidebarDesktopOnlyClass ]
+                    (Html.div [ UI.sidebarDesktopOnlyAttr ]
                         [ PageToc.view tocEntries ]
                     )
-            , maybeTodos
+
+        sections : List (Html Msg)
+        sections =
+            [ maybeTopActionLinks
+            , maybeTocSection
             , maybeTags
+            , maybeTodos
             , maybeBacklinks
             ]
                 |> List.filterMap identity
-
-        mainColumnClass : String
-        mainColumnClass =
-            if routeUsesAuditLogFillLayout model.route then
-                UI.layoutMainColumnClassAuditFill hasRightColumn
-
-            else
-                UI.layoutMainColumnClass hasRightColumn
-
-        mainColumnBody : Html Msg
-        mainColumnBody =
-            if routeUsesAuditLogFillLayout model.route then
-                Html.div
-                    [ TW.cls "flex min-h-0 min-w-0 flex-1 flex-col" ]
-                    [ viewBody model ]
-
-            else
-                viewBody model
-
-        mainColumns : List (Html Msg)
-        mainColumns =
-            List.concat
-                [ [ Html.aside [ TW.cls UI.layoutLeftNavAsideClass ]
-                        [ viewRouteSideNav model ]
-                  , Html.main_
-                        [ Attr.id UI.appMainScrollRegionId
-                        , TW.cls mainColumnClass
-                        ]
-                        [ mainColumnBody ]
-                  ]
-                , if List.isEmpty rightColumnSections then
-                    []
-
-                  else
-                    [ Html.aside [ TW.cls UI.sidebarContainerClass ]
-                        rightColumnSections
-                    ]
-                ]
     in
+    { hasRightColumn = not (List.isEmpty sections)
+    , sections = sections
+    }
+
+
+viewMainColumnBody : Model -> Html Msg
+viewMainColumnBody model =
+    if routeUsesAuditLogFillLayout model.route then
+        Html.div
+            [ UI.auditMainColumnBodyInnerAttr ]
+            [ viewBody model ]
+
+    else if routeUsesMainContentPadding model.route then
+        Html.div
+            [ UI.mainContentPaddingAttr ]
+            [ viewBody model ]
+
+    else
+        viewBody model
+
+
+routeUsesMainContentPadding : Route -> Bool
+routeUsesMainContentPadding route =
+    case route of
+        Route.WikiSubmitNew _ ->
+            False
+
+        Route.WikiSubmitEdit _ _ ->
+            False
+
+        Route.HostAdminAudit ->
+            False
+
+        Route.HostAdminAuditDiff _ _ ->
+            False
+
+        Route.WikiAdminAudit _ ->
+            False
+
+        Route.WikiAdminAuditDiff _ _ ->
+            False
+
+        _ ->
+            True
+
+
+viewMainAppBody : Model -> List (Html Msg)
+viewMainAppBody model =
+    let
+        rightRail : { hasRightColumn : Bool, sections : List (Html Msg) }
+        rightRail =
+            viewWikiRightRail model
+    in
+    case model.route of
+        Route.WikiList ->
+            [ viewAppHeader model
+            , Html.div
+                [ Attr.class "flex min-h-0 min-w-0 flex-1 flex-col bg-[var(--chrome-bg)]" ]
+                [ Html.main_
+                    [ Attr.id UI.appMainScrollRegionId
+                    , Attr.class "flex-1 min-h-0 min-w-0 overflow-y-auto overscroll-contain bg-[var(--chrome-bg)] px-0 border-r-0 py-0"
+                    ]
+                    [ viewMainColumnBody model ]
+                , viewWikiListBottomSiteAdminLink model
+                ]
+            ]
+
+        _ ->
+            [ viewAppHeader model
+            , UI.holyGrailLayout
+                { hasRightColumn = rightRail.hasRightColumn
+                , trimHorizontalGutter = True
+                , leftNav = viewRouteSideNav model
+                , mainAttributes =
+                    [ Attr.id UI.appMainScrollRegionId
+                    , UI.layoutMainColumnForRouteAttr
+                        { hasRightColumn = rightRail.hasRightColumn
+                        , auditFill = routeUsesAuditLogFillLayout model.route
+                        , trimRightPadding = True
+                        , trimVerticalPadding = True
+                        }
+                    ]
+                , mainBody = viewMainColumnBody model
+                , rightRailSections = rightRail.sections
+                }
+            ]
+
+
+view : Model -> Effect.Browser.Document Msg
+view model =
     { title = documentTitle model
     , body =
         [ Html.div
-            [ TW.cls <|
-                case ColorTheme.effectiveColorTheme model.colorThemePreference model.systemColorTheme of
-                    ColorTheme.Light ->
-                        UI.appRootClass
+            [ UI.appRootClassAttr
+                { isDark =
+                    case ColorTheme.effectiveColorTheme model.colorThemePreference model.systemColorTheme of
+                        ColorTheme.Light ->
+                            False
 
-                    ColorTheme.Dark ->
-                        UI.appRootClass ++ " dark"
+                        ColorTheme.Dark ->
+                            True
+                , trimHorizontalPadding = True
+                }
             ]
-            [ viewAppHeader model
-            , Html.div [ TW.cls (UI.layoutHolyGrailClass hasRightColumn) ] mainColumns
-            ]
+            (if routeUsesAuthShell model.route then
+                [ viewBody model ]
+
+             else
+                viewMainAppBody model
+            )
         ]
     }

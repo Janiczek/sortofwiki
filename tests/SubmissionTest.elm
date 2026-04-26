@@ -104,7 +104,8 @@ suite =
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = "wanted"
-                                    , markdown = "m", tags = []
+                                    , markdown = "m"
+                                    , tags = []
                                     }
                             , status = Submission.Pending
                             , reviewerNote = Nothing
@@ -123,7 +124,8 @@ suite =
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = "wanted"
-                                    , markdown = "", tags = []
+                                    , markdown = ""
+                                    , tags = []
                                     }
                             , status = Submission.Draft
                             , reviewerNote = Nothing
@@ -146,7 +148,8 @@ suite =
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = "aaa-fixed"
-                                    , markdown = "m", tags = []
+                                    , markdown = "m"
+                                    , tags = []
                                     }
                             , status = Submission.Pending
                             , reviewerNote = Nothing
@@ -167,7 +170,8 @@ suite =
                                     { pageSlug = "guides"
                                     , baseMarkdown = "base"
                                     , baseRevision = 1
-                                    , proposedMarkdown = "proposed", tags = []
+                                    , proposedMarkdown = "proposed"
+                                    , tags = []
                                     }
                             , status = Submission.Pending
                             , reviewerNote = Nothing
@@ -231,7 +235,8 @@ suite =
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = "wanted"
-                                    , markdown = "", tags = []
+                                    , markdown = ""
+                                    , tags = []
                                     }
                             , status = Submission.Draft
                             , reviewerNote = Nothing
@@ -254,7 +259,8 @@ suite =
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = "wanted"
-                                    , markdown = "", tags = []
+                                    , markdown = ""
+                                    , tags = []
                                     }
                             , status = Submission.Draft
                             , reviewerNote = Nothing
@@ -277,7 +283,8 @@ suite =
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = "wanted"
-                                    , markdown = "m", tags = []
+                                    , markdown = "m"
+                                    , tags = []
                                     }
                             , status = Submission.Pending
                             , reviewerNote = Nothing
@@ -304,7 +311,8 @@ suite =
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = slug
-                                    , markdown = "", tags = []
+                                    , markdown = ""
+                                    , tags = []
                                     }
                             , status = Submission.Draft
                             , reviewerNote = Nothing
@@ -329,7 +337,8 @@ suite =
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = "wanted"
-                                    , markdown = "", tags = []
+                                    , markdown = ""
+                                    , tags = []
                                     }
                             , status = Submission.Draft
                             , reviewerNote = Nothing
@@ -343,7 +352,8 @@ suite =
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = "wanted"
-                                    , markdown = "", tags = []
+                                    , markdown = ""
+                                    , tags = []
                                     }
                             , status = Submission.Draft
                             , reviewerNote = Nothing
@@ -372,7 +382,8 @@ suite =
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = slugA
-                                    , markdown = "", tags = []
+                                    , markdown = ""
+                                    , tags = []
                                     }
                             , status = Submission.Draft
                             , reviewerNote = Nothing
@@ -976,7 +987,8 @@ suite =
                                     { pageSlug = "home"
                                     , baseMarkdown = "stale-base"
                                     , baseRevision = 1
-                                    , proposedMarkdown = "  my-edit \n", tags = []
+                                    , proposedMarkdown = "  my-edit \n"
+                                    , tags = []
                                     }
                             , status = Submission.Draft
                             , reviewerNote = Just "old note"
@@ -995,7 +1007,8 @@ suite =
                                         { pageSlug = "home"
                                         , baseMarkdown = "current-live"
                                         , baseRevision = 1
-                                        , proposedMarkdown = "my-edit", tags = []
+                                        , proposedMarkdown = "my-edit"
+                                        , tags = []
                                         }
                                 }
                             )
@@ -1161,7 +1174,8 @@ suite =
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = "QueueDemoPage"
-                                    , markdown = "Body text", tags = []
+                                    , markdown = "Body text"
+                                    , tags = []
                                     }
                             , status = Submission.Pending
                             , reviewerNote = Just "draft note"
@@ -1190,7 +1204,7 @@ suite =
                             , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
                                 Submission.NewPage
-                                    { pageSlug = "x", markdown = "m" , tags = []}
+                                    { pageSlug = "x", markdown = "m", tags = [] }
                             , status = Submission.Rejected
                             , reviewerNote = Nothing
                             }
@@ -1214,7 +1228,8 @@ suite =
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = "QueueDemoPage"
-                                    , markdown = "new", tags = []
+                                    , markdown = "new"
+                                    , tags = []
                                     }
                             , status = Submission.Pending
                             , reviewerNote = Nothing
@@ -1266,7 +1281,8 @@ suite =
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = "QueueDemoPage"
-                                    , markdown = "Body text", tags = []
+                                    , markdown = "Body text"
+                                    , tags = []
                                     }
                             , status = Submission.Pending
                             , reviewerNote = Nothing
@@ -1290,7 +1306,7 @@ suite =
                             , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
                                 Submission.NewPage
-                                    { pageSlug = "x", markdown = "m" , tags = []}
+                                    { pageSlug = "x", markdown = "m", tags = [] }
                             , status = Submission.Approved
                             , reviewerNote = Nothing
                             }
@@ -1310,7 +1326,8 @@ suite =
                             , kind =
                                 Submission.NewPage
                                     { pageSlug = "x-page"
-                                    , markdown = "Body", tags = []
+                                    , markdown = "Body"
+                                    , tags = []
                                     }
                             , status = Submission.Pending
                             , reviewerNote = Nothing
@@ -1334,7 +1351,7 @@ suite =
                             , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
                                 Submission.NewPage
-                                    { pageSlug = "x", markdown = "m" , tags = []}
+                                    { pageSlug = "x", markdown = "m", tags = [] }
                             , status = Submission.Pending
                             , reviewerNote = Nothing
                             }
@@ -1351,7 +1368,7 @@ suite =
                             , authorId = ContributorAccount.newAccountId "Demo" "u"
                             , kind =
                                 Submission.NewPage
-                                    { pageSlug = "x", markdown = "m" , tags = []}
+                                    { pageSlug = "x", markdown = "m", tags = [] }
                             , status = Submission.Approved
                             , reviewerNote = Nothing
                             }

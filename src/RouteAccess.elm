@@ -96,6 +96,16 @@ contributorForcedRedirect sessions url route =
             else
                 Just (ToContributorLogin wikiSlug returnPath)
 
+        Route.WikiAdminAuditDiff wikiSlug _ ->
+            if adminHere wikiSlug then
+                Nothing
+
+            else if loggedInHere wikiSlug then
+                Nothing
+
+            else
+                Just (ToContributorLogin wikiSlug returnPath)
+
         Route.WikiSubmitNew wikiSlug ->
             if loggedInHere wikiSlug then
                 Nothing
@@ -152,6 +162,9 @@ contributorForcedRedirect sessions url route =
         Route.HostAdminAudit ->
             Nothing
 
+        Route.HostAdminAuditDiff _ _ ->
+            Nothing
+
         Route.HostAdminBackup ->
             Nothing
 
@@ -162,6 +175,9 @@ contributorForcedRedirect sessions url route =
             Nothing
 
         Route.WikiGraph _ ->
+            Nothing
+
+        Route.WikiSearch _ ->
             Nothing
 
         Route.WikiPage _ _ ->
@@ -198,6 +214,9 @@ contributorRestrictedReturnPath route =
         Route.WikiAdminAudit wikiSlug ->
             Just ( wikiSlug, Wiki.adminAuditUrlPath wikiSlug )
 
+        Route.WikiAdminAuditDiff wikiSlug atMillis ->
+            Just ( wikiSlug, Wiki.adminAuditDiffUrlPath wikiSlug atMillis )
+
         Route.WikiSubmitNew wikiSlug ->
             Just ( wikiSlug, Wiki.submitNewPageUrlPath wikiSlug )
 
@@ -231,6 +250,9 @@ contributorRestrictedReturnPath route =
         Route.HostAdminAudit ->
             Nothing
 
+        Route.HostAdminAuditDiff _ _ ->
+            Nothing
+
         Route.HostAdminBackup ->
             Nothing
 
@@ -241,6 +263,9 @@ contributorRestrictedReturnPath route =
             Nothing
 
         Route.WikiGraph _ ->
+            Nothing
+
+        Route.WikiSearch _ ->
             Nothing
 
         Route.WikiPage _ _ ->

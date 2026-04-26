@@ -62,7 +62,6 @@ module Submission exposing
     , pendingNewPageSlugInUse
     , pendingNewPageSlugInUseExcept
     , pendingReviewCountForWiki
-    , statusTriggersPendingReviewCount
     , pendingSubmissionsForWiki
     , promoteDraftToPending
     , rejectPendingSubmission
@@ -79,6 +78,7 @@ module Submission exposing
     , savePageDeleteDraftErrorToUserText
     , savePageEditDraftErrorToUserText
     , statusLabelUserText
+    , statusTriggersPendingReviewCount
     , submitDraftForReviewErrorToUserText
     , submitNewPageErrorToUserText
     , submitPageEditErrorToUserText

@@ -78,28 +78,6 @@ function parseColorToRgb(color) {
   return null;
 }
 
-function rgbToHex(rgb) {
-  function toHex(value) {
-    return Math.max(0, Math.min(255, value)).toString(16).padStart(2, "0");
-  }
-
-  return "#" + toHex(rgb.r) + toHex(rgb.g) + toHex(rgb.b);
-}
-
-function tintFillColor(fillColor, darkMode) {
-  const rgb = parseColorToRgb(fillColor);
-  if (!rgb) {
-    return null;
-  }
-
-  const amount = darkMode ? 18 : -18;
-  return rgbToHex({
-    r: rgb.r + amount,
-    g: rgb.g + amount,
-    b: rgb.b + amount,
-  });
-}
-
 function isWarningRed(color) {
   if (!color) {
     return false;
@@ -142,8 +120,8 @@ function fallbackHoverFillForShape(shape, nodeGroup) {
   }
 
   return darkMode
-    ? "var(--link-bg-hover, #2f3c1f)"
-    : "var(--chrome-bg, #ecefe3)";
+    ? "var(--chrome-bg-hover, #313629)"
+    : "var(--chrome-bg-hover, #e7e8dd)";
 }
 
 function readAnchorHref(anchor) {
@@ -223,11 +201,7 @@ function applyNodeHoverState(nodeGroup, hovered, darkMode) {
     if (!shape.dataset.sowGraphvizBaseFill) {
       const baseFill = shape.getAttribute("fill");
       shape.dataset.sowGraphvizBaseFill = baseFill || "__none__";
-
-      const hoverFill =
-        !warningNode && baseFill ? tintFillColor(baseFill, darkMode) : null;
-      shape.dataset.sowGraphvizHoverFill =
-        hoverFill || fallbackHoverFillForShape(shape, nodeGroup);
+      shape.dataset.sowGraphvizHoverFill = fallbackHoverFillForShape(shape, nodeGroup);
     }
 
     const baseFill = shape.dataset.sowGraphvizBaseFill;

@@ -44,7 +44,7 @@ endToEndTests =
                             (ProgramTest.Query.expectAll
                                 [ ProgramTest.Query.expectWikiHomePageShowsSlug "Demo"
                                 , ProgramTest.Query.withinId "wiki-logout-button"
-                                    (ProgramTest.Query.expectHasText "Log out")
+                                    (ProgramTest.Query.expectHasText "Logout")
                                 ]
                             )
                       , client.click 100 (Effect.Browser.Dom.id "wiki-logout-button")
@@ -81,8 +81,8 @@ endToEndTests =
                                     (ProgramTest.Query.expectAll
                                         [ ProgramTest.Query.expectWikiHomePageShowsSlug "Demo"
                                         , ProgramTest.Query.withinId "wiki-logout-button"
-                                            (ProgramTest.Query.expectHasText "Log out")
-                                        , ProgramTest.Query.expectHasText "Logged in as demo_trusted_publisher"
+                                            (ProgramTest.Query.expectHasText "Logout")
+                                        , ProgramTest.Query.expectHasText "@demo_trusted_publisher"
                                         ]
                                     )
                               ]
@@ -98,8 +98,8 @@ endToEndTests =
                             (ProgramTest.Query.expectAll
                                 [ ProgramTest.Query.expectWikiHomePageShowsSlug "Demo"
                                 , ProgramTest.Query.withinId "wiki-logout-button"
-                                    (ProgramTest.Query.expectHasText "Log out")
-                                , ProgramTest.Query.expectHasText "Logged in as demo_trusted_publisher"
+                                    (ProgramTest.Query.expectHasText "Logout")
+                                , ProgramTest.Query.expectHasText "@demo_trusted_publisher"
                                 ]
                             )
                         , client.checkModel 200
@@ -180,12 +180,12 @@ endToEndTests =
                         client
                     , [ client.checkView 400
                             (ProgramTest.Query.withinId "wiki-logout-button"
-                                (ProgramTest.Query.expectHasText "Log out")
+                                (ProgramTest.Query.expectHasText "Logout")
                             )
                       , client.click 100 (Effect.Browser.Dom.id "wiki-logout-button")
                       , client.checkView 400
-                            (ProgramTest.Query.withinHref (Wiki.loginUrlPath "Demo")
-                                (ProgramTest.Query.expectHasText "Log in")
+                            (ProgramTest.Query.withinId "wiki-header-login-link"
+                                (ProgramTest.Query.expectHasText "Login")
                             )
                       , client.checkModel 100
                             (\model ->

@@ -36,40 +36,7 @@ type alias GlobalChromeInput =
 globalChromeSections : GlobalChromeInput -> List Section
 globalChromeSections input =
     List.concat
-        [ let
-            sortOfWikiLinks : List Link
-            sortOfWikiLinks =
-                { linkLabel = "All wikis"
-                  , linkRoute = Route.WikiList
-                  , linkEmphasized = False
-                  }
-                    :: (if input.hostAdminAuthenticated && input.showHostAdminTools then
-                            []
-
-                        else if input.hostAdminAuthenticated then
-                            [ { linkLabel = "Admin"
-                              , linkRoute = Route.HostAdminWikis
-                              , linkEmphasized = False
-                              }
-                            ]
-
-                        else
-                            [ { linkLabel = "Admin"
-                              , linkRoute = Route.HostAdmin Nothing
-                              , linkEmphasized = False
-                              }
-                            ]
-                       )
-          in
-          if List.isEmpty sortOfWikiLinks then
-            []
-
-          else
-            [ { sectionTitle = "SortOfWiki"
-              , links = sortOfWikiLinks
-              }
-            ]
-        , if input.hostAdminAuthenticated && input.showHostAdminTools then
+        [ if input.hostAdminAuthenticated && input.showHostAdminTools then
             [ { sectionTitle = "Host admin"
               , links =
                     [ { linkLabel = "Hosted wikis", linkRoute = Route.HostAdminWikis, linkEmphasized = False }
@@ -82,6 +49,20 @@ globalChromeSections input =
 
           else
             []
+        , [ { sectionTitle = "Site"
+            , links =
+                [ { linkLabel = "Site admin"
+                  , linkRoute =
+                        if input.hostAdminAuthenticated then
+                            Route.HostAdminWikis
+
+                        else
+                            Route.HostAdmin Nothing
+                  , linkEmphasized = False
+                  }
+                ]
+            }
+          ]
         ]
 
 
@@ -92,7 +73,11 @@ wikiNavLinks wikiSlug maybeRole =
     let
         publicLinks : List Link
         publicLinks =
-            [ { linkLabel = "Graph"
+            [ { linkLabel = "Search"
+              , linkRoute = Route.WikiSearch wikiSlug
+              , linkEmphasized = False
+              }
+            , { linkLabel = "Graph"
               , linkRoute = Route.WikiGraph wikiSlug
               , linkEmphasized = False
               }
@@ -116,40 +101,40 @@ wikiNavLinks wikiSlug maybeRole =
                    ]
 
         Just role ->
-            publicLinks
+            List.concat
+                [ [ { linkLabel = "Create page"
+                    , linkRoute = Route.WikiSubmitNew wikiSlug
+                    , linkEmphasized = False
+                    }
+                  ]
+                , publicLinks
+                , if WikiRole.isTrustedModerator role then
+                    [ { linkLabel = "Review"
+                      , linkRoute = Route.WikiReview wikiSlug
+                      , linkEmphasized = False
+                      }
+                    ]
+
+                  else
+                    []
+                , if WikiRole.canAccessWikiAdminUsers role then
+                    [ { linkLabel = "Audit log"
+                      , linkRoute = Route.WikiAdminAudit wikiSlug
+                      , linkEmphasized = False
+                      }
+                    , { linkLabel = "Admin"
+                      , linkRoute = Route.WikiAdminUsers wikiSlug
+                      , linkEmphasized = False
+                      }
+                    ]
+
+                  else
+                    []
+                ]
                 ++ List.concat
-                    [ [ { linkLabel = "Create page"
-                        , linkRoute = Route.WikiSubmitNew wikiSlug
-                        , linkEmphasized = False
-                        }
-                      ]
-                        |> List.append
-                            (if WikiRole.hasMySubmissionsAccess role then
-                                [ { linkLabel = "My submissions"
-                                  , linkRoute = Route.WikiMySubmissions wikiSlug
-                                  , linkEmphasized = False
-                                  }
-                                ]
-
-                             else
-                                []
-                            )
-                    , if WikiRole.isTrustedModerator role then
-                        [ { linkLabel = "Review"
-                          , linkRoute = Route.WikiReview wikiSlug
-                          , linkEmphasized = False
-                          }
-                        ]
-
-                      else
-                        []
-                    , if WikiRole.canAccessWikiAdminUsers role then
-                        [ { linkLabel = "Admin"
-                          , linkRoute = Route.WikiAdminUsers wikiSlug
-                          , linkEmphasized = False
-                          }
-                        , { linkLabel = "Audit log"
-                          , linkRoute = Route.WikiAdminAudit wikiSlug
+                    [ if WikiRole.hasMySubmissionsAccess role then
+                        [ { linkLabel = "My submissions"
+                          , linkRoute = Route.WikiMySubmissions wikiSlug
                           , linkEmphasized = False
                           }
                         ]

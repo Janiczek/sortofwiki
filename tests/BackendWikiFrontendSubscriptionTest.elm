@@ -12,8 +12,8 @@ import Test exposing (Test)
 import Time
 import Types exposing (ToBackend(..), ToFrontend(..))
 import Wiki
-import WikiRole
 import WikiFrontendSubscription
+import WikiRole
 import WikiUser
 
 

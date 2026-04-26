@@ -53,6 +53,9 @@ navUrlPath route =
         HostAdminAudit ->
             Wiki.hostAdminAuditUrlPath
 
+        HostAdminAuditDiff wikiSlug atMillis ->
+            Wiki.hostAdminAuditDiffUrlPath wikiSlug atMillis
+
         HostAdminBackup ->
             Wiki.hostAdminBackupUrlPath
 
@@ -64,6 +67,9 @@ navUrlPath route =
 
         WikiGraph wikiSlug ->
             Wiki.graphUrlPath wikiSlug
+
+        WikiSearch wikiSlug ->
+            Wiki.searchUrlPath wikiSlug
 
         WikiPage wikiSlug pageSlug ->
             Wiki.publishedPageUrlPath wikiSlug pageSlug
@@ -108,6 +114,9 @@ navUrlPath route =
 
         WikiAdminAudit wikiSlug ->
             Wiki.adminAuditUrlPath wikiSlug
+
+        WikiAdminAuditDiff wikiSlug atMillis ->
+            Wiki.adminAuditDiffUrlPath wikiSlug atMillis
 
         NotFound u ->
             u.path
@@ -157,6 +166,9 @@ canAccess ctx route =
         HostAdminAudit ->
             ctx.hostAdminAuthenticated
 
+        HostAdminAuditDiff _ _ ->
+            ctx.hostAdminAuthenticated
+
         HostAdminBackup ->
             ctx.hostAdminAuthenticated
 
@@ -167,6 +179,9 @@ canAccess ctx route =
             slugOk wikiSlug
 
         WikiGraph wikiSlug ->
+            slugOk wikiSlug
+
+        WikiSearch wikiSlug ->
             slugOk wikiSlug
 
         WikiPage wikiSlug _ ->
@@ -215,6 +230,9 @@ canAccess ctx route =
         WikiAdminAudit wikiSlug ->
             slugOk wikiSlug && wikiAdminOk
 
+        WikiAdminAuditDiff wikiSlug _ ->
+            slugOk wikiSlug && wikiAdminOk
+
         NotFound _ ->
             False
 
@@ -228,10 +246,12 @@ type Route
     | HostAdminWikiNew
     | HostAdminWikiDetail Wiki.Slug
     | HostAdminAudit
+    | HostAdminAuditDiff Wiki.Slug Int
     | HostAdminBackup
     | WikiHome Wiki.Slug
     | WikiTodos Wiki.Slug
     | WikiGraph Wiki.Slug
+    | WikiSearch Wiki.Slug
     | WikiPage Wiki.Slug Page.Slug
     | WikiPageGraph Wiki.Slug Page.Slug
     | WikiLogin Wiki.Slug (Maybe String)
@@ -245,6 +265,7 @@ type Route
     | WikiReviewDetail Wiki.Slug String
     | WikiAdminUsers Wiki.Slug
     | WikiAdminAudit Wiki.Slug
+    | WikiAdminAuditDiff Wiki.Slug Int
     | NotFound Url
 
 
@@ -287,6 +308,26 @@ fromUrl url =
                 [ "admin", "audit" ] ->
                     HostAdminAudit
 
+                [ "admin", "audit", "diff", wikiSlug, atMillisRaw ] ->
+                    if wikiSlug == "" then
+                        NotFound url
+
+                    else
+                        case String.toInt atMillisRaw of
+                            Just atMillis ->
+                                HostAdminAuditDiff wikiSlug atMillis
+
+                            Nothing ->
+                                NotFound url
+
+                [ "admin", "audit", "diff", atMillisRaw ] ->
+                    case String.toInt atMillisRaw of
+                        Just atMillis ->
+                            HostAdminAuditDiff "" atMillis
+
+                        Nothing ->
+                            NotFound url
+
                 [ "admin", "backup" ] ->
                     HostAdminBackup
 
@@ -310,6 +351,13 @@ fromUrl url =
 
                     else
                         WikiGraph wikiSlug
+
+                [ "w", wikiSlug, "search" ] ->
+                    if wikiSlug == "" then
+                        NotFound url
+
+                    else
+                        WikiSearch wikiSlug
 
                 [ "w", wikiSlug, "p", pageSlug ] ->
                     if wikiSlug == "" || pageSlug == "" then
@@ -373,6 +421,18 @@ fromUrl url =
 
                     else
                         WikiAdminAudit wikiSlug
+
+                [ "w", wikiSlug, "admin", "audit", "diff", atMillisRaw ] ->
+                    if wikiSlug == "" then
+                        NotFound url
+
+                    else
+                        case String.toInt atMillisRaw of
+                            Just atMillis ->
+                                WikiAdminAuditDiff wikiSlug atMillis
+
+                            Nothing ->
+                                NotFound url
 
                 [ "w", wikiSlug, "submissions" ] ->
                     if wikiSlug == "" then
@@ -440,6 +500,9 @@ isWikiList route =
         HostAdminAudit ->
             False
 
+        HostAdminAuditDiff _ _ ->
+            False
+
         HostAdminBackup ->
             False
 
@@ -450,6 +513,9 @@ isWikiList route =
             False
 
         WikiGraph _ ->
+            False
+
+        WikiSearch _ ->
             False
 
         WikiPage _ _ ->
@@ -491,6 +557,9 @@ isWikiList route =
         WikiAdminAudit _ ->
             False
 
+        WikiAdminAuditDiff _ _ ->
+            False
+
         NotFound _ ->
             False
 
@@ -516,6 +585,9 @@ storeActions route =
         HostAdminAudit ->
             []
 
+        HostAdminAuditDiff _ _ ->
+            []
+
         HostAdminBackup ->
             []
 
@@ -526,6 +598,9 @@ storeActions route =
             [ AskForWikiCatalog, AskForWikiFrontendDetails slug ]
 
         WikiGraph slug ->
+            [ AskForWikiCatalog, AskForWikiFrontendDetails slug ]
+
+        WikiSearch slug ->
             [ AskForWikiCatalog, AskForWikiFrontendDetails slug ]
 
         WikiPage wikiSlug pageSlug ->
@@ -594,6 +669,12 @@ storeActions route =
             ]
 
         WikiAdminAudit slug ->
+            [ AskForWikiCatalog
+            , AskForWikiFrontendDetails slug
+            , AskForWikiAuditLog slug WikiAuditLog.emptyAuditLogFilter
+            ]
+
+        WikiAdminAuditDiff slug _ ->
             [ AskForWikiCatalog
             , AskForWikiFrontendDetails slug
             , AskForWikiAuditLog slug WikiAuditLog.emptyAuditLogFilter

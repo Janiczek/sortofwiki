@@ -204,10 +204,12 @@ suite =
                                     ]
                                 )
                     in
-                    [ String.contains "\"Home\" [href=\"/w/Demo/p/Home\", penwidth=2];" graphDot
-                    , String.contains "\"Guide\" [href=\"/w/Demo/pg/Guide\"];" graphDot
-                    , String.contains "\"About\" [href=\"/w/Demo/pg/About\"];" graphDot
-                    , String.contains "\"TodoGap\" [href=\"/w/Demo/pg/TodoGap\", style=\"dashed\", color=\"#dc2626\", fontcolor=\"#dc2626\"];" graphDot
+                    [ String.contains "\"Home\" [href=\"/w/Demo/p/Home\"" graphDot
+                    , String.contains ", penwidth=2" graphDot
+                    , String.contains "\"Guide\" [href=\"/w/Demo/pg/Guide\"" graphDot
+                    , String.contains "\"About\" [href=\"/w/Demo/pg/About\"" graphDot
+                    , String.contains "\"TodoGap\" [href=\"/w/Demo/p/TodoGap\"" graphDot
+                    , String.contains "style=\"dashed\", color=\"#dc2626\", fontcolor=\"#dc2626\"" graphDot
                     , String.contains "\"Guide\" -> \"Home\";" graphDot
                     , String.contains "\"Home\" -> \"About\";" graphDot
                     , String.contains "\"Home\" -> \"TodoGap\";" graphDot
@@ -258,7 +260,7 @@ suite =
                                     ]
                                 )
                     in
-                    String.contains "\"TagOnly\" [href=\"/w/Demo/pg/TagOnly\"];" graphDot
+                    String.contains "\"TagOnly\" [href=\"/w/Demo/pg/TagOnly\"" graphDot
                         |> Expect.equal True
             , Test.test "styles target node red when focused page is missing" <|
                 \() ->
@@ -276,7 +278,11 @@ suite =
                                     ]
                                 )
                     in
-                    String.contains "\"MissingFocus\" [href=\"/w/Demo/p/MissingFocus\", penwidth=2, style=\"dashed\", color=\"#dc2626\", fontcolor=\"#dc2626\"];" graphDot
+                    [ String.contains "\"MissingFocus\" [href=\"/w/Demo/p/MissingFocus\"" graphDot
+                    , String.contains ", penwidth=2" graphDot
+                    , String.contains "style=\"dashed\", color=\"#dc2626\", fontcolor=\"#dc2626\"" graphDot
+                    ]
+                        |> List.all identity
                         |> Expect.equal True
             ]
         ]

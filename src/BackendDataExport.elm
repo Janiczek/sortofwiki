@@ -4,8 +4,8 @@ module BackendDataExport exposing
     , applySnapshotToBackendModel
     , applyWikiSnapshotMerge
     , decodeImportString
-    , decodeWikiImportString
     , decodeWikiImportForSlug
+    , decodeWikiImportString
     , encodeModelToJsonString
     , encodeWikiSnapshotToJsonString
     , importErrorToString

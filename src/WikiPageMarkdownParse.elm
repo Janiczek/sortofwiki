@@ -1,9 +1,9 @@
 module WikiPageMarkdownParse exposing (blocksWithHeadingSlugs)
 
-import MarkdownMath
 import Markdown.Block as Block
 import Markdown.Parser as MarkdownParser
 import MarkdownHeadingSlugs
+import MarkdownMath
 import Page
 import Wiki
 import WikiLinkSyntax

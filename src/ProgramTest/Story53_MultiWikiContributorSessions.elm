@@ -118,14 +118,14 @@ endToEndTests =
                       , client.checkView 300
                             (ProgramTest.Query.expectAll
                                 [ ProgramTest.Query.withinId "wiki-logout-button"
-                                    (ProgramTest.Query.expectHasText "Log out")
-                                , ProgramTest.Query.expectHasText "Logged in as elmtipsadmin"
+                                    (ProgramTest.Query.expectHasText "Logout")
+                                , ProgramTest.Query.expectHasText "@elmtipsadmin"
                                 ]
                             )
                       , client.update 100 (UrlChanged demoWikiHomeUrl)
                       , client.checkView 400 (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
                       , client.checkView 300
-                            (ProgramTest.Query.expectHasText "Logged in as demo_trusted_publisher")
+                            (ProgramTest.Query.expectHasText "@demo_trusted_publisher")
                       ]
                     ]
         }

@@ -49,6 +49,7 @@ import ProgramTest.Story54_MySubmissionsRoleGate as Story54
 import ProgramTest.Story55_MarkdownKitchenSink as Story55
 import ProgramTest.Story56_TodosPage as Story56
 import ProgramTest.Story57_WikiGraphPage as Story57
+import ProgramTest.Story58_WikiSearch as Story58
 import Types exposing (ToBackend, ToFrontend)
 
 
@@ -104,6 +105,7 @@ main =
     , Story55.endToEndTests
     , Story56.endToEndTests
     , Story57.endToEndTests
+    , Story58.endToEndTests
     ]
         |> List.concat
         |> Effect.Test.viewer

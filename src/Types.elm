@@ -364,6 +364,8 @@ type alias FrontendModel =
     , contributorWikiSessions : Dict Wiki.Slug ContributorWikiSession
     , registerDraft : RegisterDraft
     , loginDraft : LoginDraft
+    , headerSearchQuery : String
+    , wikiSearchPageQuery : String
     , newPageSubmitDraft : NewPageSubmitDraft
     , pageEditSubmitDraft : PageEditSubmitDraft
     , pageDeleteSubmitDraft : PageDeleteSubmitDraft
@@ -413,6 +415,9 @@ type FrontendMsg
     | LoginFormUsernameChanged String
     | LoginFormPasswordChanged String
     | LoginFormSubmitted
+    | HeaderSearchQueryChanged String
+    | HeaderSearchSubmitted
+    | WikiSearchPageQueryChanged String
     | ContributorLogoutWiki Wiki.Slug
     | NewPageSubmitMarkdownChanged String
     | NewPageSubmitSlugChanged String

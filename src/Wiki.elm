@@ -4,6 +4,7 @@ module Wiki exposing
     , Slug
     , Wiki
     , adminAuditUrlPath
+    , adminAuditDiffUrlPath
     , adminUsersUrlPath
     , applyPublishedMarkdownEdit
     , catalogEntry
@@ -12,6 +13,7 @@ module Wiki exposing
     , frontendDetailsForViewer
     , graphUrlPath
     , hostAdminAuditUrlPath
+    , hostAdminAuditDiffUrlPath
     , hostAdminBackupUrlPath
     , hostAdminLoginUrlPathWithRedirect
     , hostAdminNewWikiUrlPath
@@ -29,6 +31,7 @@ module Wiki exposing
     , removePublishedPage
     , reviewDetailUrlPath
     , reviewQueueUrlPath
+    , searchUrlPath
     , submissionDetailUrlPath
     , submitDeleteUrlPath
     , submitEditUrlPath
@@ -40,8 +43,8 @@ module Wiki exposing
     , wikiWithPages
     )
 
-import Dict exposing (Dict)
 import ContributorWikiSession exposing (ContributorWikiSession)
+import Dict exposing (Dict)
 import Page
 import PageBacklinks
 import PageTags
@@ -324,6 +327,13 @@ adminAuditUrlPath wikiSlug =
     "/w/" ++ wikiSlug ++ "/admin/audit"
 
 
+{-| Wiki admin audit diff detail. Path: `/w/:wikiSlug/admin/audit/diff/:eventIndex`.
+-}
+adminAuditDiffUrlPath : Slug -> Int -> String
+adminAuditDiffUrlPath wikiSlug eventIndex =
+    "/w/" ++ wikiSlug ++ "/admin/audit/diff/" ++ String.fromInt eventIndex
+
+
 {-| Contributor list of submissions waiting for review. Path: `/w/:wikiSlug/submissions`.
 -}
 mySubmissionsUrlPath : Slug -> String
@@ -336,6 +346,13 @@ mySubmissionsUrlPath wikiSlug =
 reviewQueueUrlPath : Slug -> String
 reviewQueueUrlPath wikiSlug =
     "/w/" ++ wikiSlug ++ "/review"
+
+
+{-| Wiki search page. Path: `/w/:wikiSlug/search`.
+-}
+searchUrlPath : Slug -> String
+searchUrlPath wikiSlug =
+    "/w/" ++ wikiSlug ++ "/search"
 
 
 {-| Review decision screen for one submission. Path: `/w/:wikiSlug/review/:submissionId`.
@@ -378,6 +395,13 @@ hostAdminBackupUrlPath =
 hostAdminAuditUrlPath : String
 hostAdminAuditUrlPath =
     "/admin/audit"
+
+
+{-| Platform host-admin audit diff detail. Path: `/admin/audit/diff/:wikiSlug/:eventIndex`.
+-}
+hostAdminAuditDiffUrlPath : Slug -> Int -> String
+hostAdminAuditDiffUrlPath wikiSlug eventIndex =
+    "/admin/audit/diff/" ++ wikiSlug ++ "/" ++ String.fromInt eventIndex
 
 
 {-| Platform host-admin wiki detail. Path: `/admin/wikis/:wikiSlug`.

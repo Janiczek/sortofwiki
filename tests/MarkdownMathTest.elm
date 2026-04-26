@@ -50,7 +50,14 @@ suite =
             , Test.fuzz
                 (Fuzz.string
                     |> Fuzz.map (String.filter (\char -> char /= '$'))
-                    |> Fuzz.map (\text -> if text == "" then "plain" else text)
+                    |> Fuzz.map
+                        (\text ->
+                            if text == "" then
+                                "plain"
+
+                            else
+                                text
+                        )
                 )
                 "leaves plain text without delimiters unchanged"
               <|

@@ -1,9 +1,11 @@
-module PageGraph exposing (Edge, EdgeDirection(..), EdgeKind(..), Summary, dot, summary)
+module PageGraph exposing (Edge, EdgeDirection(..), EdgeKind(..), Summary, dot, graph, summary)
 
 import Dict exposing (Dict)
+import GraphData
 import Page
 import PageLinkRefs
 import Set
+import UI.Graph
 import Wiki
 
 
@@ -156,7 +158,20 @@ summary wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags =
         edges : List Edge
         edges =
             List.concat [ backlinkEdges, outgoingEdges, incomingTagEdges, targetTagEdges ]
-                |> normalizeEdges
+                |> GraphData.normalizeEdges
+                    { fromSlug = .fromPageSlug
+                    , toSlug = .toPageSlug
+                    , direction = .direction >> toGraphDataDirection
+                    , kindSortKey = .kind >> kindSortKey
+                    , toUndirected =
+                        \pair edge ->
+                            { fromPageSlug = pair.canonicalFrom
+                            , toPageSlug = pair.canonicalTo
+                            , direction = Undirected
+                            , targetPublished = True
+                            , kind = edge.kind
+                            }
+                    }
 
         missingPageSlugs : List Page.Slug
         missingPageSlugs =
@@ -189,85 +204,83 @@ summary wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags =
 
 dot : Wiki.Slug -> Page.Slug -> Dict Page.Slug String -> Dict Page.Slug (List Page.Slug) -> String
 dot wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags =
+    graph wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags
+        |> UI.Graph.toDot
+
+
+graph :
+    Wiki.Slug
+    -> Page.Slug
+    -> Dict Page.Slug String
+    -> Dict Page.Slug (List Page.Slug)
+    -> UI.Graph.Graph
+graph wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags =
     let
         graphSummary : Summary
         graphSummary =
             summary wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags
 
-        targetPublished : Bool
-        targetPublished =
-            Dict.keys publishedPageMarkdownSources
-                |> List.any (\slug -> String.toLower slug == String.toLower graphSummary.targetPageSlug)
+        globalEdgeCounts : Dict String Int
+        globalEdgeCounts =
+            List.append
+                (edgesFromMarkdown wikiSlug publishedPageMarkdownSources)
+                (edgesFromTags publishedPageTags)
+                |> GraphData.totalEdgeCountsByNormalizedSlug
+                    { fromSlug = .fromPageSlug
+                    , toSlug = .toPageSlug
+                    }
 
-        targetNodeLine : String
-        targetNodeLine =
-            "  "
-                ++ dotString graphSummary.targetPageSlug
-                ++ " [href="
-                ++ dotString (Wiki.publishedPageUrlPath wikiSlug graphSummary.targetPageSlug)
-                ++ (if targetPublished then
-                        ", penwidth=2];"
+        targetNode : UI.Graph.Node
+        targetNode =
+            let
+                targetPublished : Bool
+                targetPublished =
+                    Dict.keys publishedPageMarkdownSources
+                        |> List.any (\slug -> String.toLower slug == String.toLower graphSummary.targetPageSlug)
 
-                    else
-                        ", penwidth=2, style="
-                            ++ dotString "dashed"
-                            ++ ", color="
-                            ++ dotString "#dc2626"
-                            ++ ", fontcolor="
-                            ++ dotString "#dc2626"
-                            ++ "];"
-                   )
+                inboundCount : Int
+                inboundCount =
+                    Dict.get (String.toLower graphSummary.targetPageSlug) globalEdgeCounts
+                        |> Maybe.withDefault 0
+            in
+            { id = graphSummary.targetPageSlug
+            , href = Wiki.publishedPageUrlPath wikiSlug graphSummary.targetPageSlug
+            , inboundCount = inboundCount
+            , kind =
+                if targetPublished then
+                    UI.Graph.FocusedNode
 
-        publishedNodeLine : Page.Slug -> String
-        publishedNodeLine pageSlug =
-            "  "
-                ++ dotString pageSlug
-                ++ " [href="
-                ++ dotString (Wiki.pageGraphUrlPath wikiSlug pageSlug)
-                ++ "];"
+                else
+                    UI.Graph.MissingFocusedNode
+            }
 
-        missingNodeLine : Page.Slug -> String
-        missingNodeLine pageSlug =
-            "  "
-                ++ dotString pageSlug
-                ++ " [href="
-                ++ dotString (Wiki.pageGraphUrlPath wikiSlug pageSlug)
-                ++ ", style="
-                ++ dotString "dashed"
-                ++ ", color="
-                ++ dotString "#dc2626"
-                ++ ", fontcolor="
-                ++ dotString "#dc2626"
-                ++ "];"
+        publishedNode : Page.Slug -> UI.Graph.Node
+        publishedNode pageSlug =
+            let
+                inboundCount : Int
+                inboundCount =
+                    Dict.get (String.toLower pageSlug) globalEdgeCounts
+                        |> Maybe.withDefault 0
+            in
+            { id = pageSlug
+            , href = Wiki.pageGraphUrlPath wikiSlug pageSlug
+            , inboundCount = inboundCount
+            , kind = UI.Graph.NormalNode
+            }
 
-        edgeLine : Edge -> String
-        edgeLine edge =
-            "  "
-                ++ dotString edge.fromPageSlug
-                ++ " -> "
-                ++ dotString edge.toPageSlug
-                ++ (case edge.kind of
-                        WikiLinkEdge ->
-                            case edge.direction of
-                                Directed ->
-                                    ";"
-
-                                Undirected ->
-                                    " [dir=none];"
-
-                        TagEdge ->
-                            " [style="
-                                ++ dotString "dashed"
-                                ++ ", color="
-                                ++ dotString "#7c3aed"
-                                ++ (case edge.direction of
-                                        Directed ->
-                                            "];"
-
-                                        Undirected ->
-                                            ", dir=none];"
-                                   )
-                   )
+        missingNode : Page.Slug -> UI.Graph.Node
+        missingNode pageSlug =
+            let
+                inboundCount : Int
+                inboundCount =
+                    Dict.get (String.toLower pageSlug) globalEdgeCounts
+                        |> Maybe.withDefault 0
+            in
+            { id = pageSlug
+            , href = Wiki.publishedPageUrlPath wikiSlug pageSlug
+            , inboundCount = inboundCount
+            , kind = UI.Graph.MissingNode
+            }
 
         linkedPublishedNodes : List Page.Slug
         linkedPublishedNodes =
@@ -286,137 +299,24 @@ dot wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags =
                     []
                 |> List.sortBy String.toLower
     in
-    String.join "\n"
-        (List.concat
-            [ [ "digraph page {"
-              , "  layout=neato;"
-              , "  overlap=" ++ dotString "prism" ++ ";"
-              , "  overlap_scaling=1;"
-              , "  sep=" ++ dotString "+6" ++ ";"
-              , "  esep=" ++ dotString "+2" ++ ";"
-              , "  splines=true;"
-              , "  mode=major;"
-              , "  model=" ++ dotString "shortpath" ++ ";"
-              , "  start=" ++ dotString "random42" ++ ";"
-              , "  epsilon=0.0001;"
-              , "  maxiter=2000;"
-              , "  pad=" ++ dotString "0.2" ++ ";"
-              , "  concentrate=true;"
-              , "  bgcolor=" ++ dotString "transparent" ++ ";"
-              , "  node [shape=box"
-                    ++ ", fontname="
-                    ++ dotString "'Source Serif 4', system-ui, sans-serif"
-                    ++ ", fontsize="
-                    ++ dotString "11"
-                    ++ ", margin="
-                    ++ dotString "0.18,0.08"
-                    ++ ", height=0.3"
-                    ++ ", penwidth=1"
-                    ++ "];"
-              , "  edge [color="
-                    ++ dotString "#6b7280"
-                    ++ ", arrowsize=0.7"
-                    ++ ", penwidth=0.9"
-                    ++ ", len=0.9"
-                    ++ "];"
-              , targetNodeLine
-              ]
-            , List.map publishedNodeLine linkedPublishedNodes
-            , List.map missingNodeLine graphSummary.missingPageSlugs
-            , List.map edgeLine graphSummary.edges
-            , [ "}" ]
+    { graphName = "page"
+    , nodes =
+        List.concat
+            [ [ targetNode ]
+            , List.map publishedNode linkedPublishedNodes
+            , List.map missingNode graphSummary.missingPageSlugs
             ]
-        )
-
-
-dotString : String -> String
-dotString raw =
-    "\""
-        ++ (raw
-                |> String.replace "\\" "\\\\"
-                |> String.replace "\"" "\\\""
-                |> String.replace "\n" "\\n"
-           )
-        ++ "\""
-
-
-normalizeEdges : List Edge -> List Edge
-normalizeEdges rawEdges =
-    let
-        rawLookup : Dict String Edge
-        rawLookup =
-            rawEdges
-                |> List.sortBy edgeSortKey
-                |> List.foldl
-                    (\edge acc -> Dict.insert (directedEdgeKey edge) edge acc)
-                    Dict.empty
-
-        normalizedLookup : Dict String Edge
-        normalizedLookup =
-            rawLookup
-                |> Dict.values
-                |> List.sortBy edgeSortKey
-                |> List.foldl
-                    (\edge acc ->
-                        let
-                            normalizedEdge : Edge
-                            normalizedEdge =
-                                if edge.fromPageSlug /= edge.toPageSlug && Dict.member (reverseDirectedEdgeKey edge) rawLookup then
-                                    undirectedEdge edge
-
-                                else
-                                    edge
-
-                            normalizedKey : String
-                            normalizedKey =
-                                case normalizedEdge.direction of
-                                    Directed ->
-                                        directedEdgeKey normalizedEdge
-
-                                    Undirected ->
-                                        undirectedEdgeKey normalizedEdge
-                        in
-                        Dict.insert normalizedKey normalizedEdge acc
-                    )
-                    Dict.empty
-    in
-    normalizedLookup
-        |> Dict.values
-        |> List.sortBy edgeSortKey
-
-
-undirectedEdge : Edge -> Edge
-undirectedEdge edge =
-    let
-        ( canonicalFrom, canonicalTo ) =
-            canonicalPair edge.fromPageSlug edge.toPageSlug
-    in
-    { fromPageSlug = canonicalFrom
-    , toPageSlug = canonicalTo
-    , direction = Undirected
-    , targetPublished = True
-    , kind = edge.kind
+    , edges =
+        List.map
+            (\edge ->
+                { from = edge.fromPageSlug
+                , to = edge.toPageSlug
+                , direction = toUiDirection edge.direction
+                , kind = toUiKind edge.kind
+                }
+            )
+            graphSummary.edges
     }
-
-
-canonicalPair : Page.Slug -> Page.Slug -> ( Page.Slug, Page.Slug )
-canonicalPair left right =
-    if slugSortKey left <= slugSortKey right then
-        ( left, right )
-
-    else
-        ( right, left )
-
-
-edgeSortKey : Edge -> String
-edgeSortKey edge =
-    kindSortKey edge.kind
-        ++ "|"
-        ++ slugSortKey edge.fromPageSlug
-        ++ "|"
-        ++ slugSortKey edge.toPageSlug
-        ++ "|"
-        ++ directionSortKey edge.direction
 
 
 kindSortKey : EdgeKind -> String
@@ -429,47 +329,69 @@ kindSortKey kind =
             "1"
 
 
-directionSortKey : EdgeDirection -> String
-directionSortKey direction =
+edgesFromMarkdown : Wiki.Slug -> Dict Page.Slug String -> List Edge
+edgesFromMarkdown wikiSlug publishedPageMarkdownSources =
+    publishedPageMarkdownSources
+        |> Dict.toList
+        |> List.concatMap
+            (\( fromPageSlug, markdown ) ->
+                PageLinkRefs.linkedPageSlugs wikiSlug markdown
+                    |> List.map
+                        (\toPageSlug ->
+                            { fromPageSlug = fromPageSlug
+                            , toPageSlug = toPageSlug
+                            , direction = Directed
+                            , targetPublished = True
+                            , kind = WikiLinkEdge
+                            }
+                        )
+            )
+
+
+edgesFromTags : Dict Page.Slug (List Page.Slug) -> List Edge
+edgesFromTags publishedPageTags =
+    publishedPageTags
+        |> Dict.toList
+        |> List.concatMap
+            (\( fromPageSlug, tags ) ->
+                tags
+                    |> List.map
+                        (\toPageSlug ->
+                            { fromPageSlug = fromPageSlug
+                            , toPageSlug = toPageSlug
+                            , direction = Directed
+                            , targetPublished = True
+                            , kind = TagEdge
+                            }
+                        )
+            )
+
+
+toGraphDataDirection : EdgeDirection -> GraphData.EdgeDirection
+toGraphDataDirection direction =
     case direction of
         Directed ->
-            "0"
+            GraphData.Directed
 
         Undirected ->
-            "1"
+            GraphData.Undirected
 
 
-slugSortKey : Page.Slug -> String
-slugSortKey pageSlug =
-    String.toLower pageSlug ++ "|" ++ pageSlug
+toUiDirection : EdgeDirection -> UI.Graph.EdgeDirection
+toUiDirection direction =
+    case direction of
+        Directed ->
+            UI.Graph.Directed
+
+        Undirected ->
+            UI.Graph.Undirected
 
 
-directedEdgeKey : Edge -> String
-directedEdgeKey edge =
-    kindSortKey edge.kind
-        ++ "|"
-        ++ slugSortKey edge.fromPageSlug
-        ++ "|"
-        ++ slugSortKey edge.toPageSlug
+toUiKind : EdgeKind -> UI.Graph.EdgeKind
+toUiKind kind =
+    case kind of
+        WikiLinkEdge ->
+            UI.Graph.LinkEdge
 
-
-reverseDirectedEdgeKey : Edge -> String
-reverseDirectedEdgeKey edge =
-    kindSortKey edge.kind
-        ++ "|"
-        ++ slugSortKey edge.toPageSlug
-        ++ "|"
-        ++ slugSortKey edge.fromPageSlug
-
-
-undirectedEdgeKey : Edge -> String
-undirectedEdgeKey edge =
-    let
-        ( canonicalFrom, canonicalTo ) =
-            canonicalPair edge.fromPageSlug edge.toPageSlug
-    in
-    kindSortKey edge.kind
-        ++ "|"
-        ++ slugSortKey canonicalFrom
-        ++ "|"
-        ++ slugSortKey canonicalTo
+        TagEdge ->
+            UI.Graph.TagEdge

@@ -22,13 +22,15 @@ endToEndTests =
                     (ProgramTest.Query.withinId "page-markdown"
                         (ProgramTest.Query.expectAll
                             [ \md ->
-                                ProgramTest.Query.withinDataAttribute "data-equation" "progtestStory55Inline"
+                                ProgramTest.Query.withinDataAttribute "data-equation"
+                                    "progtestStory55Inline"
                                     (\eq ->
                                         Test.Html.Query.has [ Test.Html.Selector.tag "inline-equation" ] eq
                                     )
                                     md
                             , \md ->
-                                ProgramTest.Query.withinDataAttribute "data-equation" "progtestStory55Block"
+                                ProgramTest.Query.withinDataAttribute "data-equation"
+                                    "progtestStory55Block"
                                     (\eq ->
                                         Test.Html.Query.has [ Test.Html.Selector.tag "block-equation" ] eq
                                     )

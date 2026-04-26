@@ -65,6 +65,7 @@ config =
         |> Rule.ignoreErrorsForFiles
             [ "src/Env.elm"
             , "src/Store.elm"
+            , "src/UI.elm"
             , "src/WikiRole.elm" -- type mustn't be opaque
             ]
         |> Rule.ignoreErrorsForDirectories [ "src/Evergreen/" ]

@@ -16,23 +16,32 @@
   }
 
   @font-face {
-    font-family: "Source Serif 4";
+    font-family: "Manrope";
     font-style: normal;
-    font-weight: 200 900;
+    font-weight: 100 900;
     font-display: swap;
-    src: url("/SourceSerif4-VariableFont_opsz,wght.ttf") format("truetype");
+    src: url("/Manrope-VariableFont_wght.ttf") format("truetype");
   }
 
   @font-face {
-    font-family: "Source Serif 4";
-    font-style: italic;
-    font-weight: 200 900;
+    font-family: "Newsreader";
+    font-style: normal;
+    font-weight: 200 800;
     font-display: swap;
-    src: url("/SourceSerif4-Italic-VariableFont_opsz,wght.ttf") format("truetype");
+    src: url("/Newsreader-VariableFont_opsz,wght.ttf") format("truetype");
+  }
+
+  @font-face {
+    font-family: "Newsreader";
+    font-style: italic;
+    font-weight: 200 800;
+    font-display: swap;
+    src: url("/Newsreader-Italic-VariableFont_opsz,wght.ttf") format("truetype");
   }
 
   :root {
-    --font-serif: "Source Serif 4", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --font-ui: "Manrope", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-serif: "Newsreader", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
     --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   }
 
@@ -48,32 +57,44 @@
     background-color: #0c0d0a;
   }
 
+  .app-root a[href^="http://"]:not([href^="http://sortofwiki.lamdera.app"])::after,
+  .app-root a[href^="https://"]:not([href^="https://sortofwiki.lamdera.app"])::after {
+    content: "↗";
+    font-size: 0.72em;
+    vertical-align: super;
+    margin-left: 0.08em;
+    line-height: 1;
+  }
+
   /* Theme tokens live on .app-root so Tailwind-style `class="dark"` on the same node switches palette. */
   .app-root {
-    font-size: 1rem;
-    --bg: #f8faec;
-    --fg: #181c10;
-    --fg-muted: #414d29;
-    --link: #34501c;
+    /* Warm paper + botanical green; subtle borders */
+    --bg: #fafaf2;
+    --fg: #1a1c18;
+    --fg-muted: #44483d;
+    --link: #36521f;
     --link-hover: #243713;
-    --link-bg-hover: #dce8bf;
-    --border: #879161;
+    --link-bg-hover: #e3e8d0;
+    --border: #74796c;
+    --border-subtle: #c4c8ba;
     --border-dash: #929d6c;
-    --chrome-bg: #eff2db;
-    --btn-bg: #465e28;
-    --btn-fg: #fcfdf6;
-    --btn-border: #2d3c17;
+    --chrome-bg: #f4f4ec;
+    --chrome-bg-hover: #e7e8dd;
+    --btn-bg: #496731;
+    --btn-bg-hover: #5a7b3e;
+    --btn-fg: #ffffff;
+    --btn-border: #324e1b;
     --danger: #6b1010;
     --danger-link-bg-hover: #f7cdcd;
-    --danger-bg: #fce8e8;
+    --danger-bg: #ffdad6;
     /* Filled danger control: same deep red in both roots (dark root keeps --danger as light pink for inline text) */
     --danger-btn-bg: #6b1010;
     --danger-btn-fg: #ffffff;
-    --code-bg: #e9ecd3;
-    --focus-ring: #587232;
+    --code-bg: #eeeee6;
+    --focus-ring: #496731;
     --input-bg: #ffffff;
-    --table-stripe: #e2eac8;
-    --table-row-hover: #d6e5b2;
+    --table-stripe: #e9e9e1;
+    --table-row-hover: #e3e3db;
     /* Audit filter chips (badge-style toggles; distinct from primary buttons) */
     --chip-off-bg: var(--input-bg);
     --chip-off-fg: var(--fg-muted);
@@ -81,6 +102,23 @@
     --chip-on-bg: #5c7a34;
     --chip-on-fg: #fcfdf6;
     --chip-on-border: #3a4f20;
+    /* Tag pills: neutral surface, consistent with chrome/input tones */
+    --tag-bg: var(--chrome-bg);
+    --tag-fg: var(--fg-muted);
+    --tag-border: var(--border-subtle);
+    --auth-card-bg: #f4f4ec;
+    --auth-card-fg: #1d2118;
+    --auth-card-fg-muted: #303527;
+    --auth-card-heading: #243116;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .app-root {
+      --auth-card-bg: #1f2619;
+      --auth-card-fg: #f4f8eb;
+      --auth-card-fg-muted: #dfe8cc;
+      --auth-card-heading: #f4f8eb;
+    }
   }
 
   /* Math equation hosts (SVG lives in shadow DOM; only host layout belongs here). */
@@ -94,17 +132,20 @@
     overflow-x: auto;
   }
   .app-root.dark {
-    --bg: #16190f;
-    --fg: #f0f4e5;
-    --fg-muted: #b2bd92;
-    --link: #a3cf6e;
-    --link-hover: #c5e398;
+    --bg: #1a1c16;
+    --fg: #f1f1e9;
+    --fg-muted: #b2bd9a;
+    --link: #afd190;
+    --link-hover: #caedaa;
     --link-bg-hover: #2f3c1f;
     --border: #667944;
+    --border-subtle: #3d4235;
     --border-dash: #788b54;
-    --chrome-bg: #202815;
+    --chrome-bg: #23251f;
+    --chrome-bg-hover: #313629;
     /* Filled control: muted surface (not saturated mint) so actions read calm on dark UI */
     --btn-bg: #313e22;
+    --btn-bg-hover: #3e4f2b;
     --btn-fg: #f3f5e8;
     --btn-border: #637647;
     --danger: #ffb4b4;
@@ -123,6 +164,62 @@
     --chip-on-bg: #3d5228;
     --chip-on-fg: #f3f5e8;
     --chip-on-border: #5a7238;
+    /* Tag pills: neutral surface, consistent with chrome/input tones */
+    --tag-bg: var(--chrome-bg);
+    --tag-fg: var(--fg-muted);
+    --tag-border: var(--border-subtle);
+    --auth-card-bg: #1f2619;
+    /* Auth card text colors target AAA contrast on auth surface in dark mode. */
+    --auth-card-fg: #f4f8eb;
+    --auth-card-fg-muted: #dfe8cc;
+    --auth-card-heading: #f4f8eb;
+  }
+
+  .login-shell-page {
+    position: relative;
+    min-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .login-shell-bg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background-image:
+      linear-gradient(130deg, rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0.52)),
+      url("/alin-gavriliuc-nYhc16wJJqU-unsplash.webp");
+    background-size: cover;
+    background-position: center;
+    filter: saturate(0.96) contrast(1.03);
+  }
+
+  .login-shell-main {
+    position: relative;
+    z-index: 1;
+    min-height: 100dvh;
+    width: min(30rem, calc(100vw - 2rem));
+    margin: 0 auto;
+    padding: 4.5rem 0 2rem;
+  }
+
+  .login-shell-brand {
+    text-align: center;
+    margin-bottom: 1.25rem;
+  }
+
+  .login-shell-card {
+    border: 1px solid color-mix(in srgb, var(--border-subtle) 82%, transparent);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    background: color-mix(in srgb, var(--auth-card-bg) 90%, transparent);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 20px 50px rgba(74, 93, 63, 0.12);
+  }
+
+  .app-root.dark .login-shell-card {
+    background: color-mix(in srgb, var(--auth-card-bg) 90%, transparent);
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
   }
 
 </style>

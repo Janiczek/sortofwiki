@@ -22,9 +22,11 @@
             "lamdera/codecs": "1.0.0",
             "lamdera/core": "1.0.0",
             "lamdera/program-test": "3.0.0",
+            "rluiten/elm-text-search": "5.1.1",
             "zwilias/elm-html-string": "2.0.2"
         },
         "indirect": {
+            "NoRedInk/elm-json-decode-pipeline": "1.0.1",
             "NoRedInk/elm-string-conversions": "1.0.1",
             "danfishgold/base64-bytes": "1.1.0",
             "elm/file": "1.0.5",
@@ -37,6 +39,9 @@
             "ianmackenzie/elm-units": "2.10.0",
             "lamdera/containers": "1.0.0",
             "mgold/elm-nonempty-list": "4.2.0",
+            "rluiten/sparsevector": "1.0.4",
+            "rluiten/stemmer": "1.0.4",
+            "rluiten/trie": "2.1.1",
             "rtfeldman/elm-hex": "1.0.0"
         }
     },

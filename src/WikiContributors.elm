@@ -1,9 +1,9 @@
 module WikiContributors exposing
     ( Registry
     , StoredContributor
-    , contributorAccountIdForNormalizedUsername
     , attemptLogin
     , attemptRegister
+    , contributorAccountIdForNormalizedUsername
     , demoteTrustedToContributorAtWiki
     , displayUsernameForAccount
     , emptyRegistry

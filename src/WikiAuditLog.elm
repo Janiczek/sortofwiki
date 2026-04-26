@@ -591,5 +591,3 @@ formatEventRowText e =
         ++ e.actorUsername
         ++ " — "
         ++ eventKindUserText e.kind
-
-
