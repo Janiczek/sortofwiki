@@ -7621,6 +7621,11 @@ viewWikiListBottomSiteAdminLink model =
 
 viewHeaderAccountArea : Wiki.Slug -> Maybe String -> Html Msg
 viewHeaderAccountArea wikiSlug maybeUsername =
+    let
+        headerAuthActionClass : String
+        headerAuthActionClass =
+            "text-[0.8125rem] rounded px-[0.35rem] py-[0.1rem] text-[var(--link)] hover:text-[var(--link-hover)] hover:bg-[var(--link-bg-hover)]"
+    in
     case maybeUsername of
         Just username ->
             Html.div
@@ -7633,7 +7638,7 @@ viewHeaderAccountArea wikiSlug maybeUsername =
                 , UI.Button.inlineLinkButton
                     [ Attr.type_ "button"
                     , Attr.id "wiki-logout-button"
-                    , Attr.class "text-[0.8125rem]"
+                    , Attr.class headerAuthActionClass
                     , Events.onClick (ContributorLogoutWiki wikiSlug)
                     ]
                     [ Html.text "Logout" ]
@@ -7643,6 +7648,7 @@ viewHeaderAccountArea wikiSlug maybeUsername =
             UI.Link.subtleLink
                 [ Attr.id "wiki-header-login-link"
                 , Attr.href (Wiki.loginUrlPath wikiSlug)
+                , Attr.class headerAuthActionClass
                 ]
                 [ Html.text "Login" ]
 
