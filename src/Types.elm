@@ -279,6 +279,7 @@ type alias NewPageSubmitDraft =
 type alias PageEditSubmitDraft =
     { markdownBody : String
     , tagsInput : String
+    , publishedRowCollapsed : Bool
     , maybeSavedDraftId : Maybe String
     , inFlight : Bool
     , saveDraftInFlight : Bool
@@ -425,6 +426,7 @@ type FrontendMsg
     | NewPageSubmitFormSubmitted
     | PageEditSubmitMarkdownChanged String
     | PageEditSubmitTagsChanged String
+    | PageEditPublishedRowToggled
     | PageEditSubmitFormSubmitted
     | PageDeleteSubmitReasonChanged String
     | PageDeleteRequestDeletionSubmitted

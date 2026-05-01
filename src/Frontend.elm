@@ -405,6 +405,7 @@ emptyPageEditSubmitDraft : PageEditSubmitDraft
 emptyPageEditSubmitDraft =
     { markdownBody = ""
     , tagsInput = ""
+    , publishedRowCollapsed = False
     , maybeSavedDraftId = Nothing
     , inFlight = False
     , saveDraftInFlight = False
@@ -2497,6 +2498,16 @@ update msg model =
                     model.pageEditSubmitDraft
             in
             ( { model | pageEditSubmitDraft = { d | tagsInput = value } }
+            , Command.none
+            )
+
+        PageEditPublishedRowToggled ->
+            let
+                d : PageEditSubmitDraft
+                d =
+                    model.pageEditSubmitDraft
+            in
+            ( { model | pageEditSubmitDraft = { d | publishedRowCollapsed = not d.publishedRowCollapsed } }
             , Command.none
             )
 
@@ -9516,9 +9527,100 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
         formBusy =
             draft.inFlight || draft.saveDraftInFlight
 
+        publishedRowCollapsed : Bool
+        publishedRowCollapsed =
+            draft.publishedRowCollapsed
+
         originalMarkdown : String
         originalMarkdown =
             pageDetails.maybeMarkdownSource |> Maybe.withDefault ""
+
+        publishedHeadingButton : Bool -> String -> Html Msg
+        publishedHeadingButton showIcon label =
+            let
+                spacingAndDividerClass : String
+                spacingAndDividerClass =
+                    if publishedRowCollapsed then
+                        ""
+
+                    else
+                        " mb-2 border-b"
+
+                iconNodes : List (Html Msg)
+                iconNodes =
+                    if showIcon then
+                        [ Html.span
+                            [ Attr.class
+                                ("absolute right-0 top-[-1px] inline-block text-[1rem] leading-none select-none scale-[1.5]"
+                                    ++ (if publishedRowCollapsed then
+                                            " translate-y-[-3px] translate-x-[-1px]"
+
+                                        else
+                                            " rotate-90"
+                                       )
+                                )
+                            , Attr.attribute "aria-hidden" "true"
+                            ]
+                            [ Html.text "▸" ]
+                        ]
+
+                    else
+                        []
+            in
+            Html.button
+                [ Attr.type_ "button"
+                , Attr.class ("w-full appearance-none border-0 border-[var(--border-subtle)] bg-transparent m-0 px-4 py-1 text-left leading-[1] cursor-pointer transition-colors hover:bg-[var(--chrome-bg-hover)] hover:text-[var(--fg)]" ++ spacingAndDividerClass)
+                , Events.onClick PageEditPublishedRowToggled
+                ]
+                [ Html.span [ Attr.class "relative inline-flex items-center -translate-y-[1px] font-sans text-[0.8125rem] leading-[1]" ]
+                    ([ Html.span
+                                [ Attr.class
+                                    (if showIcon then
+                                        "pr-4"
+
+                                     else
+                                        ""
+                                    )
+                                ]
+                                [ Html.text label ]
+                           ]
+                        ++ iconNodes
+                    )
+                ]
+
+        editPaneGridClass : String
+        editPaneGridClass =
+            if publishedRowCollapsed then
+                "min-h-0 flex-1 grid grid-rows-1 gap-3"
+
+            else
+                "min-h-0 flex-1 grid grid-rows-2 gap-3"
+
+        publishedMarkdownRow : List (Html Msg)
+        publishedMarkdownRow =
+            if publishedRowCollapsed then
+                []
+
+            else
+                [ Html.div [ UI.newPageEditorMarkdownPreviewCellAttr ]
+                    [ submitEditReadonlyTextarea "wiki-submit-edit-original-markdown" originalMarkdown " h-full max-h-none px-4" ]
+                ]
+
+        publishedPreviewRow : List (Html Msg)
+        publishedPreviewRow =
+            if publishedRowCollapsed then
+                []
+
+            else
+                [ Html.div [ UI.newPageEditorMarkdownPreviewCellAttr ]
+                    [ Html.div
+                        [ Attr.class "h-full max-h-none opacity-75"
+                        , UI.markdownPreviewScrollMinFlexFullHeightAttr
+                        , Attr.class "px-4 pt-2"
+                        ]
+                        [ PageMarkdown.viewPreview "wiki-submit-edit-original-preview" wikiSlug publishedSlugExists originalMarkdown ]
+                    ]
+                ]
 
         submitEditReadonlyTextarea : String -> String -> String -> Html Msg
         submitEditReadonlyTextarea elementId markdown extraClass =
@@ -9564,13 +9666,11 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
                 , contentChildren =
                     [ Html.section [ Attr.class "min-w-0 min-h-0 flex flex-col bg-[var(--input-bg)]" ]
                         [ UI.PanelHeader.view { kind = UI.PanelHeader.Primary, text = "EDITOR" }
-                        , Html.div [ Attr.class "min-h-0 flex-1 grid grid-rows-2 gap-3" ]
-                            [ Html.div [ UI.newPageEditorMarkdownPreviewCellAttr ]
-                                [ UI.Heading.panelHeadingSecondary [ Attr.class "px-4 py-1 mb-2 border-b border-[var(--border-subtle)]" ] [ Html.text "Published" ]
-                                , submitEditReadonlyTextarea "wiki-submit-edit-original-markdown" originalMarkdown " h-full max-h-none px-4"
-                                ]
-                            , Html.div [ UI.newPageEditorMarkdownPreviewCellAttr, Attr.class "border-t border-[var(--border-subtle)]" ]
-                                [ UI.Heading.panelHeadingSecondary [ Attr.class "px-4 py-1 mb-2 border-b border-[var(--border-subtle)]" ] [ Html.text "Your edit" ]
+                        , publishedHeadingButton True "Published"
+                        , Html.div [ Attr.class editPaneGridClass ]
+                            (publishedMarkdownRow
+                                ++ [ Html.div [ UI.newPageEditorMarkdownPreviewCellAttr, Attr.class "border-t border-[var(--border-subtle)]" ]
+                                        [ UI.Heading.panelHeadingSecondary [ Attr.class "px-4 py-1 mb-2 border-b border-[var(--border-subtle)] text-[0.8125rem]" ] [ Html.text "Your edit" ]
                                 , Html.textarea
                                     (UI.Textarea.markdownEditableCell
                                         [ Attr.id "wiki-submit-edit-markdown"
@@ -9583,22 +9683,16 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
                                     )
                                     []
                                 ]
-                            ]
+                                   ]
+                            )
                         ]
                     , Html.section [ Attr.class "min-w-0 min-h-0 flex flex-col bg-[var(--bg)]" ]
                         [ UI.PanelHeader.view { kind = UI.PanelHeader.Secondary, text = "LIVE PREVIEW" }
-                        , Html.div [ Attr.class "min-h-0 flex-1 grid grid-rows-2 gap-3" ]
-                            [ Html.div [ UI.newPageEditorMarkdownPreviewCellAttr ]
-                                [ UI.Heading.panelHeadingSecondary [ Attr.class "px-4 py-1 mb-2 border-b border-[var(--border-subtle)]" ] [ Html.text "Published preview" ]
-                                , Html.div
-                                    [ Attr.class "h-full max-h-none opacity-75"
-                                    , UI.markdownPreviewScrollMinFlexFullHeightAttr
-                                    , Attr.class "px-4 pt-2"
-                                    ]
-                                    [ PageMarkdown.viewPreview "wiki-submit-edit-original-preview" wikiSlug publishedSlugExists originalMarkdown ]
-                                ]
-                            , Html.div [ UI.newPageEditorMarkdownPreviewCellAttr, Attr.class "border-t border-[var(--border-subtle)]" ]
-                                [ UI.Heading.panelHeadingSecondary [ Attr.class "px-4 py-1 mb-2 border-b border-[var(--border-subtle)]" ] [ Html.text "Your preview" ]
+                        , publishedHeadingButton False "Published preview"
+                        , Html.div [ Attr.class editPaneGridClass ]
+                            (publishedPreviewRow
+                                ++ [ Html.div [ UI.newPageEditorMarkdownPreviewCellAttr, Attr.class "border-t border-[var(--border-subtle)]" ]
+                                        [ UI.Heading.panelHeadingSecondary [ Attr.class "px-4 py-1 mb-2 border-b border-[var(--border-subtle)] text-[0.8125rem]" ] [ Html.text "Your preview" ]
                                 , Html.div
                                     [ Attr.class "h-full max-h-none"
                                     , UI.markdownPreviewScrollMinFlexFullHeightAttr
@@ -9606,7 +9700,8 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
                                     ]
                                     [ PageMarkdown.viewPreview "wiki-submit-edit-new-preview" wikiSlug publishedSlugExists draft.markdownBody ]
                                 ]
-                            ]
+                                   ]
+                            )
                         ]
                     ]
                 }
