@@ -233,6 +233,225 @@ function parseGraphData(raw) {
   }
 }
 
+const WIKI_GRAPH_CACHE_PREFIX = "sortofwiki_wikigraph_";
+const WIKI_GRAPH_CACHE_VERSION_SUFFIX = "_version";
+const WIKI_GRAPH_CACHE_GRAPH_SUFFIX = "_graph";
+const MAX_WIKI_GRAPH_CACHE_ENTRIES = 24;
+const MAX_WIKI_GRAPH_CACHE_BYTES = 2000000;
+
+function wikiGraphCacheKeys(wikiSlug) {
+  return {
+    versionKey:
+      WIKI_GRAPH_CACHE_PREFIX + wikiSlug + WIKI_GRAPH_CACHE_VERSION_SUFFIX,
+    graphKey: WIKI_GRAPH_CACHE_PREFIX + wikiSlug + WIKI_GRAPH_CACHE_GRAPH_SUFFIX,
+  };
+}
+
+function readLocalStorageSafe(key) {
+  try {
+    return window.localStorage.getItem(key);
+  } catch (_) {
+    return null;
+  }
+}
+
+function writeLocalStorageSafe(key, value) {
+  try {
+    window.localStorage.setItem(key, value);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+function removeLocalStorageSafe(key) {
+  try {
+    window.localStorage.removeItem(key);
+  } catch (_) {
+    /* no-op */
+  }
+}
+
+function parseContentVersion(value) {
+  if (typeof value !== "string" || value.trim() === "") {
+    return null;
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    return null;
+  }
+  return parsed;
+}
+
+function getWikiGraphCacheContext(host) {
+  const wikiSlugAttr = host.getAttribute("data-graph-wiki-slug");
+  const contentVersionAttr = host.getAttribute("data-graph-content-version");
+  const wikiSlug = typeof wikiSlugAttr === "string" ? wikiSlugAttr.trim() : "";
+  const contentVersion = parseContentVersion(contentVersionAttr);
+  if (!wikiSlug || contentVersion === null) {
+    return null;
+  }
+  const keys = wikiGraphCacheKeys(wikiSlug);
+  return {
+    wikiSlug: wikiSlug,
+    contentVersion: contentVersion,
+    versionKey: keys.versionKey,
+    graphKey: keys.graphKey,
+  };
+}
+
+function parseCachedGraphPayload(raw) {
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.nodePositions)) {
+      return null;
+    }
+    return parsed;
+  } catch (_) {
+    return null;
+  }
+}
+
+function applyCachedNodePositions(nodes, cachedPayload) {
+  if (!Array.isArray(cachedPayload.nodePositions)) {
+    return false;
+  }
+  const positionsById = new Map(
+    cachedPayload.nodePositions
+      .filter(function (entry) {
+        return (
+          entry &&
+          typeof entry.id === "string" &&
+          Number.isFinite(entry.x) &&
+          Number.isFinite(entry.y)
+        );
+      })
+      .map(function (entry) {
+        return [entry.id, entry];
+      })
+  );
+  if (positionsById.size === 0) {
+    return false;
+  }
+
+  let appliedCount = 0;
+  nodes.forEach(function (node) {
+    const cached = positionsById.get(node.id);
+    if (!cached) {
+      return;
+    }
+    node.x = cached.x;
+    node.y = cached.y;
+    appliedCount += 1;
+  });
+
+  return appliedCount > 0 && appliedCount === nodes.length;
+}
+
+function readCachedWikiGraphPayload(cacheContext) {
+  const expectedVersion = String(cacheContext.contentVersion);
+  const storedVersion = readLocalStorageSafe(cacheContext.versionKey);
+  if (storedVersion !== expectedVersion) {
+    removeLocalStorageSafe(cacheContext.graphKey);
+    return null;
+  }
+  const cached = parseCachedGraphPayload(readLocalStorageSafe(cacheContext.graphKey));
+  if (!cached) {
+    return null;
+  }
+  return cached;
+}
+
+function estimateJsonBytes(jsonValue) {
+  return jsonValue.length * 2;
+}
+
+function collectWikiGraphCacheEntries() {
+  const entries = [];
+  try {
+    for (let i = 0; i < window.localStorage.length; i += 1) {
+      const key = window.localStorage.key(i);
+      if (
+        typeof key !== "string" ||
+        !key.startsWith(WIKI_GRAPH_CACHE_PREFIX) ||
+        !key.endsWith(WIKI_GRAPH_CACHE_VERSION_SUFFIX)
+      ) {
+        continue;
+      }
+      const wikiSlug = key.slice(
+        WIKI_GRAPH_CACHE_PREFIX.length,
+        key.length - WIKI_GRAPH_CACHE_VERSION_SUFFIX.length
+      );
+      if (!wikiSlug) {
+        continue;
+      }
+      const keys = wikiGraphCacheKeys(wikiSlug);
+      const graphRaw = readLocalStorageSafe(keys.graphKey);
+      const parsed = parseCachedGraphPayload(graphRaw);
+      entries.push({
+        wikiSlug: wikiSlug,
+        versionKey: keys.versionKey,
+        graphKey: keys.graphKey,
+        savedAtMs:
+          parsed && Number.isFinite(parsed.savedAtMs) ? parsed.savedAtMs : 0,
+      });
+    }
+  } catch (_) {
+    return [];
+  }
+  return entries;
+}
+
+function enforceWikiGraphCacheBounds() {
+  const entries = collectWikiGraphCacheEntries();
+  if (entries.length <= MAX_WIKI_GRAPH_CACHE_ENTRIES) {
+    return;
+  }
+  entries.sort(function (a, b) {
+    return a.savedAtMs - b.savedAtMs;
+  });
+  const removeCount = entries.length - MAX_WIKI_GRAPH_CACHE_ENTRIES;
+  for (let i = 0; i < removeCount; i += 1) {
+    removeLocalStorageSafe(entries[i].versionKey);
+    removeLocalStorageSafe(entries[i].graphKey);
+  }
+}
+
+function writeCachedWikiGraphPayload(cacheContext, nodes) {
+  const payload = {
+    savedAtMs: Date.now(),
+    nodePositions: nodes.map(function (node) {
+      const x = Number.isFinite(node.x) ? node.x : 0;
+      const y = Number.isFinite(node.y) ? node.y : 0;
+      return {
+        id: node.id,
+        x: x,
+        y: y,
+      };
+    }),
+  };
+  const json = JSON.stringify(payload);
+  if (estimateJsonBytes(json) > MAX_WIKI_GRAPH_CACHE_BYTES) {
+    return;
+  }
+  if (!writeLocalStorageSafe(cacheContext.graphKey, json)) {
+    return;
+  }
+  if (
+    !writeLocalStorageSafe(
+      cacheContext.versionKey,
+      String(cacheContext.contentVersion)
+    )
+  ) {
+    removeLocalStorageSafe(cacheContext.graphKey);
+    return;
+  }
+  enforceWikiGraphCacheBounds();
+}
+
 function resolveNodeRef(nodeRef, nodes) {
   if (typeof nodeRef === "number") {
     return nodes[nodeRef];
@@ -303,7 +522,11 @@ function nodeHoverFill(node, darkMode, host) {
 
 class ColaGraphElement extends HTMLElement {
   static get observedAttributes() {
-    return ["data-graph"];
+    return [
+      "data-graph",
+      "data-graph-wiki-slug",
+      "data-graph-content-version",
+    ];
   }
 
   constructor() {
@@ -311,22 +534,49 @@ class ColaGraphElement extends HTMLElement {
     this._root = this.attachShadow({ mode: "open" });
     this._themeObserver = null;
     this._themeMql = null;
+    this._lastRenderKey = null;
     this._onThemeChange = this.renderGraph.bind(this);
+    this._onStorageChange = this.handleStorageChange.bind(this);
   }
 
   connectedCallback() {
     this.setupThemeReactivity();
+    window.addEventListener("storage", this._onStorageChange);
     this.renderGraph();
   }
 
   disconnectedCallback() {
     this.teardownThemeReactivity();
+    window.removeEventListener("storage", this._onStorageChange);
   }
 
   attributeChangedCallback(name, _oldValue, _newValue) {
-    if (name === "data-graph") {
+    if (
+      name === "data-graph" ||
+      name === "data-graph-wiki-slug" ||
+      name === "data-graph-content-version"
+    ) {
       this.renderGraph();
     }
+  }
+
+  handleStorageChange(event) {
+    const cacheContext = getWikiGraphCacheContext(this);
+    if (!cacheContext) {
+      return;
+    }
+    if (event && event.storageArea && event.storageArea !== window.localStorage) {
+      return;
+    }
+    if (
+      event &&
+      event.key &&
+      event.key !== cacheContext.versionKey &&
+      event.key !== cacheContext.graphKey
+    ) {
+      return;
+    }
+    this.renderGraph({ force: true });
   }
 
   setupThemeReactivity() {
@@ -367,8 +617,22 @@ class ColaGraphElement extends HTMLElement {
     }
   }
 
-  renderGraph() {
-    const graph = parseGraphData(this.getAttribute("data-graph"));
+  renderGraph(options) {
+    const force = options && options.force === true;
+    const rawGraph = this.getAttribute("data-graph");
+    const cacheContext = getWikiGraphCacheContext(this);
+    const darkMode = isDarkMode(this);
+    const renderKey = JSON.stringify({
+      darkMode: darkMode,
+      rawGraph: rawGraph || "",
+      cacheWikiSlug: cacheContext ? cacheContext.wikiSlug : "",
+      cacheVersion: cacheContext ? cacheContext.contentVersion : -1,
+    });
+
+    if (!force && this._lastRenderKey === renderKey) {
+      return;
+    }
+    this._lastRenderKey = renderKey;
     this._root.innerHTML = "";
 
     const style = document.createElement("style");
@@ -402,6 +666,7 @@ class ColaGraphElement extends HTMLElement {
     `;
     this._root.appendChild(style);
 
+    const graph = parseGraphData(rawGraph);
     if (!graph || graph.nodes.length === 0) {
       const empty = document.createElement("div");
       empty.textContent = "";
@@ -409,7 +674,6 @@ class ColaGraphElement extends HTMLElement {
       return;
     }
 
-    const darkMode = isDarkMode(this);
     const width = 1200;
     const height = graph.graphName === "page" ? 860 : 980;
 
@@ -450,37 +714,51 @@ class ColaGraphElement extends HTMLElement {
       })
       .filter(Boolean);
 
-    if (!window.cola || !window.cola.Layout) {
-      const message = document.createElement("div");
-      message.textContent = "Cola layout unavailable.";
-      this._root.appendChild(message);
-      return;
+    let usedCachedLayout = false;
+    if (cacheContext) {
+      const cachedGraph = readCachedWikiGraphPayload(cacheContext);
+      if (cachedGraph) {
+        usedCachedLayout = applyCachedNodePositions(nodes, cachedGraph);
+      }
     }
 
-    const layout = new window.cola.Layout();
-    layout
-      .size([width, height])
-      .nodes(nodes)
-      .links(links)
-      .linkDistance(function (link) {
-        if (graph.graphName === "page") {
-          if (link.deemphasized) {
-            return 165;
+    if (!usedCachedLayout) {
+      if (!window.cola || !window.cola.Layout) {
+        const message = document.createElement("div");
+        message.textContent = "Cola layout unavailable.";
+        this._root.appendChild(message);
+        return;
+      }
+
+      const layout = new window.cola.Layout();
+      layout
+        .size([width, height])
+        .nodes(nodes)
+        .links(links)
+        .linkDistance(function (link) {
+          if (graph.graphName === "page") {
+            if (link.deemphasized) {
+              return 165;
+            }
+            return link.kind === "tag" ? 145 : 125;
           }
-          return link.kind === "tag" ? 145 : 125;
-        }
 
-        if (link.deemphasized) {
-          return 145;
-        }
-        return link.kind === "tag" ? 130 : 120;
-      })
-      .avoidOverlaps(true)
-      .start(90, 0, 0, 0, false);
+          if (link.deemphasized) {
+            return 145;
+          }
+          return link.kind === "tag" ? 130 : 120;
+        })
+        .avoidOverlaps(true)
+        .start(90, 0, 0, 0, false);
 
-    for (let i = 0; i < 350; i += 1) {
-      if (layout.tick()) {
-        break;
+      for (let i = 0; i < 350; i += 1) {
+        if (layout.tick()) {
+          break;
+        }
+      }
+
+      if (cacheContext && graph.graphName === "wiki") {
+        writeCachedWikiGraphPayload(cacheContext, nodes);
       }
     }
 
@@ -672,6 +950,7 @@ class ColaGraphElement extends HTMLElement {
     });
 
     this._root.appendChild(svg);
+
   }
 }
 
@@ -693,6 +972,21 @@ function syncMiniGraphPreview(miniPreview, graphHost) {
   clonedSvg.style.height = "100%";
   clonedSvg.style.display = "block";
   clonedSvg.style.pointerEvents = "none";
+  clonedSvg.querySelectorAll("a.node g").forEach(function (group) {
+    const rect = group.querySelector("rect");
+    if (!rect) {
+      return;
+    }
+    const borderColor = rect.getAttribute("stroke");
+    if (!borderColor) {
+      return;
+    }
+    rect.setAttribute("fill", borderColor);
+    const text = group.querySelector("text");
+    if (text) {
+      text.setAttribute("fill", borderColor);
+    }
+  });
 
   miniPreview.innerHTML = "";
   miniPreview.appendChild(clonedSvg);
@@ -792,8 +1086,16 @@ function setupWikiGraphNavigator() {
     const scaleX = miniWidth / contentWidth;
     const scaleY = miniHeight / contentHeight;
 
-    const viewLeft = clamp(horizontalScrollRegion.scrollLeft, 0, contentWidth);
-    const viewTop = clamp(verticalScrollRegion.scrollTop, 0, contentHeight);
+    const maxScrollLeft = Math.max(
+      contentWidth - horizontalScrollRegion.clientWidth,
+      0
+    );
+    const maxScrollTop = Math.max(
+      contentHeight - verticalScrollRegion.clientHeight,
+      0
+    );
+    const viewLeft = clamp(horizontalScrollRegion.scrollLeft, 0, maxScrollLeft);
+    const viewTop = clamp(verticalScrollRegion.scrollTop, 0, maxScrollTop);
     const viewWidth = clamp(horizontalScrollRegion.clientWidth, 8, contentWidth);
     const viewHeight = clamp(verticalScrollRegion.clientHeight, 8, contentHeight);
 
@@ -817,7 +1119,8 @@ function setupWikiGraphNavigator() {
     miniSurface.style.height = miniHeight + "px";
     miniSurface.style.border = "1px solid var(--border, #667944)";
     miniSurface.style.borderRadius = "0.4rem";
-    miniSurface.style.background = "var(--chrome-bg, #f6f8ef)";
+    miniSurface.style.background =
+      "color-mix(in srgb, var(--chrome-bg, #f6f8ef) 85%, var(--bg, #ffffff))";
     miniSurface.style.overflow = "hidden";
 
     miniPreview.style.position = "absolute";
@@ -832,12 +1135,30 @@ function setupWikiGraphNavigator() {
       state.previewDirty = false;
     }
 
+    const viewportBorderWidth = 2;
+    const minViewportOuterSize = 12;
+    const viewportEndInset = viewportBorderWidth;
+    const viewportWidth = Math.min(
+      Math.max(viewWidth * scaleX, Math.max(minViewportOuterSize, viewportBorderWidth * 2)),
+      Math.max(miniWidth - viewportEndInset, 0)
+    );
+    const viewportHeight = Math.min(
+      Math.max(viewHeight * scaleY, Math.max(minViewportOuterSize, viewportBorderWidth * 2)),
+      Math.max(miniHeight - viewportEndInset, 0)
+    );
+    const viewportTravelX = Math.max(miniWidth - viewportWidth - viewportEndInset, 0);
+    const viewportTravelY = Math.max(miniHeight - viewportHeight - viewportEndInset, 0);
+    const viewportLeft = maxScrollLeft > 0 ? (viewLeft / maxScrollLeft) * viewportTravelX : 0;
+    const viewportTop = maxScrollTop > 0 ? (viewTop / maxScrollTop) * viewportTravelY : 0;
+
     viewport.style.position = "absolute";
-    viewport.style.left = viewLeft * scaleX + "px";
-    viewport.style.top = viewTop * scaleY + "px";
-    viewport.style.width = Math.max(viewWidth * scaleX, 12) + "px";
-    viewport.style.height = Math.max(viewHeight * scaleY, 12) + "px";
-    viewport.style.border = "2px solid var(--focus-ring, #7c3aed)";
+    viewport.style.left = viewportLeft + "px";
+    viewport.style.top = viewportTop + "px";
+    viewport.style.width = viewportWidth + "px";
+    viewport.style.height = viewportHeight + "px";
+    viewport.style.boxSizing = "border-box";
+    viewport.style.border = `${viewportBorderWidth}px solid var(--focus-ring, #7c3aed)`;
+    viewport.style.boxShadow = "none";
     viewport.style.borderRadius = "0.25rem";
     viewport.style.background = "rgba(124,58,237,0.12)";
     viewport.style.pointerEvents = "none";
@@ -949,6 +1270,16 @@ function setupWikiGraphNavigator() {
     attributes: true,
     attributeFilter: ["data-graph"],
   });
+  if (graphHost.shadowRoot) {
+    const shadowObserver = new MutationObserver(function onGraphShadowMutation() {
+      state.previewDirty = true;
+      scheduleRender();
+    });
+    shadowObserver.observe(graphHost.shadowRoot, {
+      childList: true,
+      subtree: true,
+    });
+  }
 
   navigatorHost.dataset.sowGraphNavigatorBound = "1";
   scheduleRender();

@@ -1,4 +1,4 @@
-module WikiGraph exposing (Edge, EdgeDirection(..), EdgeKind(..), Summary, graph, summary)
+module WikiGraph exposing (Edge, EdgeDirection(..), EdgeKind(..), Summary, graph, graphFromSummary, summary)
 
 import Dict exposing (Dict)
 import GraphData
@@ -151,11 +151,13 @@ graph :
     -> Dict Page.Slug (List Page.Slug)
     -> UI.Graph.Graph
 graph wikiSlug publishedPageMarkdownSources publishedPageTags =
-    let
-        graphSummary : Summary
-        graphSummary =
-            summary wikiSlug publishedPageMarkdownSources publishedPageTags
+    summary wikiSlug publishedPageMarkdownSources publishedPageTags
+        |> graphFromSummary wikiSlug
 
+
+graphFromSummary : Wiki.Slug -> Summary -> UI.Graph.Graph
+graphFromSummary wikiSlug graphSummary =
+    let
         nodeAttrs : Page.Slug -> UI.Graph.Node
         nodeAttrs pageSlug =
             let

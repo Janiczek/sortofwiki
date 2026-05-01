@@ -61,6 +61,7 @@ type alias Wiki =
     , name : String
     , summary : String
     , active : Bool
+    , contentVersion : Int
     , pages : Dict Page.Slug Page.Page
     }
 
@@ -79,6 +80,7 @@ type alias FrontendDetails =
     { pageSlugs : List Page.Slug
     , publishedPageMarkdownSources : Dict Page.Slug String
     , publishedPageTags : Dict Page.Slug (List Page.Slug)
+    , contentVersion : Int
     , pendingReviewCountForTrustedViewer : Maybe Int
     , viewerSession : Maybe ContributorWikiSession
     }
@@ -110,6 +112,7 @@ wikiWithPages slug name pages =
     , name = name
     , summary = ""
     , active = True
+    , contentVersion = 1
     , pages = pages
     }
 
@@ -141,6 +144,7 @@ frontendDetails w =
                     ( slug, page.tags )
                 )
             |> Dict.fromList
+    , contentVersion = w.contentVersion
     , pendingReviewCountForTrustedViewer = Nothing
     , viewerSession = Nothing
     }
@@ -434,6 +438,7 @@ publishNewPageOnWiki payload wiki =
     { wiki
         | pages =
             Dict.insert payload.pageSlug newPage wiki.pages
+        , contentVersion = wiki.contentVersion + 1
     }
 
 
@@ -458,6 +463,7 @@ applyPublishedMarkdownEdit pageSlug markdown tags wiki =
             { wiki
                 | pages =
                     Dict.insert pageSlug nextPage wiki.pages
+                , contentVersion = wiki.contentVersion + 1
             }
 
 
@@ -465,4 +471,7 @@ applyPublishedMarkdownEdit pageSlug markdown tags wiki =
 -}
 removePublishedPage : Page.Slug -> Wiki -> Wiki
 removePublishedPage pageSlug wiki =
-    { wiki | pages = Dict.remove pageSlug wiki.pages }
+    { wiki
+        | pages = Dict.remove pageSlug wiki.pages
+        , contentVersion = wiki.contentVersion + 1
+    }

@@ -2525,6 +2525,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                     , name = name
                                                     , summary = ""
                                                     , active = True
+                                                    , contentVersion = 1
                                                     , pages = Dict.empty
                                                     }
 

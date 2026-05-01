@@ -215,6 +215,7 @@ encodeWiki w =
         , ( "name", Encode.string w.name )
         , ( "summary", Encode.string w.summary )
         , ( "active", Encode.bool w.active )
+        , ( "contentVersion", Encode.int w.contentVersion )
         , ( "pages", encodePages w.pages )
         ]
 
@@ -255,11 +256,16 @@ decodeWikis =
 
 decodeWiki : Decoder Wiki
 decodeWiki =
-    Decode.map5 Wiki
+    Decode.map6 Wiki
         (Decode.field "slug" Decode.string)
         (Decode.field "name" Decode.string)
         (Decode.field "summary" Decode.string)
         (Decode.field "active" Decode.bool)
+        (Decode.oneOf
+            [ Decode.field "contentVersion" Decode.int
+            , Decode.succeed 1
+            ]
+        )
         (Decode.field "pages" decodePages)
 
 

@@ -1870,6 +1870,7 @@ afterTrustedNewPagePublishedImmediately wikiSlug payload store =
                                     Dict.insert payload.pageSlug payload.markdown details.publishedPageMarkdownSources
                                 , publishedPageTags =
                                     Dict.insert payload.pageSlug payload.tags details.publishedPageTags
+                                , contentVersion = details.contentVersion + 1
                             }
                         )
                         store.wikiDetails
@@ -1900,6 +1901,7 @@ afterTrustedEditPublishedImmediately wikiSlug pageSlug edit store =
                                     Dict.insert pageSlug edit.proposedMarkdown details.publishedPageMarkdownSources
                                 , publishedPageTags =
                                     Dict.insert pageSlug edit.tags details.publishedPageTags
+                                , contentVersion = details.contentVersion + 1
                             }
                         )
                         store.wikiDetails
@@ -13171,7 +13173,7 @@ viewWikiGraphPage wikiSlug wikiDetails =
           else
             let
                 graphData =
-                    WikiGraph.graph wikiSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags
+                    WikiGraph.graphFromSummary wikiSlug graphSummary
             in
             Html.div
                 [ UI.classAttr "relative min-h-[14rem]" ]
@@ -13194,6 +13196,8 @@ viewWikiGraphPage wikiSlug wikiDetails =
                         , attrs =
                             [ Attr.attribute "data-graph-pages" (String.fromInt (List.length graphSummary.publishedPageSlugs))
                             , Attr.attribute "data-graph-edges" (String.fromInt (List.length graphSummary.edges))
+                            , Attr.attribute "data-graph-wiki-slug" wikiSlug
+                            , Attr.attribute "data-graph-content-version" (String.fromInt wikiDetails.contentVersion)
                             ]
                         }
                     ]
