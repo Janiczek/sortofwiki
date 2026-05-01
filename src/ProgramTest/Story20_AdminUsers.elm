@@ -9,8 +9,8 @@ import Wiki
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "20 — wiki admin opens /w/Demo/admin/users and sees contributors"
+    ProgramTest.Start.bothViewports
+        { baseName = "20 — wiki admin opens /w/Demo/admin/users and sees contributors"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story20-admin-users"
         , path = "/"
@@ -45,4 +45,3 @@ endToEndTests =
                       ]
                     ]
         }
-    ]

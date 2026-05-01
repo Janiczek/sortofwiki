@@ -1,4 +1,15 @@
-module ProgramTest.Start exposing (Config, EndToEndTest, connectFrontend, start, startWith)
+module ProgramTest.Start exposing
+    ( Config
+    , EndToEndTest
+    , bothViewports
+    , connectFrontend
+    , connectFrontendWithViewport
+    , narrowViewport
+    , start
+    , startWith
+    , startWithViewport
+    , viewport
+    )
 
 {-| Wrappers around `Effect.Test.start` / `connectFrontend` with fixed simulated time,
 800×600 viewport, and string session ids. Use `start` for one browser; `startWith` plus
@@ -37,6 +48,13 @@ startTime =
 viewport : { width : Int, height : Int }
 viewport =
     { width = 800, height = 600 }
+
+
+{-| Narrow viewport (`md` breakpoint shell + mobile drawer). Paired with `bothViewports` for wiki stories.
+-}
+narrowViewport : { width : Int, height : Int }
+narrowViewport =
+    { width = 390, height = 844 }
 
 
 {-| Default first argument to `Effect.Test.connectFrontend` (client id in the harness).
@@ -100,6 +118,29 @@ startWith args =
     Effect.Test.start args.name startTime args.config args.steps
 
 
+{-| `Effect.Test.connectFrontend` with explicit viewport width/height.
+-}
+connectFrontendWithViewport :
+    { width : Int, height : Int }
+    ->
+        { a
+            | connectClientMs : Maybe Int
+            , sessionId : String
+            , path : String
+            , steps :
+                Effect.Test.FrontendActions toBackend frontendMsg frontendModel toFrontend backendMsg backendModel
+                -> List (Effect.Test.Action toBackend frontendMsg frontendModel toFrontend backendMsg backendModel)
+        }
+    -> Effect.Test.Action toBackend frontendMsg frontendModel toFrontend backendMsg backendModel
+connectFrontendWithViewport vp args =
+    Effect.Test.connectFrontend
+        (resolveConnectClientMs args.connectClientMs)
+        (Effect.Lamdera.sessionIdFromString args.sessionId)
+        args.path
+        vp
+        args.steps
+
+
 {-| `Effect.Test.connectFrontend` with `viewport`, string session id, and optional connect delay (`Nothing` → 100).
 -}
 connectFrontend :
@@ -113,9 +154,67 @@ connectFrontend :
     }
     -> Effect.Test.Action toBackend frontendMsg frontendModel toFrontend backendMsg backendModel
 connectFrontend args =
-    Effect.Test.connectFrontend
-        (resolveConnectClientMs args.connectClientMs)
-        (Effect.Lamdera.sessionIdFromString args.sessionId)
-        args.path
-        viewport
-        args.steps
+    connectFrontendWithViewport viewport args
+
+
+{-| Same as `start` but uses the given viewport for the single client.
+-}
+startWithViewport :
+    { width : Int, height : Int }
+    ->
+        { name : String
+        , config : Effect.Test.Config toBackend frontendMsg frontendModel toFrontend backendMsg backendModel
+        , sessionId : String
+        , path : String
+        , connectClientMs : Maybe Int
+        , clientSteps :
+            Effect.Test.FrontendActions toBackend frontendMsg frontendModel toFrontend backendMsg backendModel
+            -> List (Effect.Test.Action toBackend frontendMsg frontendModel toFrontend backendMsg backendModel)
+        }
+    -> Effect.Test.EndToEndTest toBackend frontendMsg frontendModel toFrontend backendMsg backendModel
+startWithViewport vp args =
+    startWith
+        { name = args.name
+        , config = args.config
+        , steps =
+            [ connectFrontendWithViewport vp
+                { sessionId = args.sessionId
+                , path = args.path
+                , connectClientMs = args.connectClientMs
+                , steps = args.clientSteps
+                }
+            ]
+        }
+
+
+{-| Desktop + narrow viewport pair (second test name gets `" (narrow)"`; session id gets `-narrow`).
+-}
+bothViewports :
+    { baseName : String
+    , config : Effect.Test.Config toBackend frontendMsg frontendModel toFrontend backendMsg backendModel
+    , sessionId : String
+    , path : String
+    , connectClientMs : Maybe Int
+    , clientSteps :
+        Effect.Test.FrontendActions toBackend frontendMsg frontendModel toFrontend backendMsg backendModel
+        -> List (Effect.Test.Action toBackend frontendMsg frontendModel toFrontend backendMsg backendModel)
+    }
+    -> List (Effect.Test.EndToEndTest toBackend frontendMsg frontendModel toFrontend backendMsg backendModel)
+bothViewports cfg =
+    [ startWithViewport viewport
+        { name = cfg.baseName
+        , config = cfg.config
+        , sessionId = cfg.sessionId
+        , path = cfg.path
+        , connectClientMs = cfg.connectClientMs
+        , clientSteps = cfg.clientSteps
+        }
+    , startWithViewport narrowViewport
+        { name = cfg.baseName ++ " (narrow)"
+        , config = cfg.config
+        , sessionId = cfg.sessionId ++ "-narrow"
+        , path = cfg.path
+        , connectClientMs = cfg.connectClientMs
+        , clientSteps = cfg.clientSteps
+        }
+    ]

@@ -73,7 +73,7 @@ endToEndTests =
                             )
                       , client.checkView 100
                             (ProgramTest.Query.withinHostAdminWikiRow "Demo"
-                                (ProgramTest.Query.expectHasText "Import JSON…")
+                                (ProgramTest.Query.expectHasText "Import (replace)")
                             )
                       ]
                     ]
@@ -113,8 +113,9 @@ endToEndTests =
                             (ProgramTest.Query.withinWikiCatalogRow story52ImportedWikiSlug
                                 (ProgramTest.Query.expectHasText "Demo Wiki")
                             )
-                      , client.clickLink 100 (Wiki.wikiHomeUrlPath story52ImportedWikiSlug)
-                      , client.checkView 300
+                      ]
+                    , ProgramTest.Actions.navigateToWikiHome story52ImportedWikiSlug client
+                    , [ client.checkView 300
                             (ProgramTest.Query.expectAll
                                 [ ProgramTest.Query.expectWikiHomePageShowsSlug story52ImportedWikiSlug
                                 , ProgramTest.Query.withinId "wiki-home-page"

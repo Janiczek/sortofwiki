@@ -58,7 +58,7 @@ navListItemClass emphasized =
 -}
 navListItemMutedClass : String
 navListItemMutedClass =
-    "block w-full rounded py-[0.14rem] px-[0.55rem] -ml-[0.55rem] !text-[var(--fg-muted)] hover:!text-[var(--link)] hover:bg-[var(--link-bg-hover)]"
+    "block w-full rounded py-[0.14rem] px-[0.55rem] -ml-[0.55rem] !text-[var(--fg-muted)] hover:!text-[var(--link)] hover:bg-[var(--link-bg-hover)] underline underline-offset-[2px]"
 
 
 cardTitleClass : String

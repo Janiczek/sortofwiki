@@ -21,8 +21,8 @@ searchUrl =
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "58 — wiki search popup and page show matching results"
+    ProgramTest.Start.bothViewports
+        { baseName = "58 — wiki search popup and page show matching results"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story58-wiki-search"
         , path = "/w/Demo/p/About"
@@ -30,7 +30,9 @@ endToEndTests =
         , clientSteps =
             \client ->
                 [ client.checkView 150
-                    (ProgramTest.Query.withinHref "/w/Demo/search" (ProgramTest.Query.expectHasText "Search"))
+                    (ProgramTest.Query.withinLayoutHeader
+                        (ProgramTest.Query.withinHref "/w/Demo/search" (ProgramTest.Query.expectHasText "Search"))
+                    )
                 , client.input 100 (Effect.Browser.Dom.id "header-search-input") "contributor"
                 , client.checkView 150
                     (ProgramTest.Query.withinId "header-search-input"
@@ -47,4 +49,3 @@ endToEndTests =
                     )
                 ]
         }
-    ]

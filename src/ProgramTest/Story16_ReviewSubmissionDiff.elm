@@ -9,8 +9,8 @@ import Wiki
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "16 — trusted contributor sees submission diff on review detail"
+    ProgramTest.Start.bothViewports
+        { baseName = "16 — trusted contributor sees submission diff on review detail"
         , config = ProgramTest.Config.demoWikiWithModerationSeeds
         , sessionId = "session-story16-review-diff"
         , path = "/"
@@ -41,4 +41,3 @@ endToEndTests =
                       ]
                     ]
         }
-    ]

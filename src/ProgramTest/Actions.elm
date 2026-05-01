@@ -2,6 +2,7 @@ module ProgramTest.Actions exposing
     ( createPage
     , loginToWiki
     , navigateToPath
+    , navigateToWikiHome
     , navigateToWikiSubmitEdit
     , submitHostAdminLoginFormViaFormSubmit
     , submitWikiEditForm
@@ -69,6 +70,16 @@ navigateToPath path client =
     [ client.update 100
         (UrlChanged (programTestUrl path Nothing))
     ]
+
+
+{-| `UrlChanged` to wiki home (no sidebar link ambiguity with subtle header wiki-home link).
+-}
+navigateToWikiHome :
+    Wiki.Slug
+    -> Effect.Test.FrontendActions ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model
+    -> List (Effect.Test.Action ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model)
+navigateToWikiHome wikiSlug client =
+    navigateToPath (Wiki.wikiHomeUrlPath wikiSlug) client
 
 
 {-| First ATX heading text (`# ...`) if present; otherwise `pageSlug`.
@@ -140,8 +151,9 @@ loginToWikiFromCatalog creds client =
                 (ProgramTest.Query.withinWikiCatalogRow creds.wikiSlug
                     (ProgramTest.Query.expectHasText (Wiki.wikiHomeUrlPath creds.wikiSlug))
                 )
-          , client.clickLink 100 (Wiki.wikiHomeUrlPath creds.wikiSlug)
-          , client.checkView 400
+          ]
+        , navigateToWikiHome creds.wikiSlug client
+        , [ client.checkView 400
                 (ProgramTest.Query.expectWikiHomePageShowsSlug creds.wikiSlug)
           , client.clickLink 100 creds.wikiHomeToLoginHref
           , client.checkView 200

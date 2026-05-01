@@ -9,8 +9,8 @@ import Wiki
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "15 — trusted contributor sees standard user's pending submission in review queue"
+    ProgramTest.Start.bothViewports
+        { baseName = "15 — trusted contributor sees standard user's pending submission in review queue"
         , config = ProgramTest.Config.demoWikiWithModerationSeeds
         , sessionId = "session-story15-review-queue"
         , path = "/"
@@ -47,4 +47,3 @@ endToEndTests =
                       ]
                     ]
         }
-    ]

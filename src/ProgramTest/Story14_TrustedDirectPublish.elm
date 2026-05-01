@@ -37,8 +37,9 @@ submitNewPageUrlAfterDraft =
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "14 — trusted contributor new page is public without review"
+    List.concat
+        [ ProgramTest.Start.bothViewports
+        { baseName = "14 — trusted contributor new page is public without review"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story14-trusted-new"
         , path = "/"
@@ -66,8 +67,9 @@ endToEndTests =
                             (ProgramTest.Query.withinPageMarkdownHeading "h1"
                                 (ProgramTest.Query.expectHasText "Story 14 trusted publish")
                             )
-                      , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
-                      , client.checkView 200
+                      ]
+                    , ProgramTest.Actions.navigateToWikiHome "Demo" client
+                    , [ client.checkView 200
                             (ProgramTest.Query.withinId "wiki-home-page-slugs"
                                 (ProgramTest.Query.expectDataAttributeOccurrenceCount "data-page-slug" "Story14TrustedPage" (\c -> c |> Expect.equal 1))
                             )
@@ -79,8 +81,8 @@ endToEndTests =
                       ]
                     ]
         }
-    , ProgramTest.Start.start
-        { name = "14 — trusted saves new-page draft then Create still publishes immediately"
+    , ProgramTest.Start.bothViewports
+        { baseName = "14 — trusted saves new-page draft then Create still publishes immediately"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story14-trusted-draft-create"
         , path = "/"
@@ -113,16 +115,17 @@ endToEndTests =
                             (ProgramTest.Query.withinPageMarkdownHeading "h1"
                                 (ProgramTest.Query.expectHasText "Story 14 draft then live")
                             )
-                      , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
-                      , client.checkView 200
+                      ]
+                    , ProgramTest.Actions.navigateToWikiHome "Demo" client
+                    , [ client.checkView 200
                             (ProgramTest.Query.withinId "wiki-home-page-slugs"
                                 (ProgramTest.Query.expectDataAttributeOccurrenceCount "data-page-slug" "Story14TrustedDraftThenLive" (\c -> c |> Expect.equal 1))
                             )
                       ]
                     ]
         }
-    , ProgramTest.Start.start
-        { name = "14 — trusted direct page edit redirects to published page"
+    , ProgramTest.Start.bothViewports
+        { baseName = "14 — trusted direct page edit redirects to published page"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story14-trusted-edit-redirect"
         , path = "/"
@@ -159,4 +162,4 @@ endToEndTests =
                     , ProgramTest.Actions.submitWikiEditForm "Demo" "Guides" "# Story 14 trusted edit redirect\n\nEdited body." client
                     ]
         }
-    ]
+        ]

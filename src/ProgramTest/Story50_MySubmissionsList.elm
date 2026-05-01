@@ -10,8 +10,9 @@ import Wiki
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "50 — contributor sees My submissions link and pending rows (demo_contributor)"
+    List.concat
+        [ ProgramTest.Start.bothViewports
+        { baseName = "50 — contributor sees My submissions link and pending rows (demo_contributor)"
         , config = ProgramTest.Config.demoWikiWithModerationSeeds
         , sessionId = "session-story50-my-submissions"
         , path = "/"
@@ -51,8 +52,8 @@ endToEndTests =
                       ]
                     ]
         }
-    , ProgramTest.Start.start
-        { name = "50 — new contributor sees empty my submissions list"
+    , ProgramTest.Start.bothViewports
+        { baseName = "50 — new contributor sees empty my submissions list"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story50-empty"
         , path = "/w/Demo/register"
@@ -74,4 +75,4 @@ endToEndTests =
                       ]
                     ]
         }
-    ]
+        ]

@@ -20,8 +20,8 @@ pageGraphUrl =
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "58 — page immediate graph link and page render"
+    ProgramTest.Start.bothViewports
+        { baseName = "58 — page immediate graph link and page render"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story58-page-immediate-graph"
         , path = "/w/Demo/p/About"
@@ -31,9 +31,9 @@ endToEndTests =
                 [ client.checkView 150
                     (ProgramTest.Query.expectAll
                         [ ProgramTest.Query.withinId "page-immediate-graph-link"
-                            (ProgramTest.Query.expectHasTexts [ "Graph" ])
+                            (ProgramTest.Query.expectHasTexts [ "Page graph" ])
                         , ProgramTest.Query.withinHref "/w/Demo/pg/About"
-                            (ProgramTest.Query.expectHasTexts [ "Graph" ])
+                            (ProgramTest.Query.expectHasTexts [ "Page graph" ])
                         ]
                     )
                 , client.update 100 (UrlChanged pageGraphUrl)
@@ -53,4 +53,3 @@ endToEndTests =
                     )
                 ]
         }
-    ]

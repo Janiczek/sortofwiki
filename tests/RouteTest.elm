@@ -337,6 +337,9 @@ suite =
                                         Route.WikiAdminAudit _ ->
                                             False
 
+                                        Route.WikiAdminAuditDiff _ _ ->
+                                            False
+
                                         Route.HostAdmin _ ->
                                             False
 
@@ -350,6 +353,9 @@ suite =
                                             False
 
                                         Route.HostAdminAudit ->
+                                            False
+
+                                        Route.HostAdminAuditDiff _ _ ->
                                             False
 
                                         Route.HostAdminBackup ->

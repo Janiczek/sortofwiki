@@ -8,8 +8,9 @@ import Wiki
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "See list of wikis on /"
+    List.concat
+        [ ProgramTest.Start.bothViewports
+        { baseName = "See list of wikis on /"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-anonymous-viewer"
         , path = "/"
@@ -32,8 +33,8 @@ endToEndTests =
                     )
                 ]
         }
-    , ProgramTest.Start.start
-        { name = "Empty hosted catalog shows a clear message on /"
+    , ProgramTest.Start.bothViewports
+        { baseName = "Empty hosted catalog shows a clear message on /"
         , config = ProgramTest.Config.emptyConfig
         , sessionId = "session-empty-catalog-viewer"
         , path = "/"
@@ -51,4 +52,4 @@ endToEndTests =
                     )
                 ]
         }
-    ]
+        ]

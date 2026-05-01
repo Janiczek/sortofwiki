@@ -34,8 +34,9 @@ submitNewNoQueryUrl =
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "49 — [[...]] to missing published page is red on MarkdownPlayground"
+    List.concat
+        [ ProgramTest.Start.bothViewports
+        { baseName = "49 — [[...]] to missing published page is red on MarkdownPlayground"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story49-red-wikilink"
         , path = "/w/Demo/p/MarkdownPlayground"
@@ -49,8 +50,8 @@ endToEndTests =
                     )
                 ]
         }
-    , ProgramTest.Start.start
-        { name = "49 — submit/new?page= shows page slug read-only from URL"
+    , ProgramTest.Start.bothViewports
+        { baseName = "49 — submit/new?page= shows page slug read-only from URL"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story49-submit-new-prefill"
         , path = "/w/Demo/register"
@@ -77,8 +78,8 @@ endToEndTests =
                       ]
                     ]
         }
-    , ProgramTest.Start.start
-        { name = "49 — submit/new without ?page= leaves page slug editable"
+    , ProgramTest.Start.bothViewports
+        { baseName = "49 — submit/new without ?page= leaves page slug editable"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story49-submit-new-editable-slug"
         , path = "/w/Demo/register"
@@ -100,8 +101,8 @@ endToEndTests =
                       ]
                     ]
         }
-    , ProgramTest.Start.start
-        { name = "49 — missing-page create link targets submit/new with page hint"
+    , ProgramTest.Start.bothViewports
+        { baseName = "49 — missing-page create link targets submit/new with page hint"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story49-missing-create-href"
         , path = "/w/Demo/p/Story49MissingTargetPage"
@@ -121,8 +122,8 @@ endToEndTests =
                     )
                 ]
         }
-    , ProgramTest.Start.start
-        { name = "49 — missing published page shows Create page in right nav"
+    , ProgramTest.Start.bothViewports
+        { baseName = "49 — missing published page shows Create page in right nav"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story49-sidebar-create"
         , path = "/w/Demo/p/Story49SidebarMissingPage"
@@ -146,8 +147,8 @@ endToEndTests =
                     )
                 ]
         }
-    , ProgramTest.Start.start
-        { name = "49 — missing published page shows backlinks in right nav"
+    , ProgramTest.Start.bothViewports
+        { baseName = "49 — missing published page shows backlinks in right nav"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story49-sidebar-backlinks"
         , path = "/w/Demo/p/Story49MissingPage"
@@ -158,8 +159,8 @@ endToEndTests =
                     (ProgramTest.Query.expectBacklinks "Demo" [ "MarkdownPlayground" ])
                 ]
         }
-    , ProgramTest.Start.start
-        { name = "49 — missing published page shows immediate page graph on /p/ route"
+    , ProgramTest.Start.bothViewports
+        { baseName = "49 — missing published page shows immediate page graph on /p/ route"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story49-missing-page-graph"
         , path = "/w/Demo/p/TodoGap"
@@ -176,4 +177,4 @@ endToEndTests =
                     )
                 ]
         }
-    ]
+        ]

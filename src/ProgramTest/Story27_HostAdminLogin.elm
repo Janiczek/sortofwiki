@@ -21,18 +21,22 @@ endToEndTests =
             \client ->
                 List.concat
                     [ [ client.checkView 100
-                            (ProgramTest.Query.expectAll
-                                [ ProgramTest.Query.headingIs "SortOfWiki"
-                                , ProgramTest.Query.subheadingIs "Admin: Login"
-                                ]
+                            (ProgramTest.Query.withinId "host-admin-login-page"
+                                (ProgramTest.Query.expectAll
+                                    [ ProgramTest.Query.expectHasText "SortOfWiki Admin"
+                                    , ProgramTest.Query.expectHasText "Platform administration login"
+                                    ]
+                                )
                             )
                       ]
                     , ProgramTest.Actions.navigateToPath Wiki.hostAdminWikisUrlPath client
                     , [ client.checkView 200
-                            (ProgramTest.Query.expectAll
-                                [ ProgramTest.Query.headingIs "SortOfWiki"
-                                , ProgramTest.Query.subheadingIs "Admin: Login"
-                                ]
+                            (ProgramTest.Query.withinId "host-admin-login-page"
+                                (ProgramTest.Query.expectAll
+                                    [ ProgramTest.Query.expectHasText "SortOfWiki Admin"
+                                    , ProgramTest.Query.expectHasText "Platform administration login"
+                                    ]
+                                )
                             )
                       , client.input 100 (Effect.Browser.Dom.id "host-admin-login-password") "wrong-password"
                       ]
@@ -72,18 +76,22 @@ endToEndTests =
             \client ->
                 List.concat
                     [ [ client.checkView 100
-                            (ProgramTest.Query.expectAll
-                                [ ProgramTest.Query.headingIs "SortOfWiki"
-                                , ProgramTest.Query.subheadingIs "Admin: Login"
-                                ]
+                            (ProgramTest.Query.withinId "host-admin-login-page"
+                                (ProgramTest.Query.expectAll
+                                    [ ProgramTest.Query.expectHasText "SortOfWiki Admin"
+                                    , ProgramTest.Query.expectHasText "Platform administration login"
+                                    ]
+                                )
                             )
                       ]
                     , ProgramTest.Actions.navigateToPath Wiki.hostAdminWikisUrlPath client
                     , [ client.checkView 200
-                            (ProgramTest.Query.expectAll
-                                [ ProgramTest.Query.headingIs "SortOfWiki"
-                                , ProgramTest.Query.subheadingIs "Admin: Login"
-                                ]
+                            (ProgramTest.Query.withinId "host-admin-login-page"
+                                (ProgramTest.Query.expectAll
+                                    [ ProgramTest.Query.expectHasText "SortOfWiki Admin"
+                                    , ProgramTest.Query.expectHasText "Platform administration login"
+                                    ]
+                                )
                             )
                       ]
                     , ProgramTest.Actions.submitHostAdminLoginFormViaFormSubmit Env.hostAdminPassword client

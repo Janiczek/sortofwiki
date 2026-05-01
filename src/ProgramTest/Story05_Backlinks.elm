@@ -51,8 +51,8 @@ publishedLinkerUrl =
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "Backlinks: create, check existence, remove, check absence"
+    ProgramTest.Start.bothViewports
+        { baseName = "Backlinks: create, check existence, remove, check absence"
         , config = ProgramTest.Config.demoWikiCatalogOnly
         , sessionId = "session-story05-backlinks"
         , path = "/"
@@ -98,4 +98,3 @@ endToEndTests =
                       ]
                     ]
         }
-    ]

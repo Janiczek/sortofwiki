@@ -9,8 +9,8 @@ import Wiki
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "13 — contributor sees seeded reviewer note on sub_3 (demo_contributor / password12)"
+    ProgramTest.Start.bothViewports
+        { baseName = "13 — contributor sees seeded reviewer note on sub_3 (demo_contributor / password12)"
         , config = ProgramTest.Config.demoWikiWithModerationSeeds
         , sessionId = "session-story13-reviewer-note"
         , path = "/"
@@ -35,4 +35,3 @@ endToEndTests =
                       ]
                     ]
         }
-    ]

@@ -35,8 +35,9 @@ submitNewPageUrl =
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "9 — save new-page draft off index; submit for review; missing-page copy"
+    List.concat
+        [ ProgramTest.Start.bothViewports
+        { baseName = "9 — save new-page draft off index; submit for review; missing-page copy"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story09-submit"
         , path = "/w/Demo/register"
@@ -69,8 +70,9 @@ endToEndTests =
                             (ProgramTest.Query.withinId "wiki-submit-new-save-draft-success"
                                 (ProgramTest.Query.expectHasText "Draft saved.")
                             )
-                      , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
-                      , client.checkView 200
+                      ]
+                    , ProgramTest.Actions.navigateToWikiHome "Demo" client
+                    , [ client.checkView 200
                             (ProgramTest.Query.withinId "wiki-home-page-slugs"
                                 (ProgramTest.Query.expectDataAttributeOccurrenceCount "data-page-slug" "Story09NewPage" (\c -> c |> Expect.equal 0))
                             )
@@ -144,8 +146,8 @@ endToEndTests =
                       ]
                     ]
         }
-    , ProgramTest.Start.start
-        { name = "9 — cross-session: saved new-page draft still listed after logout and login"
+    , ProgramTest.Start.bothViewports
+        { baseName = "9 — cross-session: saved new-page draft still listed after logout and login"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story09-cross"
         , path = "/w/Demo/register"
@@ -183,8 +185,8 @@ endToEndTests =
                       ]
                     ]
         }
-    , ProgramTest.Start.start
-        { name = "9 — withdraw pending new page to draft; delete removes missing-page notice"
+    , ProgramTest.Start.bothViewports
+        { baseName = "9 — withdraw pending new page to draft; delete removes missing-page notice"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story09-withdraw-delete"
         , path = "/w/Demo/register"
@@ -252,8 +254,9 @@ endToEndTests =
                             (ProgramTest.Query.withinId "wiki-my-submissions-empty"
                                 (ProgramTest.Query.expectHasText "No submissions to show here yet.")
                             )
-                      , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
-                      , client.update 100 (UrlChanged missingUrl)
+                      ]
+                    , ProgramTest.Actions.navigateToWikiHome "Demo" client
+                    , [ client.update 100 (UrlChanged missingUrl)
                       , client.checkView 400
                             (ProgramTest.Query.withinId "wiki-missing-published-page"
                                 (ProgramTest.Query.expectHasNotId "wiki-missing-published-pending-notice")
@@ -261,8 +264,8 @@ endToEndTests =
                       ]
                     ]
         }
-    , ProgramTest.Start.start
-        { name = "9 — missing page without login shows no contributor draft notice"
+    , ProgramTest.Start.bothViewports
+        { baseName = "9 — missing page without login shows no contributor draft notice"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story09-missing-anon"
         , path = "/w/Demo/p/Story09AnonMissing"
@@ -279,4 +282,4 @@ endToEndTests =
                     )
                 ]
         }
-    ]
+        ]

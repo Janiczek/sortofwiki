@@ -23,8 +23,9 @@ submitNewPageUrl =
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "12 — contributor sees Pending on new submission detail"
+    List.concat
+        [ ProgramTest.Start.bothViewports
+        { baseName = "12 — contributor sees Pending on new submission detail"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story12-pending"
         , path = "/w/Demo/register"
@@ -74,8 +75,8 @@ endToEndTests =
                       ]
                     ]
         }
-    , ProgramTest.Start.start
-        { name = "12 — seeded demo user sees Rejected on sub_3 (log in as demo_contributor / password12)"
+    , ProgramTest.Start.bothViewports
+        { baseName = "12 — seeded demo user sees Rejected on sub_3 (log in as demo_contributor / password12)"
         , config = ProgramTest.Config.demoWikiWithModerationSeeds
         , sessionId = "session-story12-seed-rejected"
         , path = "/"
@@ -104,4 +105,4 @@ endToEndTests =
                       ]
                     ]
         }
-    ]
+        ]

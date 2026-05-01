@@ -9,8 +9,9 @@ import Wiki
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "See wiki page content on /w/Demo/p/Guides"
+    List.concat
+        [ ProgramTest.Start.bothViewports
+        { baseName = "See wiki page content on /w/Demo/p/Guides"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-published-page-guides"
         , path = "/w/Demo/p/Guides"
@@ -49,8 +50,8 @@ endToEndTests =
                     )
                 ]
         }
-    , ProgramTest.Start.start
-        { name = "See '[[Unknown]]: Create?' on /w/Demo/p/Unknown"
+    , ProgramTest.Start.bothViewports
+        { baseName = "See '[[Unknown]]: Create?' on /w/Demo/p/Unknown"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-published-page-missing"
         , path = "/w/Demo/p/Unknown"
@@ -67,7 +68,7 @@ endToEndTests =
                             )
                         , ProgramTest.Query.withinId "wiki-missing-published-page"
                             (ProgramTest.Query.expectDescendantMatchesEvery
-                                [ Test.Html.Selector.text "The page \"Unknown\" does not exist yet."
+                                [ Test.Html.Selector.text "This page does not exist yet."
                                 , Test.Html.Selector.id "wiki-missing-published-login-link"
                                 ]
                             )
@@ -82,4 +83,4 @@ endToEndTests =
                     )
                 ]
         }
-    ]
+        ]

@@ -11,8 +11,9 @@ import Wiki
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "My submissions: TrustedContributor doesn't see link and can't access"
+    List.concat
+        [ ProgramTest.Start.bothViewports
+        { baseName = "My submissions: TrustedContributor doesn't see link and can't access"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story54-trusted-my-submissions"
         , path = "/"
@@ -41,8 +42,8 @@ endToEndTests =
                       ]
                     ]
         }
-    , ProgramTest.Start.start
-        { name = "My submissions: Admin doesn't see link and can't access"
+    , ProgramTest.Start.bothViewports
+        { baseName = "My submissions: Admin doesn't see link and can't access"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story54-admin-my-submissions"
         , path = "/"
@@ -71,8 +72,8 @@ endToEndTests =
                       ]
                     ]
         }
-    , ProgramTest.Start.start
-        { name = "My submissions: UntrustedContributor sees link and can access"
+    , ProgramTest.Start.bothViewports
+        { baseName = "My submissions: UntrustedContributor sees link and can access"
         , config = ProgramTest.Config.demoWikiWithModerationSeeds
         , sessionId = "session-story54-untrusted-my-submissions"
         , path = "/"
@@ -98,4 +99,4 @@ endToEndTests =
                       ]
                     ]
         }
-    ]
+        ]

@@ -60,6 +60,7 @@ import UI.FormActionFooter
 import UI.Graph
 import UI.Heading
 import UI.Link
+import UI.MobileChrome
 import UI.PanelHeader
 import UI.ResultNotice
 import UI.SidebarSection
@@ -72,6 +73,7 @@ import Wiki
 import WikiAdminUsers
 import WikiAuditLog
 import WikiGraph
+import WikiMarkdownEditorPane exposing (WikiMarkdownEditorPane(..))
 import WikiRole exposing (WikiRole)
 import WikiSearch
 import WikiTodos
@@ -88,6 +90,7 @@ type alias Msg =
 type AppHeaderSecondary
     = AppHeaderSecondaryPlain String
     | AppHeaderSecondaryWikiLink String
+    | AppHeaderSecondaryWikiHome Wiki.Slug String
     | AppHeaderSecondaryPlainThenWikiLink { plainPrefix : String, wikiLabel : String }
     | AppHeaderSecondaryWikiLinkThenPlain { wikiLabel : String, plainSuffix : String }
 
@@ -105,9 +108,52 @@ wikiLoadedHeaderTitle summary maybeSecondary =
     , primaryHref = Just Wiki.wikiListUrlPath
     , secondary =
         maybeSecondary
-            |> Maybe.withDefault (AppHeaderSecondaryPlain summary.name)
+            |> Maybe.withDefault (AppHeaderSecondaryWikiHome summary.slug summary.name)
             |> Just
     }
+
+
+{-| Wiki page route: published pages show wiki name + \[\[slug\]\]; missing pages show \[\[slug\]\]: Create? (matches program tests / wiki-link convention).
+-}
+wikiPageRouteHeaderSecondary :
+    Store
+    -> Wiki.Slug
+    -> Page.Slug
+    -> Wiki.CatalogEntry
+    -> AppHeaderSecondary
+wikiPageRouteHeaderSecondary store wikiSlug pageSlug summary =
+    case Store.get_ ( wikiSlug, pageSlug ) store.publishedPages of
+        Success pageDetails ->
+            case pageDetails.maybeMarkdownSource of
+                Just _ ->
+                    AppHeaderSecondaryPlainThenWikiLink
+                        { plainPrefix = summary.name ++ " "
+                        , wikiLabel = pageSlug
+                        }
+
+                Nothing ->
+                    AppHeaderSecondaryWikiLinkThenPlain
+                        { wikiLabel = pageSlug
+                        , plainSuffix = ": Create?"
+                        }
+
+        Failure _ ->
+            AppHeaderSecondaryWikiLinkThenPlain
+                { wikiLabel = pageSlug
+                , plainSuffix = ": Create?"
+                }
+
+        NotAsked ->
+            AppHeaderSecondaryPlainThenWikiLink
+                { plainPrefix = summary.name ++ " "
+                , wikiLabel = pageSlug
+                }
+
+        Loading ->
+            AppHeaderSecondaryPlainThenWikiLink
+                { plainPrefix = summary.name ++ " "
+                , wikiLabel = pageSlug
+                }
 
 
 sortOfWikiAppHeaderTitle : Maybe AppHeaderSecondary -> AppHeaderTitle
@@ -1045,6 +1091,14 @@ hostAdminSectionNavVisible model =
 sideNavLinkLi : SideNavMenu.Link -> Html Msg
 sideNavLinkLi link =
     case link.linkRoute of
+        Route.WikiList ->
+            Html.li [ Attr.class "md:hidden" ]
+                [ UI.Link.navListItem link.linkEmphasized
+                    [ Attr.href (Route.navUrlPath link.linkRoute)
+                    ]
+                    [ Html.text link.linkLabel ]
+                ]
+
         Route.HostAdmin Nothing ->
             Html.li []
                 [ UI.Link.navListItemMuted link.linkEmphasized
@@ -1060,6 +1114,59 @@ sideNavLinkLi link =
                     ]
                     [ Html.text link.linkLabel ]
                 ]
+
+
+themePreferenceLabel : ColorTheme.ColorThemePreference -> String
+themePreferenceLabel preference =
+    case preference of
+        ColorTheme.FollowSystem ->
+            "System"
+
+        ColorTheme.Fixed ColorTheme.Light ->
+            "Light"
+
+        ColorTheme.Fixed ColorTheme.Dark ->
+            "Dark"
+
+
+mobileThemeToggleLi : Model -> Html Msg
+mobileThemeToggleLi model =
+    Html.li
+        [ Attr.class "md:hidden" ]
+        [ UI.Button.inlineLinkButton
+            [ Attr.type_ "button"
+            , Attr.id "mobile-color-theme-toggle"
+            , Attr.class "block w-full rounded py-[0.14rem] px-[0.55rem] -ml-[0.55rem] text-left [font-family:var(--font-ui)] text-[0.8125rem]"
+            , Events.onClick ColorThemeToggled
+            ]
+            [ Html.text ("Theme: " ++ themePreferenceLabel model.colorThemePreference) ]
+        ]
+
+
+mobileWikiAccountItems : Wiki.Slug -> Maybe ContributorWikiSession -> List (Html Msg)
+mobileWikiAccountItems wikiSlug maybeSession =
+    case maybeSession of
+        Just session ->
+            [ Html.li [ Attr.class "md:hidden" ]
+                [ Html.span
+                    [ Attr.id "mobile-wiki-account-link"
+                    , Attr.class "block w-full rounded py-[0.14rem] px-[0.55rem] -ml-[0.55rem] text-[0.8125rem] text-[var(--fg-muted)]"
+                    ]
+                    [ Html.text ("@" ++ session.displayUsername) ]
+                ]
+            , Html.li [ Attr.class "md:hidden" ]
+                [ UI.Button.inlineLinkButton
+                    [ Attr.type_ "button"
+                    , Attr.id "mobile-wiki-logout-button"
+                    , Attr.class "block w-full rounded py-[0.14rem] px-[0.55rem] -ml-[0.55rem] text-left [font-family:var(--font-ui)] text-[0.8125rem]"
+                    , Events.onClick (ContributorLogoutWiki wikiSlug)
+                    ]
+                    [ Html.text "Logout" ]
+                ]
+            ]
+
+        Nothing ->
+            []
 
 
 reviewQueueCountForWiki :
@@ -1199,6 +1306,14 @@ viewSortOfWikiSideNavSections model =
         , showHostAdminTools = hostAdminSectionNavVisible model
         }
         |> List.map sideNavSectionFromMenu
+        |> List.map
+            (\section ->
+                if section.heading == "Site" then
+                    { section | items = section.items ++ [ mobileThemeToggleLi model ] }
+
+                else
+                    section
+            )
 
 
 init :
@@ -1253,6 +1368,8 @@ init url key =
             , hostAdminWikiImportInFlightSlug = Nothing
             , hostAdminWikiImportPendingSlug = Nothing
             , hostAdminWikisNotice = Nothing
+            , sideNavOpen = False
+            , wikiMarkdownEditorPane = EditorWrite
             , navigationFragment = Nothing
             }
 
@@ -1350,6 +1467,8 @@ init url key =
             , hostAdminWikiImportInFlightSlug = Nothing
             , hostAdminWikiImportPendingSlug = Nothing
             , hostAdminWikisNotice = Nothing
+            , sideNavOpen = False
+            , wikiMarkdownEditorPane = EditorWrite
             , navigationFragment = url.fragment
             }
     in
@@ -2013,6 +2132,8 @@ update msg model =
                         , hostAdminWikiImportInFlightSlug = Nothing
                         , hostAdminWikiImportPendingSlug = Nothing
                         , hostAdminWikisNotice = Nothing
+                        , sideNavOpen = False
+                        , wikiMarkdownEditorPane = EditorWrite
                     }
 
                 next : Model
@@ -2050,6 +2171,21 @@ update msg model =
 
         UrlFragmentScrollDone ->
             ( model, Command.none )
+
+        SideNavOpened ->
+            ( { model | sideNavOpen = True }
+            , Command.none
+            )
+
+        SideNavClosed ->
+            ( { model | sideNavOpen = False }
+            , Command.none
+            )
+
+        WikiMarkdownEditorPaneSelected pane ->
+            ( { model | wikiMarkdownEditorPane = pane }
+            , Command.none
+            )
 
         ContributorLogoutWiki wikiSlug ->
             ( model, Effect.Lamdera.sendToBackend (LogoutContributor wikiSlug) )
@@ -7146,12 +7282,7 @@ wikiScopeSideNavItems wikiSlug model =
 
         authChrome : List (Html Msg)
         authChrome =
-            case maybeCw of
-                Just _ ->
-                    []
-
-                Nothing ->
-                    []
+            mobileWikiAccountItems wikiSlug maybeCw
     in
     List.concat
         [ authChrome
@@ -7257,12 +7388,7 @@ appHeaderTitle ({ store, route } as model) =
             wikiScopeHeaderTitle store wikiSlug <|
                 \summary ->
                     wikiLoadedHeaderTitle summary <|
-                        Just
-                            (AppHeaderSecondaryPlainThenWikiLink
-                                { plainPrefix = summary.name ++ " "
-                                , wikiLabel = pageSlug
-                                }
-                            )
+                        Just (wikiPageRouteHeaderSecondary store wikiSlug pageSlug summary)
 
         Route.WikiPageGraph wikiSlug pageSlug ->
             wikiScopeHeaderTitle store wikiSlug <|
@@ -7389,6 +7515,14 @@ viewAppHeaderSecondary secondary =
                 [ Html.text label
                 ]
 
+        AppHeaderSecondaryWikiHome wikiSlug label ->
+            Html.a
+                [ Attr.href (Wiki.wikiHomeUrlPath wikiSlug)
+                , UI.appHeaderSecondaryMetaAttr
+                , Attr.class "no-underline hover:underline underline-offset-[2px]"
+                ]
+                [ Html.text label ]
+
         AppHeaderSecondaryWikiLink label ->
             Html.span [ UI.appHeaderSecondaryWikiWrapAttr ]
                 [ Html.span
@@ -7440,9 +7574,192 @@ viewAppHeaderTitleInner t =
                 ]
 
 
+appHeaderSecondaryToText : AppHeaderSecondary -> String
+appHeaderSecondaryToText secondary =
+    case secondary of
+        AppHeaderSecondaryPlain label ->
+            label
+
+        AppHeaderSecondaryWikiHome _ label ->
+            label
+
+        AppHeaderSecondaryWikiLink label ->
+            "[[" ++ label ++ "]]"
+
+        AppHeaderSecondaryPlainThenWikiLink { plainPrefix, wikiLabel } ->
+            plainPrefix ++ "[[" ++ wikiLabel ++ "]]"
+
+        AppHeaderSecondaryWikiLinkThenPlain { wikiLabel, plainSuffix } ->
+            "[[" ++ wikiLabel ++ "]]" ++ plainSuffix
+
+
+wikiSlugForRoute : Route -> Maybe Wiki.Slug
+wikiSlugForRoute route =
+    case route of
+        Route.WikiHome slug ->
+            Just slug
+
+        Route.WikiTodos slug ->
+            Just slug
+
+        Route.WikiGraph slug ->
+            Just slug
+
+        Route.WikiSearch slug ->
+            Just slug
+
+        Route.WikiPage wikiSlug _ ->
+            Just wikiSlug
+
+        Route.WikiPageGraph wikiSlug _ ->
+            Just wikiSlug
+
+        Route.WikiRegister slug ->
+            Just slug
+
+        Route.WikiLogin slug _ ->
+            Just slug
+
+        Route.WikiSubmitNew slug ->
+            Just slug
+
+        Route.WikiSubmitEdit slug _ ->
+            Just slug
+
+        Route.WikiSubmitDelete slug _ ->
+            Just slug
+
+        Route.WikiSubmissionDetail slug _ ->
+            Just slug
+
+        Route.WikiMySubmissions slug ->
+            Just slug
+
+        Route.WikiReview slug ->
+            Just slug
+
+        Route.WikiReviewDetail slug _ ->
+            Just slug
+
+        Route.WikiAdminUsers slug ->
+            Just slug
+
+        Route.WikiAdminAudit slug ->
+            Just slug
+
+        Route.WikiAdminAuditDiff slug _ ->
+            Just slug
+
+        Route.WikiList ->
+            Nothing
+
+        Route.HostAdmin _ ->
+            Nothing
+
+        Route.HostAdminWikis ->
+            Nothing
+
+        Route.HostAdminWikiNew ->
+            Nothing
+
+        Route.HostAdminWikiDetail _ ->
+            Nothing
+
+        Route.HostAdminAudit ->
+            Nothing
+
+        Route.HostAdminAuditDiff _ _ ->
+            Nothing
+
+        Route.HostAdminBackup ->
+            Nothing
+
+        Route.NotFound _ ->
+            Nothing
+
+
+wikiNameForRoute : Store -> Route -> Maybe String
+wikiNameForRoute store route =
+    case wikiSlugForRoute route of
+        Just slug ->
+            case store.wikiCatalog of
+                RemoteData.Success catalog ->
+                    Dict.get slug catalog |> Maybe.map .name
+
+                RemoteData.Failure _ ->
+                    Nothing
+
+                RemoteData.Loading ->
+                    Nothing
+
+                RemoteData.NotAsked ->
+                    Nothing
+
+        Nothing ->
+            Nothing
+
+
+mobileHeaderMainTitle : Model -> AppHeaderTitle -> String
+mobileHeaderMainTitle model headerTitle =
+    case model.route of
+        Route.WikiHome _ ->
+            "Pages"
+
+        Route.WikiPage _ pageSlug ->
+            "[[" ++ pageSlug ++ "]]"
+
+        Route.WikiPageGraph _ pageSlug ->
+            "[[" ++ pageSlug ++ "]]: Graph"
+
+        Route.WikiSubmitNew _ ->
+            if String.isEmpty model.newPageSubmitDraft.pageSlug then
+                "Create page"
+
+            else
+                "Create [[" ++ model.newPageSubmitDraft.pageSlug ++ "]]"
+
+        Route.WikiSubmitEdit _ pageSlug ->
+            "Edit [[" ++ pageSlug ++ "]]"
+
+        Route.WikiSubmitDelete _ pageSlug ->
+            "Delete [[" ++ pageSlug ++ "]]"
+
+        _ ->
+            case headerTitle.secondary of
+                Just secondary ->
+                    appHeaderSecondaryToText secondary
+
+                Nothing ->
+                    headerTitle.primary
+
+
+viewMobileHeaderTitle : Model -> AppHeaderTitle -> Html Msg
+viewMobileHeaderTitle model headerTitle =
+    let
+        routeTitle : String
+        routeTitle =
+            mobileHeaderMainTitle model headerTitle
+    in
+    Html.span [ Attr.class "flex md:hidden min-w-0 flex-col gap-[0.05rem]" ]
+        [ Html.span [ Attr.class "block truncate text-[1.06rem] leading-[1.2] font-normal text-[var(--fg)] [font-family:var(--font-serif)]" ]
+            [ Html.text routeTitle ]
+        , case wikiNameForRoute model.store model.route of
+            Just wikiName ->
+                Html.span [ Attr.class "block truncate text-[0.76rem] leading-[1.2] text-[var(--fg-muted)] italic font-normal [font-family:var(--font-serif)]" ]
+                    [ Html.text wikiName ]
+
+            Nothing ->
+                Html.text ""
+        ]
+
+
 viewAppHeader : Model -> Html Msg
 viewAppHeader model =
     let
+        headerTitle : AppHeaderTitle
+        headerTitle =
+            appHeaderTitle model
+
         wikiAuthChrome : Html Msg
         wikiAuthChrome =
             case wikiSideNavSlugIfActive model of
@@ -7585,25 +7902,55 @@ viewAppHeader model =
 
             else
                 Nothing
+
     in
     Html.header
         [ UI.appHeaderBarAttr
         , Attr.attribute "data-context" "layout-header"
         ]
-        ([ Html.div [ Attr.class "min-w-0 flex-1 flex items-center gap-[0.7rem] flex-wrap" ]
-            [ Html.h1 [ UI.appHeaderH1Attr ]
-                [ viewAppHeaderTitleInner (appHeaderTitle model) ]
-            ]
+        ([ Html.div [ Attr.class "min-w-0 flex-1 flex items-center gap-[0.7rem] flex-wrap md:flex-nowrap" ]
+            (List.concat
+                [ if routeUsesAuthShell model.route then
+                    []
+
+                  else
+                    [ UI.MobileChrome.menuButton
+                        [ Events.onClick
+                            (if model.sideNavOpen then
+                                SideNavClosed
+
+                             else
+                                SideNavOpened
+                            )
+                        , Attr.attribute "aria-expanded"
+                            (if model.sideNavOpen then
+                                "true"
+
+                             else
+                                "false"
+                            )
+                        ]
+                    ]
+                , [ Html.h1 [ UI.appHeaderH1Attr ]
+                        [ Html.span [ Attr.class "hidden md:inline" ]
+                            [ viewAppHeaderTitleInner headerTitle ]
+                        , viewMobileHeaderTitle model headerTitle
+                        ]
+                  ]
+                ]
+            )
          ]
             ++ (maybeSearchForm |> Maybe.map List.singleton |> Maybe.withDefault [])
             ++ [ Html.div [ Attr.class "shrink-0 flex items-center gap-2" ]
-                    [ wikiAuthChrome
+                    [ Html.span [ Attr.class "hidden md:inline-flex items-center" ]
+                        [ wikiAuthChrome ]
                     , Html.span
                         [ Attr.class "hidden md:inline h-7 w-px bg-[var(--border-subtle)]"
                         , Attr.attribute "aria-hidden" "true"
                         ]
                         []
-                    , viewThemeToggle model
+                    , Html.span [ Attr.class "hidden md:inline-flex" ]
+                        [ viewThemeToggle model ]
                     ]
                ]
         )
@@ -7621,7 +7968,7 @@ siteAdminRoute model =
 viewWikiListBottomSiteAdminLink : Model -> Html Msg
 viewWikiListBottomSiteAdminLink model =
     Html.footer
-        [ Attr.class "shrink-0 border-t border-[var(--border-subtle)] bg-[var(--bg)] px-[0.85rem] py-[0.75rem] text-right shadow-[inset_0_8px_14px_-12px_rgba(73,103,49,0.3)]" ]
+        [ Attr.class "hidden md:block shrink-0 border-t border-[var(--border-subtle)] bg-[var(--bg)] px-[0.85rem] py-[0.75rem] text-right shadow-[inset_0_8px_14px_-12px_rgba(73,103,49,0.3)]" ]
         [ UI.Link.subtleLink
             [ Attr.id "wiki-list-site-admin-link"
             , Attr.href (Route.navUrlPath (siteAdminRoute model))
@@ -9306,8 +9653,8 @@ viewNewPageSubmitFeedback wikiSlug draft =
         ]
 
 
-viewSubmitNewLoaded : Wiki.Slug -> (Page.Slug -> Bool) -> Bool -> NewPageSubmitDraft -> Html Msg
-viewSubmitNewLoaded wikiSlug publishedSlugExists showUntrustedContributorDisclaimer draft =
+viewSubmitNewLoaded : Wiki.Slug -> (Page.Slug -> Bool) -> Bool -> NewPageSubmitDraft -> WikiMarkdownEditorPane -> Html Msg
+viewSubmitNewLoaded wikiSlug publishedSlugExists showUntrustedContributorDisclaimer draft editorPane =
     let
         formBusy : Bool
         formBusy =
@@ -9364,8 +9711,13 @@ viewSubmitNewLoaded wikiSlug publishedSlugExists showUntrustedContributorDisclai
                         ]
                     ]
                 , contentAttrs = []
+                , maybeMarkdownTabs =
+                    Just
+                        { activePane = editorPane
+                        , onSelectPane = WikiMarkdownEditorPaneSelected
+                        }
                 , contentChildren =
-                    [ Html.section [ Attr.class "min-w-0 min-h-0 flex flex-col bg-[var(--input-bg)]" ]
+                    [ Html.section [ Attr.class "min-w-0 min-h-0 h-full flex-1 flex flex-col bg-[var(--input-bg)]" ]
                         [ UI.PanelHeader.view { kind = UI.PanelHeader.Primary, text = "EDITOR" }
                         , Html.div [ Attr.class "min-h-0 flex-1" ]
                             [ Html.textarea
@@ -9381,7 +9733,7 @@ viewSubmitNewLoaded wikiSlug publishedSlugExists showUntrustedContributorDisclai
                                 []
                             ]
                         ]
-                    , Html.section [ Attr.class "min-w-0 min-h-0 flex flex-col bg-[var(--bg)]" ]
+                    , Html.section [ Attr.class "min-w-0 min-h-0 h-full flex-1 flex flex-col bg-[var(--bg)]" ]
                         [ UI.PanelHeader.view { kind = UI.PanelHeader.Secondary, text = "LIVE PREVIEW" }
                         , Html.div [ Attr.class "min-h-0 flex-1 p-3" ]
                             [ Html.div
@@ -9432,6 +9784,7 @@ viewSubmitNewRoute model wikiSlug =
                         (publishedSlugExistsFromWikiDetails wikiDetails)
                         (contributorLoggedInOnWikiSlug wikiSlug model && not (wikiSessionTrustedOnWiki wikiSlug model))
                         model.newPageSubmitDraft
+                        model.wikiMarkdownEditorPane
 
                 RemoteData.Failure _ ->
                     viewNotFound
@@ -9520,8 +9873,9 @@ viewSubmitEditLoaded :
     -> (Page.Slug -> Bool)
     -> Page.FrontendDetails
     -> PageEditSubmitDraft
+    -> WikiMarkdownEditorPane
     -> Html Msg
-viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publishedSlugExists pageDetails draft =
+viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publishedSlugExists pageDetails draft editorPane =
     let
         formBusy : Bool
         formBusy =
@@ -9538,14 +9892,6 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
         publishedHeadingButton : Bool -> String -> Html Msg
         publishedHeadingButton showIcon label =
             let
-                spacingAndDividerClass : String
-                spacingAndDividerClass =
-                    if publishedRowCollapsed then
-                        ""
-
-                    else
-                        " mb-2 border-b"
-
                 iconNodes : List (Html Msg)
                 iconNodes =
                     if showIcon then
@@ -9569,7 +9915,7 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
             in
             Html.button
                 [ Attr.type_ "button"
-                , Attr.class ("w-full appearance-none border-0 border-[var(--border-subtle)] bg-transparent m-0 px-4 py-1 text-left leading-[1] cursor-pointer transition-colors hover:bg-[var(--chrome-bg-hover)] hover:text-[var(--fg)]" ++ spacingAndDividerClass)
+                , Attr.class "w-full appearance-none border-0 border-b border-[var(--border-subtle)] bg-transparent m-0 px-4 py-1 text-left leading-[1] cursor-pointer transition-colors hover:bg-[var(--chrome-bg-hover)] hover:text-[var(--fg)]"
                 , Events.onClick PageEditPublishedRowToggled
                 ]
                 [ Html.span [ Attr.class "relative inline-flex items-center -translate-y-[1px] font-sans text-[0.8125rem] leading-[1]" ]
@@ -9590,11 +9936,7 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
 
         editPaneGridClass : String
         editPaneGridClass =
-            if publishedRowCollapsed then
-                "min-h-0 flex-1 grid grid-rows-1 gap-3"
-
-            else
-                "min-h-0 flex-1 grid grid-rows-2 gap-3"
+            "min-h-0 flex-1 flex flex-col"
 
         publishedMarkdownRow : List (Html Msg)
         publishedMarkdownRow =
@@ -9602,7 +9944,7 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
                 []
 
             else
-                [ Html.div [ UI.newPageEditorMarkdownPreviewCellAttr ]
+                [ Html.div [ UI.newPageEditorMarkdownPreviewCellAttr, Attr.class "flex-1 min-h-0" ]
                     [ submitEditReadonlyTextarea "wiki-submit-edit-original-markdown" originalMarkdown " h-full max-h-none px-4" ]
                 ]
 
@@ -9612,11 +9954,12 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
                 []
 
             else
-                [ Html.div [ UI.newPageEditorMarkdownPreviewCellAttr ]
+                [ Html.div [ UI.newPageEditorMarkdownPreviewCellAttr, Attr.class "flex-1 min-h-0" ]
                     [ Html.div
-                        [ Attr.class "h-full max-h-none opacity-75"
-                        , UI.markdownPreviewScrollMinFlexFullHeightAttr
-                        , Attr.class "px-4 pt-2"
+                        [ Attr.class
+                            (UI.markdownPreviewScrollClass
+                                ++ " min-h-0 h-full flex-1 max-h-none opacity-75 px-4 pt-2"
+                            )
                         ]
                         [ PageMarkdown.viewPreview "wiki-submit-edit-original-preview" wikiSlug publishedSlugExists originalMarkdown ]
                     ]
@@ -9627,12 +9970,29 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
             Html.textarea
                 ([ Attr.id elementId
                  , Attr.readonly True
-                 , Attr.rows 12
                  , Attr.value markdown
                  ]
                     |> UI.Textarea.markdownReadonlyWithExtra extraClass
                 )
                 []
+
+        yourEditHeadingClass : String
+        yourEditHeadingClass =
+            (if publishedRowCollapsed then
+                "shrink-0 px-4 py-1 border-b border-[var(--border-subtle)] text-[0.8125rem]"
+
+             else
+                "shrink-0 px-4 py-1 border-t border-b border-[var(--border-subtle)] text-[0.8125rem]"
+            )
+
+        yourPreviewHeadingClass : String
+        yourPreviewHeadingClass =
+            (if publishedRowCollapsed then
+                "shrink-0 px-4 py-1 border-b border-[var(--border-subtle)] text-[0.8125rem]"
+
+             else
+                "shrink-0 px-4 py-1 border-t border-b border-[var(--border-subtle)] text-[0.8125rem]"
+            )
     in
     Html.div
         [ Attr.id "wiki-submit-edit-page"
@@ -9663,43 +10023,48 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
                         ]
                     ]
                 , contentAttrs = []
+                , maybeMarkdownTabs =
+                    Just
+                        { activePane = editorPane
+                        , onSelectPane = WikiMarkdownEditorPaneSelected
+                        }
                 , contentChildren =
-                    [ Html.section [ Attr.class "min-w-0 min-h-0 flex flex-col bg-[var(--input-bg)]" ]
+                    [ Html.section [ Attr.class "min-w-0 min-h-0 h-full flex-1 flex flex-col bg-[var(--input-bg)]" ]
                         [ UI.PanelHeader.view { kind = UI.PanelHeader.Primary, text = "EDITOR" }
                         , publishedHeadingButton True "Published"
                         , Html.div [ Attr.class editPaneGridClass ]
                             (publishedMarkdownRow
-                                ++ [ Html.div [ UI.newPageEditorMarkdownPreviewCellAttr, Attr.class "border-t border-[var(--border-subtle)]" ]
-                                        [ UI.Heading.panelHeadingSecondary [ Attr.class "px-4 py-1 mb-2 border-b border-[var(--border-subtle)] text-[0.8125rem]" ] [ Html.text "Your edit" ]
-                                , Html.textarea
-                                    (UI.Textarea.markdownEditableCell
-                                        [ Attr.id "wiki-submit-edit-markdown"
-                                        , Attr.value draft.markdownBody
-                                        , Events.onInput PageEditSubmitMarkdownChanged
-                                        , Attr.disabled formBusy
-                                        , Attr.rows 12
-                                        , Attr.class "h-full max-h-none px-4"
+                                ++ [ UI.Heading.panelHeadingSecondary [ Attr.class yourEditHeadingClass ] [ Html.text "Your edit" ]
+                                   , Html.div [ UI.newPageEditorMarkdownPreviewCellAttr, Attr.class "flex-1 min-h-0" ]
+                                        [ Html.textarea
+                                            (UI.Textarea.markdownEditableCell
+                                                [ Attr.id "wiki-submit-edit-markdown"
+                                                , Attr.value draft.markdownBody
+                                                , Events.onInput PageEditSubmitMarkdownChanged
+                                                , Attr.disabled formBusy
+                                                , Attr.class "h-full max-h-none px-4"
+                                                ]
+                                            )
+                                            []
                                         ]
-                                    )
-                                    []
-                                ]
                                    ]
                             )
                         ]
-                    , Html.section [ Attr.class "min-w-0 min-h-0 flex flex-col bg-[var(--bg)]" ]
+                    , Html.section [ Attr.class "min-w-0 min-h-0 h-full flex-1 flex flex-col bg-[var(--bg)]" ]
                         [ UI.PanelHeader.view { kind = UI.PanelHeader.Secondary, text = "LIVE PREVIEW" }
                         , publishedHeadingButton False "Published preview"
                         , Html.div [ Attr.class editPaneGridClass ]
                             (publishedPreviewRow
-                                ++ [ Html.div [ UI.newPageEditorMarkdownPreviewCellAttr, Attr.class "border-t border-[var(--border-subtle)]" ]
-                                        [ UI.Heading.panelHeadingSecondary [ Attr.class "px-4 py-1 mb-2 border-b border-[var(--border-subtle)] text-[0.8125rem]" ] [ Html.text "Your preview" ]
-                                , Html.div
-                                    [ Attr.class "h-full max-h-none"
-                                    , UI.markdownPreviewScrollMinFlexFullHeightAttr
-                                    , Attr.class "px-4 pt-2"
-                                    ]
-                                    [ PageMarkdown.viewPreview "wiki-submit-edit-new-preview" wikiSlug publishedSlugExists draft.markdownBody ]
-                                ]
+                                ++ [ UI.Heading.panelHeadingSecondary [ Attr.class yourPreviewHeadingClass ] [ Html.text "Your preview" ]
+                                   , Html.div [ UI.newPageEditorMarkdownPreviewCellAttr, Attr.class "flex-1 min-h-0" ]
+                                        [ Html.div
+                                            [ Attr.class
+                                                (UI.markdownPreviewScrollClass
+                                                    ++ " min-h-0 h-full flex-1 max-h-none px-4 pt-2"
+                                                )
+                                            ]
+                                            [ PageMarkdown.viewPreview "wiki-submit-edit-new-preview" wikiSlug publishedSlugExists draft.markdownBody ]
+                                        ]
                                    ]
                             )
                         ]
@@ -9788,6 +10153,7 @@ viewSubmitEditRoute model wikiSlug pageSlug =
                                         (publishedSlugExistsFromWikiDetails wikiDetails)
                                         pageDetails
                                         model.pageEditSubmitDraft
+                                        model.wikiMarkdownEditorPane
 
 
 viewPageDeleteSaveDraftFeedback : PageDeleteSubmitDraft -> Html Msg
@@ -11281,6 +11647,7 @@ viewAuditLogDiffReadonly wikiSlug publishedSlugExists detail =
                         ]
                     ]
                 , contentAttrs = []
+                , maybeMarkdownTabs = Nothing
                 , contentChildren =
                     [ Html.section [ Attr.class "min-w-0 min-h-0 flex flex-col bg-[var(--input-bg)]" ]
                         [ UI.PanelHeader.view { kind = UI.PanelHeader.Primary, text = "MARKDOWN" }
@@ -11305,6 +11672,7 @@ viewAuditLogDiffReadonly wikiSlug publishedSlugExists detail =
                 , controlsAttrs = [ Attr.class "justify-between" ]
                 , controlsChildren = []
                 , contentAttrs = []
+                , maybeMarkdownTabs = Nothing
                 , contentChildren =
                     [ Html.section [ Attr.class "min-w-0 min-h-0 flex flex-col bg-[var(--input-bg)]" ]
                         [ UI.PanelHeader.view { kind = UI.PanelHeader.Primary, text = "EDITOR" }
@@ -11343,6 +11711,7 @@ viewAuditLogDiffReadonly wikiSlug publishedSlugExists detail =
                                 ]
                     ]
                 , contentAttrs = []
+                , maybeMarkdownTabs = Nothing
                 , contentChildren =
                     [ Html.section [ Attr.class "min-w-0 min-h-0 flex flex-col bg-[var(--input-bg)]" ]
                         [ UI.PanelHeader.view { kind = UI.PanelHeader.Primary, text = "MARKDOWN" }
@@ -13120,15 +13489,26 @@ viewMainAppBody model =
     case model.route of
         Route.WikiList ->
             [ viewAppHeader model
-            , Html.div
-                [ Attr.class "flex min-h-0 min-w-0 flex-1 flex-col bg-[var(--chrome-bg)]" ]
-                [ Html.main_
-                    [ Attr.id UI.appMainScrollRegionId
-                    , Attr.class "flex-1 min-h-0 min-w-0 overflow-y-auto overscroll-contain bg-[var(--chrome-bg)] px-0 border-r-0 py-0"
+            , Html.div [ UI.wikiListMobileChromeOuterAttr ]
+                (List.concat
+                    [ if model.sideNavOpen then
+                        [ UI.mobileWikiNavBackdropView SideNavClosed ]
+
+                      else
+                        []
+                    , [ Html.aside (UI.mobileOnlySideNavAsideAttrs model.sideNavOpen SideNavClosed)
+                            [ viewAppChromeSideNav model ]
+                      , Html.div [ Attr.class "flex min-h-0 min-w-0 flex-1 flex-col" ]
+                            [ Html.main_
+                                [ Attr.id UI.appMainScrollRegionId
+                                , Attr.class "flex-1 min-h-0 min-w-0 overflow-y-auto overscroll-contain bg-[var(--chrome-bg)] px-0 border-r-0 py-0"
+                                ]
+                                [ viewMainColumnBody model ]
+                            , viewWikiListBottomSiteAdminLink model
+                            ]
+                      ]
                     ]
-                    [ viewMainColumnBody model ]
-                , viewWikiListBottomSiteAdminLink model
-                ]
+                )
             ]
 
         _ ->
@@ -13136,6 +13516,8 @@ viewMainAppBody model =
             , UI.holyGrailLayout
                 { hasRightColumn = rightRail.hasRightColumn
                 , trimHorizontalGutter = True
+                , mobileSideNavOpen = model.sideNavOpen
+                , onCloseMobileNav = SideNavClosed
                 , leftNav = viewRouteSideNav model
                 , mainAttributes =
                     [ Attr.id UI.appMainScrollRegionId

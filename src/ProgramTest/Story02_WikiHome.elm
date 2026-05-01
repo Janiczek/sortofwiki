@@ -7,8 +7,9 @@ import ProgramTest.Start
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "See wiki home on /w/:wiki"
+    List.concat
+        [ ProgramTest.Start.bothViewports
+        { baseName = "See wiki home on /w/:wiki"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-wiki-demo"
         , path = "/w/Demo"
@@ -23,8 +24,8 @@ endToEndTests =
                     )
                 ]
         }
-    , ProgramTest.Start.start
-        { name = "See 'Wiki not found' on /w/unknown"
+    , ProgramTest.Start.bothViewports
+        { baseName = "See 'Wiki not found' on /w/unknown"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-wiki-unknown"
         , path = "/w/unknown-slug"
@@ -45,4 +46,4 @@ endToEndTests =
                     )
                 ]
         }
-    ]
+        ]

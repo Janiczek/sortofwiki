@@ -7,8 +7,8 @@ import ProgramTest.Start
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "46 — [[Home]] on published page renders as same-wiki link"
+    ProgramTest.Start.bothViewports
+        { baseName = "46 — [[Home]] on published page renders as same-wiki link"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-wiki-links-about"
         , path = "/w/Demo/p/About"
@@ -23,4 +23,3 @@ endToEndTests =
                     )
                 ]
         }
-    ]

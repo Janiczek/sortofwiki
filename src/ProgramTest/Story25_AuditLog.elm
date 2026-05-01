@@ -10,8 +10,8 @@ import Wiki
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "Audit log"
+    ProgramTest.Start.bothViewports
+        { baseName = "Audit log"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story25-audit"
         , path = "/"
@@ -61,4 +61,3 @@ endToEndTests =
                       ]
                     ]
         }
-    ]

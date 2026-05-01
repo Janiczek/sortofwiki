@@ -11,8 +11,8 @@ import Route
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "Register on a wiki"
+    ProgramTest.Start.bothViewports
+        { baseName = "Register on a wiki"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story07-register"
         , path = "/w/Demo/register"
@@ -32,4 +32,3 @@ endToEndTests =
                       ]
                     ]
         }
-    ]

@@ -26,8 +26,9 @@ requiredDeletionReasonUserText =
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "11 — submit page deletion request; published page unchanged"
+    List.concat
+        [ ProgramTest.Start.bothViewports
+        { baseName = "11 — submit page deletion request; published page unchanged"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story11-delete"
         , path = "/w/Demo/register"
@@ -51,8 +52,9 @@ endToEndTests =
                         client
                     , [ client.checkView 300
                             (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
-                      , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
-                      , client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
+                      ]
+                    , ProgramTest.Actions.navigateToWikiHome "Demo" client
+                    , [ client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
                       , client.checkView 200
                             (ProgramTest.Query.withinId "wiki-page-request-deletion"
                                 (ProgramTest.Query.expectHasText "Request deletion")
@@ -73,8 +75,9 @@ endToEndTests =
                             (ProgramTest.Query.withinId "wiki-submit-delete-success"
                                 (ProgramTest.Query.expectHasSubmissionId "sub_1")
                             )
-                      , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
-                      , client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
+                      ]
+                    , ProgramTest.Actions.navigateToWikiHome "Demo" client
+                    , [ client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
                       , client.checkView 200
                             (ProgramTest.Query.withinPageMarkdownHeading "h2"
                                 (ProgramTest.Query.expectHasText "How to use this wiki")
@@ -82,8 +85,8 @@ endToEndTests =
                       ]
                     ]
         }
-    , ProgramTest.Start.start
-        { name = "11 — trusted contributor deletes published page immediately (no submission)"
+    , ProgramTest.Start.bothViewports
+        { baseName = "11 — trusted contributor deletes published page immediately (no submission)"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story11-trusted-immediate-delete"
         , path = "/"
@@ -99,8 +102,8 @@ endToEndTests =
                         client
                     , [ client.checkView 300
                             (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
-                      , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
                       ]
+                    , ProgramTest.Actions.navigateToWikiHome "Demo" client
                     , ProgramTest.Actions.navigateToPath (Wiki.publishedPageUrlPath "Demo" "About") client
                     , [ client.checkView 200
                             (ProgramTest.Query.withinId "wiki-page-delete-published"
@@ -133,13 +136,13 @@ endToEndTests =
                     , ProgramTest.Actions.navigateToPath (Wiki.publishedPageUrlPath "Demo" "About") client
                     , [ client.checkView 200
                             (ProgramTest.Query.withinId "wiki-missing-published-page"
-                                (ProgramTest.Query.expectHasText "The page \"About\" does not exist yet.")
+                                (ProgramTest.Query.expectHasText "This page does not exist yet.")
                             )
                       ]
                     ]
         }
-    , ProgramTest.Start.start
-        { name = "11 — wiki admin deletes published page immediately (no submission)"
+    , ProgramTest.Start.bothViewports
+        { baseName = "11 — wiki admin deletes published page immediately (no submission)"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story11-admin-immediate-delete"
         , path = "/"
@@ -155,8 +158,8 @@ endToEndTests =
                         client
                     , [ client.checkView 300
                             (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
-                      , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
                       ]
+                    , ProgramTest.Actions.navigateToWikiHome "Demo" client
                     , ProgramTest.Actions.navigateToPath (Wiki.publishedPageUrlPath "Demo" "MarkdownPlayground") client
                     , [ client.checkView 200
                             (ProgramTest.Query.withinId "wiki-page-delete-published"
@@ -177,13 +180,13 @@ endToEndTests =
                     , ProgramTest.Actions.navigateToPath (Wiki.publishedPageUrlPath "Demo" "MarkdownPlayground") client
                     , [ client.checkView 200
                             (ProgramTest.Query.withinId "wiki-missing-published-page"
-                                (ProgramTest.Query.expectHasText "The page \"MarkdownPlayground\" does not exist yet.")
+                                (ProgramTest.Query.expectHasText "This page does not exist yet.")
                             )
                       ]
                     ]
         }
-    , ProgramTest.Start.start
-        { name = "11 — contributor deletion request requires non-empty reason"
+    , ProgramTest.Start.bothViewports
+        { baseName = "11 — contributor deletion request requires non-empty reason"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story11-untrusted-reason-required"
         , path = "/w/Demo/register"
@@ -207,8 +210,9 @@ endToEndTests =
                         client
                     , [ client.checkView 300
                             (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
-                      , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
-                      , client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
+                      ]
+                    , ProgramTest.Actions.navigateToWikiHome "Demo" client
+                    , [ client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
                       , client.clickLink 100 (Wiki.submitDeleteUrlPath "Demo" "Guides")
                       , client.checkView 100
                             (ProgramTest.Query.withinId "wiki-submit-delete-page"
@@ -227,8 +231,8 @@ endToEndTests =
                       ]
                     ]
         }
-    , ProgramTest.Start.start
-        { name = "11 — trusted immediate delete requires non-empty reason"
+    , ProgramTest.Start.bothViewports
+        { baseName = "11 — trusted immediate delete requires non-empty reason"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story11-trusted-reason-required"
         , path = "/"
@@ -244,8 +248,8 @@ endToEndTests =
                         client
                     , [ client.checkView 300
                             (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
-                      , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
                       ]
+                    , ProgramTest.Actions.navigateToWikiHome "Demo" client
                     , ProgramTest.Actions.navigateToPath (Wiki.publishedPageUrlPath "Demo" "About") client
                     , [ client.checkView 200
                             (ProgramTest.Query.withinId "wiki-page-delete-published"
@@ -266,8 +270,8 @@ endToEndTests =
                       ]
                     ]
         }
-    , ProgramTest.Start.start
-        { name = "11 — wiki admin immediate delete requires non-empty reason"
+    , ProgramTest.Start.bothViewports
+        { baseName = "11 — wiki admin immediate delete requires non-empty reason"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story11-admin-reason-required"
         , path = "/"
@@ -283,8 +287,8 @@ endToEndTests =
                         client
                     , [ client.checkView 300
                             (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
-                      , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
                       ]
+                    , ProgramTest.Actions.navigateToWikiHome "Demo" client
                     , ProgramTest.Actions.navigateToPath (Wiki.publishedPageUrlPath "Demo" "MarkdownPlayground") client
                     , [ client.checkView 200
                             (ProgramTest.Query.withinId "wiki-page-delete-published"
@@ -305,4 +309,4 @@ endToEndTests =
                       ]
                     ]
         }
-    ]
+        ]

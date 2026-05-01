@@ -1,13 +1,15 @@
 module ProgramTest.Story48_ConcurrentEditConflicts exposing (endToEndTests)
 
+import Backend
 import Effect.Browser.Dom
 import Effect.Test
+import Frontend
 import ProgramTest.Actions
 import ProgramTest.Config
 import ProgramTest.Query
 import ProgramTest.Start
 import Submission
-import Types exposing (FrontendMsg(..))
+import Types exposing (FrontendMsg(..), ToBackend, ToFrontend)
 import Url exposing (Protocol(..), Url)
 import Wiki
 
@@ -39,13 +41,15 @@ editBResolved =
 
 
 navigateToSubmitEditGuides :
-    Effect.Test.FrontendActions toBackend FrontendMsg frontendModel toFrontend backendMsg backendModel
-    -> List (Effect.Test.Action toBackend FrontendMsg frontendModel toFrontend backendMsg backendModel)
+    Effect.Test.FrontendActions ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model
+    -> List (Effect.Test.Action ToBackend Frontend.Msg Frontend.Model ToFrontend Backend.Msg Backend.Model)
 navigateToSubmitEditGuides client =
-    [ client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
-    , client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
-    , client.update 100 (UrlChanged story48SubmitEditGuidesUrl)
-    ]
+    List.concat
+        [ ProgramTest.Actions.navigateToWikiHome "Demo" client
+        , [ client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
+          , client.update 100 (UrlChanged story48SubmitEditGuidesUrl)
+          ]
+        ]
 
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
@@ -197,8 +201,9 @@ endToEndTests =
                                     (ProgramTest.Query.withinId "wiki-review-approve-success"
                                         (ProgramTest.Query.expectHasText "Submission approved and published.")
                                     )
-                              , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
-                              , client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
+                              ]
+                            , ProgramTest.Actions.navigateToWikiHome "Demo" client
+                            , [ client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
                               , client.checkView 400
                                     (ProgramTest.Query.withinPageMarkdownHeading "h1"
                                         (ProgramTest.Query.expectHasText "Story48 resolved edit B")

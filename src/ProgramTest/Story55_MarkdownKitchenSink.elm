@@ -10,8 +10,8 @@ import Test.Html.Selector
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "55 — KitchenSink: $$ → inline-equation, $$$ → block-equation; Markdown features render"
+    ProgramTest.Start.bothViewports
+        { baseName = "55 — KitchenSink: $$ → inline-equation, $$$ → block-equation; Markdown features render"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story55-kitchen-sink"
         , path = "/w/Demo/p/KitchenSink"
@@ -71,4 +71,3 @@ endToEndTests =
                     )
                 ]
         }
-    ]

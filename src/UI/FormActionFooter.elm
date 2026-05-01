@@ -11,7 +11,7 @@ type Align
 
 stickyBaseClass : String
 stickyBaseClass =
-    "shrink-0 sticky bottom-0 z-10 border-t border-[var(--border-subtle)] bg-[var(--bg)] px-4 py-3 flex"
+    "shrink-0 sticky bottom-0 border-t border-[var(--border-subtle)] bg-[var(--bg)] px-4 py-3 flex"
 
 
 {-| Sticky bottom action bar for editor shells.

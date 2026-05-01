@@ -47,7 +47,7 @@ suite =
                                 , { fromPageSlug = "About", toPageSlug = "TodoGap", direction = WikiGraph.Directed, targetPublished = False, kind = WikiGraph.WikiLinkEdge }
                                 , { fromPageSlug = "About", toPageSlug = "Meta", direction = WikiGraph.Directed, targetPublished = False, kind = WikiGraph.TagEdge }
                                 ]
-                            , globalInboundCounts = Dict.fromList [ ( "about", 1 ), ( "home", 1 ), ( "meta", 1 ), ( "todogap", 1 ) ]
+                            , globalEdgeCounts = Dict.fromList [ ( "about", 4 ), ( "home", 2 ), ( "meta", 1 ), ( "todogap", 1 ) ]
                             }
             , Test.test "keeps reciprocal page links undirected while one-way tags stay directed" <|
                 \() ->

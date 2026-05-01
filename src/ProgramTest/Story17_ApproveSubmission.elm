@@ -10,8 +10,8 @@ import Wiki
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "17 — trusted contributor approves pending new-page submission; page goes live"
+    ProgramTest.Start.bothViewports
+        { baseName = "17 — trusted contributor approves pending new-page submission; page goes live"
         , config = ProgramTest.Config.demoWikiWithModerationSeeds
         , sessionId = "session-story17-approve"
         , path = "/"
@@ -38,8 +38,9 @@ endToEndTests =
                             (ProgramTest.Query.withinId "wiki-review-approve-success"
                                 (ProgramTest.Query.expectHasText "Submission approved and published.")
                             )
-                      , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
-                      , client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "QueueDemoPage")
+                      ]
+                    , ProgramTest.Actions.navigateToWikiHome "Demo" client
+                    , [ client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "QueueDemoPage")
                       , client.checkView 400
                             (ProgramTest.Query.withinId "page-markdown"
                                 (ProgramTest.Query.expectHasText
@@ -49,4 +50,3 @@ endToEndTests =
                       ]
                     ]
         }
-    ]

@@ -31,8 +31,8 @@ todosUrl =
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "56 — TODO markers render inline, show in rail, and aggregate on wiki TODOs page"
+    ProgramTest.Start.bothViewports
+        { baseName = "56 — TODO markers render inline, show in rail, and aggregate on wiki TODOs page"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story56-todos"
         , path = "/w/Demo/p/About"
@@ -76,4 +76,3 @@ endToEndTests =
                     )
                 ]
         }
-    ]

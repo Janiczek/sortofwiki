@@ -11,8 +11,8 @@ import Wiki
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "26 — wiki admin filters audit log by event type"
+    ProgramTest.Start.bothViewports
+        { baseName = "26 — wiki admin filters audit log by event type"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story26-audit-filters"
         , path = "/"
@@ -68,4 +68,3 @@ endToEndTests =
                       ]
                     ]
         }
-    ]

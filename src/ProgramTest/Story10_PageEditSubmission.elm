@@ -31,8 +31,8 @@ proposedEditMarker =
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "10 — submit page edit proposal; published content unchanged"
+    ProgramTest.Start.bothViewports
+        { baseName = "10 — submit page edit proposal; published content unchanged"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story10-edit"
         , path = "/w/Demo/register"
@@ -56,8 +56,9 @@ endToEndTests =
                         client
                     , [ client.checkView 300
                             (ProgramTest.Query.expectWikiHomePageShowsSlug "Demo")
-                      , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
-                      , client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
+                      ]
+                    , ProgramTest.Actions.navigateToWikiHome "Demo" client
+                    , [ client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
                       , client.checkView 200
                             (ProgramTest.Query.withinId "wiki-page-propose-edit"
                                 (ProgramTest.Query.expectHasText "Propose edit")
@@ -88,8 +89,9 @@ endToEndTests =
                             (ProgramTest.Query.withinId "wiki-submit-edit-success"
                                 (ProgramTest.Query.expectHasSubmissionId "sub_1")
                             )
-                      , client.clickLink 100 (Wiki.wikiHomeUrlPath "Demo")
-                      , client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
+                      ]
+                    , ProgramTest.Actions.navigateToWikiHome "Demo" client
+                    , [ client.clickLink 100 (Wiki.publishedPageUrlPath "Demo" "Guides")
                       , client.checkView 200
                             (ProgramTest.Query.expectAll
                                 [ ProgramTest.Query.withinPageMarkdownHeading "h2"
@@ -100,4 +102,3 @@ endToEndTests =
                       ]
                     ]
         }
-    ]

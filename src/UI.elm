@@ -72,6 +72,11 @@ module UI exposing
     , gridTwoColEditorStrAttr
     , headerClassForVerticalAlign
     , holyGrailLayout
+    , mobileSideNavDrawerId
+    , mobileWikiNavBackdropView
+    , mobileSideNavAsideAttrs
+    , mobileOnlySideNavAsideAttrs
+    , wikiListMobileChromeOuterAttr
     , hostAdminAuditDiffPageShellAttr
     , hostAdminAuditFiltersCardAttr
     , hostAdminAuditFiltersGridAttr
@@ -226,6 +231,8 @@ module UI exposing
 
 import Html exposing (Attribute, Html)
 import Html.Attributes as Attr
+import Html.Events as Events
+import Json.Decode
 import TW
 
 
@@ -388,7 +395,7 @@ formTextInputClass =
 
 sidebarContainerClass : String
 sidebarContainerClass =
-    "min-h-0 self-stretch overflow-y-auto overscroll-contain flex flex-col gap-y-[0.9rem] bg-[var(--chrome-bg)] border-0 py-[0.85rem] px-[0.85rem] pr-0"
+    "min-h-0 self-stretch overflow-y-auto overscroll-contain flex flex-col gap-y-[0.9rem] bg-[var(--chrome-bg)] max-md:flex-none max-md:max-h-[50%] border-0 max-md:border-t max-md:border-[var(--border-subtle)] py-[0.85rem] px-[0.85rem] pr-0"
 
 
 {-| Indents block content under `sidebarHeading` (same inset as the first ToC heading tier in `PageToc`).
@@ -599,7 +606,7 @@ appHeaderDividerClass =
 
 appHeaderBarClass : String
 appHeaderBarClass =
-    "shrink-0 flex flex-row flex-wrap items-center justify-between gap-y-[0.5rem] gap-x-[0.75rem] px-[0.75rem] py-[0.55rem] border-b border-[var(--border-subtle)] shadow-[0_4px_20px_rgba(73,103,49,0.08)] backdrop-blur-sm"
+    "relative z-50 shrink-0 flex flex-row flex-wrap md:flex-nowrap items-center justify-between gap-y-[0.5rem] gap-x-[0.75rem] py-[0.55rem] border-b border-[var(--border-subtle)] shadow-[0_4px_20px_rgba(73,103,49,0.08)] backdrop-blur-sm max-md:pt-[max(0.55rem,env(safe-area-inset-top))] pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))]"
 
 
 appHeaderH1Class : String
@@ -629,12 +636,12 @@ sideNavBottomSectionClass =
 
 sideNavMainSectionClass : String
 sideNavMainSectionClass =
-    "flex-1 min-h-0"
+    "min-h-0 md:flex-1"
 
 
 wikiCatalogGridClass : String
 wikiCatalogGridClass =
-    "grid w-full max-w-[72rem] grid-cols-3 gap-3"
+    "grid w-full max-w-[72rem] grid-cols-1 md:grid-cols-3 gap-3"
 
 
 hostAdminWikiDetailShellClass : String
@@ -704,7 +711,7 @@ wikiCatalogCardSummaryClass =
 
 markdownContainerClass : String
 markdownContainerClass =
-    "markdown-body block max-w-[52rem] text-[1.125rem] leading-[1.6] [font-family:var(--font-serif)] [&>*:first-child]:mt-0 [&>*:first-child]:pt-0"
+    "markdown-body block max-w-[52rem] text-[1rem] leading-[1.6] md:text-[1.125rem] [font-family:var(--font-serif)] [&>*:first-child]:mt-0 [&>*:first-child]:pt-0"
 
 
 markdownParagraphClass : String
@@ -818,8 +825,8 @@ layoutLeftNavAsideClass =
     "self-stretch min-h-0 overflow-y-auto overscroll-contain leading-[1.35] text-[var(--fg)] text-[0.8125rem] bg-[var(--chrome-bg)] border-r border-[var(--border-subtle)] py-[0.85rem] pl-[0.85rem]"
 
 
-layoutHolyGrailClass : Bool -> Bool -> String
-layoutHolyGrailClass hasRightColumn trimHorizontalGutter =
+layoutHolyGrailClass : Bool -> String
+layoutHolyGrailClass trimHorizontalGutter =
     let
         horizontalGutterClass : String
         horizontalGutterClass =
@@ -829,13 +836,8 @@ layoutHolyGrailClass hasRightColumn trimHorizontalGutter =
             else
                 " px-[0.5rem] -mx-[0.5rem]"
     in
-    if hasRightColumn then
-        "grid min-h-0 min-w-0 h-full w-full flex-1 overflow-hidden items-stretch gap-y-[0.65rem] max-w-none grid-rows-[minmax(0,1fr)] auto-rows-[minmax(0,1fr)] grid-cols-[12.5rem_minmax(0,1fr)_minmax(10rem,14rem)]"
-            ++ horizontalGutterClass
-
-    else
-        "grid min-h-0 min-w-0 h-full w-full flex-1 overflow-hidden items-stretch gap-y-[0.65rem] max-w-none grid-rows-[minmax(0,1fr)] auto-rows-[minmax(0,1fr)] grid-cols-[12.5rem_minmax(0,1fr)]"
-            ++ horizontalGutterClass
+    "relative flex min-h-0 min-w-0 h-full w-full flex-1 overflow-hidden flex-col md:flex-row md:items-stretch "
+        ++ horizontalGutterClass
 
 
 layoutMainColumnClass : Bool -> Bool -> Bool -> String
@@ -851,20 +853,20 @@ layoutMainColumnClass hasRightColumn trimRightPadding trimVerticalPadding =
     in
     if hasRightColumn then
         if trimRightPadding then
-            "min-h-0 min-w-0 overflow-y-auto overscroll-contain bg-[var(--bg)] px-0 border-r border-[var(--border-subtle)] "
+            "min-h-0 h-full flex-1 min-w-0 overflow-y-auto overscroll-contain bg-[var(--bg)] px-0 border-r border-[var(--border-subtle)] max-md:border-r-0 "
                 ++ verticalPaddingClass
 
         else
-            "min-h-0 min-w-0 overflow-y-auto overscroll-contain bg-[var(--bg)] px-[0.85rem] border-r border-[var(--border-subtle)] "
+            "min-h-0 h-full flex-1 min-w-0 overflow-y-auto overscroll-contain bg-[var(--bg)] px-[0.85rem] border-r border-[var(--border-subtle)] max-md:border-r-0 "
                 ++ verticalPaddingClass
 
     else
         if trimRightPadding then
-            "min-h-0 min-w-0 overflow-y-auto overscroll-contain bg-[var(--bg)] px-0 border-r-0 "
+            "min-h-0 h-full flex-1 min-w-0 overflow-y-auto overscroll-contain bg-[var(--bg)] px-0 border-r-0 "
                 ++ verticalPaddingClass
 
         else
-            "min-h-0 min-w-0 overflow-y-auto overscroll-contain bg-[var(--bg)] pl-[0.85rem] pr-0 border-r-0 "
+            "min-h-0 h-full flex-1 min-w-0 overflow-y-auto overscroll-contain bg-[var(--bg)] pl-[0.85rem] pr-0 border-r-0 "
                 ++ verticalPaddingClass
 
 
@@ -883,20 +885,20 @@ layoutMainColumnClassAuditFill hasRightColumn trimRightPadding trimVerticalPaddi
     in
     if hasRightColumn then
         if trimRightPadding then
-            "min-h-0 min-w-0 flex flex-col overflow-hidden overscroll-contain bg-[var(--bg)] px-0 border-r border-[var(--border-subtle)] "
+            "min-h-0 h-full flex-1 min-w-0 flex flex-col overflow-hidden overscroll-contain bg-[var(--bg)] px-0 border-r border-[var(--border-subtle)] max-md:border-r-0 "
                 ++ verticalPaddingClass
 
         else
-            "min-h-0 min-w-0 flex flex-col overflow-hidden overscroll-contain bg-[var(--bg)] px-[0.85rem] border-r border-[var(--border-subtle)] "
+            "min-h-0 h-full flex-1 min-w-0 flex flex-col overflow-hidden overscroll-contain bg-[var(--bg)] px-[0.85rem] border-r border-[var(--border-subtle)] max-md:border-r-0 "
                 ++ verticalPaddingClass
 
     else
         if trimRightPadding then
-            "min-h-0 min-w-0 flex flex-col overflow-hidden overscroll-contain bg-[var(--bg)] px-0 border-r-0 "
+            "min-h-0 h-full flex-1 min-w-0 flex flex-col overflow-hidden overscroll-contain bg-[var(--bg)] px-0 border-r-0 "
                 ++ verticalPaddingClass
 
         else
-            "min-h-0 min-w-0 flex flex-col overflow-hidden overscroll-contain bg-[var(--bg)] pl-[0.85rem] pr-0 border-r-0 "
+            "min-h-0 h-full flex-1 min-w-0 flex flex-col overflow-hidden overscroll-contain bg-[var(--bg)] pl-[0.85rem] pr-0 border-r-0 "
                 ++ verticalPaddingClass
 
 
@@ -942,8 +944,8 @@ appRootClassAttr { isDark, trimHorizontalPadding } =
 
 
 layoutHolyGrailAttr : { hasRightColumn : Bool, trimHorizontalGutter : Bool } -> Attribute msg
-layoutHolyGrailAttr { hasRightColumn, trimHorizontalGutter } =
-    TW.cls (layoutHolyGrailClass hasRightColumn trimHorizontalGutter)
+layoutHolyGrailAttr { trimHorizontalGutter } =
+    TW.cls (layoutHolyGrailClass trimHorizontalGutter)
 
 
 layoutMainColumnForRouteAttr : { hasRightColumn : Bool, auditFill : Bool, trimRightPadding : Bool, trimVerticalPadding : Bool } -> Attribute msg
@@ -962,9 +964,95 @@ mainContentPaddingAttr =
     TW.cls "px-[0.85rem] py-[0.85rem]"
 
 
+{-| `id` on the mobile off-canvas nav panel for focus management.
+-}
+mobileSideNavDrawerId : String
+mobileSideNavDrawerId =
+    "mobile-side-nav-drawer"
+
+
+mobileNavBackdropClass : String
+mobileNavBackdropClass =
+    "absolute z-[40] inset-0 bg-black/35 md:hidden"
+
+
+mobileWikiNavBackdropView : msg -> Html msg
+mobileWikiNavBackdropView onClose =
+    Html.div
+        [ TW.cls mobileNavBackdropClass
+        , Events.onClick onClose
+        , Attr.attribute "aria-hidden" "true"
+        ]
+        []
+
+
+mobileSideNavAsideAttrs : Bool -> msg -> List (Attribute msg)
+mobileSideNavAsideAttrs open onClose =
+    [ TW.cls (mobileSideNavAsideClass open)
+    , Attr.id mobileSideNavDrawerId
+    , Attr.tabindex -1
+    , mobileNavEscapeAttr onClose
+    ]
+
+
+mobileOnlySideNavAsideAttrs : Bool -> msg -> List (Attribute msg)
+mobileOnlySideNavAsideAttrs open onClose =
+    [ TW.cls (mobileSideNavAsideClass open ++ " md:hidden")
+    , Attr.id mobileSideNavDrawerId
+    , Attr.tabindex -1
+    , mobileNavEscapeAttr onClose
+    ]
+
+
+mobileSideNavAsideClass : Bool -> String
+mobileSideNavAsideClass open =
+    let
+        translateClass : String
+        translateClass =
+            if open then
+                "translate-x-0 "
+
+            else
+                "-translate-x-full "
+    in
+    translateClass
+        ++ "mobile-side-nav-drawer absolute z-[45] left-0 top-0 bottom-0 max-md:w-fit max-md:min-w-[max(200px,50%)] max-md:max-w-[100dvw] flex flex-col min-h-0 overflow-y-auto overscroll-contain leading-[1.35] text-[var(--fg)] text-[0.8125rem] bg-[var(--chrome-bg)] border-r border-[var(--border-subtle)] py-[0.85rem] pl-[max(0.85rem,env(safe-area-inset-left))] pr-[0.65rem] pb-[env(safe-area-inset-bottom)] transition-transform duration-200 ease-out motion-reduce:transition-none motion-reduce:duration-0 shadow-[4px_0_24px_rgba(0,0,0,0.12)] md:shadow-none md:static md:z-auto md:inset-auto md:top-auto md:bottom-auto md:h-auto md:self-stretch md:w-[12.5rem] md:max-w-none md:translate-x-0 md:flex-shrink-0 md:overflow-y-auto md:py-[0.85rem] md:pl-[0.85rem] md:pr-0 md:pb-[0.85rem]"
+
+
+wikiChromeInnerGridClass : Bool -> String
+wikiChromeInnerGridClass hasRightColumn =
+    if hasRightColumn then
+        "flex flex-col flex-1 min-h-0 h-full w-full min-w-0 overflow-hidden md:grid md:min-h-0 md:grid-cols-[minmax(0,1fr)_minmax(10rem,14rem)] md:items-stretch"
+
+    else
+        "flex flex-col flex-1 min-h-0 h-full w-full min-w-0 overflow-hidden"
+
+
+mobileNavEscapeAttr : msg -> Attribute msg
+mobileNavEscapeAttr onClose =
+    Events.on "keydown"
+        (Json.Decode.field "key" Json.Decode.string
+            |> Json.Decode.andThen
+                (\key ->
+                    if key == "Escape" then
+                        Json.Decode.succeed onClose
+
+                    else
+                        Json.Decode.fail "not escape"
+                )
+        )
+
+
+wikiListMobileChromeOuterAttr : Attribute msg
+wikiListMobileChromeOuterAttr =
+    TW.cls "relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[var(--chrome-bg)]"
+
+
 holyGrailLayout :
     { hasRightColumn : Bool
     , trimHorizontalGutter : Bool
+    , mobileSideNavOpen : Bool
+    , onCloseMobileNav : msg
     , leftNav : Html msg
     , mainAttributes : List (Attribute msg)
     , mainBody : Html msg
@@ -979,27 +1067,43 @@ holyGrailLayout config =
             }
         ]
         (List.concat
-            [ [ Html.aside [ layoutLeftNavAsideAttr ] [ config.leftNav ]
-              , Html.main_ config.mainAttributes [ config.mainBody ]
-              ]
-            , if List.isEmpty config.rightRailSections then
-                []
+            [ if config.mobileSideNavOpen then
+                [ mobileWikiNavBackdropView config.onCloseMobileNav ]
 
               else
-                [ Html.aside [ sidebarContainerAttr ] (rightRailSectionCards config.rightRailSections) ]
+                []
+            , [ Html.aside
+                    (mobileSideNavAsideAttrs config.mobileSideNavOpen config.onCloseMobileNav)
+                    [ config.leftNav ]
+              , Html.div
+                    [ TW.cls (wikiChromeInnerGridClass config.hasRightColumn) ]
+                    (List.concat
+                        [ [ Html.main_ config.mainAttributes [ config.mainBody ] ]
+                        , if List.isEmpty config.rightRailSections then
+                            []
+
+                          else
+                            [ Html.aside [ sidebarContainerAttr ] (rightRailSectionCards config.rightRailSections) ]
+                        ]
+                    )
+              ]
             ]
         )
 
 
 rightRailSectionCards : List (Html msg) -> List (Html msg)
 rightRailSectionCards sections =
-    List.map
-        (\section ->
-            Html.div
-                [ wikiRightRailSectionCardAttr ]
-                [ section ]
+    [ Html.div
+        [ TW.cls "w-full max-md:grid max-md:grid-cols-3 max-md:gap-3 md:contents" ]
+        (List.map
+            (\section ->
+                Html.div
+                    [ wikiRightRailSectionCardAttr ]
+                    [ section ]
+            )
+            sections
         )
-        sections
+    ]
 
 
 auditMainColumnBodyInnerAttr : Attribute msg
@@ -1435,7 +1539,7 @@ wikiRightRailTocNudgeAttr =
 
 wikiRightRailSectionCardClass : String
 wikiRightRailSectionCardClass =
-    "-ml-[0.85rem] w-[calc(100%+0.85rem)] px-[0.85rem] pt-3 border-t border-[var(--border-subtle)] first:border-t-0 first:pt-0"
+    "-ml-[0.85rem] w-[calc(100%+0.85rem)] px-[0.85rem] pt-3 border-t border-[var(--border-subtle)] first:border-t-0 first:pt-0 max-md:ml-0 max-md:w-auto max-md:px-0 max-md:pt-0 max-md:border-t-0"
 
 
 wikiRightRailSectionCardAttr : Attribute msg

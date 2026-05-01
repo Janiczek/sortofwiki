@@ -62,8 +62,8 @@ loginToWikiFromHome creds client =
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "Same browser session can stay logged in to two wikis"
+    ProgramTest.Start.bothViewports
+        { baseName = "Same browser session can stay logged in to two wikis"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story53-multi-wiki"
         , path = "/w/Demo"
@@ -91,8 +91,9 @@ endToEndTests =
                             (ProgramTest.Query.withinWikiCatalogRow "ElmTips"
                                 (ProgramTest.Query.expectHasText (Wiki.wikiHomeUrlPath "ElmTips"))
                             )
-                      , client.clickLink 100 (Wiki.wikiHomeUrlPath "ElmTips")
-                      , client.checkView 400 (ProgramTest.Query.expectWikiHomePageShowsSlug "ElmTips")
+                      ]
+                    , ProgramTest.Actions.navigateToWikiHome "ElmTips" client
+                    , [ client.checkView 400 (ProgramTest.Query.expectWikiHomePageShowsSlug "ElmTips")
                       , client.clickLink 100 (Wiki.loginUrlPath "ElmTips")
                       , client.checkView 200 (ProgramTest.Query.expectWikiLoginPageShowsSlug "ElmTips")
                       ]
@@ -129,4 +130,3 @@ endToEndTests =
                       ]
                     ]
         }
-    ]

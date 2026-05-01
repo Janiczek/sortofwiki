@@ -14,6 +14,7 @@ import Chapters.Heading as Heading
 import Chapters.IconInput as IconInput
 import Chapters.Link as Link
 import Chapters.MarkdownElements as MarkdownElements
+import Chapters.MobileChrome as MobileChrome
 import Chapters.Navigation as Navigation
 import Chapters.PanelHeader as PanelHeader
 import Chapters.ResultNotice as ResultNotice
@@ -70,7 +71,7 @@ main =
               )
             , ( "Navigation & Sidebar", [ Navigation.chapter_ ] )
             , ( "Tables", [ Tables.chapter_ ] )
-            , ( "App Header", [ AppHeader.chapter_ ] )
+            , ( "App Header", [ AppHeader.chapter_, MobileChrome.chapter_ ] )
             , ( "Markdown", [ MarkdownElements.chapter_ ] )
             , ( "Wiki", [ WikiComponents.chapter_ ] )
             , ( "Graph", [ Graph.chapter_ ] )

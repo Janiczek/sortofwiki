@@ -20,8 +20,8 @@ graphUrl =
 
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
-    [ ProgramTest.Start.start
-        { name = "57 — wiki graph page renders public page-link graph"
+    ProgramTest.Start.bothViewports
+        { baseName = "57 — wiki graph page renders public page-link graph"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story57-wiki-graph"
         , path = "/w/Demo/p/About"
@@ -29,7 +29,9 @@ endToEndTests =
         , clientSteps =
             \client ->
                 [ client.checkView 150
-                    (ProgramTest.Query.withinHref "/w/Demo/graph" (ProgramTest.Query.expectHasText "Graph"))
+                    (ProgramTest.Query.withinId "mobile-side-nav-drawer"
+                        (ProgramTest.Query.withinHref "/w/Demo/graph" (ProgramTest.Query.expectHasText "Graph"))
+                    )
                 , client.update 100 (UrlChanged graphUrl)
                 , client.checkView 200
                     (ProgramTest.Query.expectAll
@@ -45,4 +47,3 @@ endToEndTests =
                     )
                 ]
         }
-    ]

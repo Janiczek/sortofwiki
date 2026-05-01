@@ -51,7 +51,11 @@ globalChromeSections input =
             []
         , [ { sectionTitle = "Site"
             , links =
-                [ { linkLabel = "Site admin"
+                [ { linkLabel = "All wikis"
+                  , linkRoute = Route.WikiList
+                  , linkEmphasized = False
+                  }
+                , { linkLabel = "Site admin"
                   , linkRoute =
                         if input.hostAdminAuthenticated then
                             Route.HostAdminWikis

@@ -48,6 +48,7 @@ import SubmissionReviewDetail
 import Time
 import Url exposing (Url)
 import Wiki exposing (Wiki)
+import WikiMarkdownEditorPane exposing (WikiMarkdownEditorPane)
 import WikiAdminUsers
 import WikiAuditLog
 import WikiContributors
@@ -401,6 +402,8 @@ type alias FrontendModel =
     , hostAdminWikiImportInFlightSlug : Maybe Wiki.Slug
     , hostAdminWikiImportPendingSlug : Maybe Wiki.Slug
     , hostAdminWikisNotice : Maybe String
+    , sideNavOpen : Bool
+    , wikiMarkdownEditorPane : WikiMarkdownEditorPane
     }
 
 
@@ -481,3 +484,6 @@ type FrontendMsg
     | HostAdminWikiDataImportPickRequested Wiki.Slug
     | HostAdminWikiDataImportFileSelected Effect.File.File
     | HostAdminWikiDataImportFileRead Wiki.Slug (Result () String)
+    | SideNavOpened
+    | SideNavClosed
+    | WikiMarkdownEditorPaneSelected WikiMarkdownEditorPane
