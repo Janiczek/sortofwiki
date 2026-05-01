@@ -440,11 +440,301 @@ function bindGraphvizHosts() {
   document.querySelectorAll("graphviz-graph").forEach(attachHostObserver);
 }
 
+function clamp(value, min, max) {
+  return Math.min(Math.max(value, min), max);
+}
+
+function graphRenderedSize(graphHost) {
+  const fallbackRect = graphHost.getBoundingClientRect();
+  const fallback = {
+    width: Math.max(fallbackRect.width, 1),
+    height: Math.max(fallbackRect.height, 1),
+    valid: false,
+  };
+
+  const root = graphHost.shadowRoot;
+  if (!root) {
+    return fallback;
+  }
+
+  const svg = root.querySelector("svg");
+  if (!svg) {
+    return fallback;
+  }
+
+  const graphGroup = root.querySelector("g.graph");
+  if (!graphGroup || typeof graphGroup.getBBox !== "function") {
+    return fallback;
+  }
+
+  let bbox;
+  try {
+    bbox = graphGroup.getBBox();
+  } catch (_) {
+    return fallback;
+  }
+
+  if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
+    return fallback;
+  }
+
+  const svgViewBox =
+    svg.viewBox && svg.viewBox.baseVal
+      ? svg.viewBox.baseVal
+      : { width: fallback.width, height: fallback.height };
+  const scaleX = svgViewBox.width > 0 ? fallback.width / svgViewBox.width : 1;
+  const scaleY = svgViewBox.height > 0 ? fallback.height / svgViewBox.height : 1;
+
+  return {
+    width: Math.max(bbox.width * scaleX, 1),
+    height: Math.max(bbox.height * scaleY, 1),
+    valid: true,
+  };
+}
+
+function syncMiniGraphPreview(miniPreview, graphHost) {
+  const root = graphHost.shadowRoot;
+  if (!root) {
+    return;
+  }
+
+  const sourceSvg = root.querySelector("svg");
+  if (!sourceSvg) {
+    return;
+  }
+
+  const clonedSvg = sourceSvg.cloneNode(true);
+  clonedSvg.removeAttribute("width");
+  clonedSvg.removeAttribute("height");
+  clonedSvg.style.width = "100%";
+  clonedSvg.style.height = "100%";
+  clonedSvg.style.display = "block";
+  clonedSvg.style.pointerEvents = "none";
+
+  clonedSvg.querySelectorAll("g.node").forEach(function (nodeGroup) {
+    const nodeShapes = Array.from(nodeGroup.querySelectorAll("polygon, rect, ellipse, path"));
+    const nodeTexts = Array.from(nodeGroup.querySelectorAll("text"));
+    const isMissingNode =
+      nodeShapes.some(function (shape) {
+        return isWarningRed(getEffectiveSvgColor(shape, "stroke"));
+      }) ||
+      nodeTexts.some(function (textEl) {
+        return isWarningRed(getEffectiveSvgColor(textEl, "fill"));
+      });
+
+    const nodeColor = isMissingNode ? "#dc2626" : "#000000";
+
+    nodeShapes.forEach(function (shape) {
+      shape.setAttribute("fill", nodeColor);
+      shape.setAttribute("stroke", nodeColor);
+    });
+
+    nodeTexts.forEach(function (textEl) {
+      textEl.setAttribute("fill", nodeColor);
+    });
+  });
+
+  miniPreview.innerHTML = "";
+  miniPreview.appendChild(clonedSvg);
+}
+
+function setupWikiGraphNavigator() {
+  const page = document.getElementById("wiki-graph-page");
+  if (!page) {
+    return;
+  }
+
+  const navigatorHost = document.getElementById("wiki-graph-navigator");
+  const graphHost = document.getElementById("wiki-graphviz");
+  const scrollRegion = document.getElementById("app-main-scroll");
+  if (!navigatorHost || !graphHost || !scrollRegion) {
+    return;
+  }
+  if (navigatorHost.dataset.sowGraphNavigatorBound === "1") {
+    return;
+  }
+
+  let miniSurface = navigatorHost.querySelector("[data-sow-nav='surface']");
+  let miniPreview = navigatorHost.querySelector("[data-sow-nav='preview']");
+  let viewport = navigatorHost.querySelector("[data-sow-nav='viewport']");
+  if (!miniSurface || !miniPreview || !viewport) {
+    navigatorHost.innerHTML = "";
+    miniSurface = document.createElement("div");
+    miniPreview = document.createElement("div");
+    viewport = document.createElement("div");
+    miniSurface.setAttribute("data-sow-nav", "surface");
+    miniPreview.setAttribute("data-sow-nav", "preview");
+    viewport.setAttribute("data-sow-nav", "viewport");
+    miniSurface.appendChild(miniPreview);
+    miniSurface.appendChild(viewport);
+    navigatorHost.appendChild(miniSurface);
+  }
+
+  const state = { dragging: false, previewDirty: true, retryTimer: null, retryCount: 0 };
+  const render = function renderNavigator() {
+    const scrollRect = scrollRegion.getBoundingClientRect();
+    const renderedGraphSize = graphRenderedSize(graphHost);
+    const contentWidth = Math.max(scrollRegion.scrollWidth || 0, scrollRegion.clientWidth || 0, 1);
+    const contentHeight = Math.max(scrollRegion.scrollHeight || 0, scrollRegion.clientHeight || 0, 1);
+
+    if (!renderedGraphSize.valid && contentHeight <= scrollRegion.clientHeight + 1) {
+      navigatorHost.style.visibility = "hidden";
+      if (!state.retryTimer && state.retryCount < 12) {
+        state.retryCount += 1;
+        state.retryTimer = window.setTimeout(function onNavigatorRetry() {
+          state.retryTimer = null;
+          scheduleRender();
+        }, state.retryCount <= 2 ? 0 : 40);
+      }
+      return;
+    }
+    state.retryCount = 0;
+    navigatorHost.style.visibility = "visible";
+
+    const maxMiniWidth = 190;
+    const minMiniHeight = 96;
+    const maxMiniHeight = 190;
+    const miniWidth = maxMiniWidth;
+    const miniHeight = clamp((contentHeight / contentWidth) * miniWidth, minMiniHeight, maxMiniHeight);
+    const scaleX = miniWidth / contentWidth;
+    const scaleY = miniHeight / contentHeight;
+
+    const viewLeft = clamp(scrollRegion.scrollLeft, 0, contentWidth);
+    const viewTop = clamp(scrollRegion.scrollTop, 0, contentHeight);
+    const viewWidth = clamp(scrollRegion.clientWidth, 8, contentWidth);
+    const viewHeight = clamp(scrollRegion.clientHeight, 8, contentHeight);
+
+    navigatorHost.style.position = "fixed";
+    navigatorHost.style.right = Math.max(window.innerWidth - scrollRect.right + 8, 8) + "px";
+    navigatorHost.style.top = Math.max(scrollRect.top + 8, 8) + "px";
+    navigatorHost.style.zIndex = "12";
+    navigatorHost.style.borderRadius = "0.625rem";
+    navigatorHost.style.border = "1px solid var(--border-subtle, #8aa06a)";
+    navigatorHost.style.background = "color-mix(in srgb, var(--chrome-bg, #f6f8ef) 92%, transparent)";
+    navigatorHost.style.backdropFilter = "blur(2px)";
+    navigatorHost.style.padding = "0.4rem";
+    navigatorHost.style.boxShadow = "0 2px 10px rgba(0,0,0,0.12)";
+    navigatorHost.style.userSelect = "none";
+    navigatorHost.style.touchAction = "none";
+    navigatorHost.style.cursor = state.dragging ? "grabbing" : "grab";
+
+    miniSurface.style.position = "relative";
+    miniSurface.style.width = miniWidth + "px";
+    miniSurface.style.height = miniHeight + "px";
+    miniSurface.style.border = "1px solid var(--border, #667944)";
+    miniSurface.style.borderRadius = "0.4rem";
+    miniSurface.style.background = "var(--chrome-bg, #f6f8ef)";
+    miniSurface.style.overflow = "hidden";
+
+    miniPreview.style.position = "absolute";
+    miniPreview.style.inset = "0";
+    miniPreview.style.pointerEvents = "none";
+    miniPreview.style.opacity = "0.92";
+    miniPreview.style.transform = "scale(0.96)";
+    miniPreview.style.transformOrigin = "center";
+
+    if (state.previewDirty) {
+      syncMiniGraphPreview(miniPreview, graphHost);
+      state.previewDirty = false;
+    }
+
+    viewport.style.position = "absolute";
+    viewport.style.left = viewLeft * scaleX + "px";
+    viewport.style.top = viewTop * scaleY + "px";
+    viewport.style.width = Math.max(viewWidth * scaleX, 12) + "px";
+    viewport.style.height = Math.max(viewHeight * scaleY, 12) + "px";
+    viewport.style.border = "2px solid var(--focus-ring, #7c3aed)";
+    viewport.style.borderRadius = "0.25rem";
+    viewport.style.background = "rgba(124,58,237,0.12)";
+    viewport.style.pointerEvents = "none";
+  };
+
+  let frameRequested = false;
+  const scheduleRender = function scheduleRender() {
+    if (frameRequested) {
+      return;
+    }
+    frameRequested = true;
+    window.requestAnimationFrame(function onFrame() {
+      frameRequested = false;
+      render();
+    });
+  };
+
+  const panToClientPoint = function panToClientPoint(clientX, clientY) {
+    const surfaceRect = miniSurface.getBoundingClientRect();
+    const xRatio = clamp((clientX - surfaceRect.left) / Math.max(surfaceRect.width, 1), 0, 1);
+    const yRatio = clamp((clientY - surfaceRect.top) / Math.max(surfaceRect.height, 1), 0, 1);
+
+    const contentWidth = Math.max(scrollRegion.scrollWidth || 0, scrollRegion.clientWidth || 0, 1);
+    const contentHeight = Math.max(scrollRegion.scrollHeight || 0, scrollRegion.clientHeight || 0, 1);
+    const targetScrollLeft = xRatio * contentWidth - scrollRegion.clientWidth / 2;
+    const targetScrollTop = yRatio * contentHeight - scrollRegion.clientHeight / 2;
+    const maxScrollLeft = Math.max(contentWidth - scrollRegion.clientWidth, 0);
+    const maxScrollTop = Math.max(contentHeight - scrollRegion.clientHeight, 0);
+
+    scrollRegion.scrollLeft = clamp(targetScrollLeft, 0, maxScrollLeft);
+    scrollRegion.scrollTop = clamp(targetScrollTop, 0, maxScrollTop);
+    scheduleRender();
+  };
+
+  navigatorHost.addEventListener("pointerdown", function onPointerDown(event) {
+    event.preventDefault();
+    state.dragging = true;
+    navigatorHost.style.cursor = "grabbing";
+    if (navigatorHost.setPointerCapture) {
+      navigatorHost.setPointerCapture(event.pointerId);
+    }
+    panToClientPoint(event.clientX, event.clientY);
+  });
+
+  navigatorHost.addEventListener("pointermove", function onPointerMove(event) {
+    if (!state.dragging) {
+      return;
+    }
+    event.preventDefault();
+    panToClientPoint(event.clientX, event.clientY);
+  });
+
+  navigatorHost.addEventListener("pointerup", function onPointerUp(event) {
+    state.dragging = false;
+    navigatorHost.style.cursor = "grab";
+    if (navigatorHost.releasePointerCapture) {
+      try {
+        navigatorHost.releasePointerCapture(event.pointerId);
+      } catch (_) {
+        /* no-op */
+      }
+    }
+  });
+
+  navigatorHost.addEventListener("pointercancel", function onPointerCancel() {
+    state.dragging = false;
+    navigatorHost.style.cursor = "grab";
+  });
+
+  scrollRegion.addEventListener("scroll", scheduleRender, { passive: true });
+  window.addEventListener("resize", scheduleRender);
+
+  const observer = new MutationObserver(function onGraphMutation() {
+    state.previewDirty = true;
+    scheduleRender();
+  });
+  observer.observe(graphHost, { attributes: true, attributeFilter: ["graph"] });
+
+  navigatorHost.dataset.sowGraphNavigatorBound = "1";
+
+  scheduleRender();
+  window.setTimeout(scheduleRender, 0);
+}
+
 exports.init = function init(_app) {
   bindGraphvizHosts();
+  setupWikiGraphNavigator();
 
   const docObserver = new MutationObserver(function onDocumentMutation() {
     bindGraphvizHosts();
+    setupWikiGraphNavigator();
   });
   docObserver.observe(document.documentElement, {
     childList: true,

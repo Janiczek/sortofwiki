@@ -12897,6 +12897,7 @@ viewWikiGraphPage wikiSlug wikiDetails =
     Html.div
         [ Attr.id "wiki-graph-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
+        , UI.classAttr "relative"
         ]
         [ if List.isEmpty graphSummary.publishedPageSlugs then
             UI.contentParagraph
@@ -12908,14 +12909,23 @@ viewWikiGraphPage wikiSlug wikiDetails =
                 graphData =
                     WikiGraph.graph wikiSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags
             in
-            UI.Graph.view
-                { id = "wiki-graphviz"
-                , graph = graphData
-                , attrs =
-                    [ Attr.attribute "data-graphviz-pages" (String.fromInt (List.length graphSummary.publishedPageSlugs))
-                    , Attr.attribute "data-graphviz-edges" (String.fromInt (List.length graphSummary.edges))
+            Html.div
+                [ UI.classAttr "relative min-h-[14rem]" ]
+                [ Html.div
+                    [ Attr.id "wiki-graph-navigator"
+                    , Attr.attribute "data-role" "graph-navigator"
+                    , UI.classAttr "absolute right-2 top-2 z-10"
                     ]
-                }
+                    []
+                , UI.Graph.view
+                    { id = "wiki-graphviz"
+                    , graph = graphData
+                    , attrs =
+                        [ Attr.attribute "data-graphviz-pages" (String.fromInt (List.length graphSummary.publishedPageSlugs))
+                        , Attr.attribute "data-graphviz-edges" (String.fromInt (List.length graphSummary.edges))
+                        ]
+                    }
+                ]
         ]
 
 
