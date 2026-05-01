@@ -1,4 +1,4 @@
-module UI.EditorShell exposing (view)
+module UI.EditorShell exposing (MarkdownTabs, view)
 
 import Html exposing (Attribute, Html)
 import Html.Attributes as Attr

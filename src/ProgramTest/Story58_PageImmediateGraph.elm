@@ -47,7 +47,7 @@ endToEndTests =
                             )
                         , ProgramTest.Query.withinHref "/w/Demo/p/About"
                             (ProgramTest.Query.expectHasTexts [ "Page" ])
-                        , ProgramTest.Query.withinId "page-immediate-graphviz"
+                        , ProgramTest.Query.withinId "page-immediate-graph"
                             (ProgramTest.Query.expectHasDataAttributes [])
                         ]
                     )

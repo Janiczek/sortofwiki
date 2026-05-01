@@ -1,6 +1,5 @@
 module UI.Link exposing
     ( breakAllSpan
-    , cardTitle
     , contentLink
     , listItemTight
     , missingLink
@@ -61,11 +60,6 @@ navListItemMutedClass =
     "block w-full rounded py-[0.14rem] px-[0.55rem] -ml-[0.55rem] !text-[var(--fg-muted)] hover:!text-[var(--link)] hover:bg-[var(--link-bg-hover)] underline underline-offset-[2px]"
 
 
-cardTitleClass : String
-cardTitleClass =
-    "no-underline hover:underline underline-offset-[0.2em]"
-
-
 missingClass : String
 missingClass =
     "!text-red-700 dark:!text-red-400 hover:!bg-[var(--danger-link-bg-hover)] underline underline-offset-[2px]"
@@ -118,8 +112,3 @@ listItemTight attrs children =
 breakAllSpan : List (Attribute msg) -> List (Html msg) -> Html msg
 breakAllSpan attrs children =
     Html.span (TW.cls "break-all" :: attrs) children
-
-
-cardTitle : List (Attribute msg) -> List (Html msg) -> Html msg
-cardTitle attrs children =
-    Html.a (TW.cls cardTitleClass :: attrs) children

@@ -1,6 +1,5 @@
 module MarkdownTypographicSubstitutions exposing (postProcessBlocksWithTypographicSubstitutions)
 
-import Char
 import Markdown.Block as Block
 
 
@@ -136,11 +135,6 @@ smartQuoteChars maybePrev inSingleQuote inDoubleQuote remaining acc =
             acc
 
         char :: rest ->
-            let
-                maybeNext : Maybe Char
-                maybeNext =
-                    List.head rest
-            in
             if char == '"' then
                 if inDoubleQuote then
                     smartQuoteChars (Just '”') inSingleQuote False rest ('”' :: acc)
@@ -149,6 +143,11 @@ smartQuoteChars maybePrev inSingleQuote inDoubleQuote remaining acc =
                     smartQuoteChars (Just '“') inSingleQuote True rest ('“' :: acc)
 
             else if char == '\'' then
+                let
+                    maybeNext : Maybe Char
+                    maybeNext =
+                        List.head rest
+                in
                 if isApostrophe maybePrev maybeNext then
                     smartQuoteChars (Just '’') inSingleQuote inDoubleQuote rest ('’' :: acc)
 

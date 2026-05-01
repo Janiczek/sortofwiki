@@ -1,4 +1,4 @@
-module UI.ZIndex exposing (ZIndexUsecase(..), class, orderedUsecases, value, valuesByUsecase)
+module UI.ZIndex exposing (ZIndexUsecase(..), class)
 
 import SeqDict exposing (SeqDict)
 
@@ -10,7 +10,8 @@ type ZIndexUsecase
     | HeaderSearchPopup
 
 
-{-| Top: smaller z-index, bottom: larger z-index. -}
+{-| Top: smaller z-index, bottom: larger z-index.
+-}
 orderedUsecases : List ZIndexUsecase
 orderedUsecases =
     [ HeaderSearchLayer

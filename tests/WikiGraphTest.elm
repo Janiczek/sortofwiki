@@ -7,19 +7,9 @@ import Fuzzers
 import Page
 import PageLinkRefs
 import Test exposing (Test)
+import UI.Graph
 import Wiki
 import WikiGraph
-
-
-dotString : String -> String
-dotString raw =
-    "\""
-        ++ (raw
-                |> String.replace "\\" "\\\\"
-                |> String.replace "\"" "\\\""
-                |> String.replace "\n" "\\n"
-           )
-        ++ "\""
 
 
 suite : Test
@@ -148,13 +138,13 @@ suite =
                         ]
                         ()
             ]
-        , Test.describe "dot"
+        , Test.describe "graph"
             [ Test.test "renders published nodes, missing nodes, and edges" <|
                 \() ->
                     let
-                        graphDot : String
-                        graphDot =
-                            WikiGraph.dot "Demo"
+                        renderedGraph : UI.Graph.Graph
+                        renderedGraph =
+                            WikiGraph.graph "Demo"
                                 (Dict.fromList
                                     [ ( "About", "[[Home]]\n[[TodoGap]]" )
                                     , ( "Home", "[[About]]" )
@@ -166,23 +156,27 @@ suite =
                                     ]
                                 )
                     in
-                    [ String.contains "\"About\" [href=\"/w/Demo/pg/About\"" graphDot
-                    , String.contains "\"Home\" [href=\"/w/Demo/pg/Home\"" graphDot
-                    , String.contains "\"TodoGap\" [href=\"/w/Demo/p/TodoGap\"" graphDot
-                    , String.contains "style=\"dashed\", color=\"#dc2626\", fontcolor=\"#dc2626\"" graphDot
-                    , String.contains "\"About\" -> \"Home\" [dir=none];" graphDot
-                    , String.contains "\"About\" -> \"TodoGap\";" graphDot
-                    , String.contains "\"About\" -> \"Meta\" [style=\"dashed\", color=\"#7c3aed\"];" graphDot
-                    , String.contains "label=" graphDot |> not
+                    [ renderedGraph.nodes
+                        |> List.any (\node -> node.id == "About" && node.href == "/w/Demo/pg/About" && node.kind == UI.Graph.NormalNode)
+                    , renderedGraph.nodes
+                        |> List.any (\node -> node.id == "Home" && node.href == "/w/Demo/pg/Home" && node.kind == UI.Graph.NormalNode)
+                    , renderedGraph.nodes
+                        |> List.any (\node -> node.id == "TodoGap" && node.href == "/w/Demo/p/TodoGap" && node.kind == UI.Graph.MissingNode)
+                    , renderedGraph.edges
+                        |> List.any (\edge -> edge.from == "About" && edge.to == "Home" && edge.direction == UI.Graph.Undirected && edge.kind == UI.Graph.LinkEdge)
+                    , renderedGraph.edges
+                        |> List.any (\edge -> edge.from == "About" && edge.to == "TodoGap" && edge.direction == UI.Graph.Directed && edge.kind == UI.Graph.LinkEdge)
+                    , renderedGraph.edges
+                        |> List.any (\edge -> edge.from == "About" && edge.to == "Meta" && edge.direction == UI.Graph.Directed && edge.kind == UI.Graph.TagEdge)
                     ]
                         |> List.all identity
                         |> Expect.equal True
-            , Test.test "renders undirected reciprocal page-link and tag edges without arrowheads" <|
+            , Test.test "renders undirected reciprocal page-link and tag edges" <|
                 \() ->
                     let
-                        graphDot : String
-                        graphDot =
-                            WikiGraph.dot "Demo"
+                        renderedGraph : UI.Graph.Graph
+                        renderedGraph =
+                            WikiGraph.graph "Demo"
                                 (Dict.fromList
                                     [ ( "A", "[[B]]" )
                                     , ( "B", "[[A]]" )
@@ -194,15 +188,18 @@ suite =
                                     ]
                                 )
                     in
-                    [ String.contains "\"A\" -> \"B\" [dir=none];" graphDot
-                    , String.contains "\"A\" -> \"B\" [style=\"dashed\", color=\"#7c3aed\", dir=none];" graphDot
+                    [ renderedGraph.edges
+                        |> List.any (\edge -> edge.from == "A" && edge.to == "B" && edge.direction == UI.Graph.Undirected && edge.kind == UI.Graph.LinkEdge)
+                    , renderedGraph.edges
+                        |> List.any (\edge -> edge.from == "A" && edge.to == "B" && edge.direction == UI.Graph.Undirected && edge.kind == UI.Graph.TagEdge)
                     ]
                         |> List.all identity
                         |> Expect.equal True
             , Test.fuzz (Fuzz.map2 Tuple.pair Fuzzers.wikiSlug Fuzzers.pageSlug) "includes href for each published page node" <|
                 \( wikiSlug, pageSlug ) ->
-                    WikiGraph.dot wikiSlug (Dict.fromList [ ( pageSlug, "" ) ]) (Dict.fromList [ ( pageSlug, [] ) ])
-                        |> String.contains (dotString (Wiki.pageGraphUrlPath wikiSlug pageSlug))
+                    WikiGraph.graph wikiSlug (Dict.fromList [ ( pageSlug, "" ) ]) (Dict.fromList [ ( pageSlug, [] ) ])
+                        |> .nodes
+                        |> List.any (\node -> node.id == pageSlug && node.href == Wiki.pageGraphUrlPath wikiSlug pageSlug)
                         |> Expect.equal True
             ]
         ]

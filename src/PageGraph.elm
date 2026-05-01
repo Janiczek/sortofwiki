@@ -1,4 +1,4 @@
-module PageGraph exposing (Edge, EdgeDirection(..), EdgeKind(..), Summary, dot, graph, summary)
+module PageGraph exposing (Edge, EdgeDirection(..), EdgeKind(..), Summary, graph, summary)
 
 import Dict exposing (Dict)
 import GraphData
@@ -200,12 +200,6 @@ summary wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags =
     , missingPageSlugs = missingPageSlugs
     , edges = edges
     }
-
-
-dot : Wiki.Slug -> Page.Slug -> Dict Page.Slug String -> Dict Page.Slug (List Page.Slug) -> String
-dot wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags =
-    graph wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags
-        |> UI.Graph.toDot
 
 
 graph :

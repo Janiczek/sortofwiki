@@ -169,4 +169,4 @@ tokenize text =
         |> String.trim
         |> String.toLower
         |> Regex.split separatorRegex
-        |> List.filter (\token -> String.length token > 0)
+        |> List.filter (\token -> not (String.isEmpty token))

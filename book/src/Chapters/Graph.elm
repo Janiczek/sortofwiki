@@ -4,6 +4,7 @@ import ElmBook.Chapter exposing (Chapter, chapter, renderComponentList)
 import GraphData
 import Html
 import Html.Attributes as Attr
+import Json.Encode as Encode
 import UI.Graph
 
 
@@ -24,13 +25,13 @@ chapter_ : Chapter x
 chapter_ =
     chapter "UI.Graph"
         |> renderComponentList
-            [ ( "UI.Graph.viewGraphviz (rendered graph)"
+            [ ( "UI.Graph.view (cola graph)"
               , Html.div
                     [ Attr.style "min-height" "24rem"
                     , Attr.style "padding" "0.5rem"
                     ]
                     [ UI.Graph.view
-                        { id = "book-graphviz-preview"
+                        { id = "book-graph-preview"
                         , graph =
                             { graphName = "book_graph"
                             , nodes =
@@ -55,9 +56,9 @@ chapter_ =
             ]
 
 
-exampleDot : String
-exampleDot =
-    UI.Graph.toDot
+exampleEncoded : String
+exampleEncoded =
+    UI.Graph.encode
         { graphName = "book_graph"
         , nodes =
             [ node "Alpha" "/alpha" 8 False
@@ -69,6 +70,7 @@ exampleDot =
             , edgeToUi { fromSlug = "Alpha", toSlug = "Missing Node", direction = GraphData.Directed, kind = TagEdge }
             ]
         }
+        |> Encode.encode 0
 
 
 node : String -> String -> Int -> Bool -> UI.Graph.Node

@@ -135,17 +135,16 @@ wikiNavLinks wikiSlug maybeRole =
                   else
                     []
                 ]
-                ++ List.concat
-                    [ if WikiRole.hasMySubmissionsAccess role then
+                ++ (if WikiRole.hasMySubmissionsAccess role then
                         [ { linkLabel = "My submissions"
                           , linkRoute = Route.WikiMySubmissions wikiSlug
                           , linkEmphasized = False
                           }
                         ]
 
-                      else
+                    else
                         []
-                    ]
+                   )
 
 
 allLinks : List Section -> List Link

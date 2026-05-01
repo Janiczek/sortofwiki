@@ -8,10 +8,10 @@ import Markdown.Renderer as MarkdownRenderer
 import Page
 import UI
 import UI.FocusVisible
+import UI.Heading
+import UI.Link
 import Wiki
 import WikiPageMarkdownParse
-import UI.Link
-import UI.Heading
 
 
 {-| Render markdown source as HTML using [dillonkearns/elm-markdown](https://package.elm-lang.org/packages/dillonkearns/elm-markdown/latest/).
@@ -108,8 +108,8 @@ htmlRendererWithHeadingIds maybeSlug =
 
                     _ ->
                         UI.Link.contentLink
-                            ([ Attr.href destination ]
-                                ++ (title
+                            (Attr.href destination
+                                :: (title
                                         |> Maybe.map Attr.title
                                         |> Maybe.map List.singleton
                                         |> Maybe.withDefault []
@@ -167,28 +167,6 @@ htmlRendererWithHeadingIds maybeSlug =
         , thematicBreak =
             Html.hr [ UI.markdownThematicBreakAttr ] []
     }
-
-
-headingHtml : List (Html.Attribute msg) -> Block.HeadingLevel -> List (Html msg) -> Html msg
-headingHtml attrs level children =
-    case level of
-        Block.H1 ->
-            Html.h1 attrs children
-
-        Block.H2 ->
-            Html.h2 attrs children
-
-        Block.H3 ->
-            Html.h3 attrs children
-
-        Block.H4 ->
-            Html.h4 attrs children
-
-        Block.H5 ->
-            Html.h5 attrs children
-
-        Block.H6 ->
-            Html.h6 attrs children
 
 
 tableAlignmentAttrs : Maybe Block.Alignment -> List (Html.Attribute msg)

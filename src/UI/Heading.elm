@@ -1,12 +1,7 @@
 module UI.Heading exposing
     ( cardHeadingDanger
-    , cardHeadingLg
     , cardHeadingSm
     , contentHeading2
-    , gridHeadingCol1
-    , gridHeadingCol2
-    , gridHeadingPrimaryCol1
-    , gridHeadingSecondaryCol2
     , markdownHeading1
     , markdownHeading2
     , markdownHeading3
@@ -103,11 +98,6 @@ panelHeadingSecondaryClass =
     "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg-muted)]"
 
 
-reviewDiffCellHeadingClass : String
-reviewDiffCellHeadingClass =
-    "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)]"
-
-
 panelHeadingPrimary : List (Attribute msg) -> List (Html msg) -> Html msg
 panelHeadingPrimary attrs children =
     Html.h3 (TW.cls panelHeadingPrimaryClass :: attrs) children
@@ -116,35 +106,6 @@ panelHeadingPrimary attrs children =
 panelHeadingSecondary : List (Attribute msg) -> List (Html msg) -> Html msg
 panelHeadingSecondary attrs children =
     Html.h3 (TW.cls panelHeadingSecondaryClass :: attrs) children
-
-
-gridHeadingPrimaryCol1 : List (Attribute msg) -> List (Html msg) -> Html msg
-gridHeadingPrimaryCol1 attrs children =
-    Html.h3
-        (TW.cls "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)] col-start-1 row-start-1" :: attrs)
-        children
-
-
-gridHeadingSecondaryCol2 : List (Attribute msg) -> List (Html msg) -> Html msg
-gridHeadingSecondaryCol2 attrs children =
-    Html.h3
-        (TW.cls "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg-muted)] col-start-2 row-start-1" :: attrs)
-        children
-
-
-gridHeadingCol1 : List (Attribute msg) -> List (Html msg) -> Html msg
-gridHeadingCol1 attrs children =
-    Html.h3 (TW.cls (reviewDiffCellHeadingClass ++ " col-start-1 row-start-1") :: attrs) children
-
-
-gridHeadingCol2 : List (Attribute msg) -> List (Html msg) -> Html msg
-gridHeadingCol2 attrs children =
-    Html.h3 (TW.cls (reviewDiffCellHeadingClass ++ " col-start-2 row-start-1") :: attrs) children
-
-
-cardHeadingLg : List (Attribute msg) -> List (Html msg) -> Html msg
-cardHeadingLg attrs children =
-    Html.h2 (TW.cls "m-0 mb-2 text-[1.1rem] font-semibold text-[var(--fg)] leading-[1.2]" :: attrs) children
 
 
 cardHeadingSm : List (Attribute msg) -> List (Html msg) -> Html msg

@@ -11,8 +11,8 @@ import Browser.Navigation
 import ColorTheme
 import ContributorAccount
 import ContributorWikiSession exposing (ContributorWikiSession)
-import Duration
 import Dict exposing (Dict)
+import Duration
 import Effect.Browser exposing (UrlRequest)
 import Effect.Browser.Dom
 import Effect.Browser.Navigation
@@ -116,7 +116,7 @@ wikiLoadedHeaderTitle summary maybeSecondary =
     }
 
 
-{-| Wiki page route: published pages show wiki name + \[\[slug\]\]; missing pages show \[\[slug\]\]: Create? (matches program tests / wiki-link convention).
+{-| Wiki page route: published pages show wiki name + [[slug]]; missing pages show [[slug]]: Create? (matches program tests / wiki-link convention).
 -}
 wikiPageRouteHeaderSecondary :
     Store
@@ -1333,10 +1333,9 @@ viewSideNav ariaLabel sections =
 
         navChildren : List (Html Msg)
         navChildren =
-            [ Html.div [ UI.sideNavMainSectionAttr ]
+            Html.div [ UI.sideNavMainSectionAttr ]
                 [ Html.div [ UI.sideNavStackAttr ] (viewSideNavSections topSections) ]
-            ]
-                ++ (if List.isEmpty bottomSections then
+                :: (if List.isEmpty bottomSections then
                         []
 
                     else
@@ -7975,36 +7974,6 @@ viewAppHeader model =
                 Nothing ->
                     Html.text ""
 
-        maybeSearchWikiSlug : Maybe Wiki.Slug
-        maybeSearchWikiSlug =
-            wikiSideNavSlugIfActive model
-
-        hasSearchScope : Bool
-        hasSearchScope =
-            maybeSearchWikiSlug /= Nothing
-
-        headerSearchMarkdownSources : Dict Page.Slug String
-        headerSearchMarkdownSources =
-            case maybeSearchWikiSlug of
-                Just wikiSlug ->
-                    case Store.get_ wikiSlug model.store.wikiDetails of
-                        Success details ->
-                            details.publishedPageMarkdownSources
-
-                        _ ->
-                            Dict.empty
-
-                Nothing ->
-                    Dict.empty
-
-        headerSearchResults : List WikiSearch.ResultItem
-        headerSearchResults =
-            model.headerSearchResults
-
-        headerSearchQueryTrimmed : String
-        headerSearchQueryTrimmed =
-            String.trim model.headerSearchQuery
-
         showHeaderSearch : Bool
         showHeaderSearch =
             case model.route of
@@ -8038,6 +8007,15 @@ viewAppHeader model =
         maybeSearchForm : Maybe (Html Msg)
         maybeSearchForm =
             if showHeaderSearch then
+                let
+                    maybeSearchWikiSlug : Maybe Wiki.Slug
+                    maybeSearchWikiSlug =
+                        wikiSideNavSlugIfActive model
+
+                    hasSearchScope : Bool
+                    hasSearchScope =
+                        maybeSearchWikiSlug /= Nothing
+                in
                 Just
                     (Html.form
                         [ Attr.id "header-search-form"
@@ -8067,6 +8045,11 @@ viewAppHeader model =
                             []
                         , case maybeSearchWikiSlug of
                             Just wikiSlug ->
+                                let
+                                    headerSearchQueryTrimmed : String
+                                    headerSearchQueryTrimmed =
+                                        String.trim model.headerSearchQuery
+                                in
                                 if String.isEmpty headerSearchQueryTrimmed then
                                     Html.text ""
 
@@ -8086,42 +8069,58 @@ viewAppHeader model =
                                                 ]
                                                 [ Html.text "Please type three or more characters." ]
 
-                                          else if List.isEmpty headerSearchResults then
-                                            Html.p
-                                                [ Attr.id "header-search-popup-empty"
-                                                , Attr.class "m-1 text-[0.8rem] text-[var(--fg-muted)] [font-family:var(--font-ui)]"
-                                                ]
-                                                [ Html.text "No matches." ]
-
                                           else
-                                            Html.ul
-                                                [ Attr.id "header-search-popup-results"
-                                                , Attr.class "m-0 p-0 list-none"
-                                                ]
-                                                (headerSearchResults
-                                                    |> List.take 5
-                                                    |> List.map
-                                                        (\result ->
-                                                            Html.li
-                                                                [ Attr.class "m-0 -mx-2 px-2 border-b border-[var(--border-subtle)] pb-2 mb-2 last:mb-0 last:pb-0 last:border-b-0" ]
-                                                                [ UI.Link.subtleLink
-                                                                    [ Attr.href (Wiki.publishedPageUrlPath wikiSlug result.pageSlug)
-                                                                    , Attr.attribute "data-search-page-slug" result.pageSlug
+                                            let
+                                                headerSearchResults : List WikiSearch.ResultItem
+                                                headerSearchResults =
+                                                    model.headerSearchResults
+                                            in
+                                            if List.isEmpty headerSearchResults then
+                                                Html.p
+                                                    [ Attr.id "header-search-popup-empty"
+                                                    , Attr.class "m-1 text-[0.8rem] text-[var(--fg-muted)] [font-family:var(--font-ui)]"
+                                                    ]
+                                                    [ Html.text "No matches." ]
+
+                                            else
+                                                let
+                                                    headerSearchMarkdownSources : Dict Page.Slug String
+                                                    headerSearchMarkdownSources =
+                                                        case Store.get_ wikiSlug model.store.wikiDetails of
+                                                            Success details ->
+                                                                details.publishedPageMarkdownSources
+
+                                                            _ ->
+                                                                Dict.empty
+                                                in
+                                                Html.ul
+                                                    [ Attr.id "header-search-popup-results"
+                                                    , Attr.class "m-0 p-0 list-none"
+                                                    ]
+                                                    (headerSearchResults
+                                                        |> List.take 5
+                                                        |> List.map
+                                                            (\result ->
+                                                                Html.li
+                                                                    [ Attr.class "m-0 -mx-2 px-2 border-b border-[var(--border-subtle)] pb-2 mb-2 last:mb-0 last:pb-0 last:border-b-0" ]
+                                                                    [ UI.Link.subtleLink
+                                                                        [ Attr.href (Wiki.publishedPageUrlPath wikiSlug result.pageSlug)
+                                                                        , Attr.attribute "data-search-page-slug" result.pageSlug
+                                                                        ]
+                                                                        [ Html.span
+                                                                            [ Attr.class "block text-[0.8125rem]" ]
+                                                                            [ viewHighlightedText model.headerSearchQuery result.pageSlug ]
+                                                                        ]
+                                                                    , Html.p
+                                                                        [ Attr.class "mt-0.5 mb-0 text-[0.76rem] text-[var(--fg-muted)] leading-snug" ]
+                                                                        [ Dict.get result.pageSlug headerSearchMarkdownSources
+                                                                            |> Maybe.withDefault ""
+                                                                            |> excerptFromMarkdown model.headerSearchQuery
+                                                                            |> viewSearchExcerpt
+                                                                        ]
                                                                     ]
-                                                                    [ Html.span
-                                                                        [ Attr.class "block text-[0.8125rem]" ]
-                                                                        [ viewHighlightedText model.headerSearchQuery result.pageSlug ]
-                                                                    ]
-                                                                , Html.p
-                                                                    [ Attr.class "mt-0.5 mb-0 text-[0.76rem] text-[var(--fg-muted)] leading-snug" ]
-                                                                    [ Dict.get result.pageSlug headerSearchMarkdownSources
-                                                                        |> Maybe.withDefault ""
-                                                                        |> excerptFromMarkdown model.headerSearchQuery
-                                                                        |> viewSearchExcerpt
-                                                                    ]
-                                                                ]
-                                                        )
-                                                )
+                                                            )
+                                                    )
                                         , Html.div [ Attr.class "mt-2 -mx-2 px-2 border-t border-[var(--border-subtle)] pt-2" ]
                                             [ UI.Link.subtleLink
                                                 [ Attr.id "header-search-open-page"
@@ -8140,13 +8139,12 @@ viewAppHeader model =
 
             else
                 Nothing
-
     in
     Html.header
         [ UI.appHeaderBarAttr
         , Attr.attribute "data-context" "layout-header"
         ]
-        ([ Html.div [ Attr.class "min-w-0 flex-1 flex items-center gap-[0.7rem] flex-wrap md:flex-nowrap" ]
+        (Html.div [ Attr.class "min-w-0 flex-1 flex items-center gap-[0.7rem] flex-wrap md:flex-nowrap" ]
             (List.concat
                 [ if routeUsesAuthShell model.route then
                     []
@@ -8177,8 +8175,7 @@ viewAppHeader model =
                   ]
                 ]
             )
-         ]
-            ++ (maybeSearchForm |> Maybe.map List.singleton |> Maybe.withDefault [])
+            :: (maybeSearchForm |> Maybe.map List.singleton |> Maybe.withDefault [])
             ++ [ Html.div [ Attr.class "shrink-0 flex items-center gap-2" ]
                     [ Html.span [ Attr.class "hidden md:inline-flex items-center" ]
                         [ wikiAuthChrome ]
@@ -10157,18 +10154,17 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
                 , Events.onClick PageEditPublishedRowToggled
                 ]
                 [ Html.span [ Attr.class "relative inline-flex items-center -translate-y-[1px] font-sans text-[0.8125rem] leading-[1]" ]
-                    ([ Html.span
-                                [ Attr.class
-                                    (if showIcon then
-                                        "pr-4"
+                    (Html.span
+                        [ Attr.class
+                            (if showIcon then
+                                "pr-4"
 
-                                     else
-                                        ""
-                                    )
-                                ]
-                                [ Html.text label ]
-                           ]
-                        ++ iconNodes
+                             else
+                                ""
+                            )
+                        ]
+                        [ Html.text label ]
+                        :: iconNodes
                     )
                 ]
 
@@ -10216,21 +10212,19 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
 
         yourEditHeadingClass : String
         yourEditHeadingClass =
-            (if publishedRowCollapsed then
+            if publishedRowCollapsed then
                 "shrink-0 px-4 py-1 border-b border-[var(--border-subtle)] text-[0.8125rem]"
 
-             else
+            else
                 "shrink-0 px-4 py-1 border-t border-b border-[var(--border-subtle)] text-[0.8125rem]"
-            )
 
         yourPreviewHeadingClass : String
         yourPreviewHeadingClass =
-            (if publishedRowCollapsed then
+            if publishedRowCollapsed then
                 "shrink-0 px-4 py-1 border-b border-[var(--border-subtle)] text-[0.8125rem]"
 
-             else
+            else
                 "shrink-0 px-4 py-1 border-t border-b border-[var(--border-subtle)] text-[0.8125rem]"
-            )
     in
     Html.div
         [ Attr.id "wiki-submit-edit-page"
@@ -11485,7 +11479,7 @@ viewWikiAdminAuditLoaded wikiSlug model =
 viewWikiAdminAuditRoute : Model -> Wiki.Slug -> Html Msg
 viewWikiAdminAuditRoute model wikiSlug =
     case Store.get_ wikiSlug model.store.wikiDetails of
-        RemoteData.Success wikiDetails ->
+        RemoteData.Success _ ->
             case Store.get wikiSlug model.store.wikiCatalog of
                 RemoteData.Success _ ->
                     viewWikiAdminAuditLoaded wikiSlug model
@@ -11631,8 +11625,8 @@ viewWikiAdminAuditDiffRoute wikiSlug wikiDetails eventIndex model =
                 ]
 
 
-viewHostAdminAuditDiffRoute : Wiki.Slug -> Int -> Model -> Html Msg
-viewHostAdminAuditDiffRoute _ eventIndex model =
+viewHostAdminAuditDiffRoute : Int -> Model -> Html Msg
+viewHostAdminAuditDiffRoute eventIndex model =
     let
         maybeDiffBody : Maybe ( Wiki.Slug, TrustedAuditDiffBody )
         maybeDiffBody =
@@ -12506,7 +12500,7 @@ viewMissingPublishedPage wikiSlug pageSlug taggedPageSlugs maybeContributorWiki 
                 [ Attr.id "wiki-missing-published-page-graph"
                 , UI.wikiRightRailTocNudgeAttr
                 ]
-                [ immediatePublishedPageGraphviz "wiki-missing-published-graphviz" wikiSlug pageSlug wikiDetails
+                [ immediatePublishedPageGraphviz "wiki-missing-published-graph" wikiSlug pageSlug wikiDetails
                 ]
     in
     Html.div
@@ -12796,10 +12790,6 @@ excerptFromMarkdown rawQuery markdown =
         plainText : String
         plainText =
             markdownToPlainText markdown
-
-        lowerPlainText : String
-        lowerPlainText =
-            String.toLower plainText
     in
     if String.isEmpty query then
         if String.length plainText > 140 then
@@ -12815,6 +12805,11 @@ excerptFromMarkdown rawQuery markdown =
             }
 
     else
+        let
+            lowerPlainText : String
+            lowerPlainText =
+                String.toLower plainText
+        in
         case String.indexes query lowerPlainText |> List.head of
             Just start ->
                 let
@@ -12870,7 +12865,7 @@ markdownToPlainText markdown =
     of
         Ok lines ->
             lines
-                |> String.join ""
+                |> String.concat
                 |> String.words
                 |> String.join " "
 
@@ -12882,11 +12877,11 @@ markdownToPlainText markdown =
 
 plainTextRenderer : MarkdownRenderer.Renderer String
 plainTextRenderer =
-    { heading = \{ children } -> String.join "" children ++ " "
-    , paragraph = \children -> String.join "" children ++ " "
-    , blockQuote = \children -> String.join "" children ++ " "
+    { heading = \{ children } -> String.concat children ++ " "
+    , paragraph = \children -> String.concat children ++ " "
+    , blockQuote = \children -> String.concat children ++ " "
     , codeSpan = identity
-    , link = \_ children -> String.join "" children
+    , link = \_ children -> String.concat children
     , unorderedList =
         \items ->
             items
@@ -12894,14 +12889,14 @@ plainTextRenderer =
                     (\item ->
                         case item of
                             Block.ListItem _ children ->
-                                String.join "" children
+                                String.concat children
                     )
                 |> String.join " "
                 |> (\s -> s ++ " ")
     , orderedList =
         \_ items ->
             items
-                |> List.map (String.join "")
+                |> List.map String.concat
                 |> String.join " "
                 |> (\s -> s ++ " ")
     , table =
@@ -12912,19 +12907,19 @@ plainTextRenderer =
     , tableRow = String.join " "
     , tableHeaderCell =
         \_ children ->
-            String.join "" children
+            String.concat children
     , tableCell =
         \_ children ->
-            String.join "" children
+            String.concat children
     , codeBlock =
         \{ body } ->
             body ++ " "
     , html = Markdown.Html.oneOf []
     , thematicBreak = " "
     , text = identity
-    , strong = String.join ""
-    , emphasis = String.join ""
-    , strikethrough = String.join ""
+    , strong = String.concat
+    , emphasis = String.concat
+    , strikethrough = String.concat
     , hardLineBreak = " "
     , image = \image -> image.alt
     }
@@ -12951,15 +12946,16 @@ viewHighlightedText rawQuery text =
         query : String
         query =
             String.trim rawQuery |> String.toLower
-
-        lowerText : String
-        lowerText =
-            String.toLower text
     in
     if String.isEmpty query then
         Html.text text
 
     else
+        let
+            lowerText : String
+            lowerText =
+                String.toLower text
+        in
         case String.indexes query lowerText |> List.head of
             Just start ->
                 let
@@ -13007,10 +13003,6 @@ viewWikiSearchRoute model wikiSlug =
                         query : String
                         query =
                             String.trim model.wikiSearchPageQuery
-
-                        results : List WikiSearch.ResultItem
-                        results =
-                            model.wikiSearchPageResults
                     in
                     Html.div
                         [ Attr.id "wiki-search-page"
@@ -13047,82 +13039,88 @@ viewWikiSearchRoute model wikiSlug =
                                     [ Html.text "Please type three or more characters." ]
                                 ]
 
-                          else if List.isEmpty results then
-                            Html.div [ Attr.class "space-y-3" ]
-                                [ Html.input
-                                    [ Attr.id "wiki-search-input"
-                                    , Attr.type_ "search"
-                                    , Attr.placeholder "Search this wiki..."
-                                    , Attr.value model.wikiSearchPageQuery
-                                    , Events.onInput WikiSearchPageQueryChanged
-                                    , Attr.class "w-full max-w-[28rem] rounded-md border border-[var(--border-subtle)] bg-[var(--bg)] px-3 py-2 text-[0.8125rem] text-[var(--fg)]"
-                                    ]
-                                    []
-                                , UI.contentParagraph
-                                    [ Attr.id "wiki-search-no-results"
-                                    , Attr.class "[font-family:var(--font-ui)] text-[0.8125rem]"
-                                    ]
-                                    [ Html.text "No matching pages found." ]
-                                ]
-
                           else
-                            Html.div [ Attr.class "space-y-3" ]
-                                [ Html.input
-                                    [ Attr.id "wiki-search-input"
-                                    , Attr.type_ "search"
-                                    , Attr.placeholder "Search this wiki..."
-                                    , Attr.value model.wikiSearchPageQuery
-                                    , Events.onInput WikiSearchPageQueryChanged
-                                    , Attr.class "w-full max-w-[28rem] rounded-md border border-[var(--border-subtle)] bg-[var(--bg)] px-3 py-2 text-[0.8125rem] text-[var(--fg)]"
-                                    ]
-                                    []
-                                , Html.p
-                                    [ Attr.id "wiki-search-count"
-                                    , UI.formFeedbackTextSmAttr
-                                    ]
-                                    [ Html.text
-                                        ("Found " ++ String.fromInt (List.length results) ++ " matching pages.")
-                                    ]
-                                , UI.table UI.TableFullMax72
-                                    [ Attr.id "wiki-search-results-table" ]
-                                    { theadAttrs = []
-                                    , headerRowAttrs = []
-                                    , headerAlign = UI.TableAlignMiddle
-                                    , headers =
-                                        [ UI.tableHeaderText "Page"
-                                        , UI.tableHeaderText "Excerpt"
+                            let
+                                results : List WikiSearch.ResultItem
+                                results =
+                                    model.wikiSearchPageResults
+                            in
+                            if List.isEmpty results then
+                                Html.div [ Attr.class "space-y-3" ]
+                                    [ Html.input
+                                        [ Attr.id "wiki-search-input"
+                                        , Attr.type_ "search"
+                                        , Attr.placeholder "Search this wiki..."
+                                        , Attr.value model.wikiSearchPageQuery
+                                        , Events.onInput WikiSearchPageQueryChanged
+                                        , Attr.class "w-full max-w-[28rem] rounded-md border border-[var(--border-subtle)] bg-[var(--bg)] px-3 py-2 text-[0.8125rem] text-[var(--fg)]"
                                         ]
-                                    , tbodyAttrs = [ Attr.id "wiki-search-results" ]
-                                    , rows =
-                                        results
-                                            |> List.map
-                                                (\result ->
-                                                    let
-                                                        markdown : String
-                                                        markdown =
-                                                            Dict.get result.pageSlug wikiDetails.publishedPageMarkdownSources
-                                                                |> Maybe.withDefault ""
-                                                    in
-                                                    UI.trStriped
-                                                        [ Attr.attribute "data-search-page-slug" result.pageSlug ]
-                                                        [ UI.tableTd UI.TableAlignMiddle
-                                                            []
-                                                            [ UI.Link.contentLink
-                                                                [ Attr.href (Wiki.publishedPageUrlPath wikiSlug result.pageSlug) ]
-                                                                [ Html.span [ Attr.class "text-[0.8125rem]" ] [ viewHighlightedText query result.pageSlug ] ]
-                                                            ]
-                                                        , UI.tableTd UI.TableAlignMiddle
-                                                            []
-                                                            [ Html.p
-                                                                [ Attr.class "m-0 text-[0.85rem] text-[var(--fg-muted)] [font-family:var(--font-serif)]" ]
-                                                                [ excerptFromMarkdown query markdown
-                                                                    |> viewSearchExcerpt
+                                        []
+                                    , UI.contentParagraph
+                                        [ Attr.id "wiki-search-no-results"
+                                        , Attr.class "[font-family:var(--font-ui)] text-[0.8125rem]"
+                                        ]
+                                        [ Html.text "No matching pages found." ]
+                                    ]
+
+                            else
+                                Html.div [ Attr.class "space-y-3" ]
+                                    [ Html.input
+                                        [ Attr.id "wiki-search-input"
+                                        , Attr.type_ "search"
+                                        , Attr.placeholder "Search this wiki..."
+                                        , Attr.value model.wikiSearchPageQuery
+                                        , Events.onInput WikiSearchPageQueryChanged
+                                        , Attr.class "w-full max-w-[28rem] rounded-md border border-[var(--border-subtle)] bg-[var(--bg)] px-3 py-2 text-[0.8125rem] text-[var(--fg)]"
+                                        ]
+                                        []
+                                    , Html.p
+                                        [ Attr.id "wiki-search-count"
+                                        , UI.formFeedbackTextSmAttr
+                                        ]
+                                        [ Html.text
+                                            ("Found " ++ String.fromInt (List.length results) ++ " matching pages.")
+                                        ]
+                                    , UI.table UI.TableFullMax72
+                                        [ Attr.id "wiki-search-results-table" ]
+                                        { theadAttrs = []
+                                        , headerRowAttrs = []
+                                        , headerAlign = UI.TableAlignMiddle
+                                        , headers =
+                                            [ UI.tableHeaderText "Page"
+                                            , UI.tableHeaderText "Excerpt"
+                                            ]
+                                        , tbodyAttrs = [ Attr.id "wiki-search-results" ]
+                                        , rows =
+                                            results
+                                                |> List.map
+                                                    (\result ->
+                                                        let
+                                                            markdown : String
+                                                            markdown =
+                                                                Dict.get result.pageSlug wikiDetails.publishedPageMarkdownSources
+                                                                    |> Maybe.withDefault ""
+                                                        in
+                                                        UI.trStriped
+                                                            [ Attr.attribute "data-search-page-slug" result.pageSlug ]
+                                                            [ UI.tableTd UI.TableAlignMiddle
+                                                                []
+                                                                [ UI.Link.contentLink
+                                                                    [ Attr.href (Wiki.publishedPageUrlPath wikiSlug result.pageSlug) ]
+                                                                    [ Html.span [ Attr.class "text-[0.8125rem]" ] [ viewHighlightedText query result.pageSlug ] ]
+                                                                ]
+                                                            , UI.tableTd UI.TableAlignMiddle
+                                                                []
+                                                                [ Html.p
+                                                                    [ Attr.class "m-0 text-[0.85rem] text-[var(--fg-muted)] [font-family:var(--font-serif)]" ]
+                                                                    [ excerptFromMarkdown query markdown
+                                                                        |> viewSearchExcerpt
+                                                                    ]
                                                                 ]
                                                             ]
-                                                        ]
-                                                )
-                                    }
-                                ]
+                                                    )
+                                        }
+                                    ]
                         ]
 
 
@@ -13178,20 +13176,6 @@ viewWikiGraphPage wikiSlug wikiDetails =
             Html.div
                 [ UI.classAttr "relative min-h-[14rem]" ]
                 [ Html.div
-                    [ Attr.id "wiki-graph-loading"
-                    , UI.classAttr "pointer-events-none absolute inset-0 flex items-center justify-center"
-                    , Attr.attribute "aria-live" "polite"
-                    ]
-                    [ Html.div
-                        [ UI.classAttr "rounded-md border border-[var(--border-subtle)] bg-[color:var(--chrome-bg)] px-3 py-2 text-[0.95rem] text-[color:var(--fg-muted)] shadow-sm"
-                        ]
-                        [ Html.span
-                            [ UI.classAttr "mr-2 inline-block h-[0.9rem] w-[0.9rem] animate-spin rounded-full border-2 border-[color:var(--border)] border-t-transparent align-[-0.12rem]" ]
-                            []
-                        , Html.text "Graph is loading"
-                        ]
-                    ]
-                , Html.div
                     [ Attr.id "wiki-graph-navigator"
                     , Attr.attribute "data-role" "graph-navigator"
                     , UI.classAttr
@@ -13200,14 +13184,19 @@ viewWikiGraphPage wikiSlug wikiDetails =
                         )
                     ]
                     []
-                , UI.Graph.view
-                    { id = "wiki-graphviz"
-                    , graph = graphData
-                    , attrs =
-                        [ Attr.attribute "data-graphviz-pages" (String.fromInt (List.length graphSummary.publishedPageSlugs))
-                        , Attr.attribute "data-graphviz-edges" (String.fromInt (List.length graphSummary.edges))
-                        ]
-                    }
+                , Html.div
+                    [ Attr.id "wiki-graph-scroll-region"
+                    , UI.classAttr "w-full overflow-x-auto overflow-y-hidden"
+                    ]
+                    [ UI.Graph.view
+                        { id = "wiki-graph"
+                        , graph = graphData
+                        , attrs =
+                            [ Attr.attribute "data-graph-pages" (String.fromInt (List.length graphSummary.publishedPageSlugs))
+                            , Attr.attribute "data-graph-edges" (String.fromInt (List.length graphSummary.edges))
+                            ]
+                        }
+                    ]
                 ]
         ]
 
@@ -13254,8 +13243,12 @@ viewPublishedPageGraphRoute model wikiSlug pageSlug =
 -}
 immediatePublishedPageGraphDescription : Html Msg
 immediatePublishedPageGraphDescription =
-    UI.contentParagraph []
-        [ Html.text "Legend: Red pages are missing; tag edges are purple dashed." ]
+    Html.div []
+        [ UI.contentParagraph []
+            [ Html.text "Legend: Red pages are missing; tag edges are purple dashed." ]
+        , UI.contentParagraph []
+            [ Html.text "Click main node to visit the page." ]
+        ]
 
 
 immediatePublishedPageGraphviz : String -> Wiki.Slug -> Page.Slug -> Wiki.FrontendDetails -> Html Msg
@@ -13264,11 +13257,14 @@ immediatePublishedPageGraphviz graphvizId wikiSlug pageSlug wikiDetails =
         graphData =
             PageGraph.graph wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags
     in
-    UI.Graph.view
-        { id = graphvizId
-        , graph = graphData
-        , attrs = []
-        }
+    Html.div
+        [ UI.classAttr "w-full overflow-x-auto overflow-y-hidden" ]
+        [ UI.Graph.view
+            { id = graphvizId
+            , graph = graphData
+            , attrs = []
+            }
+        ]
 
 
 viewPublishedPageGraphPage : Wiki.Slug -> Page.Slug -> Wiki.FrontendDetails -> Html Msg
@@ -13282,7 +13278,7 @@ viewPublishedPageGraphPage wikiSlug pageSlug wikiDetails =
             [ UI.classAttr "m-0 mb-[0.75rem] [font-family:var(--font-serif)] text-[2rem] leading-[1.2] font-semibold text-[var(--fg)] break-words" ]
             [ Html.text pageSlug ]
         , immediatePublishedPageGraphDescription
-        , immediatePublishedPageGraphviz "page-immediate-graphviz" wikiSlug pageSlug wikiDetails
+        , immediatePublishedPageGraphviz "page-immediate-graph" wikiSlug pageSlug wikiDetails
         ]
 
 
@@ -13307,8 +13303,8 @@ viewBody model =
         Route.HostAdminAudit ->
             viewHostAdminAudit model
 
-        Route.HostAdminAuditDiff wikiSlug atMillis ->
-            viewHostAdminAuditDiffRoute wikiSlug atMillis model
+        Route.HostAdminAuditDiff _ atMillis ->
+            viewHostAdminAuditDiffRoute atMillis model
 
         Route.HostAdminBackup ->
             viewHostAdminBackupPage model
@@ -13774,11 +13770,6 @@ routeUsesMainContentPadding route =
 
 viewMainAppBody : Model -> List (Html Msg)
 viewMainAppBody model =
-    let
-        rightRail : { hasRightColumn : Bool, sections : List (Html Msg) }
-        rightRail =
-            viewWikiRightRail model
-    in
     case model.route of
         Route.WikiList ->
             [ viewAppHeader model
@@ -13805,6 +13796,11 @@ viewMainAppBody model =
             ]
 
         _ ->
+            let
+                rightRail : { hasRightColumn : Bool, sections : List (Html Msg) }
+                rightRail =
+                    viewWikiRightRail model
+            in
             [ viewAppHeader model
             , UI.holyGrailLayout
                 { hasRightColumn = rightRail.hasRightColumn

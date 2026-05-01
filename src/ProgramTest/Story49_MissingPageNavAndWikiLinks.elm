@@ -194,7 +194,7 @@ endToEndTests =
                 [ client.checkView 200
                     (ProgramTest.Query.withinId "wiki-missing-published-page"
                         (ProgramTest.Query.withinId "wiki-missing-published-page-graph"
-                            (ProgramTest.Query.withinId "wiki-missing-published-graphviz"
+                            (ProgramTest.Query.withinId "wiki-missing-published-graph"
                                 (ProgramTest.Query.expectHasDataAttributes [])
                             )
                         )

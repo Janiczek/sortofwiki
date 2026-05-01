@@ -5,12 +5,12 @@ module UI.Graph exposing
     , Graph
     , Node
     , NodeKind(..)
-    , toDot
     , view
     )
 
 import Html
 import Html.Attributes as Attr
+import Json.Encode as Encode
 
 
 type alias Graph =
@@ -61,245 +61,76 @@ view :
     }
     -> Html.Html msg
 view config =
-    Html.node "graphviz-graph"
+    Html.node "cola-graph"
         ([ Attr.id config.id
-         , Attr.attribute "graph" (toDot config.graph)
+         , Attr.attribute "data-graph" (config.graph |> encode |> Encode.encode 0)
          ]
             ++ config.attrs
         )
         []
 
 
-toDot : Graph -> String
-toDot graph =
-    renderDot
-        { graphName = graph.graphName
-        , nodeLines = List.map nodeLine graph.nodes
-        , edgeLines = List.map edgeLine graph.edges
-        }
+encode : Graph -> Encode.Value
+encode graph =
+    Encode.object
+        [ ( "graphName", Encode.string graph.graphName )
+        , ( "nodes", Encode.list encodeNode graph.nodes )
+        , ( "edges", Encode.list encodeEdge graph.edges )
+        ]
 
 
-nodeLine : Node -> String
-nodeLine node =
-    let
-        basePenWidth : Float
-        basePenWidth =
-            nodePenWidth node.inboundCount
-
-        penWidth : Float
-        penWidth =
-            case node.kind of
-                FocusedNode ->
-                    max 2 basePenWidth
-
-                MissingFocusedNode ->
-                    max 2 basePenWidth
-
-                NormalNode ->
-                    basePenWidth
-
-                MissingNode ->
-                    basePenWidth
-
-        attrs : List String
-        attrs =
-            [ "href=" ++ dotString node.href
-            , "height=" ++ formatFloat (nodeHeight node.inboundCount)
-            , "fontsize=" ++ formatFloat (nodeFontSize node.inboundCount)
-            , "penwidth=" ++ formatFloat penWidth
-            ]
-                ++ (case node.kind of
-                        MissingNode ->
-                            missingNodeAttrs
-
-                        MissingFocusedNode ->
-                            missingNodeAttrs
-
-                        NormalNode ->
-                            []
-
-                        FocusedNode ->
-                            []
-                   )
-    in
-    "  "
-        ++ dotString node.id
-        ++ " ["
-        ++ String.join ", " attrs
-        ++ "];"
+encodeNode : Node -> Encode.Value
+encodeNode node =
+    Encode.object
+        [ ( "id", Encode.string node.id )
+        , ( "href", Encode.string node.href )
+        , ( "inboundCount", Encode.int node.inboundCount )
+        , ( "kind", node.kind |> nodeKindToString |> Encode.string )
+        ]
 
 
-edgeLine : Edge -> String
-edgeLine edge =
-    let
-        attrs : List String
-        attrs =
-            edgeAttrs edge
-
-        attrsPart : String
-        attrsPart =
-            if List.isEmpty attrs then
-                ";"
-
-            else
-                " [" ++ String.join ", " attrs ++ "];"
-    in
-    "  "
-        ++ dotString edge.from
-        ++ " -> "
-        ++ dotString edge.to
-        ++ attrsPart
+encodeEdge : Edge -> Encode.Value
+encodeEdge edge =
+    Encode.object
+        [ ( "from", Encode.string edge.from )
+        , ( "to", Encode.string edge.to )
+        , ( "direction", edge.direction |> edgeDirectionToString |> Encode.string )
+        , ( "kind", edge.kind |> edgeKindToString |> Encode.string )
+        , ( "deemphasized", Encode.bool edge.deemphasized )
+        ]
 
 
-edgeAttrs : Edge -> List String
-edgeAttrs edge =
-    let
-        directionAttrs : List String
-        directionAttrs =
-            case edge.direction of
-                Directed ->
-                    []
+nodeKindToString : NodeKind -> String
+nodeKindToString nodeKind =
+    case nodeKind of
+        NormalNode ->
+            "normal"
 
-                Undirected ->
-                    [ "dir=none" ]
+        MissingNode ->
+            "missing"
 
-        deemphasizedAttrs : List String
-        deemphasizedAttrs =
-            if edge.deemphasized then
-                [ "color=" ++ dotString "#6b728066" ]
+        FocusedNode ->
+            "focused"
 
-            else
-                []
-    in
-    case edge.kind of
+        MissingFocusedNode ->
+            "missingFocused"
+
+
+edgeDirectionToString : EdgeDirection -> String
+edgeDirectionToString edgeDirection =
+    case edgeDirection of
+        Directed ->
+            "directed"
+
+        Undirected ->
+            "undirected"
+
+
+edgeKindToString : EdgeKind -> String
+edgeKindToString edgeKind =
+    case edgeKind of
         LinkEdge ->
-            deemphasizedAttrs ++ directionAttrs
+            "link"
 
         TagEdge ->
-            (if edge.deemphasized then
-                [ "style=" ++ dotString "dashed"
-                , "color=" ++ dotString "#7c3aed66"
-                ]
-
-             else
-                [ "style=" ++ dotString "dashed"
-                , "color=" ++ dotString "#7c3aed"
-                ]
-            )
-                ++ directionAttrs
-
-
-missingNodeAttrs : List String
-missingNodeAttrs =
-    [ "style=" ++ dotString "dashed"
-    , "color=" ++ dotString "#dc2626"
-    , "fontcolor=" ++ dotString "#dc2626"
-    ]
-
-
-nodePenWidth : Int -> Float
-nodePenWidth inboundCount =
-    0.5 + inboundScale inboundCount
-
-
-inboundScale : Int -> Float
-inboundScale inboundCount =
-    logBase 11 (toFloat inboundCount + 1)
-        |> clamp 0 1
-
-
-nodeHeight : Int -> Float
-nodeHeight inboundCount =
-    0.2 + (0.1 * inboundScale inboundCount)
-
-
-nodeFontSize : Int -> Float
-nodeFontSize _ =
-    9
-
-
-defaultGraphAttrs : String
-defaultGraphAttrs =
-    """
-    bgcolor="transparent";
-    layout=fdp;
-    start=random1;
-    maxiter=2000;
-    mode=major;
-    """
-
-
-defaultNodeAttrsLine : String
-defaultNodeAttrsLine =
-    "  node [shape=box"
-        ++ ", fontname="
-        ++ dotString "'Source Serif 4', system-ui, sans-serif"
-        ++ ", fontsize="
-        ++ dotString "11"
-        ++ ", margin="
-        ++ dotString "0.16,0.04"
-        ++ ", width=0.01"
-        ++ ", height=0.2"
-        ++ ", penwidth=1"
-        ++ "];"
-
-
-defaultEdgeAttrsLine : String -> String
-defaultEdgeAttrsLine graphName =
-    let
-        ( edgeLen, edgeWeight ) =
-            if graphName == "page" then
-                -- Let link structure drive page graph layout more strongly.
-                ( "0.34", "11" )
-
-            else
-                ( "0.24", "14" )
-    in
-    "  edge [color="
-        ++ dotString "#6b7280"
-        ++ ", arrowsize=0.7"
-        ++ ", penwidth=0.9"
-        ++ ", len="
-        ++ edgeLen
-        ++ ", weight="
-        ++ edgeWeight
-        ++ "];"
-
-
-dotString : String -> String
-dotString raw =
-    "\""
-        ++ (raw
-                |> String.replace "\\" "\\\\"
-                |> String.replace "\"" "\\\""
-                |> String.replace "\n" "\\n"
-           )
-        ++ "\""
-
-
-renderDot :
-    { graphName : String
-    , nodeLines : List String
-    , edgeLines : List String
-    }
-    -> String
-renderDot config =
-    String.join "\n"
-        (List.concat
-            [ [ "digraph " ++ config.graphName ++ " {" ]
-            , [ defaultGraphAttrs
-              , defaultNodeAttrsLine
-              , defaultEdgeAttrsLine config.graphName
-              ]
-            , config.edgeLines
-            , config.nodeLines
-            , [ "}" ]
-            ]
-        )
-
-
-formatFloat : Float -> String
-formatFloat value =
-    value
-        |> (\v -> toFloat (round (v * 100)) / 100)
-        |> String.fromFloat
+            "tag"

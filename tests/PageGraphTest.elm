@@ -6,6 +6,7 @@ import Fuzzers
 import Page
 import PageGraph
 import Test exposing (Test)
+import UI.Graph
 
 
 suite : Test
@@ -183,13 +184,13 @@ suite =
                         ]
                         ()
             ]
-        , Test.describe "dot"
+        , Test.describe "graph"
             [ Test.test "renders target, immediate neighbors, and edges" <|
                 \() ->
                     let
-                        graphDot : String
-                        graphDot =
-                            PageGraph.dot "Demo"
+                        renderedGraph : UI.Graph.Graph
+                        renderedGraph =
+                            PageGraph.graph "Demo"
                                 "Home"
                                 (Dict.fromList
                                     [ ( "Home", "[[About]]\n[[TodoGap]]" )
@@ -204,27 +205,27 @@ suite =
                                     ]
                                 )
                     in
-                    [ String.contains "\"Home\" [href=\"/w/Demo/p/Home\"" graphDot
-                    , String.contains ", penwidth=2" graphDot
-                    , String.contains "\"Guide\" [href=\"/w/Demo/pg/Guide\"" graphDot
-                    , String.contains "\"About\" [href=\"/w/Demo/pg/About\"" graphDot
-                    , String.contains "\"TodoGap\" [href=\"/w/Demo/p/TodoGap\"" graphDot
-                    , String.contains "style=\"dashed\", color=\"#dc2626\", fontcolor=\"#dc2626\"" graphDot
-                    , String.contains "\"Guide\" -> \"Home\";" graphDot
-                    , String.contains "\"Home\" -> \"About\";" graphDot
-                    , String.contains "\"Home\" -> \"TodoGap\";" graphDot
-                    , String.contains "\"Guide\" -> \"Home\" [style=\"dashed\", color=\"#7c3aed\"];" graphDot
-                    , String.contains "\"Home\" -> \"Meta\" [style=\"dashed\", color=\"#7c3aed\"];" graphDot
-                    , String.contains "label=" graphDot |> not
+                    [ renderedGraph.nodes
+                        |> List.any (\node -> node.id == "Home" && node.href == "/w/Demo/p/Home" && node.kind == UI.Graph.FocusedNode)
+                    , renderedGraph.nodes
+                        |> List.any (\node -> node.id == "Guide" && node.href == "/w/Demo/pg/Guide")
+                    , renderedGraph.nodes
+                        |> List.any (\node -> node.id == "About" && node.href == "/w/Demo/pg/About")
+                    , renderedGraph.nodes
+                        |> List.any (\node -> node.id == "TodoGap" && node.href == "/w/Demo/p/TodoGap" && node.kind == UI.Graph.MissingNode)
+                    , renderedGraph.edges
+                        |> List.any (\edge -> edge.from == "Guide" && edge.to == "Home" && edge.kind == UI.Graph.LinkEdge && edge.direction == UI.Graph.Directed)
+                    , renderedGraph.edges
+                        |> List.any (\edge -> edge.from == "Home" && edge.to == "Meta" && edge.kind == UI.Graph.TagEdge && edge.direction == UI.Graph.Directed)
                     ]
                         |> List.all identity
                         |> Expect.equal True
-            , Test.test "renders undirected reciprocal page-link and tag edges without arrowheads" <|
+            , Test.test "renders undirected reciprocal page-link and tag edges" <|
                 \() ->
                     let
-                        graphDot : String
-                        graphDot =
-                            PageGraph.dot "Demo"
+                        renderedGraph : UI.Graph.Graph
+                        renderedGraph =
+                            PageGraph.graph "Demo"
                                 "A"
                                 (Dict.fromList
                                     [ ( "A", "[[B]]" )
@@ -237,17 +238,19 @@ suite =
                                     ]
                                 )
                     in
-                    [ String.contains "\"A\" -> \"B\" [dir=none];" graphDot
-                    , String.contains "\"A\" -> \"B\" [style=\"dashed\", color=\"#7c3aed\", dir=none];" graphDot
+                    [ renderedGraph.edges
+                        |> List.any (\edge -> edge.from == "A" && edge.to == "B" && edge.direction == UI.Graph.Undirected && edge.kind == UI.Graph.LinkEdge)
+                    , renderedGraph.edges
+                        |> List.any (\edge -> edge.from == "A" && edge.to == "B" && edge.direction == UI.Graph.Undirected && edge.kind == UI.Graph.TagEdge)
                     ]
                         |> List.all identity
                         |> Expect.equal True
             , Test.test "renders href node for published page reached only via tag edge" <|
                 \() ->
                     let
-                        graphDot : String
-                        graphDot =
-                            PageGraph.dot "Demo"
+                        renderedGraph : UI.Graph.Graph
+                        renderedGraph =
+                            PageGraph.graph "Demo"
                                 "Home"
                                 (Dict.fromList
                                     [ ( "Home", "" )
@@ -260,14 +263,15 @@ suite =
                                     ]
                                 )
                     in
-                    String.contains "\"TagOnly\" [href=\"/w/Demo/pg/TagOnly\"" graphDot
+                    renderedGraph.nodes
+                        |> List.any (\node -> node.id == "TagOnly" && node.href == "/w/Demo/pg/TagOnly")
                         |> Expect.equal True
             , Test.test "styles target node red when focused page is missing" <|
                 \() ->
                     let
-                        graphDot : String
-                        graphDot =
-                            PageGraph.dot "Demo"
+                        renderedGraph : UI.Graph.Graph
+                        renderedGraph =
+                            PageGraph.graph "Demo"
                                 "MissingFocus"
                                 (Dict.fromList
                                     [ ( "Home", "[[MissingFocus]]" )
@@ -278,11 +282,13 @@ suite =
                                     ]
                                 )
                     in
-                    [ String.contains "\"MissingFocus\" [href=\"/w/Demo/p/MissingFocus\"" graphDot
-                    , String.contains ", penwidth=2" graphDot
-                    , String.contains "style=\"dashed\", color=\"#dc2626\", fontcolor=\"#dc2626\"" graphDot
-                    ]
-                        |> List.all identity
+                    renderedGraph.nodes
+                        |> List.any
+                            (\node ->
+                                node.id == "MissingFocus"
+                                    && node.href == "/w/Demo/p/MissingFocus"
+                                    && node.kind == UI.Graph.MissingFocusedNode
+                            )
                         |> Expect.equal True
             ]
         ]

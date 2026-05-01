@@ -3,12 +3,8 @@ module ProgramTest.Start exposing
     , EndToEndTest
     , bothViewports
     , connectFrontend
-    , connectFrontendWithViewport
-    , narrowViewport
     , start
     , startWith
-    , startWithViewport
-    , viewport
     )
 
 {-| Wrappers around `Effect.Test.start` / `connectFrontend` with fixed simulated time,

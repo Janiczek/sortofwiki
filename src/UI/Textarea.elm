@@ -1,7 +1,5 @@
 module UI.Textarea exposing
-    ( compact
-    , default
-    , form
+    ( form
     , formCompact
     , markdownEditableCell
     , markdownReadonly
@@ -78,16 +76,6 @@ markdownPanelCellClass =
 markdownReadonlyWithExtra : String -> List (Attribute msg) -> List (Attribute msg)
 markdownReadonlyWithExtra extraClass attrs =
     TW.cls (markdownPanelReadonlyClass ++ extraClass) :: attrs
-
-
-default : List (Attribute msg) -> List (Attribute msg)
-default attrs =
-    form attrs
-
-
-compact : List (Attribute msg) -> List (Attribute msg)
-compact attrs =
-    formCompact attrs
 
 
 form : List (Attribute msg) -> List (Attribute msg)

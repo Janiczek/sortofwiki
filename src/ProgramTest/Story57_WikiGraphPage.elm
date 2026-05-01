@@ -41,10 +41,10 @@ endToEndTests =
                             (ProgramTest.Query.expectHasDataAttributes
                                 [ ( "data-role", "graph-navigator" ) ]
                             )
-                        , ProgramTest.Query.withinId "wiki-graphviz"
+                        , ProgramTest.Query.withinId "wiki-graph"
                             (ProgramTest.Query.expectHasDataAttributes
-                                [ ( "data-graphviz-pages", "5" )
-                                , ( "data-graphviz-edges", "11" )
+                                [ ( "data-graph-pages", "5" )
+                                , ( "data-graph-edges", "12" )
                                 ]
                             )
                         ]
