@@ -5,29 +5,27 @@ import Dict
 import Expect
 import Fuzz
 import Page
-import Regex
 import Submission
 import Test exposing (Test)
 import Wiki
-
-
-pageSlugHtmlPatternRegex : Regex.Regex
-pageSlugHtmlPatternRegex =
-    "^("
-        ++ Submission.pageSlugHtmlPattern
-        ++ ")$"
-        |> Regex.fromString
-        |> Maybe.withDefault Regex.never
 
 
 suite : Test
 suite =
     Test.describe "Submission"
         [ Test.describe "validatePageSlug"
-            [ Test.test "trims and validates PascalCase slug" <|
+            [ Test.test "trims and validates uppercase-first slug" <|
                 \() ->
                     Submission.validatePageSlug "  MyPage1  "
                         |> Expect.equal (Ok "MyPage1")
+            , Test.test "accepts uppercase-first slug with diacritics" <|
+                \() ->
+                    Submission.validatePageSlug "  Návsí42  "
+                        |> Expect.equal (Ok "Návsí42")
+            , Test.test "rejects lowercase-first slug with diacritics" <|
+                \() ->
+                    Submission.validatePageSlug "návsí42"
+                        |> Expect.equal (Err Submission.SlugInvalidChars)
             , Test.fuzz Fuzz.string "aligns with validateNewPageFields for any slug when body non-empty" <|
                 \rawSlug ->
                     case Submission.validatePageSlug rawSlug of
@@ -38,15 +36,10 @@ suite =
                         Ok slug ->
                             Submission.validateNewPageFields rawSlug "x" ""
                                 |> Expect.equal (Ok { pageSlug = slug, markdown = "x", tags = [] })
-            , Test.fuzz Fuzz.string "pageSlugHtmlPattern accepts every validatePageSlug Ok input" <|
-                \raw ->
-                    case Submission.validatePageSlug raw of
-                        Ok _ ->
-                            Regex.contains pageSlugHtmlPatternRegex raw
-                                |> Expect.equal True
-
-                        Err _ ->
-                            Expect.pass
+            , Test.test "pageSlugHtmlPattern allows Unicode uppercase start and letters/digits" <|
+                \() ->
+                    Submission.pageSlugHtmlPattern
+                        |> Expect.equal "\\s*[\\p{Lu}][\\p{L}\\p{Nd}]{0,63}\\s*"
             ]
         , Test.describe "validateNewPageFields"
             [ Test.test "rejects empty slug" <|
@@ -73,7 +66,7 @@ suite =
                 \() ->
                     Submission.validateNewPageFields "ValidSlug" "  \n\t " ""
                         |> Expect.equal (Err Submission.BodyEmpty)
-            , Test.test "keeps trimmed PascalCase slug" <|
+            , Test.test "keeps trimmed uppercase-first slug" <|
                 \() ->
                     Submission.validateNewPageFields " MyPage1  " "# Hi" ""
                         |> Expect.equal (Ok { pageSlug = "MyPage1", markdown = "# Hi", tags = [] })

@@ -22,6 +22,7 @@ suite =
             , ( "https://example.com/w/Demo/graph", Route.WikiGraph "Demo" )
             , ( "https://example.com/w/Demo/search", Route.WikiSearch "Demo" )
             , ( "https://example.com/w/Demo/p/guides", Route.WikiPage "Demo" "guides" )
+            , ( "https://example.com/w/Demo/p/N%C3%A1vs%C3%AD", Route.WikiPage "Demo" "Návsí" )
             , ( "https://example.com/w/Demo/pg/guides", Route.WikiPageGraph "Demo" "guides" )
             , ( "https://example.com/w/Demo/register", Route.WikiRegister "Demo" )
             , ( "https://example.com/w/Demo/login", Route.WikiLogin "Demo" Nothing )

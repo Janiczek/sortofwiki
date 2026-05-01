@@ -40,6 +40,10 @@ suite =
                 \() ->
                     PageLinkRefs.linkedPageSlugs "Demo" "[[guides|Help]]"
                         |> Expect.equal [ "guides" ]
+            , Test.test "parses diacritic wiki links and markdown links" <|
+                \() ->
+                    PageLinkRefs.linkedPageSlugs "Demo" "[[Návsí]] and [m](/w/Demo/p/Žluťoučký)"
+                        |> Expect.equal [ "Návsí", "Žluťoučký" ]
             , Test.test "stops slug at URL fragment" <|
                 \() ->
                     PageLinkRefs.linkedPageSlugs "Demo" "[t](/w/Demo/p/sec#x)"

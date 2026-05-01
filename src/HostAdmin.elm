@@ -324,7 +324,7 @@ hostedWikiSlugErrorToUserText slugErr =
             "Wiki slug must be at most 64 characters."
 
         Submission.SlugInvalidChars ->
-            "Wiki slug must be PascalCase letters and digits only."
+            "Wiki slug must start with an uppercase letter, then use Unicode letters and digits only."
 
         Submission.BodyEmpty ->
             "Invalid wiki slug."

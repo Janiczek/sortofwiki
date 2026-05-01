@@ -79,6 +79,30 @@ endToEndTests =
                     ]
         }
     , ProgramTest.Start.bothViewports
+        { baseName = "49 — diacritic wiki link keeps raw Unicode slug and opens page route"
+        , config = ProgramTest.Config.demoWikiPagesOnly
+        , sessionId = "session-story49-diacritic-wikilink-nav"
+        , path = "/w/Demo/p/MarkdownPlayground"
+        , connectClientMs = Nothing
+        , clientSteps =
+            \client ->
+                [ client.checkView 100
+                    (ProgramTest.Query.withinTagAndHref "a"
+                        "/w/Demo/p/Návsí"
+                        (ProgramTest.Query.expectHasClass "!text-red-700")
+                    )
+                , client.clickLink 100 "/w/Demo/p/Návsí"
+                , client.checkView 100
+                    (ProgramTest.Query.withinId "wiki-missing-published-page"
+                        (ProgramTest.Query.expectHasDataAttributes
+                            [ ( "data-wiki-slug", "Demo" )
+                            , ( "data-page-slug", "Návsí" )
+                            ]
+                        )
+                    )
+                ]
+        }
+    , ProgramTest.Start.bothViewports
         { baseName = "49 — submit/new without ?page= leaves page slug editable"
         , config = ProgramTest.Config.demoWikiPagesOnly
         , sessionId = "session-story49-submit-new-editable-slug"

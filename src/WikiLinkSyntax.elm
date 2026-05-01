@@ -209,8 +209,13 @@ readSlugChars s offset acc =
             ( acc, offset )
 
         Just ( c, _ ) ->
-            if Char.isAlphaNum c || c == '-' || c == '_' then
+            if isSlugLetterOrDigit c then
                 readSlugChars s (offset + 1) (acc ++ String.fromChar c)
 
             else
                 ( acc, offset )
+
+
+isSlugLetterOrDigit : Char -> Bool
+isSlugLetterOrDigit c =
+    (Char.toLower c /= Char.toUpper c) || Char.isDigit c

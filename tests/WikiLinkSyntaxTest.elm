@@ -23,6 +23,14 @@ suite =
                 \() ->
                     WikiLinkSyntax.segmentsFromPlainText "[[guides|Help]]"
                         |> Expect.equal [ WikiLinkSyntax.WikiRef "guides" "Help" ]
+            , Test.test "parses [[Návsí]] with Unicode diacritics" <|
+                \() ->
+                    WikiLinkSyntax.segmentsFromPlainText "See [[Návsí]] here."
+                        |> Expect.equal
+                            [ WikiLinkSyntax.Plain "See "
+                            , WikiLinkSyntax.WikiRef "Návsí" "Návsí"
+                            , WikiLinkSyntax.Plain " here."
+                            ]
             , Test.test "parses [[slug\\|label]] after markdown table escaping" <|
                 \() ->
                     WikiLinkSyntax.segmentsFromPlainText "[[guides\\|Help]]"

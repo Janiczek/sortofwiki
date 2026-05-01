@@ -836,7 +836,7 @@ validationErrorToUserText err =
             "Page slug must be at most 64 characters."
 
         SlugInvalidChars ->
-            "Page slug must be PascalCase letters and digits only."
+            "Page slug must start with an uppercase letter, then use Unicode letters and digits only."
 
         BodyEmpty ->
             "Enter page content (markdown)."
@@ -1129,7 +1129,24 @@ slugCharsOk s =
             False
 
         Just ( first, rest ) ->
-            Char.isUpper first && String.all Char.isAlphaNum rest
+            isUpperLetter first && String.all isSlugLetterOrDigit rest
+
+
+isSlugLetterOrDigit : Char -> Bool
+isSlugLetterOrDigit c =
+    isUnicodeLetter c || Char.isDigit c
+
+
+isUnicodeLetter : Char -> Bool
+isUnicodeLetter c =
+    Char.toLower c /= Char.toUpper c
+
+
+isUpperLetter : Char -> Bool
+isUpperLetter c =
+    isUnicodeLetter c
+        && c == Char.toUpper c
+        && c /= Char.toLower c
 
 
 {-| Max length after trim (wiki and page slugs).
@@ -1144,7 +1161,7 @@ Uses implicit full-string anchoring; allows optional surrounding ASCII whitespac
 -}
 pageSlugHtmlPattern : String
 pageSlugHtmlPattern =
-    "\\s*[A-Z][A-Za-z0-9]{0,63}\\s*"
+    "\\s*[\\p{Lu}][\\p{L}\\p{Nd}]{0,63}\\s*"
 
 
 {-| Upper bound on raw field length (trimmed slug is at most `pageSlugMaxLength`; allows modest surrounding whitespace).
@@ -1158,7 +1175,7 @@ pageSlugHtmlMaxLength =
 -}
 pageSlugConstraintTitle : String
 pageSlugConstraintTitle =
-    "PascalCase: capital first letter, then letters or digits only; at most 64 characters after trimming spaces."
+    "Starts with uppercase letter, then Unicode letters or digits only; at most 64 characters after trimming spaces."
 
 
 {-| Trim slug before validating.
@@ -1169,7 +1186,7 @@ normalizePageSlug raw =
         |> String.trim
 
 
-{-| Page slug rules only (trim, length, PascalCase character class). Same rules as hosted wiki slugs.
+{-| Page slug rules only (trim, length, uppercase first character, Unicode letters/digits). Same rules as hosted wiki slugs.
 -}
 validatePageSlug : String -> Result ValidationError Page.Slug
 validatePageSlug rawSlug =

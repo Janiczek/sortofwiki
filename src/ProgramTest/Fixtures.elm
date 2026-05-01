@@ -44,6 +44,7 @@ This paragraph includes **bold**, *italic*, `inline code`, and ~~strikethrough~~
 - In-wiki link by slug: [[Guides]]
 - In-wiki link with label: [[About|About this wiki]]
 - Missing page (red link in UI): [[Story49MissingPage]]
+- Missing page with diacritics: [[Návsí]]
 - TODO marker: {TODO: add contributor examples}
 - Shared missing page: [[TodoGap]]
 - Raw URL autolink: <https://example.com>

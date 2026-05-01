@@ -7806,7 +7806,33 @@ viewAppHeader model =
 
         showHeaderSearch : Bool
         showHeaderSearch =
-            model.route /= Route.WikiList
+            case model.route of
+                Route.WikiList ->
+                    False
+
+                Route.HostAdmin _ ->
+                    False
+
+                Route.HostAdminWikis ->
+                    False
+
+                Route.HostAdminWikiNew ->
+                    False
+
+                Route.HostAdminWikiDetail _ ->
+                    False
+
+                Route.HostAdminAudit ->
+                    False
+
+                Route.HostAdminAuditDiff _ _ ->
+                    False
+
+                Route.HostAdminBackup ->
+                    False
+
+                _ ->
+                    True
 
         maybeSearchForm : Maybe (Html Msg)
         maybeSearchForm =

@@ -274,6 +274,13 @@ pathSegments path =
     path
         |> String.split "/"
         |> List.filter (\s -> s /= "")
+        |> List.map decodePathSegment
+
+
+decodePathSegment : String -> String
+decodePathSegment segment =
+    Url.percentDecode segment
+        |> Maybe.withDefault segment
 
 
 {-| Map the browser URL to a route.
