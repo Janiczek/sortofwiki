@@ -444,54 +444,6 @@ function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
 
-function graphRenderedSize(graphHost) {
-  const fallbackRect = graphHost.getBoundingClientRect();
-  const fallback = {
-    width: Math.max(fallbackRect.width, 1),
-    height: Math.max(fallbackRect.height, 1),
-    valid: false,
-  };
-
-  const root = graphHost.shadowRoot;
-  if (!root) {
-    return fallback;
-  }
-
-  const svg = root.querySelector("svg");
-  if (!svg) {
-    return fallback;
-  }
-
-  const graphGroup = root.querySelector("g.graph");
-  if (!graphGroup || typeof graphGroup.getBBox !== "function") {
-    return fallback;
-  }
-
-  let bbox;
-  try {
-    bbox = graphGroup.getBBox();
-  } catch (_) {
-    return fallback;
-  }
-
-  if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-    return fallback;
-  }
-
-  const svgViewBox =
-    svg.viewBox && svg.viewBox.baseVal
-      ? svg.viewBox.baseVal
-      : { width: fallback.width, height: fallback.height };
-  const scaleX = svgViewBox.width > 0 ? fallback.width / svgViewBox.width : 1;
-  const scaleY = svgViewBox.height > 0 ? fallback.height / svgViewBox.height : 1;
-
-  return {
-    width: Math.max(bbox.width * scaleX, 1),
-    height: Math.max(bbox.height * scaleY, 1),
-    valid: true,
-  };
-}
-
 function syncMiniGraphPreview(miniPreview, graphHost) {
   const root = graphHost.shadowRoot;
   if (!root) {
@@ -546,11 +498,53 @@ function setupWikiGraphNavigator() {
 
   const navigatorHost = document.getElementById("wiki-graph-navigator");
   const graphHost = document.getElementById("wiki-graphviz");
+  const loadingHost = document.getElementById("wiki-graph-loading");
   const scrollRegion = document.getElementById("app-main-scroll");
   if (!navigatorHost || !graphHost || !scrollRegion) {
     return;
   }
+
+  const setLoadingVisible = function setLoadingVisible(visible) {
+    if (!loadingHost) {
+      return;
+    }
+    loadingHost.style.display = visible ? "flex" : "none";
+  };
+
+  const isGraphSvgReady = function isGraphSvgReady() {
+    const root = graphHost.shadowRoot;
+    if (!root) {
+      return false;
+    }
+    return !!(root.querySelector("svg") && root.querySelector("g.graph"));
+  };
+
+  if (!isGraphSvgReady()) {
+    setLoadingVisible(true);
+    if (graphHost.dataset.sowGraphNavigatorWaitingForSvg === "1") {
+      return;
+    }
+
+    const root = graphHost.shadowRoot;
+    if (!root) {
+      return;
+    }
+
+    const readyObserver = new MutationObserver(function onGraphReadyMutation() {
+      if (!isGraphSvgReady()) {
+        return;
+      }
+      readyObserver.disconnect();
+      delete graphHost.dataset.sowGraphNavigatorWaitingForSvg;
+      setupWikiGraphNavigator();
+    });
+    readyObserver.observe(root, { childList: true, subtree: true });
+    graphHost.dataset.sowGraphNavigatorWaitingForSvg = "1";
+    return;
+  }
+
   if (navigatorHost.dataset.sowGraphNavigatorBound === "1") {
+    setLoadingVisible(false);
     return;
   }
 
@@ -570,25 +564,11 @@ function setupWikiGraphNavigator() {
     navigatorHost.appendChild(miniSurface);
   }
 
-  const state = { dragging: false, previewDirty: true, retryTimer: null, retryCount: 0 };
+  const state = { dragging: false, previewDirty: true };
   const render = function renderNavigator() {
     const scrollRect = scrollRegion.getBoundingClientRect();
-    const renderedGraphSize = graphRenderedSize(graphHost);
     const contentWidth = Math.max(scrollRegion.scrollWidth || 0, scrollRegion.clientWidth || 0, 1);
     const contentHeight = Math.max(scrollRegion.scrollHeight || 0, scrollRegion.clientHeight || 0, 1);
-
-    if (!renderedGraphSize.valid && contentHeight <= scrollRegion.clientHeight + 1) {
-      navigatorHost.style.visibility = "hidden";
-      if (!state.retryTimer && state.retryCount < 12) {
-        state.retryCount += 1;
-        state.retryTimer = window.setTimeout(function onNavigatorRetry() {
-          state.retryTimer = null;
-          scheduleRender();
-        }, state.retryCount <= 2 ? 0 : 40);
-      }
-      return;
-    }
-    state.retryCount = 0;
     navigatorHost.style.visibility = "visible";
 
     const maxMiniWidth = 190;
@@ -723,9 +703,9 @@ function setupWikiGraphNavigator() {
   observer.observe(graphHost, { attributes: true, attributeFilter: ["graph"] });
 
   navigatorHost.dataset.sowGraphNavigatorBound = "1";
+  setLoadingVisible(false);
 
   scheduleRender();
-  window.setTimeout(scheduleRender, 0);
 }
 
 exports.init = function init(_app) {

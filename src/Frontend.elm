@@ -67,6 +67,7 @@ import UI.SidebarSection
 import UI.StatusBadge
 import UI.SubmissionActions
 import UI.Textarea
+import UI.ZIndex
 import Url exposing (Url)
 import Url.Builder as UrlBuilder
 import Wiki
@@ -7844,7 +7845,7 @@ viewAppHeader model =
                 Just
                     (Html.form
                         [ Attr.id "header-search-form"
-                        , Attr.class "hidden md:flex items-center relative min-w-[12rem] max-w-[18rem] flex-1"
+                        , Attr.class "hidden md:flex items-center relative overflow-visible min-w-[12rem] max-w-[18rem] flex-1"
                         , Events.onSubmit HeaderSearchSubmitted
                         ]
                         [ Html.span
@@ -7876,7 +7877,11 @@ viewAppHeader model =
                                 else
                                     Html.div
                                         [ Attr.id "header-search-popup"
-                                        , Attr.class "absolute left-0 top-[calc(100%+0.45rem)] z-20 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg)] p-2 shadow-lg [font-family:var(--font-serif)]"
+                                        , Attr.class
+                                            ("absolute left-0 top-[calc(100%+0.45rem)] "
+                                                ++ UI.ZIndex.class UI.ZIndex.HeaderSearchPopup
+                                                ++ " w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg)] p-2 shadow-lg [font-family:var(--font-serif)]"
+                                            )
                                         ]
                                         [ if List.isEmpty headerSearchResults then
                                             Html.p
@@ -12942,9 +12947,26 @@ viewWikiGraphPage wikiSlug wikiDetails =
             Html.div
                 [ UI.classAttr "relative min-h-[14rem]" ]
                 [ Html.div
+                    [ Attr.id "wiki-graph-loading"
+                    , UI.classAttr "pointer-events-none absolute inset-0 flex items-center justify-center"
+                    , Attr.attribute "aria-live" "polite"
+                    ]
+                    [ Html.div
+                        [ UI.classAttr "rounded-md border border-[var(--border-subtle)] bg-[color:var(--chrome-bg)] px-3 py-2 text-[0.95rem] text-[color:var(--fg-muted)] shadow-sm"
+                        ]
+                        [ Html.span
+                            [ UI.classAttr "mr-2 inline-block h-[0.9rem] w-[0.9rem] animate-spin rounded-full border-2 border-[color:var(--border)] border-t-transparent align-[-0.12rem]" ]
+                            []
+                        , Html.text "Graph is loading"
+                        ]
+                    ]
+                , Html.div
                     [ Attr.id "wiki-graph-navigator"
                     , Attr.attribute "data-role" "graph-navigator"
-                    , UI.classAttr "absolute right-2 top-2 z-10"
+                    , UI.classAttr
+                        ("absolute right-2 top-2 "
+                            ++ UI.ZIndex.class UI.ZIndex.WikiGraphMinimap
+                        )
                     ]
                     []
                 , UI.Graph.view

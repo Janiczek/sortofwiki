@@ -208,7 +208,7 @@ defaultGraphAttrs =
     bgcolor="transparent";
     layout=fdp;
     start=random1;
-    maxiter=1200;
+    maxiter=2000;
     mode=major;
     """
 
