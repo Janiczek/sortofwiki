@@ -452,7 +452,7 @@ emptyPageEditSubmitDraft : PageEditSubmitDraft
 emptyPageEditSubmitDraft =
     { markdownBody = ""
     , tagsInput = ""
-    , publishedRowCollapsed = False
+    , publishedRowCollapsed = True
     , maybeSavedDraftId = Nothing
     , inFlight = False
     , saveDraftInFlight = False
@@ -1326,8 +1326,8 @@ init url key =
         emptySessionModel : Model
         emptySessionModel =
             { key = key
-            , colorThemePreference = ColorTheme.FollowSystem
-            , systemColorTheme = ColorTheme.Dark
+            , colorThemePreference = ColorTheme.Fixed ColorTheme.Light
+            , systemColorTheme = ColorTheme.Light
             , route = Route.WikiList
             , store = Store.empty
             , contributorWikiSessions = Dict.empty
@@ -1386,8 +1386,8 @@ init url key =
         model : Model
         model =
             { key = key
-            , colorThemePreference = ColorTheme.FollowSystem
-            , systemColorTheme = ColorTheme.Dark
+            , colorThemePreference = ColorTheme.Fixed ColorTheme.Light
+            , systemColorTheme = ColorTheme.Light
             , route = route
             , store = Store.empty
             , contributorWikiSessions = Dict.empty
