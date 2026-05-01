@@ -31,7 +31,7 @@ endToEndTests =
             \client ->
                 [ client.checkView 150
                     (ProgramTest.Query.withinLayoutHeader
-                        (ProgramTest.Query.withinHref "/w/Demo/search" (ProgramTest.Query.expectHasText "Search"))
+                        (ProgramTest.Query.withinId "header-search-input" (ProgramTest.Query.expectHasInputValue ""))
                     )
                 , client.input 100 (Effect.Browser.Dom.id "header-search-input") "contributor"
                 , client.checkView 150

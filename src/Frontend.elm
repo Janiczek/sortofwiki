@@ -11,6 +11,7 @@ import Browser.Navigation
 import ColorTheme
 import ContributorAccount
 import ContributorWikiSession exposing (ContributorWikiSession)
+import Duration
 import Dict exposing (Dict)
 import Effect.Browser exposing (UrlRequest)
 import Effect.Browser.Dom
@@ -20,6 +21,7 @@ import Effect.File
 import Effect.File.Download
 import Effect.File.Select
 import Effect.Lamdera
+import Effect.Process
 import Effect.Subscription as Subscription exposing (Subscription)
 import Effect.Task
 import HostAdmin
@@ -766,7 +768,7 @@ runRouteStoreActions ( model, cmd ) =
                     Command.none
 
                 Route.WikiSearch _ ->
-                    Command.none
+                    requestWikiSearchCmd model.wikiSearchPageQuery model.route
 
                 Route.WikiRegister _ ->
                     Command.none
@@ -810,6 +812,56 @@ runRouteStoreActions ( model, cmd ) =
     ( { model | store = store }
     , Command.batch [ cmd, storeCmd, hostWikisCmd ]
     )
+
+
+requestWikiSearchCmd : String -> Route -> Command FrontendOnly ToBackend Msg
+requestWikiSearchCmd rawQuery route =
+    case route of
+        Route.WikiSearch wikiSlug ->
+            let
+                query : String
+                query =
+                    String.trim rawQuery
+            in
+            if String.length query < 3 then
+                Command.none
+
+            else
+                Effect.Lamdera.sendToBackend (RequestWikiSearch wikiSlug query)
+
+        _ ->
+            Command.none
+
+
+requestHeaderSearchCmd : Model -> String -> Command FrontendOnly ToBackend Msg
+requestHeaderSearchCmd model rawQuery =
+    case wikiSideNavSlugIfActive model of
+        Just wikiSlug ->
+            let
+                query : String
+                query =
+                    String.trim rawQuery
+            in
+            if String.length query < 3 then
+                Command.none
+
+            else
+                Effect.Lamdera.sendToBackend (RequestWikiSearch wikiSlug query)
+
+        Nothing ->
+            Command.none
+
+
+headerSearchTimeoutCmd : Wiki.Slug -> String -> Command FrontendOnly ToBackend Msg
+headerSearchTimeoutCmd wikiSlug query =
+    Effect.Process.sleep (Duration.milliseconds 500)
+        |> Effect.Task.perform (\_ -> HeaderSearchTimeoutReached wikiSlug query)
+
+
+wikiSearchPageTimeoutCmd : Wiki.Slug -> String -> Command FrontendOnly ToBackend Msg
+wikiSearchPageTimeoutCmd wikiSlug query =
+    Effect.Process.sleep (Duration.milliseconds 500)
+        |> Effect.Task.perform (\_ -> WikiSearchPageTimeoutReached wikiSlug query)
 
 
 {-| History API URL updates (e.g. `pushUrl`) do not scroll to `#fragment`; mirror native behavior via `Browser.Dom`.
@@ -1334,7 +1386,11 @@ init url key =
             , registerDraft = emptyRegisterDraft
             , loginDraft = emptyLoginDraft
             , headerSearchQuery = ""
+            , headerSearchResults = []
+            , headerSearchPending = Nothing
             , wikiSearchPageQuery = ""
+            , wikiSearchPageResults = []
+            , wikiSearchPagePending = Nothing
             , newPageSubmitDraft = emptyNewPageSubmitDraft
             , pageEditSubmitDraft = emptyPageEditSubmitDraft
             , pageDeleteSubmitDraft = emptyPageDeleteSubmitDraft
@@ -1394,12 +1450,9 @@ init url key =
             , registerDraft = emptyRegisterDraft
             , loginDraft = emptyLoginDraft
             , headerSearchQuery =
-                case route of
-                    Route.WikiSearch _ ->
-                        searchParamFromQuery url.query
-
-                    _ ->
-                        ""
+                ""
+            , headerSearchResults = []
+            , headerSearchPending = Nothing
             , wikiSearchPageQuery =
                 case route of
                     Route.WikiSearch _ ->
@@ -1407,6 +1460,8 @@ init url key =
 
                     _ ->
                         ""
+            , wikiSearchPageResults = []
+            , wikiSearchPagePending = Nothing
             , newPageSubmitDraft = newPageSubmitDraftForRoute route url
             , pageEditSubmitDraft = pageEditSubmitDraftForRoute route Store.empty
             , pageDeleteSubmitDraft = emptyPageDeleteSubmitDraft
@@ -2000,12 +2055,9 @@ update msg model =
                         , registerDraft = emptyRegisterDraft
                         , loginDraft = emptyLoginDraft
                         , headerSearchQuery =
-                            case route of
-                                Route.WikiSearch _ ->
-                                    searchParamFromQuery url.query
-
-                                _ ->
-                                    ""
+                            ""
+                        , headerSearchResults = []
+                        , headerSearchPending = Nothing
                         , wikiSearchPageQuery =
                             case route of
                                 Route.WikiSearch _ ->
@@ -2013,6 +2065,8 @@ update msg model =
 
                                 _ ->
                                     ""
+                        , wikiSearchPageResults = []
+                        , wikiSearchPagePending = Nothing
                         , newPageSubmitDraft = newPageSubmitDraftForRoute route url
                         , pageEditSubmitDraft = pageEditSubmitDraftForRoute route storeForRoute
                         , pageDeleteSubmitDraft = emptyPageDeleteSubmitDraft
@@ -2377,9 +2431,52 @@ update msg model =
                             )
 
         HeaderSearchQueryChanged value ->
-            ( { model | headerSearchQuery = value }
-            , Command.none
-            )
+            let
+                query : String
+                query =
+                    String.trim value
+            in
+            if String.length query < 3 then
+                ( { model
+                    | headerSearchQuery = value
+                    , headerSearchResults = []
+                    , headerSearchPending = Nothing
+                  }
+                , Command.none
+                )
+
+            else
+                case wikiSideNavSlugIfActive model of
+                    Just wikiSlug ->
+                        ( { model
+                            | headerSearchQuery = value
+                            , headerSearchPending = Just ( wikiSlug, query )
+                          }
+                        , Command.batch
+                            [ requestHeaderSearchCmd model value
+                            , headerSearchTimeoutCmd wikiSlug query
+                            ]
+                        )
+
+                    Nothing ->
+                        ( { model
+                            | headerSearchQuery = value
+                            , headerSearchPending = Nothing
+                          }
+                        , Command.none
+                        )
+
+        HeaderSearchTimeoutReached wikiSlug query ->
+            if model.headerSearchPending == Just ( wikiSlug, query ) then
+                ( { model
+                    | headerSearchPending = Nothing
+                    , headerSearchResults = []
+                  }
+                , Command.none
+                )
+
+            else
+                ( model, Command.none )
 
         HeaderSearchSubmitted ->
             case wikiSideNavSlugIfActive model of
@@ -2397,9 +2494,52 @@ update msg model =
                     ( model, Command.none )
 
         WikiSearchPageQueryChanged value ->
-            ( { model | wikiSearchPageQuery = value }
-            , Command.none
-            )
+            let
+                query : String
+                query =
+                    String.trim value
+            in
+            if String.length query < 3 then
+                ( { model
+                    | wikiSearchPageQuery = value
+                    , wikiSearchPageResults = []
+                    , wikiSearchPagePending = Nothing
+                  }
+                , Command.none
+                )
+
+            else
+                case model.route of
+                    Route.WikiSearch wikiSlug ->
+                        ( { model
+                            | wikiSearchPageQuery = value
+                            , wikiSearchPagePending = Just ( wikiSlug, query )
+                          }
+                        , Command.batch
+                            [ requestWikiSearchCmd value model.route
+                            , wikiSearchPageTimeoutCmd wikiSlug query
+                            ]
+                        )
+
+                    _ ->
+                        ( { model
+                            | wikiSearchPageQuery = value
+                            , wikiSearchPagePending = Nothing
+                          }
+                        , Command.none
+                        )
+
+        WikiSearchPageTimeoutReached wikiSlug query ->
+            if model.wikiSearchPagePending == Just ( wikiSlug, query ) then
+                ( { model
+                    | wikiSearchPagePending = Nothing
+                    , wikiSearchPageResults = []
+                  }
+                , Command.none
+                )
+
+            else
+                ( model, Command.none )
 
         NewPageSubmitMarkdownChanged value ->
             let
@@ -4721,6 +4861,58 @@ updateFromBackend msg model =
             )
                 |> runRouteStoreActions
                 |> (\( m, c ) -> ( m, Command.batch [ c, pageScrollCmd ] ))
+
+        WikiSearchResponse wikiSlug query results ->
+            let
+                trimmedQuery : String
+                trimmedQuery =
+                    String.trim query
+
+                headerScopedWikiSlug : Maybe Wiki.Slug
+                headerScopedWikiSlug =
+                    wikiSideNavSlugIfActive model
+
+                headerMatchesCurrentInput : Bool
+                headerMatchesCurrentInput =
+                    String.trim model.headerSearchQuery == trimmedQuery
+
+                wikiPageMatchesCurrentInput : Bool
+                wikiPageMatchesCurrentInput =
+                    case model.route of
+                        Route.WikiSearch routeSlug ->
+                            routeSlug == wikiSlug && String.trim model.wikiSearchPageQuery == trimmedQuery
+
+                        _ ->
+                            False
+            in
+            ( { model
+                | headerSearchResults =
+                    if headerMatchesCurrentInput && headerScopedWikiSlug == Just wikiSlug then
+                        results
+
+                    else
+                        model.headerSearchResults
+                , headerSearchPending =
+                    if headerMatchesCurrentInput && headerScopedWikiSlug == Just wikiSlug then
+                        Nothing
+
+                    else
+                        model.headerSearchPending
+                , wikiSearchPageResults =
+                    if wikiPageMatchesCurrentInput then
+                        results
+
+                    else
+                        model.wikiSearchPageResults
+                , wikiSearchPagePending =
+                    if wikiPageMatchesCurrentInput then
+                        Nothing
+
+                    else
+                        model.wikiSearchPagePending
+              }
+            , Command.none
+            )
 
         ReviewQueueResponse wikiSlug result ->
             let
@@ -7807,7 +7999,11 @@ viewAppHeader model =
 
         headerSearchResults : List WikiSearch.ResultItem
         headerSearchResults =
-            WikiSearch.search model.headerSearchQuery headerSearchMarkdownSources
+            model.headerSearchResults
+
+        headerSearchQueryTrimmed : String
+        headerSearchQueryTrimmed =
+            String.trim model.headerSearchQuery
 
         showHeaderSearch : Bool
         showHeaderSearch =
@@ -7871,7 +8067,7 @@ viewAppHeader model =
                             []
                         , case maybeSearchWikiSlug of
                             Just wikiSlug ->
-                                if String.isEmpty (String.trim model.headerSearchQuery) then
+                                if String.isEmpty headerSearchQueryTrimmed then
                                     Html.text ""
 
                                 else
@@ -7883,7 +8079,14 @@ viewAppHeader model =
                                                 ++ " w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--bg)] p-2 shadow-lg [font-family:var(--font-serif)]"
                                             )
                                         ]
-                                        [ if List.isEmpty headerSearchResults then
+                                        [ if String.length headerSearchQueryTrimmed < 3 then
+                                            Html.p
+                                                [ Attr.id "header-search-popup-min-query"
+                                                , Attr.class "m-1 text-[0.8rem] text-[var(--fg-muted)] [font-family:var(--font-ui)]"
+                                                ]
+                                                [ Html.text "Please type three or more characters." ]
+
+                                          else if List.isEmpty headerSearchResults then
                                             Html.p
                                                 [ Attr.id "header-search-popup-empty"
                                                 , Attr.class "m-1 text-[0.8rem] text-[var(--fg-muted)] [font-family:var(--font-ui)]"
@@ -12807,7 +13010,7 @@ viewWikiSearchRoute model wikiSlug =
 
                         results : List WikiSearch.ResultItem
                         results =
-                            WikiSearch.search query wikiDetails.publishedPageMarkdownSources
+                            model.wikiSearchPageResults
                     in
                     Html.div
                         [ Attr.id "wiki-search-page"
@@ -12824,6 +13027,24 @@ viewWikiSearchRoute model wikiSlug =
                                     , Attr.class "w-full max-w-[28rem] rounded-md border border-[var(--border-subtle)] bg-[var(--bg)] px-3 py-2 text-[0.8125rem] text-[var(--fg)]"
                                     ]
                                     []
+                                ]
+
+                          else if String.length query < 3 then
+                            Html.div [ Attr.class "space-y-3" ]
+                                [ Html.input
+                                    [ Attr.id "wiki-search-input"
+                                    , Attr.type_ "search"
+                                    , Attr.placeholder "Search this wiki..."
+                                    , Attr.value model.wikiSearchPageQuery
+                                    , Events.onInput WikiSearchPageQueryChanged
+                                    , Attr.class "w-full max-w-[28rem] rounded-md border border-[var(--border-subtle)] bg-[var(--bg)] px-3 py-2 text-[0.8125rem] text-[var(--fg)]"
+                                    ]
+                                    []
+                                , UI.contentParagraph
+                                    [ Attr.id "wiki-search-min-query"
+                                    , Attr.class "[font-family:var(--font-ui)] text-[0.8125rem]"
+                                    ]
+                                    [ Html.text "Please type three or more characters." ]
                                 ]
 
                           else if List.isEmpty results then
@@ -12862,35 +13083,45 @@ viewWikiSearchRoute model wikiSlug =
                                     [ Html.text
                                         ("Found " ++ String.fromInt (List.length results) ++ " matching pages.")
                                     ]
-                                , Html.ul
-                                    [ Attr.id "wiki-search-results"
-                                    , UI.markdownUnorderedListAttr
-                                    ]
-                                    (results
-                                        |> List.map
-                                            (\result ->
-                                                let
-                                                    markdown : String
-                                                    markdown =
-                                                        Dict.get result.pageSlug wikiDetails.publishedPageMarkdownSources
-                                                            |> Maybe.withDefault ""
-                                                in
-                                                Html.li
-                                                    [ Attr.attribute "data-search-page-slug" result.pageSlug
-                                                    , Attr.class "pb-3 mb-3 border-b border-[var(--border-subtle)] last:mb-0 last:pb-0 last:border-b-0"
-                                                    ]
-                                                    [ UI.Link.contentLink
-                                                        [ Attr.href (Wiki.publishedPageUrlPath wikiSlug result.pageSlug) ]
-                                                        [ Html.span [ Attr.class "text-[0.8125rem]" ] [ viewHighlightedText query result.pageSlug ] ]
-                                                    , Html.p
-                                                        [ Attr.class "m-0 text-[0.85rem] text-[var(--fg-muted)]" ]
-                                                        [ excerptFromMarkdown query
-                                                            markdown
-                                                            |> viewSearchExcerpt
+                                , UI.table UI.TableFullMax72
+                                    [ Attr.id "wiki-search-results-table" ]
+                                    { theadAttrs = []
+                                    , headerRowAttrs = []
+                                    , headerAlign = UI.TableAlignMiddle
+                                    , headers =
+                                        [ UI.tableHeaderText "Page"
+                                        , UI.tableHeaderText "Excerpt"
+                                        ]
+                                    , tbodyAttrs = [ Attr.id "wiki-search-results" ]
+                                    , rows =
+                                        results
+                                            |> List.map
+                                                (\result ->
+                                                    let
+                                                        markdown : String
+                                                        markdown =
+                                                            Dict.get result.pageSlug wikiDetails.publishedPageMarkdownSources
+                                                                |> Maybe.withDefault ""
+                                                    in
+                                                    UI.trStriped
+                                                        [ Attr.attribute "data-search-page-slug" result.pageSlug ]
+                                                        [ UI.tableTd UI.TableAlignMiddle
+                                                            []
+                                                            [ UI.Link.contentLink
+                                                                [ Attr.href (Wiki.publishedPageUrlPath wikiSlug result.pageSlug) ]
+                                                                [ Html.span [ Attr.class "text-[0.8125rem]" ] [ viewHighlightedText query result.pageSlug ] ]
+                                                            ]
+                                                        , UI.tableTd UI.TableAlignMiddle
+                                                            []
+                                                            [ Html.p
+                                                                [ Attr.class "m-0 text-[0.85rem] text-[var(--fg-muted)] [font-family:var(--font-serif)]" ]
+                                                                [ excerptFromMarkdown query markdown
+                                                                    |> viewSearchExcerpt
+                                                                ]
+                                                            ]
                                                         ]
-                                                    ]
-                                            )
-                                    )
+                                                )
+                                    }
                                 ]
                         ]
 

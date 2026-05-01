@@ -54,6 +54,7 @@ import WikiAuditLog
 import WikiContributors
 import WikiFrontendSubscription
 import WikiRole
+import WikiSearch
 import WikiUser
 
 
@@ -107,6 +108,7 @@ type ToBackend
     = RequestWikiCatalog
     | RequestWikiFrontendDetails Wiki.Slug
     | RequestPageFrontendDetails Wiki.Slug Page.Slug
+    | RequestWikiSearch Wiki.Slug String
     | RequestMyPendingSubmissions Wiki.Slug
     | RequestReviewQueue Wiki.Slug
     | RequestReviewSubmissionDetail Wiki.Slug String
@@ -154,6 +156,7 @@ type ToFrontend
     | PendingReviewCountUpdated Wiki.Slug Int
     | WikiFrontendDetailsResponse Wiki.Slug (Maybe Wiki.FrontendDetails)
     | PageFrontendDetailsResponse Wiki.Slug Page.Slug (Maybe Page.FrontendDetails)
+    | WikiSearchResponse Wiki.Slug String (List WikiSearch.ResultItem)
     | MyPendingSubmissionsResponse Wiki.Slug (Result Submission.MyPendingSubmissionsError (List Submission.MyPendingSubmissionListItem))
     | ReviewQueueResponse Wiki.Slug (Result Submission.ReviewQueueError (List Submission.ReviewQueueItem))
     | ReviewSubmissionDetailResponse Wiki.Slug String (Result SubmissionReviewDetail.ReviewSubmissionDetailError SubmissionReviewDetail.SubmissionReviewDetail)
@@ -207,6 +210,7 @@ type alias BackendModel =
     , pendingReviewCounts : Dict Wiki.Slug Int
     , pendingReviewClients : PendingReviewCount.PendingReviewClientSets
     , wikiFrontendClients : WikiFrontendSubscription.WikiFrontendClientSets
+    , wikiSearchIndexes : Dict Wiki.Slug WikiSearch.PrefixIndex
     }
 
 
@@ -367,7 +371,11 @@ type alias FrontendModel =
     , registerDraft : RegisterDraft
     , loginDraft : LoginDraft
     , headerSearchQuery : String
+    , headerSearchResults : List WikiSearch.ResultItem
+    , headerSearchPending : Maybe ( Wiki.Slug, String )
     , wikiSearchPageQuery : String
+    , wikiSearchPageResults : List WikiSearch.ResultItem
+    , wikiSearchPagePending : Maybe ( Wiki.Slug, String )
     , newPageSubmitDraft : NewPageSubmitDraft
     , pageEditSubmitDraft : PageEditSubmitDraft
     , pageDeleteSubmitDraft : PageDeleteSubmitDraft
@@ -420,8 +428,10 @@ type FrontendMsg
     | LoginFormPasswordChanged String
     | LoginFormSubmitted
     | HeaderSearchQueryChanged String
+    | HeaderSearchTimeoutReached Wiki.Slug String
     | HeaderSearchSubmitted
     | WikiSearchPageQueryChanged String
+    | WikiSearchPageTimeoutReached Wiki.Slug String
     | ContributorLogoutWiki Wiki.Slug
     | NewPageSubmitMarkdownChanged String
     | NewPageSubmitSlugChanged String

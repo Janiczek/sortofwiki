@@ -423,14 +423,14 @@ tableFullWidthMax72Class =
 
 tableHeaderCellClass : String
 tableHeaderCellClass =
-    "px-[0.55rem] py-[0.22rem] text-left align-top bg-[var(--chrome-bg)] font-semibold border-b border-[var(--border)]"
+    "px-[0.55rem] py-[0.22rem] text-[0.8125rem] text-left align-top bg-[var(--chrome-bg)] font-semibold border-b border-[var(--border)]"
 
 
 {-| Same as `tableHeaderCellClass` but vertically centers content (e.g. rows with buttons). Use `tableHeaderCellClass` when cell text may wrap across lines.
 -}
 tableHeaderCellMiddleClass : String
 tableHeaderCellMiddleClass =
-    "px-[0.55rem] py-[0.22rem] text-left align-middle bg-[var(--chrome-bg)] font-semibold border-b border-[var(--border)]"
+    "px-[0.55rem] py-[0.22rem] text-[0.8125rem] text-left align-middle bg-[var(--chrome-bg)] font-semibold border-b border-[var(--border)]"
 
 
 tableCellClass : String
@@ -929,7 +929,7 @@ auditTableHeaderCellClass : String
 auditTableHeaderCellClass =
     "sticky top-0 "
         ++ UI.ZIndex.class UI.ZIndex.AuditTableHeader
-        ++ " px-[0.55rem] py-[0.22rem] text-left align-top bg-[var(--chrome-bg)] font-semibold border-b border-[var(--border)]"
+        ++ " px-[0.55rem] py-[0.22rem] text-[0.8125rem] text-left align-top bg-[var(--chrome-bg)] font-semibold border-b border-[var(--border)]"
 
 
 newPageEditorMarkdownPreviewCellClass : String

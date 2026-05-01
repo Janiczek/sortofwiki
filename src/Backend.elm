@@ -25,6 +25,7 @@ import WikiAuditLog
 import WikiContributors
 import WikiFrontendSubscription
 import WikiRole
+import WikiSearch
 import WikiUser
 
 
@@ -67,6 +68,35 @@ applyHostedWikiSlugRename oldSlug newSlug nextWiki model =
             PendingReviewCount.remapSlugInPendingReviewClients oldSlug newSlug model.pendingReviewClients
         , wikiFrontendClients =
             WikiFrontendSubscription.remapSlugInWikiFrontendClients oldSlug newSlug model.wikiFrontendClients
+        , wikiSearchIndexes =
+            model.wikiSearchIndexes
+                |> Dict.remove oldSlug
+                |> Dict.insert newSlug (WikiSearch.buildPrefixIndex (Wiki.frontendDetails nextWiki).publishedPageMarkdownSources)
+    }
+
+
+searchIndexForWiki : Wiki -> WikiSearch.PrefixIndex
+searchIndexForWiki wiki =
+    wiki
+        |> Wiki.frontendDetails
+        |> .publishedPageMarkdownSources
+        |> WikiSearch.buildPrefixIndex
+
+
+withWikiSearchIndex : Wiki.Slug -> Wiki -> Model -> Model
+withWikiSearchIndex wikiSlug wiki model =
+    { model
+        | wikiSearchIndexes =
+            Dict.insert wikiSlug (searchIndexForWiki wiki) model.wikiSearchIndexes
+    }
+
+
+withRebuiltAllWikiSearchIndexes : Model -> Model
+withRebuiltAllWikiSearchIndexes model =
+    { model
+        | wikiSearchIndexes =
+            model.wikis
+                |> Dict.map (\_ wiki -> searchIndexForWiki wiki)
     }
 
 
@@ -278,6 +308,7 @@ init =
       , pendingReviewCounts = PendingReviewCount.emptyCountMap
       , pendingReviewClients = PendingReviewCount.emptyClientSets
       , wikiFrontendClients = WikiFrontendSubscription.emptyClientSets
+      , wikiSearchIndexes = Dict.empty
       }
     , Command.none
     )
@@ -386,6 +417,28 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                             )
                     )
                 )
+            )
+
+        RequestWikiSearch wikiSlug rawQuery ->
+            let
+                query : String
+                query =
+                    String.trim rawQuery
+
+                results : List WikiSearch.ResultItem
+                results =
+                    if String.isEmpty query then
+                        []
+
+                    else
+                        model.wikiSearchIndexes
+                            |> Dict.get wikiSlug
+                            |> Maybe.withDefault Dict.empty
+                            |> WikiSearch.searchWithPrefixIndex query
+            in
+            ( model
+            , Effect.Lamdera.sendToFrontend clientId
+                (WikiSearchResponse wikiSlug query results)
             )
 
         RequestReviewQueue wikiSlug ->
@@ -1121,6 +1174,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                             | wikis = Dict.insert wikiSlug nextWiki model.wikis
                                                             , submissions = submissionsAfterDraftCleanup
                                                         }
+                                                            |> withWikiSearchIndex wikiSlug nextWiki
 
                                                     nextModel : Model
                                                     nextModel =
@@ -1242,6 +1296,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                     { model
                                                         | wikis = Dict.insert wikiSlug nextWiki model.wikis
                                                     }
+                                                        |> withWikiSearchIndex wikiSlug nextWiki
 
                                                 nextModel : Model
                                                 nextModel =
@@ -1451,6 +1506,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                         { model
                                                             | wikis = Dict.insert wikiSlug nextWiki model.wikis
                                                         }
+                                                            |> withWikiSearchIndex wikiSlug nextWiki
 
                                                     nextModel : Model
                                                     nextModel =
@@ -2164,6 +2220,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                                     | wikis = Dict.insert wikiSlug approved.wiki model.wikis
                                                                     , submissions = submissionsAfterApproval
                                                                 }
+                                                                    |> withWikiSearchIndex wikiSlug approved.wiki
 
                                                             nextModel : Model
                                                             nextModel =
@@ -2474,6 +2531,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                 modelWithWiki : Model
                                                 modelWithWiki =
                                                     { model | wikis = Dict.insert slug wiki model.wikis }
+                                                        |> withWikiSearchIndex slug wiki
                                             in
                                             case
                                                 WikiContributors.seedAdminContributorAtWiki
@@ -2589,6 +2647,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                         nextModel : Model
                                                         nextModel =
                                                             { model | wikis = Dict.insert wikiSlug nextWiki model.wikis }
+                                                                |> withWikiSearchIndex wikiSlug nextWiki
                                                     in
                                                     ( nextModel
                                                     , Effect.Lamdera.sendToFrontend clientId
@@ -2639,6 +2698,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                             nextModel : Model
                             nextModel =
                                 { model | wikis = Dict.insert wikiSlug nextWiki model.wikis }
+                                    |> withWikiSearchIndex wikiSlug nextWiki
                         in
                         ( nextModel
                         , Effect.Lamdera.sendToFrontend clientId
@@ -2675,6 +2735,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                             nextModel : Model
                             nextModel =
                                 { model | wikis = Dict.insert wikiSlug nextWiki model.wikis }
+                                    |> withWikiSearchIndex wikiSlug nextWiki
                         in
                         ( nextModel
                         , Effect.Lamdera.sendToFrontend clientId
@@ -2726,6 +2787,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                             PendingReviewCount.removeWikiSubscribers wikiSlug model.pendingReviewClients
                                         , wikiFrontendClients =
                                             WikiFrontendSubscription.removeWikiSubscribers wikiSlug model.wikiFrontendClients
+                                        , wikiSearchIndexes = Dict.remove wikiSlug model.wikiSearchIndexes
                                     }
                             in
                             ( nextModel
@@ -2780,6 +2842,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                             nextModel : Model
                             nextModel =
                                 BackendDataExport.applySnapshotToBackendModel snap model.hostSessions
+                                    |> withRebuiltAllWikiSearchIndexes
                         in
                         ( nextModel
                         , Effect.Lamdera.sendToFrontend clientId (HostAdminDataImportResponse (Ok ()))
@@ -2856,11 +2919,16 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                         )
 
                                     Ok nextModel ->
-                                        ( nextModel
+                                        let
+                                            rebuiltModel : Model
+                                            rebuiltModel =
+                                                withRebuiltAllWikiSearchIndexes nextModel
+                                        in
+                                        ( rebuiltModel
                                         , Command.batch
                                             [ Effect.Lamdera.sendToFrontend clientId
                                                 (HostAdminWikiDataImportResponse wikiSlug (Ok ()))
-                                            , sendPendingReviewCountToTrustedSubscribers wikiSlug nextModel
+                                            , sendPendingReviewCountToTrustedSubscribers wikiSlug rebuiltModel
                                             ]
                                         )
 
@@ -2901,11 +2969,16 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                 )
 
                             Ok nextModel ->
-                                ( nextModel
+                                let
+                                    rebuiltModel : Model
+                                    rebuiltModel =
+                                        withRebuiltAllWikiSearchIndexes nextModel
+                                in
+                                ( rebuiltModel
                                 , Command.batch
                                     [ Effect.Lamdera.sendToFrontend clientId
                                         (HostAdminWikiDataImportAutoResponse (Ok wikiSlug))
-                                    , sendPendingReviewCountToTrustedSubscribers wikiSlug nextModel
+                                    , sendPendingReviewCountToTrustedSubscribers wikiSlug rebuiltModel
                                     ]
                                 )
 
