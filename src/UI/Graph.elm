@@ -33,6 +33,7 @@ type alias Edge =
     , to : String
     , direction : EdgeDirection
     , kind : EdgeKind
+    , deemphasized : Bool
     }
 
 
@@ -161,15 +162,30 @@ edgeAttrs edge =
 
                 Undirected ->
                     [ "dir=none" ]
+
+        deemphasizedAttrs : List String
+        deemphasizedAttrs =
+            if edge.deemphasized then
+                [ "color=" ++ dotString "#6b728066" ]
+
+            else
+                []
     in
     case edge.kind of
         LinkEdge ->
-            directionAttrs
+            deemphasizedAttrs ++ directionAttrs
 
         TagEdge ->
-            [ "style=" ++ dotString "dashed"
-            , "color=" ++ dotString "#7c3aed"
-            ]
+            (if edge.deemphasized then
+                [ "style=" ++ dotString "dashed"
+                , "color=" ++ dotString "#7c3aed66"
+                ]
+
+             else
+                [ "style=" ++ dotString "dashed"
+                , "color=" ++ dotString "#7c3aed"
+                ]
+            )
                 ++ directionAttrs
 
 
@@ -233,8 +249,8 @@ defaultEdgeAttrsLine graphName =
     let
         ( edgeLen, edgeWeight ) =
             if graphName == "page" then
-                -- Page graph should allow longer links than wiki-wide graph.
-                ( "0.45", "6" )
+                -- Let link structure drive page graph layout more strongly.
+                ( "0.34", "11" )
 
             else
                 ( "0.24", "14" )

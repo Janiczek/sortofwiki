@@ -201,6 +201,7 @@ graph wikiSlug publishedPageMarkdownSources publishedPageTags =
                 , to = edge.toPageSlug
                 , direction = toUiDirection edge.direction
                 , kind = toUiKind edge.kind
+                , deemphasized = False
                 }
             )
             graphSummary.edges

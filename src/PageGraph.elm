@@ -298,6 +298,48 @@ graph wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags =
                     )
                     []
                 |> List.sortBy String.toLower
+
+        presentNodeSet : Set.Set String
+        presentNodeSet =
+            List.concat
+                [ [ graphSummary.targetPageSlug ]
+                , linkedPublishedNodes
+                , graphSummary.missingPageSlugs
+                ]
+                |> List.map String.toLower
+                |> Set.fromList
+
+        directEdgeKeys : Set.Set String
+        directEdgeKeys =
+            graphSummary.edges
+                |> List.map edgeKey
+                |> Set.fromList
+
+        contextualEdges : List Edge
+        contextualEdges =
+            List.append
+                (edgesFromMarkdown wikiSlug publishedPageMarkdownSources)
+                (edgesFromTags publishedPageTags)
+                |> GraphData.normalizeEdges
+                    { fromSlug = .fromPageSlug
+                    , toSlug = .toPageSlug
+                    , direction = .direction >> toGraphDataDirection
+                    , kindSortKey = .kind >> kindSortKey
+                    , toUndirected =
+                        \pair edge ->
+                            { fromPageSlug = pair.canonicalFrom
+                            , toPageSlug = pair.canonicalTo
+                            , direction = Undirected
+                            , targetPublished = True
+                            , kind = edge.kind
+                            }
+                    }
+                |> List.filter
+                    (\edge ->
+                        Set.member (String.toLower edge.fromPageSlug) presentNodeSet
+                            && Set.member (String.toLower edge.toPageSlug) presentNodeSet
+                    )
+                |> List.filter (\edge -> not (Set.member (edgeKey edge) directEdgeKeys))
     in
     { graphName = "page"
     , nodes =
@@ -307,15 +349,29 @@ graph wikiSlug targetPageSlug publishedPageMarkdownSources publishedPageTags =
             , List.map missingNode graphSummary.missingPageSlugs
             ]
     , edges =
-        List.map
-            (\edge ->
-                { from = edge.fromPageSlug
-                , to = edge.toPageSlug
-                , direction = toUiDirection edge.direction
-                , kind = toUiKind edge.kind
-                }
+        List.append
+            (graphSummary.edges
+                |> List.map
+                    (\edge ->
+                        { from = edge.fromPageSlug
+                        , to = edge.toPageSlug
+                        , direction = toUiDirection edge.direction
+                        , kind = toUiKind edge.kind
+                        , deemphasized = False
+                        }
+                    )
             )
-            graphSummary.edges
+            (contextualEdges
+                |> List.map
+                    (\edge ->
+                        { from = edge.fromPageSlug
+                        , to = edge.toPageSlug
+                        , direction = toUiDirection edge.direction
+                        , kind = toUiKind edge.kind
+                        , deemphasized = True
+                        }
+                    )
+            )
     }
 
 
@@ -395,3 +451,23 @@ toUiKind kind =
 
         TagEdge ->
             UI.Graph.TagEdge
+
+
+edgeKey : Edge -> String
+edgeKey edge =
+    String.join "|"
+        [ edge.fromPageSlug |> String.toLower
+        , edge.toPageSlug |> String.toLower
+        , edge.direction |> toGraphDataDirection |> graphDataDirectionKey
+        , edge.kind |> kindSortKey
+        ]
+
+
+graphDataDirectionKey : GraphData.EdgeDirection -> String
+graphDataDirectionKey direction =
+    case direction of
+        GraphData.Directed ->
+            "directed"
+
+        GraphData.Undirected ->
+            "undirected"
