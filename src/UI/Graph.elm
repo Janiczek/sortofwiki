@@ -183,7 +183,7 @@ missingNodeAttrs =
 
 nodePenWidth : Int -> Float
 nodePenWidth inboundCount =
-    1 + (2 * inboundScale inboundCount)
+    0.5 + inboundScale inboundCount
 
 
 inboundScale : Int -> Float
@@ -194,12 +194,12 @@ inboundScale inboundCount =
 
 nodeHeight : Int -> Float
 nodeHeight inboundCount =
-    0.3 + (0.24 * inboundScale inboundCount)
+    0.2 + (0.1 * inboundScale inboundCount)
 
 
 nodeFontSize : Int -> Float
-nodeFontSize inboundCount =
-    9 + (8 * inboundScale inboundCount)
+nodeFontSize _ =
+    9
 
 
 defaultGraphAttrs : String
@@ -221,8 +221,9 @@ defaultNodeAttrsLine =
         ++ ", fontsize="
         ++ dotString "11"
         ++ ", margin="
-        ++ dotString "0.18,0.08"
-        ++ ", height=0.3"
+        ++ dotString "0.16,0.04"
+        ++ ", width=0.01"
+        ++ ", height=0.2"
         ++ ", penwidth=1"
         ++ "];"
 
