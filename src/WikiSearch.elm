@@ -159,14 +159,50 @@ tokenPrefixes token =
 
 separatorRegex : Regex.Regex
 separatorRegex =
-    Regex.fromString "[\\s\\-]+"
+    Regex.fromString "[^a-z0-9]+"
         |> Maybe.withDefault Regex.never
 
 
 tokenize : String -> List String
 tokenize text =
-    text
-        |> String.trim
-        |> String.toLower
-        |> Regex.split separatorRegex
+    let
+        lowered : String
+        lowered =
+            text
+                |> String.trim
+                |> String.toLower
+
+        wikiLinkRegex : Regex.Regex
+        wikiLinkRegex =
+            Regex.fromString "\\[\\[([^\\]|]+)(?:\\|([^\\]]+))?\\]\\]"
+                |> Maybe.withDefault Regex.never
+
+        linkTokenMatchToTokens : Regex.Match -> List String
+        linkTokenMatchToTokens match =
+            case match.submatches of
+                (Just linkTarget) :: maybeLabel :: [] ->
+                    tokenizePlain linkTarget
+                        ++ (maybeLabel
+                                |> Maybe.withDefault ""
+                                |> tokenizePlain
+                           )
+
+                _ ->
+                    []
+
+        withoutWikiLinks : String
+        withoutWikiLinks =
+            lowered
+                |> Regex.replace wikiLinkRegex (\_ -> " ")
+    in
+    (Regex.find wikiLinkRegex lowered
+        |> List.concatMap linkTokenMatchToTokens
+    )
+        ++ tokenizePlain withoutWikiLinks
         |> List.filter (\token -> not (String.isEmpty token))
+
+
+tokenizePlain : String -> List String
+tokenizePlain text =
+    text
+        |> Regex.split separatorRegex

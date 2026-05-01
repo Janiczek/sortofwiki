@@ -10155,7 +10155,7 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
                 , Attr.class "w-full appearance-none border-0 border-b border-[var(--border-subtle)] bg-transparent m-0 px-4 py-1 text-left leading-[1] cursor-pointer transition-colors hover:bg-[var(--chrome-bg-hover)] hover:text-[var(--fg)]"
                 , Events.onClick PageEditPublishedRowToggled
                 ]
-                [ Html.span [ Attr.class "relative inline-flex items-center -translate-y-[1px] font-sans text-[0.8125rem] leading-[1]" ]
+                [ Html.span [ Attr.class "relative inline-flex items-center -translate-y-[1px] text-sm font-semibold leading-tight text-[var(--fg-muted)]" ]
                     (Html.span
                         [ Attr.class
                             (if showIcon then

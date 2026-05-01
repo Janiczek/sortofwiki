@@ -749,7 +749,7 @@ markdownTodoClass =
 
 markdownBlockQuoteClass : String
 markdownBlockQuoteClass =
-    "my-[0.8rem] first:mt-0 px-[0.75rem] py-[0.5rem] bg-[var(--chrome-bg)] border border-[var(--border-subtle)] rounded-lg italic text-[var(--fg-muted)] [font-family:var(--font-serif)]"
+    "my-[0.8rem] first:mt-0 pl-[0.9rem] pr-[0.2rem] border-l-[3px] border-[var(--border-subtle)] text-[var(--fg-muted)] [font-family:var(--font-serif)]"
 
 
 markdownUnorderedListClass : String

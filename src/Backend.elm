@@ -425,18 +425,42 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                 query =
                     String.trim rawQuery
 
+                ( modelForSearch, prefixIndex ) =
+                    case Dict.get wikiSlug model.wikiSearchIndexes of
+                        Just index ->
+                            ( model, index )
+
+                        Nothing ->
+                            case Dict.get wikiSlug model.wikis of
+                                Just wiki ->
+                                    if wiki.active then
+                                        let
+                                            index : WikiSearch.PrefixIndex
+                                            index =
+                                                searchIndexForWiki wiki
+                                        in
+                                        ( { model
+                                            | wikiSearchIndexes =
+                                                Dict.insert wikiSlug index model.wikiSearchIndexes
+                                          }
+                                        , index
+                                        )
+
+                                    else
+                                        ( model, Dict.empty )
+
+                                Nothing ->
+                                    ( model, Dict.empty )
+
                 results : List WikiSearch.ResultItem
                 results =
                     if String.isEmpty query then
                         []
 
                     else
-                        model.wikiSearchIndexes
-                            |> Dict.get wikiSlug
-                            |> Maybe.withDefault Dict.empty
-                            |> WikiSearch.searchWithPrefixIndex query
+                        WikiSearch.searchWithPrefixIndex query prefixIndex
             in
-            ( model
+            ( modelForSearch
             , Effect.Lamdera.sendToFrontend clientId
                 (WikiSearchResponse wikiSlug query results)
             )
