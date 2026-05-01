@@ -4,7 +4,7 @@ import Markdown.Block as Block
 import Markdown.Parser as MarkdownParser
 import MarkdownHeadingSlugs
 import MarkdownMath
-import MarkdownTypographicDashes
+import MarkdownTypographicSubstitutions
 import Page
 import Wiki
 import WikiLinkSyntax
@@ -21,5 +21,5 @@ blocksWithHeadingSlugs wikiSlug publishedSlugExists source =
         |> Result.mapError (List.map MarkdownParser.deadEndToString >> String.join "\n")
         |> Result.map (WikiMarkdown.postProcessBlocksWithWikiLinks wikiSlug publishedSlugExists)
         |> Result.map MarkdownMath.postProcessBlocksWithEquations
-        |> Result.map MarkdownTypographicDashes.postProcessBlocksWithTypographicDashes
+        |> Result.map MarkdownTypographicSubstitutions.postProcessBlocksWithTypographicSubstitutions
         |> Result.map MarkdownHeadingSlugs.gatherHeadingOccurrences

@@ -1,10 +1,11 @@
-module MarkdownTypographicDashes exposing (postProcessBlocksWithTypographicDashes)
+module MarkdownTypographicSubstitutions exposing (postProcessBlocksWithTypographicSubstitutions)
 
+import Char
 import Markdown.Block as Block
 
 
-postProcessBlocksWithTypographicDashes : List Block.Block -> List Block.Block
-postProcessBlocksWithTypographicDashes blocks =
+postProcessBlocksWithTypographicSubstitutions : List Block.Block -> List Block.Block
+postProcessBlocksWithTypographicSubstitutions blocks =
     List.map mapBlock blocks
 
 
@@ -76,7 +77,7 @@ mapInline : Block.Inline -> Block.Inline
 mapInline inline =
     case inline of
         Block.Text text ->
-            Block.Text (toTypographicDashes text)
+            Block.Text (applyTypographicSubstitutions text)
 
         Block.Link destination title children ->
             Block.Link destination title (List.map mapInline children)
@@ -103,8 +104,74 @@ mapInline inline =
             inline
 
 
-toTypographicDashes : String -> String
-toTypographicDashes text =
+applyTypographicSubstitutions : String -> String
+applyTypographicSubstitutions text =
+    text
+        |> applySimpleSubstitutions
+        |> applySmartQuotes
+
+
+applySimpleSubstitutions : String -> String
+applySimpleSubstitutions text =
     text
         |> String.replace "---" "—"
         |> String.replace "--" "–"
+        |> String.replace "<-" "←"
+        |> String.replace "->" "→"
+
+
+applySmartQuotes : String -> String
+applySmartQuotes text =
+    text
+        |> String.toList
+        |> (\chars -> smartQuoteChars Nothing False False chars [])
+        |> List.reverse
+        |> String.fromList
+
+
+smartQuoteChars : Maybe Char -> Bool -> Bool -> List Char -> List Char -> List Char
+smartQuoteChars maybePrev inSingleQuote inDoubleQuote remaining acc =
+    case remaining of
+        [] ->
+            acc
+
+        char :: rest ->
+            let
+                maybeNext : Maybe Char
+                maybeNext =
+                    List.head rest
+            in
+            if char == '"' then
+                if inDoubleQuote then
+                    smartQuoteChars (Just '”') inSingleQuote False rest ('”' :: acc)
+
+                else
+                    smartQuoteChars (Just '“') inSingleQuote True rest ('“' :: acc)
+
+            else if char == '\'' then
+                if isApostrophe maybePrev maybeNext then
+                    smartQuoteChars (Just '’') inSingleQuote inDoubleQuote rest ('’' :: acc)
+
+                else if inSingleQuote then
+                    smartQuoteChars (Just '’') False inDoubleQuote rest ('’' :: acc)
+
+                else
+                    smartQuoteChars (Just '‘') True inDoubleQuote rest ('‘' :: acc)
+
+            else
+                smartQuoteChars (Just char) inSingleQuote inDoubleQuote rest (char :: acc)
+
+
+isApostrophe : Maybe Char -> Maybe Char -> Bool
+isApostrophe maybePrev maybeNext =
+    case ( maybePrev, maybeNext ) of
+        ( Just prev, Just next ) ->
+            isWordChar prev && isWordChar next
+
+        _ ->
+            False
+
+
+isWordChar : Char -> Bool
+isWordChar char =
+    Char.isAlphaNum char
