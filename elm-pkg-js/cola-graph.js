@@ -674,9 +674,6 @@ class ColaGraphElement extends HTMLElement {
       return;
     }
 
-    const width = 1200;
-    const height = graph.graphName === "page" ? 860 : 980;
-
     const nodes = graph.nodes.map(function (node) {
       const box = measureNodeBox(node);
       return {
@@ -732,7 +729,6 @@ class ColaGraphElement extends HTMLElement {
 
       const layout = new window.cola.Layout();
       layout
-        .size([width, height])
         .nodes(nodes)
         .links(links)
         .linkDistance(function (link) {
