@@ -128,9 +128,9 @@ function inboundScale(inboundCount) {
   return clamp(Math.log(inboundCount + 1) / Math.log(11), 0, 1);
 }
 
-function nodeFontSize() {
-  return 12;
-}
+const NODE_FONT_SIZE = 12;
+
+const NODE_CLEARANCE_PX = 6;
 
 function nodePenWidth(node) {
   const base = 0.5 + inboundScale(node.inboundCount || 0);
@@ -158,20 +158,32 @@ function projectFromCenterToRectBoundary(centerX, centerY, halfWidth, halfHeight
 function edgeEndpoints(source, target) {
   const dx = target.x - source.x;
   const dy = target.y - source.y;
+  const sourceWidth = Number.isFinite(source.visualWidth)
+    ? source.visualWidth
+    : source.width;
+  const sourceHeight = Number.isFinite(source.visualHeight)
+    ? source.visualHeight
+    : source.height;
+  const targetWidth = Number.isFinite(target.visualWidth)
+    ? target.visualWidth
+    : target.width;
+  const targetHeight = Number.isFinite(target.visualHeight)
+    ? target.visualHeight
+    : target.height;
 
   const sourcePoint = projectFromCenterToRectBoundary(
     source.x,
     source.y,
-    source.width / 2,
-    source.height / 2,
+    sourceWidth / 2,
+    sourceHeight / 2,
     dx,
     dy
   );
   const targetPoint = projectFromCenterToRectBoundary(
     target.x,
     target.y,
-    target.width / 2,
-    target.height / 2,
+    targetWidth / 2,
+    targetHeight / 2,
     -dx,
     -dy
   );
@@ -185,14 +197,18 @@ function edgeEndpoints(source, target) {
 }
 
 function measureNodeBox(node) {
-  const fontSize = nodeFontSize();
+  const fontSize = NODE_FONT_SIZE;
   const charWidth = fontSize * 0.56;
   const labelWidth = Math.max((node.id || "").length * charWidth + 28, 66);
   const labelHeight = 28;
   const emphasisPad = (node.inboundCount || 0) > 0 ? 6 : 0;
+  const visualWidth = Math.round(labelWidth + emphasisPad);
+  const visualHeight = labelHeight;
   return {
-    width: Math.round(labelWidth + emphasisPad),
-    height: labelHeight,
+    width: visualWidth + NODE_CLEARANCE_PX * 2,
+    height: visualHeight + NODE_CLEARANCE_PX * 2,
+    visualWidth: visualWidth,
+    visualHeight: visualHeight,
   };
 }
 
@@ -378,7 +394,7 @@ class ColaGraphElement extends HTMLElement {
       }
       text {
         font-family: 'Source Serif 4', system-ui, sans-serif;
-        font-size: ${nodeFontSize()}px;
+        font-size: ${NODE_FONT_SIZE}px;
         pointer-events: none;
         user-select: none;
       }
@@ -405,6 +421,8 @@ class ColaGraphElement extends HTMLElement {
         kind: node.kind || "normal",
         width: box.width,
         height: box.height,
+        visualWidth: box.visualWidth,
+        visualHeight: box.visualHeight,
       };
     });
 
@@ -558,15 +576,21 @@ class ColaGraphElement extends HTMLElement {
     nodes.forEach(function (node) {
       const palette = nodePalette(node, darkMode, this);
       const hoverFill = nodeHoverFill(node, darkMode, this);
+      const visualWidth = Number.isFinite(node.visualWidth)
+        ? node.visualWidth
+        : node.width;
+      const visualHeight = Number.isFinite(node.visualHeight)
+        ? node.visualHeight
+        : node.height;
       const group = document.createElementNS(SVG_NS, "g");
       group.setAttribute("class", "node");
       group.setAttribute("transform", `translate(${node.x},${node.y})`);
 
       const rect = document.createElementNS(SVG_NS, "rect");
-      rect.setAttribute("x", String(-node.width / 2));
-      rect.setAttribute("y", String(-node.height / 2));
-      rect.setAttribute("width", String(node.width));
-      rect.setAttribute("height", String(node.height));
+      rect.setAttribute("x", String(-visualWidth / 2));
+      rect.setAttribute("y", String(-visualHeight / 2));
+      rect.setAttribute("width", String(visualWidth));
+      rect.setAttribute("height", String(visualHeight));
       rect.setAttribute("rx", "5");
       rect.setAttribute("ry", "5");
       rect.setAttribute("fill", palette.fill);
@@ -586,10 +610,10 @@ class ColaGraphElement extends HTMLElement {
 
       if (palette.focusRing) {
         const ring = document.createElementNS(SVG_NS, "rect");
-        ring.setAttribute("x", String(-node.width / 2 - 3));
-        ring.setAttribute("y", String(-node.height / 2 - 3));
-        ring.setAttribute("width", String(node.width + 6));
-        ring.setAttribute("height", String(node.height + 6));
+        ring.setAttribute("x", String(-visualWidth / 2 - 3));
+        ring.setAttribute("y", String(-visualHeight / 2 - 3));
+        ring.setAttribute("width", String(visualWidth + 6));
+        ring.setAttribute("height", String(visualHeight + 6));
         ring.setAttribute("rx", "8");
         ring.setAttribute("ry", "8");
         ring.setAttribute("fill", "none");
