@@ -12689,12 +12689,7 @@ viewWikiTodosPage wikiSlug wikiDetails =
                             }
                         )
                 , todoSummary.missingPages
-                    |> List.sortBy
-                        (\row ->
-                            ( negate (List.length row.linkedFromPageSlugs)
-                            , String.toLower row.missingPageSlug
-                            )
-                        )
+                    |> WikiTodos.sortMissingPagesForDisplay
                     |> List.map
                         (\row ->
                             { itemText = row.missingPageSlug

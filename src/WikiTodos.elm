@@ -1,4 +1,4 @@
-module WikiTodos exposing (MissingPageRow, Summary, TodoRow, summary)
+module WikiTodos exposing (MissingPageRow, Summary, TodoRow, sortMissingPagesForDisplay, summary)
 
 import Dict exposing (Dict)
 import Page
@@ -25,6 +25,22 @@ type alias Summary =
     { todos : List TodoRow
     , missingPages : List MissingPageRow
     }
+
+
+{-| Order for wiki TODOs table: more in-links first; then lexicographic order of
+sorted linker slugs (case-insensitive); then missing page slug (case-insensitive).
+-}
+sortMissingPagesForDisplay : List MissingPageRow -> List MissingPageRow
+sortMissingPagesForDisplay rows =
+    List.sortBy
+        (\row ->
+            ( negate (List.length row.linkedFromPageSlugs)
+            , row.linkedFromPageSlugs
+                |> List.sortBy String.toLower
+            , String.toLower row.missingPageSlug
+            )
+        )
+        rows
 
 
 summary : Wiki.Slug -> Dict Page.Slug String -> Summary

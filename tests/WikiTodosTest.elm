@@ -45,4 +45,60 @@ suite =
                         |> .missingPages
                         |> Expect.equal []
             ]
+        , Test.describe "sortMissingPagesForDisplay"
+            [ Test.test "more in-links first" <|
+                \() ->
+                    [ { missingPageSlug = "Low"
+                      , linkedFromPageSlugs = [ "A" ]
+                      }
+                    , { missingPageSlug = "High"
+                      , linkedFromPageSlugs = [ "A", "B", "C" ]
+                      }
+                    ]
+                        |> WikiTodos.sortMissingPagesForDisplay
+                        |> Expect.equal
+                            [ { missingPageSlug = "High"
+                              , linkedFromPageSlugs = [ "A", "B", "C" ]
+                              }
+                            , { missingPageSlug = "Low"
+                              , linkedFromPageSlugs = [ "A" ]
+                              }
+                            ]
+            , Test.test "same count orders by sorted linker slugs" <|
+                \() ->
+                    [ { missingPageSlug = "Z"
+                      , linkedFromPageSlugs = [ "M", "A" ]
+                      }
+                    , { missingPageSlug = "Y"
+                      , linkedFromPageSlugs = [ "B", "A" ]
+                      }
+                    ]
+                        |> WikiTodos.sortMissingPagesForDisplay
+                        |> Expect.equal
+                            [ { missingPageSlug = "Y"
+                              , linkedFromPageSlugs = [ "B", "A" ]
+                              }
+                            , { missingPageSlug = "Z"
+                              , linkedFromPageSlugs = [ "M", "A" ]
+                              }
+                            ]
+            , Test.test "same count and linker set orders by missing slug" <|
+                \() ->
+                    [ { missingPageSlug = "Zebra"
+                      , linkedFromPageSlugs = [ "B", "A" ]
+                      }
+                    , { missingPageSlug = "Alpha"
+                      , linkedFromPageSlugs = [ "A", "B" ]
+                      }
+                    ]
+                        |> WikiTodos.sortMissingPagesForDisplay
+                        |> Expect.equal
+                            [ { missingPageSlug = "Alpha"
+                              , linkedFromPageSlugs = [ "A", "B" ]
+                              }
+                            , { missingPageSlug = "Zebra"
+                              , linkedFromPageSlugs = [ "B", "A" ]
+                              }
+                            ]
+            ]
         ]
