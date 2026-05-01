@@ -7539,7 +7539,7 @@ viewAppHeaderSecondary secondary =
         AppHeaderSecondaryWikiLinkThenPlain { wikiLabel, plainSuffix } ->
             Html.span
                 [ UI.appHeaderSecondaryMetaAttr
-                , Attr.class "gap-x-0"
+                , Attr.style "column-gap" "0"
                 ]
                 [ viewAppHeaderSecondary (AppHeaderSecondaryWikiLink wikiLabel)
                 , Html.text " "
