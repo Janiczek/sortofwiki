@@ -85,14 +85,14 @@ chapter_ =
                     ]
               )
             , ( "wikiRightRailTocNudgeAttr (negative-margin side inset)"
-              , Html.div [ UI.wikiRightRailTocNudgeAttr, TW.cls "bg-[var(--chrome-bg)] p-2 text-[var(--fg-muted)] text-[0.9rem]" ]
+              , Html.div [ UI.wikiRightRailTocNudgeAttr, TW.cls "bg-[var(--chrome-bg)] p-2 text-[var(--fg-muted)] text-[0.8125rem]" ]
                     [ Html.text "Right-rail content with corrected side inset" ]
               )
             , ( "wikiRightRailSectionCardAttr (right-rail section wrapper)"
               , Html.div [ UI.wikiRightRailSectionCardAttr ]
-                    [ Html.h3 [ TW.cls "m-0 mb-1 text-[0.82rem] font-semibold tracking-[0.04em] text-[var(--fg-muted)]" ]
+                    [ Html.h3 [ TW.cls "m-0 mb-1 text-[0.8125rem] font-semibold tracking-[0.04em] text-[var(--fg-muted)]" ]
                         [ Html.text "Section Card" ]
-                    , Html.p [ TW.cls "m-0 text-[0.9rem] text-[var(--fg-muted)]" ]
+                    , Html.p [ TW.cls "m-0 text-[0.8125rem] text-[var(--fg-muted)]" ]
                         [ Html.text "Rounded card shell for right-rail ToC/tags/backlinks sections." ]
                     ]
               )

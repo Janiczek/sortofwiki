@@ -26,7 +26,7 @@ sidebarSubheadingTrackingClass =
 
 sidebarHeadingClass : String
 sidebarHeadingClass =
-    "m-0 mb-[0.35rem] text-[0.82rem] [font-family:var(--font-ui)] font-semibold "
+    "m-0 mb-[0.35rem] text-[0.8125rem] [font-family:var(--font-ui)] font-semibold "
         ++ sidebarSubheadingTrackingClass
         ++ " text-[var(--fg-muted)]"
 
@@ -90,12 +90,12 @@ markdownHeading6Class =
 
 panelHeadingPrimaryClass : String
 panelHeadingPrimaryClass =
-    "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)]"
+    "m-0 !mt-0 !mb-0 shrink-0 text-[0.8125rem] font-semibold leading-tight text-[var(--fg)]"
 
 
 panelHeadingSecondaryClass : String
 panelHeadingSecondaryClass =
-    "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg-muted)]"
+    "m-0 !mt-0 !mb-0 shrink-0 text-[0.8125rem] font-semibold leading-tight text-[var(--fg-muted)]"
 
 
 panelHeadingPrimary : List (Attribute msg) -> List (Html msg) -> Html msg

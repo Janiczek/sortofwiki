@@ -8067,7 +8067,7 @@ viewAppHeader model =
                                         [ if String.length headerSearchQueryTrimmed < 3 then
                                             Html.p
                                                 [ Attr.id "header-search-popup-min-query"
-                                                , Attr.class "m-1 text-[0.8rem] text-[var(--fg-muted)] [font-family:var(--font-ui)]"
+                                                , Attr.class "m-1 text-[0.8125rem] text-[var(--fg-muted)] [font-family:var(--font-ui)]"
                                                 ]
                                                 [ Html.text "Please type three or more characters." ]
 
@@ -8080,7 +8080,7 @@ viewAppHeader model =
                                             if List.isEmpty headerSearchResults then
                                                 Html.p
                                                     [ Attr.id "header-search-popup-empty"
-                                                    , Attr.class "m-1 text-[0.8rem] text-[var(--fg-muted)] [font-family:var(--font-ui)]"
+                                                    , Attr.class "m-1 text-[0.8125rem] text-[var(--fg-muted)] [font-family:var(--font-ui)]"
                                                     ]
                                                     [ Html.text "No matches." ]
 
@@ -8275,7 +8275,7 @@ viewHostAdminLogin model =
             [ Html.div [ Attr.class "login-shell-brand" ]
                 [ Html.h1 [ Attr.class "m-0 text-[2.2rem] leading-[1.2] text-[var(--auth-card-heading)] [font-family:var(--font-serif)]" ]
                     [ Html.text "SortOfWiki Admin" ]
-                , Html.p [ Attr.class "m-0 text-[var(--auth-card-fg-muted)] [font-family:var(--font-ui)]" ]
+                , Html.p [ Attr.class "m-0 text-[0.8125rem] text-[var(--auth-card-fg-muted)] [font-family:var(--font-ui)]" ]
                     [ Html.text "Platform administration login" ]
                 ]
             , Html.div [ Attr.class "login-shell-card" ]
@@ -8287,7 +8287,7 @@ viewHostAdminLogin model =
                     [ Html.div [ Attr.class "mb-2" ]
                         [ UI.contentLabel
                             [ Attr.for "host-admin-login-password"
-                            , Attr.class "ml-[0.15rem] text-[0.92rem]"
+                            , Attr.class "ml-[0.15rem] text-[0.8125rem]"
                             , Attr.style "color" "var(--auth-card-fg-muted)"
                             ]
                             [ Html.text "Admin password" ]
@@ -9732,7 +9732,7 @@ viewLoginLoaded wikiSlug wikiName draft =
             [ Html.div [ Attr.class "login-shell-brand" ]
                 [ Html.h1 [ Attr.class "m-0 text-[2.2rem] leading-[1.2] text-[var(--auth-card-heading)] [font-family:var(--font-serif)]" ]
                     [ Html.text wikiName ]
-                , Html.p [ Attr.class "m-0 text-[var(--auth-card-fg-muted)] [font-family:var(--font-ui)]" ]
+                , Html.p [ Attr.class "m-0 text-[0.8125rem] text-[var(--auth-card-fg-muted)] [font-family:var(--font-ui)]" ]
                     [ Html.text "Part of SortOfWiki" ]
                 ]
             , Html.div [ Attr.class "login-shell-card" ]
@@ -9744,7 +9744,7 @@ viewLoginLoaded wikiSlug wikiName draft =
                     [ Html.div [ Attr.class "mb-2" ]
                         [ UI.contentLabel
                             [ Attr.for "wiki-login-username"
-                            , Attr.class "ml-[0.15rem] text-[0.92rem]"
+                            , Attr.class "ml-[0.15rem] text-[0.8125rem]"
                             , Attr.style "color" "var(--auth-card-fg-muted)"
                             ]
                             [ Html.text "Username" ]
@@ -9761,7 +9761,7 @@ viewLoginLoaded wikiSlug wikiName draft =
                     , Html.div [ Attr.class "mb-2" ]
                         [ UI.contentLabel
                             [ Attr.for "wiki-login-password"
-                            , Attr.class "ml-[0.15rem] text-[0.92rem]"
+                            , Attr.class "ml-[0.15rem] text-[0.8125rem]"
                             , Attr.style "color" "var(--auth-card-fg-muted)"
                             ]
                             [ Html.text "Password" ]
@@ -9785,7 +9785,7 @@ viewLoginLoaded wikiSlug wikiName draft =
                     ]
                 , Html.div [ Attr.class "mt-3" ] [ viewLoginFeedback draft.lastResult ]
                 ]
-            , Html.footer [ Attr.class "mt-4 text-[0.78rem] text-[var(--auth-card-fg-muted)] [font-family:var(--font-ui)]" ]
+            , Html.footer [ Attr.class "mt-4 text-[0.8125rem] text-[var(--auth-card-fg-muted)] [font-family:var(--font-ui)]" ]
                 [ Html.div [ Attr.class "flex items-center justify-between gap-3 px-1" ]
                     [ Html.div []
                         [ Html.text "Need an account? "
@@ -10155,7 +10155,7 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
                 , Attr.class "w-full appearance-none border-0 border-b border-[var(--border-subtle)] bg-transparent m-0 px-4 py-1 text-left leading-[1] cursor-pointer transition-colors hover:bg-[var(--chrome-bg-hover)] hover:text-[var(--fg)]"
                 , Events.onClick PageEditPublishedRowToggled
                 ]
-                [ Html.span [ Attr.class "relative inline-flex items-center -translate-y-[1px] text-sm font-semibold leading-tight text-[var(--fg-muted)]" ]
+                [ Html.span [ Attr.class "relative inline-flex items-center -translate-y-[1px] text-[0.8125rem] font-semibold leading-tight text-[var(--fg-muted)]" ]
                     (Html.span
                         [ Attr.class
                             (if showIcon then
@@ -10308,7 +10308,7 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
                 { align = UI.FormActionFooter.AlignBetween
                 , left =
                     [ if showUntrustedContributorDisclaimer then
-                        Html.p [ Attr.class "m-0 text-[0.84rem] text-[var(--fg-muted)]" ]
+                        Html.p [ Attr.class "m-0 text-[0.8125rem] text-[var(--fg-muted)]" ]
                             [ Html.text "Published content stays unchanged until a reviewer approves this proposal." ]
 
                       else
@@ -10813,7 +10813,7 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
                     [ UI.submissionGridTight2ColAttr ]
                     [ Html.label
                         [ Attr.for "original-markdown-readonly-textarea"
-                        , UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)] col-start-1 row-start-1"
+                        , UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-[0.8125rem] font-semibold leading-tight text-[var(--fg)] col-start-1 row-start-1"
                         ]
                         [ Html.text "Original" ]
                     , Html.textarea
@@ -10838,7 +10838,7 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
                              else
                                 "new-markdown-readonly-textarea"
                             )
-                        , UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)] col-start-2 row-start-1"
+                        , UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-[0.8125rem] font-semibold leading-tight text-[var(--fg)] col-start-2 row-start-1"
                         ]
                         [ Html.text
                             (if detail.contributionKind == Submission.ContributorKindDeletePage then
@@ -11727,13 +11727,13 @@ viewSubmissionReviewDiff wikiSlug publishedSlugExists detail =
                 , UI.gridTwoByTwoDiffStrAttr
                 ]
                 [ Html.h3
-                    [ UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)] col-start-1 row-start-1" ]
+                    [ UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-[0.8125rem] font-semibold leading-tight text-[var(--fg)] col-start-1 row-start-1" ]
                     [ Html.text "Proposed markdown" ]
                 , reviewReadonlyTextarea "wiki-review-diff-new"
                     body.proposedMarkdown
                     (UI.Textarea.markdownReadonlyCol1Row2 [])
                 , Html.h3
-                    [ UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg-muted)] col-start-2 row-start-1" ]
+                    [ UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-[0.8125rem] font-semibold leading-tight text-[var(--fg-muted)] col-start-2 row-start-1" ]
                     [ Html.text "Preview" ]
                 , Html.div
                     [ UI.reviewDiffNewPagePreviewColShellAttr ]
@@ -11746,7 +11746,7 @@ viewSubmissionReviewDiff wikiSlug publishedSlugExists detail =
                 , UI.gridTwoByTwoDiffStrAttr
                 ]
                 [ Html.h2
-                    [ UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)] col-start-1 row-start-1" ]
+                    [ UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-[0.8125rem] font-semibold leading-tight text-[var(--fg)] col-start-1 row-start-1" ]
                     [ Html.text "Before (published)" ]
                 , reviewReadonlyTextarea "wiki-review-diff-old"
                     body.beforeMarkdown
@@ -11754,12 +11754,12 @@ viewSubmissionReviewDiff wikiSlug publishedSlugExists detail =
                 , Html.div
                     [ UI.gridCellStackCol1Row3Attr ]
                     [ Html.h3
-                        [ UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg-muted)]" ]
+                        [ UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-[0.8125rem] font-semibold leading-tight text-[var(--fg-muted)]" ]
                         [ Html.text "Preview" ]
                     , reviewPreviewInDiffCell "wiki-review-diff-old-preview" body.beforeMarkdown
                     ]
                 , Html.h2
-                    [ UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg)] col-start-2 row-start-1 border-t border-[var(--border-subtle)] pt-3" ]
+                    [ UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-[0.8125rem] font-semibold leading-tight text-[var(--fg)] col-start-2 row-start-1 border-t border-[var(--border-subtle)] pt-3" ]
                     [ Html.text "After (proposed)" ]
                 , reviewReadonlyTextarea "wiki-review-diff-new"
                     body.afterMarkdown
@@ -11767,7 +11767,7 @@ viewSubmissionReviewDiff wikiSlug publishedSlugExists detail =
                 , Html.div
                     [ UI.gridCellStackCol2Row3Attr, Attr.class "border-t border-[var(--border-subtle)] pt-3" ]
                     [ Html.h3
-                        [ UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-sm font-semibold leading-tight text-[var(--fg-muted)]" ]
+                        [ UI.classAttr "m-0 !mt-0 !mb-0 shrink-0 text-[0.8125rem] font-semibold leading-tight text-[var(--fg-muted)]" ]
                         [ Html.text "Preview" ]
                     , reviewPreviewInDiffCell "wiki-review-diff-new-preview" body.afterMarkdown
                     ]
@@ -11941,7 +11941,7 @@ viewAuditLogDiffReadonly wikiSlug publishedSlugExists detail =
                         Just r ->
                             Html.div [ Attr.class "min-w-[14rem] flex-1" ]
                                 [ UI.contentLabel [] [ Html.text "Deletion reason" ]
-                                , Html.div [ Attr.id "wiki-review-diff-reason", Attr.class "text-sm text-[var(--fg-muted)]" ] [ Html.text r ]
+                                , Html.div [ Attr.id "wiki-review-diff-reason", Attr.class "text-[0.8125rem] text-[var(--fg-muted)]" ] [ Html.text r ]
                                 ]
                     ]
                 , contentAttrs = []

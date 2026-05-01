@@ -22,7 +22,7 @@ chapter_ =
                     , Html.p [ UI.hostAdminCardParagraphTightAttr ]
                         [ Html.text "Manage this wiki's configuration and access controls." ]
                     , Html.div [ UI.hostAdminWikiDetailFormStackAttr ]
-                        [ Html.label [ TW.cls "block text-[0.82rem] font-medium text-[var(--fg-muted)]" ]
+                        [ Html.label [ TW.cls "block text-[0.8125rem] font-medium text-[var(--fg-muted)]" ]
                             [ Html.text "Slug" ]
                         , Html.input
                             [ UI.formTextInputHostAdminSlugAttr
@@ -293,9 +293,9 @@ chapterSubmissionFlow =
             , ( "Submission conflict grid (2-col with preview)"
               , Html.div [ UI.submissionGridTight2ColAttr ]
                     [ Html.div []
-                        [ Html.strong [ TW.cls "text-[0.82rem] text-[var(--fg-muted)]" ] [ Html.text "Your version" ] ]
+                        [ Html.strong [ TW.cls "text-[0.8125rem] text-[var(--fg-muted)]" ] [ Html.text "Your version" ] ]
                     , Html.div []
-                        [ Html.strong [ TW.cls "text-[0.82rem] text-[var(--fg-muted)]" ] [ Html.text "Current published" ] ]
+                        [ Html.strong [ TW.cls "text-[0.8125rem] text-[var(--fg-muted)]" ] [ Html.text "Current published" ] ]
                     , Html.textarea
                         (UI.Textarea.markdownReadonlyCol1Row2 [ Attr.readonly True ])
                         [ Html.text "# My edits\n\nContent I wrote." ]

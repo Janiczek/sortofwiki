@@ -22,7 +22,7 @@ chapter_ =
             , ( "combined strip"
               , Html.div [ TW.cls "flex items-center gap-2 bg-[var(--chrome-bg)] p-2" ]
                     [ UI.MobileChrome.menuButton [ Attr.attribute "aria-expanded" "false" ]
-                    , Html.div [ TW.cls "flex-1 text-[0.75rem] text-[var(--fg-muted)]" ] [ Html.text "header row preview" ]
+                    , Html.div [ TW.cls "flex-1 text-[0.8125rem] text-[var(--fg-muted)]" ] [ Html.text "header row preview" ]
                     , UI.MobileChrome.wikiSearchRouteLink
                         [ Attr.href "/w/Demo/search" ]
                         [ Html.text "Search" ]

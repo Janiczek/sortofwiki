@@ -408,7 +408,7 @@ sidebarNavSectionBodyClass =
 
 tableBaseClass : String
 tableBaseClass =
-    "border-collapse text-[0.94rem] leading-[1.35] border-t border-b border-[var(--border)] [&_th+th]:border-l [&_th+th]:border-[var(--border-dash)] [&_td+td]:border-l [&_td+td]:border-[var(--border-dash)] [&_tbody_tr:hover]:bg-[var(--table-row-hover)]"
+    "border-collapse text-[0.8125rem] leading-[1.35] border-t border-b border-[var(--border)] [&_th+th]:border-l [&_th+th]:border-[var(--border-dash)] [&_td+td]:border-l [&_td+td]:border-[var(--border-dash)] [&_tbody_tr:hover]:bg-[var(--table-row-hover)]"
 
 
 tableAutoClass : String
@@ -1280,7 +1280,7 @@ formFieldMinW0Attr =
 
 formFieldLabelBlockAttr : Attribute msg
 formFieldLabelBlockAttr =
-    TW.cls "block text-[0.82rem] font-medium text-[var(--fg-muted)]"
+    TW.cls "block text-[0.8125rem] font-medium text-[var(--fg-muted)]"
 
 
 auditFilterTypeGroupAttr : Attribute msg
@@ -1290,7 +1290,7 @@ auditFilterTypeGroupAttr =
 
 auditFilterLegendTextAttr : Attribute msg
 auditFilterLegendTextAttr =
-    TW.cls "m-0 mb-2 text-[0.82rem] text-[var(--fg-muted)]"
+    TW.cls "m-0 mb-2 text-[0.8125rem] text-[var(--fg-muted)]"
 
 
 hostAdminWikiDetailFormStackAttr : Attribute msg
@@ -1300,17 +1300,17 @@ hostAdminWikiDetailFormStackAttr =
 
 hostAdminCardParagraphTightAttr : Attribute msg
 hostAdminCardParagraphTightAttr =
-    TW.cls "m-0 mb-1.5 text-[0.95rem] leading-[1.4] text-[var(--fg)]"
+    TW.cls "m-0 mb-1.5 text-[0.8125rem] leading-[1.4] text-[var(--fg)]"
 
 
 hostAdminStatusParaAttr : Attribute msg
 hostAdminStatusParaAttr =
-    TW.cls "m-0 mb-1.5 text-[0.95rem] leading-[1.4] text-[var(--fg)]"
+    TW.cls "m-0 mb-1.5 text-[0.8125rem] leading-[1.4] text-[var(--fg)]"
 
 
 hostAdminDangerBlurbAttr : Attribute msg
 hostAdminDangerBlurbAttr =
-    TW.cls "m-0 mb-2 text-[0.95rem] leading-[1.4] text-[var(--fg)]"
+    TW.cls "m-0 mb-2 text-[0.8125rem] leading-[1.4] text-[var(--fg)]"
 
 
 hostAdminDeleteFormStackAttr : Attribute msg
@@ -1514,7 +1514,7 @@ pageActionsSidebarStackAttr =
 
 formFeedbackRowAttr : Attribute msg
 formFeedbackRowAttr =
-    TW.cls "mb-3 text-[0.9rem] leading-[1.4] text-[var(--fg-muted)]"
+    TW.cls "mb-3 text-[0.8125rem] leading-[1.4] text-[var(--fg-muted)]"
 
 
 tagPillAttr : Bool -> Attribute msg
@@ -1579,7 +1579,7 @@ reviewDiffNewPagePreviewColShellAttr =
 
 reviewDeletePagePreviewTitleAttr : Attribute msg
 reviewDeletePagePreviewTitleAttr =
-    TW.cls "m-0 text-sm font-semibold text-[var(--fg-muted)]"
+    TW.cls "m-0 text-[0.8125rem] font-semibold text-[var(--fg-muted)]"
 
 
 reviewFieldsetAttr : Attribute msg
@@ -1624,7 +1624,7 @@ submitActionsBarAttr =
 
 submitSummaryParagraphAttr : Attribute msg
 submitSummaryParagraphAttr =
-    TW.cls "m-0 text-[0.95rem] leading-[1.45]"
+    TW.cls "m-0 text-[0.8125rem] leading-[1.45]"
 
 
 sidebarContainerAttr : Attribute msg

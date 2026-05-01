@@ -15,7 +15,7 @@ chapter_ =
             [ ( "FormActionFooter.sticky - AlignEnd"
               , Html.div
                     [ TW.cls "relative flex h-36 flex-col overflow-hidden rounded-lg border border-dashed border-[var(--border-subtle)]" ]
-                    [ Html.div [ TW.cls "min-h-0 flex-1 p-2 text-[0.85rem] text-[var(--fg-muted)]" ]
+                    [ Html.div [ TW.cls "min-h-0 flex-1 p-2 text-[0.8125rem] text-[var(--fg-muted)]" ]
                         [ Html.text "Form body; footer sticks to bottom of this box." ]
                     , UI.FormActionFooter.sticky
                         { align = UI.FormActionFooter.AlignEnd
@@ -30,12 +30,12 @@ chapter_ =
             , ( "FormActionFooter.sticky - AlignBetween"
               , Html.div
                     [ TW.cls "relative flex h-36 flex-col overflow-hidden rounded-lg border border-dashed border-[var(--border-subtle)]" ]
-                    [ Html.div [ TW.cls "min-h-0 flex-1 p-2 text-[0.85rem] text-[var(--fg-muted)]" ]
+                    [ Html.div [ TW.cls "min-h-0 flex-1 p-2 text-[0.8125rem] text-[var(--fg-muted)]" ]
                         [ Html.text "Disclaimer + actions (submit-edit pattern)." ]
                     , UI.FormActionFooter.sticky
                         { align = UI.FormActionFooter.AlignBetween
                         , left =
-                            [ Html.p [ TW.cls "m-0 max-w-[14rem] text-[0.84rem] text-[var(--fg-muted)]" ]
+                            [ Html.p [ TW.cls "m-0 max-w-[14rem] text-[0.8125rem] text-[var(--fg-muted)]" ]
                                 [ Html.text "Reviewer must approve before changes go live." ]
                             ]
                         , right =

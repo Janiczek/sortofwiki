@@ -13,7 +13,7 @@ cls utilities =
 
 {-| Prefix each whitespace-separated utility with a variant (for example `hover`, `md`).
 
-`TW.mod "hover" "bg-blue-400 text-sm"` sets `class="hover:bg-blue-400 hover:text-sm"`.
+`TW.mod "hover" "bg-blue-400 text-[0.8125rem]"` sets `class="hover:bg-blue-400 hover:text-[0.8125rem]"`.
 
 -}
 mod : String -> String -> Attribute msg

@@ -22,10 +22,10 @@ suite =
         , Test.describe "mod"
             [ Test.test "prefixes each utility" <|
                 \() ->
-                    Html.div [ TW.mod "hover" "bg-blue-400 text-sm" ] []
+                    Html.div [ TW.mod "hover" "bg-blue-400 text-[0.8125rem]" ] []
                         |> Query.fromHtml
                         |> Query.has
-                            [ Selector.classes [ "hover:bg-blue-400", "hover:text-sm" ] ]
+                            [ Selector.classes [ "hover:bg-blue-400", "hover:text-[0.8125rem]" ] ]
             , Test.test "ignores extra whitespace" <|
                 \() ->
                     Html.div [ TW.mod "md" "  w-full  h-4  " ] []
