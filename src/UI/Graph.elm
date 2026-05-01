@@ -202,23 +202,15 @@ nodeFontSize inboundCount =
     9 + (8 * inboundScale inboundCount)
 
 
-defaultGraphAttrsLines : List String
-defaultGraphAttrsLines =
-    [ "  layout=neato;"
-    , "  overlap=" ++ dotString "prism" ++ ";"
-    , "  overlap_scaling=1;"
-    , "  sep=" ++ dotString "+6" ++ ";"
-    , "  esep=" ++ dotString "+2" ++ ";"
-    , "  splines=true;"
-    , "  mode=major;"
-    , "  model=" ++ dotString "shortpath" ++ ";"
-    , "  start=" ++ dotString "random42" ++ ";"
-    , "  epsilon=0.0001;"
-    , "  maxiter=2000;"
-    , "  pad=" ++ dotString "0.2" ++ ";"
-    , "  concentrate=true;"
-    , "  bgcolor=" ++ dotString "transparent" ++ ";"
-    ]
+defaultGraphAttrs : String
+defaultGraphAttrs =
+    """
+    bgcolor="transparent";
+    layout=fdp;
+    start=random1;
+    maxiter=1200;
+    mode=major;
+    """
 
 
 defaultNodeAttrsLine : String
@@ -235,13 +227,25 @@ defaultNodeAttrsLine =
         ++ "];"
 
 
-defaultEdgeAttrsLine : String
-defaultEdgeAttrsLine =
+defaultEdgeAttrsLine : String -> String
+defaultEdgeAttrsLine graphName =
+    let
+        ( edgeLen, edgeWeight ) =
+            if graphName == "page" then
+                -- Page graph should allow longer links than wiki-wide graph.
+                ( "0.45", "6" )
+
+            else
+                ( "0.24", "14" )
+    in
     "  edge [color="
         ++ dotString "#6b7280"
         ++ ", arrowsize=0.7"
         ++ ", penwidth=0.9"
-        ++ ", len=0.9"
+        ++ ", len="
+        ++ edgeLen
+        ++ ", weight="
+        ++ edgeWeight
         ++ "];"
 
 
@@ -266,12 +270,12 @@ renderDot config =
     String.join "\n"
         (List.concat
             [ [ "digraph " ++ config.graphName ++ " {" ]
-            , defaultGraphAttrsLines
-            , [ defaultNodeAttrsLine
-              , defaultEdgeAttrsLine
+            , [ defaultGraphAttrs
+              , defaultNodeAttrsLine
+              , defaultEdgeAttrsLine config.graphName
               ]
-            , config.nodeLines
             , config.edgeLines
+            , config.nodeLines
             , [ "}" ]
             ]
         )

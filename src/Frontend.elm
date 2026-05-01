@@ -7377,7 +7377,7 @@ appHeaderTitle ({ store, route } as model) =
         Route.WikiGraph slug ->
             wikiScopeHeaderTitle store slug <|
                 \summary ->
-                    wikiLoadedHeaderTitle summary (Just (AppHeaderSecondaryPlain "Graph"))
+                    wikiLoadedHeaderTitle summary (Just (AppHeaderSecondaryPlain "Wiki Graph"))
 
         Route.WikiSearch slug ->
             wikiScopeHeaderTitle store slug <|
