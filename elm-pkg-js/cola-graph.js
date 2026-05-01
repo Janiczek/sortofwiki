@@ -1,4 +1,5 @@
 const SVG_NS = "http://www.w3.org/2000/svg";
+const XLINK_NS = "http://www.w3.org/1999/xlink";
 
 function isPrimaryUnmodifiedClick(event) {
   return (
@@ -576,14 +577,27 @@ class ColaGraphElement extends HTMLElement {
     nodes.forEach(function (node) {
       const palette = nodePalette(node, darkMode, this);
       const hoverFill = nodeHoverFill(node, darkMode, this);
+      let parsedNodeUrl = null;
+      try {
+        parsedNodeUrl = new URL(node.href, window.location.href);
+      } catch (_) {
+        parsedNodeUrl = null;
+      }
       const visualWidth = Number.isFinite(node.visualWidth)
         ? node.visualWidth
         : node.width;
       const visualHeight = Number.isFinite(node.visualHeight)
         ? node.visualHeight
         : node.height;
+      const nodeLink = document.createElementNS(SVG_NS, "a");
+      nodeLink.setAttribute("class", "node");
+      if (parsedNodeUrl) {
+        nodeLink.setAttribute("href", parsedNodeUrl.href);
+        nodeLink.setAttributeNS(XLINK_NS, "xlink:href", parsedNodeUrl.href);
+      }
+      nodeLink.setAttribute("target", "_self");
+
       const group = document.createElementNS(SVG_NS, "g");
-      group.setAttribute("class", "node");
       group.setAttribute("transform", `translate(${node.x},${node.y})`);
 
       const rect = document.createElementNS(SVG_NS, "rect");
@@ -635,28 +649,26 @@ class ColaGraphElement extends HTMLElement {
       title.textContent = node.id;
       group.appendChild(title);
 
-      group.addEventListener("click", function onNodeClick(event) {
+      nodeLink.addEventListener("click", function onNodeClick(event) {
         if (!isPrimaryUnmodifiedClick(event)) {
           return;
         }
 
-        let parsedUrl;
-        try {
-          parsedUrl = new URL(node.href, window.location.href);
-        } catch (_) {
+        if (!parsedNodeUrl) {
           return;
         }
 
-        if (!isSameOriginPathNavigation(parsedUrl)) {
+        if (!isSameOriginPathNavigation(parsedNodeUrl)) {
           return;
         }
 
         event.preventDefault();
         event.stopPropagation();
-        navigateInSpa(parsedUrl);
+        navigateInSpa(parsedNodeUrl);
       });
 
-      svg.appendChild(group);
+      nodeLink.appendChild(group);
+      svg.appendChild(nodeLink);
     });
 
     this._root.appendChild(svg);
