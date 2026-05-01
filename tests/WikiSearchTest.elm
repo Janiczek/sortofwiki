@@ -45,5 +45,28 @@ suite =
                     results
                         |> List.map .pageSlug
                         |> Expect.equal [ "Fruits" ]
+            , Test.test "matches prefix variants of indexed words" <|
+                \() ->
+                    let
+                        pages : Dict.Dict String String
+                        pages =
+                            Dict.fromList
+                                [ ( "Docs", "setting" )
+                                ]
+
+                        slugsFor : String -> List String
+                        slugsFor query =
+                            WikiSearch.search query pages
+                                |> List.map .pageSlug
+                    in
+                    [ "set", "sett", "setti", "settin", "setting" ]
+                        |> List.map slugsFor
+                        |> Expect.equal
+                            [ [ "Docs" ]
+                            , [ "Docs" ]
+                            , [ "Docs" ]
+                            , [ "Docs" ]
+                            , [ "Docs" ]
+                            ]
             ]
         ]

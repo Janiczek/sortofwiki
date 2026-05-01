@@ -2,13 +2,17 @@ module WikiSearch exposing (ResultItem, search)
 
 import Dict exposing (Dict)
 import ElmTextSearch
+import Index.Defaults
 import Page
+import Regex
 
 
 type alias SearchDoc =
     { pageSlug : Page.Slug
     , title : String
     , body : String
+    , titlePrefixes : List String
+    , bodyPrefixes : List String
     }
 
 
@@ -34,18 +38,27 @@ search rawQuery publishedPageMarkdownSources =
                         { pageSlug = pageSlug
                         , title = pageSlug
                         , body = markdown
+                        , titlePrefixes = prefixTokens pageSlug
+                        , bodyPrefixes = prefixTokens markdown
                         }
                     )
 
         index : ElmTextSearch.Index SearchDoc
         index =
-            ElmTextSearch.new
-                { ref = .pageSlug
+            ElmTextSearch.newWith
+                { indexType = "WikiSearch Prefix v1"
+                , ref = .pageSlug
                 , fields =
                     [ ( .title, 7.0 )
                     , ( .body, 1.0 )
                     ]
-                , listFields = []
+                , listFields =
+                    [ ( .titlePrefixes, 7.0 )
+                    , ( .bodyPrefixes, 1.0 )
+                    ]
+                , initialTransformFactories = Index.Defaults.defaultInitialTransformFactories
+                , transformFactories = []
+                , filterFactories = Index.Defaults.defaultFilterFactories
                 }
     in
     if String.isEmpty query then
@@ -72,3 +85,40 @@ search rawQuery publishedPageMarkdownSources =
 
                 Err _ ->
                     []
+
+
+prefixTokens : String -> List String
+prefixTokens text =
+    text
+        |> tokenize
+        |> List.concatMap tokenPrefixes
+
+
+tokenPrefixes : String -> List String
+tokenPrefixes token =
+    let
+        tokenLength : Int
+        tokenLength =
+            String.length token
+    in
+    if tokenLength < 3 then
+        [ token ]
+
+    else
+        List.range 3 tokenLength
+            |> List.map (\n -> String.left n token)
+
+
+separatorRegex : Regex.Regex
+separatorRegex =
+    Regex.fromString "[\\s\\-]+"
+        |> Maybe.withDefault Regex.never
+
+
+tokenize : String -> List String
+tokenize text =
+    text
+        |> String.trim
+        |> String.toLower
+        |> Regex.split separatorRegex
+        |> List.filter (\token -> String.length token > 0)

@@ -7544,7 +7544,7 @@ viewAppHeader model =
                                                                     ]
                                                                     [ Html.span
                                                                         [ Attr.class "block text-[0.8125rem]" ]
-                                                                        [ Html.text result.pageSlug ]
+                                                                        [ viewHighlightedText model.headerSearchQuery result.pageSlug ]
                                                                     ]
                                                                 , Html.p
                                                                     [ Attr.class "mt-0.5 mb-0 text-[0.76rem] text-[var(--fg-muted)] leading-snug" ]
@@ -12243,6 +12243,40 @@ viewSearchExcerpt excerpt =
         ]
 
 
+viewHighlightedText : String -> String -> Html Msg
+viewHighlightedText rawQuery text =
+    let
+        query : String
+        query =
+            String.trim rawQuery |> String.toLower
+
+        lowerText : String
+        lowerText =
+            String.toLower text
+    in
+    if String.isEmpty query then
+        Html.text text
+
+    else
+        case String.indexes query lowerText |> List.head of
+            Just start ->
+                let
+                    endPos : Int
+                    endPos =
+                        start + String.length query
+                in
+                Html.span []
+                    [ Html.text (String.slice 0 start text)
+                    , Html.mark
+                        [ Attr.class "bg-yellow-200 text-[inherit] px-[0.05rem] rounded-[0.1rem]" ]
+                        [ Html.text (String.slice start endPos text) ]
+                    , Html.text (String.slice endPos (String.length text) text)
+                    ]
+
+            Nothing ->
+                Html.text text
+
+
 viewWikiSearchRoute : Model -> Wiki.Slug -> Html Msg
 viewWikiSearchRoute model wikiSlug =
     case Store.get_ wikiSlug model.store.wikiDetails of
@@ -12348,7 +12382,7 @@ viewWikiSearchRoute model wikiSlug =
                                                     ]
                                                     [ UI.Link.contentLink
                                                         [ Attr.href (Wiki.publishedPageUrlPath wikiSlug result.pageSlug) ]
-                                                        [ Html.span [ Attr.class "text-[0.8125rem]" ] [ Html.text result.pageSlug ] ]
+                                                        [ Html.span [ Attr.class "text-[0.8125rem]" ] [ viewHighlightedText query result.pageSlug ] ]
                                                     , Html.p
                                                         [ Attr.class "m-0 text-[0.85rem] text-[var(--fg-muted)]" ]
                                                         [ excerptFromMarkdown query
