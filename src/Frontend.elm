@@ -5376,11 +5376,16 @@ updateFromBackend msg model =
                         | wikiUsers = Dict.remove loggedOutWiki store0.wikiUsers
                         , wikiAuditLogs = Dict.remove loggedOutWiki store0.wikiAuditLogs
                         , myPendingSubmissions = Dict.remove loggedOutWiki store0.myPendingSubmissions
+                        , submissionDetails =
+                            Dict.filter (\( w, _ ) _ -> w /= loggedOutWiki) store0.submissionDetails
+                        , reviewSubmissionDetails =
+                            Dict.filter (\( w, _ ) _ -> w /= loggedOutWiki) store0.reviewSubmissionDetails
                     }
             in
             ( { model
                 | contributorWikiSessions = Dict.remove loggedOutWiki model.contributorWikiSessions
                 , store = nextStore
+                , submissionDetailEditDraft = emptySubmissionDetailEditDraft
               }
             , navCmd
             )
@@ -6168,9 +6173,22 @@ updateFromBackend msg model =
 
                         _ ->
                             model.submissionDetailEditDraft
+
+                redirectTrustedForbiddenToReview : Command FrontendOnly ToBackend Msg
+                redirectTrustedForbiddenToReview =
+                    case result of
+                        Err Submission.DetailsForbidden ->
+                            if wikiSessionTrustedOnWiki wikiSlug model then
+                                Effect.Browser.Navigation.replaceUrl model.key (Wiki.reviewDetailUrlPath wikiSlug submissionId)
+
+                            else
+                                Command.none
+
+                        _ ->
+                            Command.none
             in
             ( { model | store = nextStore, submissionDetailEditDraft = nextSubmissionDetailEditDraft }
-            , Command.none
+            , redirectTrustedForbiddenToReview
             )
                 |> runRouteStoreActions
 
@@ -8382,6 +8400,16 @@ viewHostAdminLogin model =
                     Just lastResult ->
                         Html.div [ Attr.class "mt-3" ] [ viewHostAdminLoginFeedback lastResult ]
                 ]
+            , Html.footer [ Attr.class "mt-4 text-[0.8125rem] font-medium text-[var(--login-shell-muted)] [font-family:var(--font-ui)]" ]
+                [ Html.div [ Attr.class "px-1" ]
+                    [ Html.a
+                        [ Attr.id "host-admin-login-sortofwiki-home-link"
+                        , Attr.href Wiki.wikiListUrlPath
+                        , Attr.class "text-[var(--login-shell-link)] underline underline-offset-2 hover:text-[var(--login-shell-link-hover)]"
+                        ]
+                        [ Html.text "SortOfWiki home" ]
+                    ]
+                ]
             ]
         ]
 
@@ -9765,7 +9793,7 @@ viewRegisterLoaded wikiSlug wikiName draft currentUrl =
                     ]
                 , Html.div [ Attr.class "mt-3" ] [ viewRegisterFeedback draft.lastResult ]
                 ]
-            , Html.footer [ Attr.class "mt-4 text-[0.8125rem] text-[var(--login-shell-muted)] [font-family:var(--font-ui)]" ]
+            , Html.footer [ Attr.class "mt-4 text-[0.8125rem] font-medium text-[var(--login-shell-muted)] [font-family:var(--font-ui)]" ]
                 [ Html.div [ Attr.class "flex items-center justify-between gap-3 px-1" ]
                     [ Html.div []
                         [ Html.text "Already have an account? "
@@ -9781,6 +9809,14 @@ viewRegisterLoaded wikiSlug wikiName draft currentUrl =
                             :: UI.Link.outsideHttpAttrs currentUrl "https://github.com/janiczek/sortofwiki"
                         )
                         [ Html.text "Source" ]
+                    ]
+                , Html.div [ Attr.class "mt-3 px-1" ]
+                    [ Html.a
+                        [ Attr.id "wiki-register-wiki-home-link"
+                        , Attr.href (Wiki.wikiHomeUrlPath wikiSlug)
+                        , Attr.class "text-[var(--login-shell-link)] underline underline-offset-2 hover:text-[var(--login-shell-link-hover)]"
+                        ]
+                        [ Html.text "Back to wiki" ]
                     ]
                 ]
             ]
@@ -9880,7 +9916,7 @@ viewLoginLoaded wikiSlug wikiName draft currentUrl =
                     ]
                 , Html.div [ Attr.class "mt-3" ] [ viewLoginFeedback draft.lastResult ]
                 ]
-            , Html.footer [ Attr.class "mt-4 text-[0.8125rem] text-[var(--login-shell-muted)] [font-family:var(--font-ui)]" ]
+            , Html.footer [ Attr.class "mt-4 text-[0.8125rem] font-medium text-[var(--login-shell-muted)] [font-family:var(--font-ui)]" ]
                 [ Html.div [ Attr.class "flex items-center justify-between gap-3 px-1" ]
                     [ Html.div []
                         [ Html.text "Need an account? "
@@ -9896,6 +9932,14 @@ viewLoginLoaded wikiSlug wikiName draft currentUrl =
                             :: UI.Link.outsideHttpAttrs currentUrl "https://github.com/janiczek/sortofwiki"
                         )
                         [ Html.text "Source" ]
+                    ]
+                , Html.div [ Attr.class "mt-3 px-1" ]
+                    [ Html.a
+                        [ Attr.id "wiki-login-wiki-home-link"
+                        , Attr.href (Wiki.wikiHomeUrlPath wikiSlug)
+                        , Attr.class "text-[var(--login-shell-link)] underline underline-offset-2 hover:text-[var(--login-shell-link-hover)]"
+                        ]
+                        [ Html.text "Back to wiki" ]
                     ]
                 ]
             ]
@@ -10673,10 +10717,11 @@ viewSubmissionDetailBody :
     Wiki.Slug
     -> Url
     -> (Page.Slug -> Bool)
+    -> Bool
     -> SubmissionDetailEditDraft
     -> RemoteData () (Result Submission.DetailsError Submission.ContributorView)
     -> Html Msg
-viewSubmissionDetailBody wikiSlug currentUrl publishedSlugExists interaction remote =
+viewSubmissionDetailBody wikiSlug currentUrl publishedSlugExists viewerIsTrustedModerator interaction remote =
     case remote of
         RemoteData.NotAsked ->
             viewWikiSubmitNewLoading
@@ -10690,11 +10735,45 @@ viewSubmissionDetailBody wikiSlug currentUrl publishedSlugExists interaction rem
                 [ UI.contentParagraph [] [ Html.text "Could not load submission details." ] ]
 
         RemoteData.Success (Err e) ->
-            Html.div
-                [ Attr.id "wiki-submission-detail-error" ]
-                [ UI.contentParagraph []
-                    [ Html.text (Submission.detailsErrorToUserText e) ]
-                ]
+            case e of
+                Submission.DetailsForbidden ->
+                    if viewerIsTrustedModerator then
+                        viewWikiSubmitNewLoading
+
+                    else
+                        Html.div
+                            [ Attr.id "wiki-submission-detail-error" ]
+                            [ UI.contentParagraph []
+                                [ Html.text (Submission.detailsErrorToUserText e) ]
+                            ]
+
+                Submission.DetailsNotLoggedIn ->
+                    Html.div
+                        [ Attr.id "wiki-submission-detail-error" ]
+                        [ UI.contentParagraph []
+                            [ Html.text (Submission.detailsErrorToUserText e) ]
+                        ]
+
+                Submission.DetailsWrongWikiSession ->
+                    Html.div
+                        [ Attr.id "wiki-submission-detail-error" ]
+                        [ UI.contentParagraph []
+                            [ Html.text (Submission.detailsErrorToUserText e) ]
+                        ]
+
+                Submission.DetailsWikiInactive ->
+                    Html.div
+                        [ Attr.id "wiki-submission-detail-error" ]
+                        [ UI.contentParagraph []
+                            [ Html.text (Submission.detailsErrorToUserText e) ]
+                        ]
+
+                Submission.DetailsNotFound ->
+                    Html.div
+                        [ Attr.id "wiki-submission-detail-error" ]
+                        [ UI.contentParagraph []
+                            [ Html.text (Submission.detailsErrorToUserText e) ]
+                        ]
 
         RemoteData.Success (Ok detail) ->
             let
@@ -12274,20 +12353,26 @@ viewSubmissionDetailRoute : Model -> Wiki.Slug -> String -> Html Msg
 viewSubmissionDetailRoute model wikiSlug submissionId =
     case Store.get_ wikiSlug model.store.wikiDetails of
         RemoteData.Success wikiDetails ->
-            case Store.get wikiSlug model.store.wikiCatalog of
-                RemoteData.Success _ ->
-                    Html.div
-                        [ Attr.id "wiki-submission-detail-page"
-                        , Attr.attribute "data-wiki-slug" wikiSlug
-                        , Attr.attribute "data-submission-id" submissionId
-                        ]
-                        [ viewSubmissionDetailBody
-                            wikiSlug
-                            model.currentUrl
-                            (publishedSlugExistsFromWikiDetails wikiDetails)
-                            model.submissionDetailEditDraft
-                            (Store.get_ ( wikiSlug, submissionId ) model.store.submissionDetails)
-                        ]
+            case model.store.wikiCatalog of
+                RemoteData.Success catalogDict ->
+                    case Dict.get wikiSlug catalogDict of
+                        Nothing ->
+                            viewNotFound
+
+                        Just _ ->
+                            Html.div
+                                [ Attr.id "wiki-submission-detail-page"
+                                , Attr.attribute "data-wiki-slug" wikiSlug
+                                , Attr.attribute "data-submission-id" submissionId
+                                ]
+                                [ viewSubmissionDetailBody
+                                    wikiSlug
+                                    model.currentUrl
+                                    (publishedSlugExistsFromWikiDetails wikiDetails)
+                                    (wikiSessionTrustedOnWiki wikiSlug model)
+                                    model.submissionDetailEditDraft
+                                    (Store.get_ ( wikiSlug, submissionId ) model.store.submissionDetails)
+                                ]
 
                 RemoteData.Failure _ ->
                     viewNotFound

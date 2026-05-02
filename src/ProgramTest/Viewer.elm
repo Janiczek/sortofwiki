@@ -50,6 +50,7 @@ import ProgramTest.Story55_MarkdownKitchenSink as Story55
 import ProgramTest.Story56_TodosPage as Story56
 import ProgramTest.Story57_WikiGraphPage as Story57
 import ProgramTest.Story58_WikiSearch as Story58
+import ProgramTest.Story59_SubmissionDetailTrustedRedirect as Story59
 import Types exposing (ToBackend, ToFrontend)
 
 
@@ -106,6 +107,7 @@ main =
     , Story56.endToEndTests
     , Story57.endToEndTests
     , Story58.endToEndTests
+    , Story59.endToEndTests
     ]
         |> List.concat
         |> Effect.Test.viewer
