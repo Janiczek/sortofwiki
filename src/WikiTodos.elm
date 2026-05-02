@@ -1,4 +1,4 @@
-module WikiTodos exposing (MissingPageRow, Summary, TodoRow, sortMissingPagesForDisplay, summary)
+module WikiTodos exposing (MissingPageRow, Summary, TableRow, TodoRow, sortMissingPagesForDisplay, summary, tableRows)
 
 import Dict exposing (Dict)
 import Page
@@ -27,6 +27,16 @@ type alias Summary =
     }
 
 
+{-| One row in wiki /todos table: either a {TODO:…} from a page or a missing \[\[link\]\] target.
+-}
+type alias TableRow =
+    { itemText : String
+    , usedInPageSlugs : List Page.Slug
+    , maybeTodoText : Maybe String
+    , maybeMissingPageSlug : Maybe Page.Slug
+    }
+
+
 {-| Order for wiki TODOs table: more in-links first; then lexicographic order of
 sorted linker slugs (case-insensitive); then missing page slug (case-insensitive).
 -}
@@ -48,6 +58,38 @@ summary wikiSlug publishedPageMarkdownSources =
     { todos = todoRows publishedPageMarkdownSources
     , missingPages = missingPageRows wikiSlug publishedPageMarkdownSources
     }
+
+
+{-| Pre-sorted list for the wiki TODOs table (todos first, then missing pages with `sortMissingPagesForDisplay`).
+-}
+tableRows : Wiki.Slug -> Dict Page.Slug String -> List TableRow
+tableRows wikiSlug publishedPageMarkdownSources =
+    let
+        todoSummary : Summary
+        todoSummary =
+            summary wikiSlug publishedPageMarkdownSources
+    in
+    List.concat
+        [ todoSummary.todos
+            |> List.map
+                (\row ->
+                    { itemText = row.todoText
+                    , usedInPageSlugs = [ row.pageSlug ]
+                    , maybeTodoText = Just row.todoText
+                    , maybeMissingPageSlug = Nothing
+                    }
+                )
+        , todoSummary.missingPages
+            |> sortMissingPagesForDisplay
+            |> List.map
+                (\row ->
+                    { itemText = row.missingPageSlug
+                    , usedInPageSlugs = row.linkedFromPageSlugs
+                    , maybeTodoText = Nothing
+                    , maybeMissingPageSlug = Just row.missingPageSlug
+                    }
+                )
+        ]
 
 
 todoRows : Dict Page.Slug String -> List TodoRow

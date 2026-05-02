@@ -602,7 +602,7 @@ storeActions route =
             [ AskForWikiCatalog, AskForWikiFrontendDetails slug ]
 
         WikiTodos slug ->
-            [ AskForWikiCatalog, AskForWikiFrontendDetails slug ]
+            [ AskForWikiCatalog, AskForWikiFrontendDetails slug, AskForWikiTodos slug ]
 
         WikiGraph slug ->
             [ AskForWikiCatalog, AskForWikiFrontendDetails slug ]

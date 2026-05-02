@@ -49,6 +49,7 @@ import Time
 import Url exposing (Url)
 import Wiki exposing (Wiki)
 import WikiMarkdownEditorPane exposing (WikiMarkdownEditorPane)
+import WikiTodos
 import WikiAdminUsers
 import WikiAuditLog
 import WikiContributors
@@ -107,6 +108,7 @@ type alias RequestSubmissionChangesPayload =
 type ToBackend
     = RequestWikiCatalog
     | RequestWikiFrontendDetails Wiki.Slug
+    | RequestWikiTodos Wiki.Slug
     | RequestPageFrontendDetails Wiki.Slug Page.Slug
     | RequestWikiSearch Wiki.Slug String
     | RequestMyPendingSubmissions Wiki.Slug
@@ -155,6 +157,7 @@ type ToFrontend
     = WikiCatalogResponse (Dict Wiki.Slug Wiki.CatalogEntry)
     | PendingReviewCountUpdated Wiki.Slug Int
     | WikiFrontendDetailsResponse Wiki.Slug (Maybe Wiki.FrontendDetails)
+    | WikiTodosResponse Wiki.Slug (Result () (List WikiTodos.TableRow))
     | PageFrontendDetailsResponse Wiki.Slug Page.Slug (Maybe Page.FrontendDetails)
     | WikiSearchResponse Wiki.Slug String (List WikiSearch.ResultItem)
     | MyPendingSubmissionsResponse Wiki.Slug (Result Submission.MyPendingSubmissionsError (List Submission.MyPendingSubmissionListItem))
@@ -211,6 +214,7 @@ type alias BackendModel =
     , pendingReviewClients : PendingReviewCount.PendingReviewClientSets
     , wikiFrontendClients : WikiFrontendSubscription.WikiFrontendClientSets
     , wikiSearchIndexes : Dict Wiki.Slug WikiSearch.PrefixIndex
+    , wikiTodosCaches : Dict Wiki.Slug (List WikiTodos.TableRow)
     }
 
 

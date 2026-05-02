@@ -27,6 +27,7 @@ import WikiFrontendSubscription
 import WikiRole
 import WikiSearch
 import WikiUser
+import WikiTodos
 
 
 type alias Model =
@@ -72,6 +73,11 @@ applyHostedWikiSlugRename oldSlug newSlug nextWiki model =
             model.wikiSearchIndexes
                 |> Dict.remove oldSlug
                 |> Dict.insert newSlug (WikiSearch.buildPrefixIndex (Wiki.frontendDetails nextWiki).publishedPageMarkdownSources)
+        , wikiTodosCaches =
+            model.wikiTodosCaches
+                |> Dict.remove oldSlug
+                |> Dict.insert newSlug
+                    (WikiTodos.tableRows newSlug (Wiki.frontendDetails nextWiki).publishedPageMarkdownSources)
     }
 
 
@@ -91,6 +97,23 @@ withWikiSearchIndex wikiSlug wiki model =
     }
 
 
+withWikiTodosCache : Wiki.Slug -> Wiki -> Model -> Model
+withWikiTodosCache wikiSlug wiki model =
+    { model
+        | wikiTodosCaches =
+            Dict.insert wikiSlug
+                (WikiTodos.tableRows wikiSlug (Wiki.frontendDetails wiki).publishedPageMarkdownSources)
+                model.wikiTodosCaches
+    }
+
+
+withWikiSearchAndTodosCaches : Wiki.Slug -> Wiki -> Model -> Model
+withWikiSearchAndTodosCaches wikiSlug wiki model =
+    model
+        |> withWikiSearchIndex wikiSlug wiki
+        |> withWikiTodosCache wikiSlug wiki
+
+
 withRebuiltAllWikiSearchIndexes : Model -> Model
 withRebuiltAllWikiSearchIndexes model =
     { model
@@ -98,6 +121,22 @@ withRebuiltAllWikiSearchIndexes model =
             model.wikis
                 |> Dict.map (\_ wiki -> searchIndexForWiki wiki)
     }
+
+
+withRebuiltAllWikiTodosCaches : Model -> Model
+withRebuiltAllWikiTodosCaches model =
+    { model
+        | wikiTodosCaches =
+            model.wikis
+                |> Dict.map (\slug wiki -> WikiTodos.tableRows slug (Wiki.frontendDetails wiki).publishedPageMarkdownSources)
+    }
+
+
+withRebuiltAllSearchAndTodosCaches : Model -> Model
+withRebuiltAllSearchAndTodosCaches model =
+    model
+        |> withRebuiltAllWikiSearchIndexes
+        |> withRebuiltAllWikiTodosCaches
 
 
 pendingCountForWiki : Wiki.Slug -> Model -> Int
@@ -309,6 +348,7 @@ init =
       , pendingReviewClients = PendingReviewCount.emptyClientSets
       , wikiFrontendClients = WikiFrontendSubscription.emptyClientSets
       , wikiSearchIndexes = Dict.empty
+      , wikiTodosCaches = Dict.empty
       }
     , Command.none
     )
@@ -327,7 +367,7 @@ update msg model =
 (and wiki binding) before changing state. Regression coverage: `tests/BackendAuthorizationTest.elm`
 (per-message `Err` and no mutation where applicable; see program tests for backend authorization).
 
-**Public:** `RequestWikiCatalog`, `RequestWikiFrontendDetails`, `RequestPageFrontendDetails`.
+**Public:** `RequestWikiCatalog`, `RequestWikiFrontendDetails`, `RequestWikiTodos`, `RequestPageFrontendDetails`.
 **Credential setup:** `RegisterContributor`, `LoginContributor`, `LogoutContributor`, `HostAdminLogin`.
 
 Each `ToBackend` is handled after `Effect.Time.now` resolves (see `ToBackendGotTime`).
@@ -399,6 +439,45 @@ updateFromFrontendWithTime sessionId clientId msg now model =
             ( modelForResponse
             , Effect.Lamdera.sendToFrontend clientId (WikiFrontendDetailsResponse slug payload)
             )
+
+        RequestWikiTodos slug ->
+            let
+                respond : Model -> List WikiTodos.TableRow -> ( Model, Command BackendOnly ToFrontend Msg )
+                respond m rows =
+                    ( m
+                    , Effect.Lamdera.sendToFrontend clientId (WikiTodosResponse slug (Ok rows))
+                    )
+            in
+            case Dict.get slug model.wikis of
+                Nothing ->
+                    ( model
+                    , Effect.Lamdera.sendToFrontend clientId (WikiTodosResponse slug (Err ()))
+                    )
+
+                Just wiki ->
+                    if not wiki.active then
+                        ( model
+                        , Effect.Lamdera.sendToFrontend clientId (WikiTodosResponse slug (Err ()))
+                        )
+
+                    else
+                        case Dict.get slug model.wikiTodosCaches of
+                            Just rows ->
+                                respond model rows
+
+                            Nothing ->
+                                let
+                                    rows : List WikiTodos.TableRow
+                                    rows =
+                                        WikiTodos.tableRows slug (Wiki.frontendDetails wiki).publishedPageMarkdownSources
+
+                                    nextModel : Model
+                                    nextModel =
+                                        { model
+                                            | wikiTodosCaches = Dict.insert slug rows model.wikiTodosCaches
+                                        }
+                                in
+                                respond nextModel rows
 
         RequestPageFrontendDetails wikiSlug pageSlug ->
             ( model
@@ -1198,7 +1277,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                             | wikis = Dict.insert wikiSlug nextWiki model.wikis
                                                             , submissions = submissionsAfterDraftCleanup
                                                         }
-                                                            |> withWikiSearchIndex wikiSlug nextWiki
+                                                            |> withWikiSearchAndTodosCaches wikiSlug nextWiki
 
                                                     nextModel : Model
                                                     nextModel =
@@ -1320,7 +1399,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                     { model
                                                         | wikis = Dict.insert wikiSlug nextWiki model.wikis
                                                     }
-                                                        |> withWikiSearchIndex wikiSlug nextWiki
+                                                        |> withWikiSearchAndTodosCaches wikiSlug nextWiki
 
                                                 nextModel : Model
                                                 nextModel =
@@ -1530,7 +1609,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                         { model
                                                             | wikis = Dict.insert wikiSlug nextWiki model.wikis
                                                         }
-                                                            |> withWikiSearchIndex wikiSlug nextWiki
+                                                            |> withWikiSearchAndTodosCaches wikiSlug nextWiki
 
                                                     nextModel : Model
                                                     nextModel =
@@ -2244,7 +2323,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                                     | wikis = Dict.insert wikiSlug approved.wiki model.wikis
                                                                     , submissions = submissionsAfterApproval
                                                                 }
-                                                                    |> withWikiSearchIndex wikiSlug approved.wiki
+                                                                    |> withWikiSearchAndTodosCaches wikiSlug approved.wiki
 
                                                             nextModel : Model
                                                             nextModel =
@@ -2556,7 +2635,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                 modelWithWiki : Model
                                                 modelWithWiki =
                                                     { model | wikis = Dict.insert slug wiki model.wikis }
-                                                        |> withWikiSearchIndex slug wiki
+                                                        |> withWikiSearchAndTodosCaches slug wiki
                                             in
                                             case
                                                 WikiContributors.seedAdminContributorAtWiki
@@ -2672,7 +2751,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                         nextModel : Model
                                                         nextModel =
                                                             { model | wikis = Dict.insert wikiSlug nextWiki model.wikis }
-                                                                |> withWikiSearchIndex wikiSlug nextWiki
+                                                                |> withWikiSearchAndTodosCaches wikiSlug nextWiki
                                                     in
                                                     ( nextModel
                                                     , Effect.Lamdera.sendToFrontend clientId
@@ -2723,7 +2802,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                             nextModel : Model
                             nextModel =
                                 { model | wikis = Dict.insert wikiSlug nextWiki model.wikis }
-                                    |> withWikiSearchIndex wikiSlug nextWiki
+                                    |> withWikiSearchAndTodosCaches wikiSlug nextWiki
                         in
                         ( nextModel
                         , Effect.Lamdera.sendToFrontend clientId
@@ -2760,7 +2839,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                             nextModel : Model
                             nextModel =
                                 { model | wikis = Dict.insert wikiSlug nextWiki model.wikis }
-                                    |> withWikiSearchIndex wikiSlug nextWiki
+                                    |> withWikiSearchAndTodosCaches wikiSlug nextWiki
                         in
                         ( nextModel
                         , Effect.Lamdera.sendToFrontend clientId
@@ -2867,7 +2946,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                             nextModel : Model
                             nextModel =
                                 BackendDataExport.applySnapshotToBackendModel snap model.hostSessions
-                                    |> withRebuiltAllWikiSearchIndexes
+                                    |> withRebuiltAllSearchAndTodosCaches
                         in
                         ( nextModel
                         , Effect.Lamdera.sendToFrontend clientId (HostAdminDataImportResponse (Ok ()))
@@ -2947,7 +3026,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                         let
                                             rebuiltModel : Model
                                             rebuiltModel =
-                                                withRebuiltAllWikiSearchIndexes nextModel
+                                                withRebuiltAllSearchAndTodosCaches nextModel
                                         in
                                         ( rebuiltModel
                                         , Command.batch
@@ -2997,7 +3076,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                 let
                                     rebuiltModel : Model
                                     rebuiltModel =
-                                        withRebuiltAllWikiSearchIndexes nextModel
+                                        withRebuiltAllSearchAndTodosCaches nextModel
                                 in
                                 ( rebuiltModel
                                 , Command.batch

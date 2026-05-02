@@ -1,7 +1,108 @@
 const SVG_NS = "http://www.w3.org/2000/svg";
 const XLINK_NS = "http://www.w3.org/1999/xlink";
 
-const LAYOUT_MAX_TICKS = 100;
+/** ParaGraphL iterations (GPU layout seed before Cola); wiki graph only. */
+const PARAGRAPHL_LAYOUT_TICKS = 100;
+
+/** Cola refinement ticks after ParaGraphL seeds positions (wiki graph). */
+const COLA_LAYOUT_TICKS = 5;
+
+/** Cola ticks for page graph — circle seed, no ParaGraphL. */
+const PAGE_GRAPH_COLA_TICKS = 10;
+
+function layoutNodesOnCircle(nodes) {
+  const n = nodes.length;
+  const radius = 80 + n * 6;
+  nodes.forEach(function (node, i) {
+    const a = (2 * Math.PI * i) / Math.max(n, 1);
+    node.x = Math.cos(a) * radius;
+    node.y = Math.sin(a) * radius;
+  });
+}
+
+/**
+ * ParaGraphL FR coordinates can sit in a tiny numeric range on large graphs;
+ * center and scale so the bbox has a minimum span (roughly Cola-like spread).
+ * Identical coordinates cannot be fixed by scaling — use a circle fallback.
+ */
+function colaLinkDistance(graph, link) {
+  if (graph.graphName === "page") {
+    if (link.deemphasized) {
+      return 165;
+    }
+    return link.kind === "tag" ? 145 : 125;
+  }
+  if (link.deemphasized) {
+    return 145;
+  }
+  return link.kind === "tag" ? 130 : 120;
+}
+
+function normalizeLayoutSpread(nodes) {
+  if (!nodes || nodes.length === 0) {
+    return;
+  }
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  nodes.forEach(function (node) {
+    if (Number.isFinite(node.x) && Number.isFinite(node.y)) {
+      minX = Math.min(minX, node.x);
+      maxX = Math.max(maxX, node.x);
+      minY = Math.min(minY, node.y);
+      maxY = Math.max(maxY, node.y);
+    }
+  });
+  if (!Number.isFinite(minX) || !Number.isFinite(maxX)) {
+    layoutNodesOnCircle(nodes);
+    return;
+  }
+  const w = maxX - minX;
+  const h = maxY - minY;
+  const span = Math.max(w, h);
+  if (span < 1e-6) {
+    layoutNodesOnCircle(nodes);
+    return;
+  }
+  const count = nodes.length;
+  const minSpan = 140 + Math.sqrt(count) * 110 + count * 4;
+  if (span >= minSpan) {
+    return;
+  }
+  const midX = (minX + maxX) / 2;
+  const midY = (minY + maxY) / 2;
+  const scale = minSpan / span;
+  nodes.forEach(function (node) {
+    if (Number.isFinite(node.x) && Number.isFinite(node.y)) {
+      node.x = (node.x - midX) * scale;
+      node.y = (node.y - midY) * scale;
+    }
+  });
+}
+
+/**
+ * Page graph: Cola only, fixed tick budget (no progress UI).
+ * Mutates nodes in place.
+ */
+function runPageGraphColaTicks(graph, nodes, links) {
+  const colaLayout = new window.cola.Layout();
+  colaLayout
+    .nodes(nodes)
+    .links(links)
+    .linkDistance(function (link) {
+      return colaLinkDistance(graph, link);
+    })
+    .avoidOverlaps(true)
+    .start(90, 0, 0, 0, false);
+  let t = 0;
+  while (t < PAGE_GRAPH_COLA_TICKS) {
+    if (colaLayout.tick()) {
+      break;
+    }
+    t += 1;
+  }
+}
 
 function isPrimaryUnmodifiedClick(event) {
   return (
@@ -552,6 +653,8 @@ function createLayoutProgressUI(maxTicks) {
 }
 
 function appendGraphSvgToColaHost(host, graph, nodes, links, darkMode) {
+  normalizeLayoutSpread(nodes);
+
   const positionedNodes = nodes.filter(function (node) {
     return Number.isFinite(node.x) && Number.isFinite(node.y);
   });
@@ -969,34 +1072,47 @@ class ColaGraphElement extends HTMLElement {
     }
 
     if (!usedCachedLayout) {
-      if (!window.cola || !window.cola.Layout) {
+      if (graph.graphName === "page") {
+        if (!window.cola || !window.cola.Layout) {
+          const message = document.createElement("div");
+          message.textContent = "Cola layout unavailable.";
+          this._root.appendChild(message);
+          return;
+        }
+        layoutNodesOnCircle(nodes);
+        runPageGraphColaTicks(graph, nodes, links);
+        appendGraphSvgToColaHost(this, graph, nodes, links, darkMode);
+        return;
+      }
+
+      if (!window.paraGraphLLayoutBegin) {
         const message = document.createElement("div");
-        message.textContent = "Cola layout unavailable.";
+        message.textContent = "ParaGraphL layout unavailable.";
         this._root.appendChild(message);
         return;
       }
 
-      const layout = new window.cola.Layout();
-      layout
-        .nodes(nodes)
-        .links(links)
-        .linkDistance(function (link) {
-          if (graph.graphName === "page") {
-            if (link.deemphasized) {
-              return 165;
-            }
-            return link.kind === "tag" ? 145 : 125;
-          }
+      const layoutTickBudget = PARAGRAPHL_LAYOUT_TICKS;
+      const progressTotal = layoutTickBudget + COLA_LAYOUT_TICKS;
 
-          if (link.deemphasized) {
-            return 145;
-          }
-          return link.kind === "tag" ? 130 : 120;
-        })
-        .avoidOverlaps(true)
-        .start(90, 0, 0, 0, false);
+      const layoutRunner = window.paraGraphLLayoutBegin({
+        nodes: nodes,
+        links: links,
+        iterations: layoutTickBudget,
+        gravity: 10,
+        speed: 0.1,
+        autoArea: true,
+      });
 
-      const progressUI = createLayoutProgressUI(LAYOUT_MAX_TICKS);
+      if (!layoutRunner.ok) {
+        const message = document.createElement("div");
+        message.textContent =
+          layoutRunner.reason || "ParaGraphL layout failed.";
+        this._root.appendChild(message);
+        return;
+      }
+
+      const progressUI = createLayoutProgressUI(progressTotal);
       this._root.appendChild(progressUI.root);
       progressUI.setTickIndex(0);
 
@@ -1007,25 +1123,71 @@ class ColaGraphElement extends HTMLElement {
         if (layoutGeneration !== host._layoutGeneration) {
           return;
         }
-        progressUI.setTickIndex(LAYOUT_MAX_TICKS);
+        progressUI.setTickIndex(progressTotal);
         progressUI.remove();
+        appendGraphSvgToColaHost(host, graph, nodes, links, darkMode);
         if (cacheContext && graph.graphName === "wiki") {
           writeCachedWikiGraphPayload(cacheContext, nodes);
         }
-        appendGraphSvgToColaHost(host, graph, nodes, links, darkMode);
+      };
+
+      const runColaRefinement = function runColaRefinement() {
+        if (layoutGeneration !== host._layoutGeneration) {
+          return;
+        }
+        if (!window.cola || !window.cola.Layout) {
+          finishAfterLayout();
+          return;
+        }
+
+        const colaLayout = new window.cola.Layout();
+        colaLayout
+          .nodes(nodes)
+          .links(links)
+          .linkDistance(function (link) {
+            return colaLinkDistance(graph, link);
+          })
+          .avoidOverlaps(true)
+          .start(90, 0, 0, 0, false);
+
+        let colaTick = 0;
+
+        const colaStep = function colaStep() {
+          if (layoutGeneration !== host._layoutGeneration) {
+            return;
+          }
+          progressUI.setTickIndex(layoutTickBudget + colaTick);
+          if (colaLayout.tick()) {
+            finishAfterLayout();
+            return;
+          }
+          colaTick += 1;
+          if (colaTick >= COLA_LAYOUT_TICKS) {
+            finishAfterLayout();
+            return;
+          }
+          window.requestAnimationFrame(colaStep);
+        };
+
+        window.requestAnimationFrame(colaStep);
       };
 
       const tickStep = function tickStep() {
         if (layoutGeneration !== host._layoutGeneration) {
+          layoutRunner.dispose();
           return;
         }
-        if (tickIndex >= LAYOUT_MAX_TICKS) {
-          finishAfterLayout();
+        if (tickIndex >= layoutTickBudget) {
+          layoutRunner.dispose();
+          normalizeLayoutSpread(nodes);
+          runColaRefinement();
           return;
         }
         progressUI.setTickIndex(tickIndex);
-        if (layout.tick()) {
-          finishAfterLayout();
+        if (layoutRunner.tick()) {
+          layoutRunner.dispose();
+          normalizeLayoutSpread(nodes);
+          runColaRefinement();
           return;
         }
         tickIndex += 1;

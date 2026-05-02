@@ -138,6 +138,7 @@ applySnapshotToBackendModel snapshot keptHostSessions =
     , pendingReviewClients = PendingReviewCount.emptyClientSets
     , wikiFrontendClients = WikiFrontendSubscription.emptyClientSets
     , wikiSearchIndexes = Dict.empty
+    , wikiTodosCaches = Dict.empty
     }
 
 

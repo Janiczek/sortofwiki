@@ -112,12 +112,13 @@ suite =
                                 [ Store.AskForWikiCatalog
                                 , Store.AskForWikiFrontendDetails slug
                                 ]
-              , Test.fuzz Fuzzers.wikiSlug "storeActions WikiTodos asks catalog and details" <|
+              , Test.fuzz Fuzzers.wikiSlug "storeActions WikiTodos asks catalog, details, and todos table" <|
                     \slug ->
                         Route.storeActions (Route.WikiTodos slug)
                             |> Expect.equal
                                 [ Store.AskForWikiCatalog
                                 , Store.AskForWikiFrontendDetails slug
+                                , Store.AskForWikiTodos slug
                                 ]
               , Test.fuzz Fuzzers.wikiSlug "storeActions WikiGraph asks catalog and details" <|
                     \slug ->

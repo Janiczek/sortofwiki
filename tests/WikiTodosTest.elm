@@ -45,6 +45,35 @@ suite =
                         |> .missingPages
                         |> Expect.equal []
             ]
+        , Test.describe "tableRows"
+            [ Test.test "matches concatenated todos then sorted missing pages" <|
+                \() ->
+                    let
+                        sources =
+                            Dict.fromList
+                                [ ( "About", "{TODO: explain roles}\n\n[[TodoGap]]" )
+                                , ( "Guides", "See [[TodoGap]] and {TODO: add examples}" )
+                                ]
+                    in
+                    WikiTodos.tableRows "Demo" sources
+                        |> Expect.equal
+                            [ { itemText = "explain roles"
+                              , usedInPageSlugs = [ "About" ]
+                              , maybeTodoText = Just "explain roles"
+                              , maybeMissingPageSlug = Nothing
+                              }
+                            , { itemText = "add examples"
+                              , usedInPageSlugs = [ "Guides" ]
+                              , maybeTodoText = Just "add examples"
+                              , maybeMissingPageSlug = Nothing
+                              }
+                            , { itemText = "TodoGap"
+                              , usedInPageSlugs = [ "About", "Guides" ]
+                              , maybeTodoText = Nothing
+                              , maybeMissingPageSlug = Just "TodoGap"
+                              }
+                            ]
+            ]
         , Test.describe "sortMissingPagesForDisplay"
             [ Test.test "more in-links first" <|
                 \() ->

@@ -176,6 +176,7 @@ storeConfig : Store.Config ToBackend
 storeConfig =
     { requestWikiCatalog = RequestWikiCatalog
     , requestWikiFrontendDetails = RequestWikiFrontendDetails
+    , requestWikiTodos = RequestWikiTodos
     , requestPageFrontendDetails = RequestPageFrontendDetails
     , requestMyPendingSubmissions = RequestMyPendingSubmissions
     , requestReviewQueue = RequestReviewQueue
@@ -1834,6 +1835,7 @@ invalidateWikiPublishedCaches : Wiki.Slug -> Store -> Store
 invalidateWikiPublishedCaches wikiSlug store =
     { store
         | wikiDetails = Dict.remove wikiSlug store.wikiDetails
+        , wikiTodos = Dict.remove wikiSlug store.wikiTodos
         , publishedPages =
             store.publishedPages
                 |> Dict.filter (\( w, _ ) _ -> w /= wikiSlug)
@@ -1878,7 +1880,11 @@ afterTrustedNewPagePublishedImmediately wikiSlug payload store =
                 _ ->
                     Dict.remove wikiSlug store.wikiDetails
     in
-    { store | publishedPages = publishedPagesNext, wikiDetails = wikiDetailsNext }
+    { store
+        | publishedPages = publishedPagesNext
+        , wikiDetails = wikiDetailsNext
+        , wikiTodos = Dict.remove wikiSlug store.wikiTodos
+    }
 
 
 {-| Trusted immediate edit: extend cached wiki details with new markdown and tags for this slug (matches server `Wiki.applyPublishedMarkdownEdit`).
@@ -1907,6 +1913,8 @@ afterTrustedEditPublishedImmediately wikiSlug pageSlug edit store =
                         store.wikiDetails
                 , publishedPages =
                     Dict.remove ( wikiSlug, pageSlug ) store.publishedPages
+                , wikiTodos =
+                    Dict.remove wikiSlug store.wikiTodos
             }
 
         _ ->
@@ -4763,6 +4771,8 @@ updateFromBackend msg model =
                                 | wikiDetails =
                                     store.wikiDetails
                                         |> Dict.insert wikiSlug (RemoteData.succeed details)
+                                , wikiTodos =
+                                    Dict.remove wikiSlug store.wikiTodos
                             }
 
                         Nothing ->
@@ -4770,6 +4780,8 @@ updateFromBackend msg model =
                                 | wikiDetails =
                                     store.wikiDetails
                                         |> Dict.insert wikiSlug (RemoteData.Failure ())
+                                , wikiTodos =
+                                    Dict.remove wikiSlug store.wikiTodos
                             }
 
                 nextModel : Model
@@ -4781,6 +4793,21 @@ updateFromBackend msg model =
             in
             ( nextModel, contributorRouteRefreshCmd wikiSlug nextModel )
                 |> runRouteStoreActions
+
+        WikiTodosResponse wikiSlug result ->
+            let
+                store : Store
+                store =
+                    model.store
+
+                nextStore : Store
+                nextStore =
+                    { store
+                        | wikiTodos =
+                            Dict.insert wikiSlug (RemoteData.succeed result) store.wikiTodos
+                    }
+            in
+            ( { model | store = nextStore }, Command.none )
 
         PageFrontendDetailsResponse wikiSlug pageSlug maybeDetails ->
             let
@@ -12660,46 +12687,28 @@ viewWikiTodosRoute model wikiSlug =
                     viewNotFound
 
                 RemoteData.Success _ ->
-                    viewWikiTodosPage wikiSlug wikiDetails
+                    case Store.get_ wikiSlug model.store.wikiTodos of
+                        RemoteData.NotAsked ->
+                            viewWikiHomeLoading
+
+                        RemoteData.Loading ->
+                            viewWikiHomeLoading
+
+                        RemoteData.Failure _ ->
+                            viewWikiHomeLoading
+
+                        RemoteData.Success inner ->
+                            case inner of
+                                Err () ->
+                                    viewNotFound
+
+                                Ok rows ->
+                                    viewWikiTodosPage wikiSlug rows
 
 
-viewWikiTodosPage : Wiki.Slug -> Wiki.FrontendDetails -> Html Msg
-viewWikiTodosPage wikiSlug wikiDetails =
+viewWikiTodosPage : Wiki.Slug -> List WikiTodos.TableRow -> Html Msg
+viewWikiTodosPage wikiSlug combinedRows =
     let
-        todoSummary : WikiTodos.Summary
-        todoSummary =
-            WikiTodos.summary wikiSlug wikiDetails.publishedPageMarkdownSources
-
-        combinedRows :
-            List
-                { itemText : String
-                , usedInPageSlugs : List Page.Slug
-                , maybeTodoText : Maybe String
-                , maybeMissingPageSlug : Maybe Page.Slug
-                }
-        combinedRows =
-            List.concat
-                [ todoSummary.todos
-                    |> List.map
-                        (\row ->
-                            { itemText = row.todoText
-                            , usedInPageSlugs = [ row.pageSlug ]
-                            , maybeTodoText = Just row.todoText
-                            , maybeMissingPageSlug = Nothing
-                            }
-                        )
-                , todoSummary.missingPages
-                    |> WikiTodos.sortMissingPagesForDisplay
-                    |> List.map
-                        (\row ->
-                            { itemText = row.missingPageSlug
-                            , usedInPageSlugs = row.linkedFromPageSlugs
-                            , maybeTodoText = Nothing
-                            , maybeMissingPageSlug = Just row.missingPageSlug
-                            }
-                        )
-                ]
-
         pageLink : Page.Slug -> Html Msg
         pageLink pageSlug =
             UI.Link.contentLink

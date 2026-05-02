@@ -19,6 +19,7 @@ import SubmissionReviewDetail
 import Wiki
 import WikiAdminUsers
 import WikiAuditLog
+import WikiTodos
 
 
 {-| Client cache; survives route changes.
@@ -40,6 +41,8 @@ type alias Store =
         Dict Wiki.Slug (RemoteData () (Result WikiAdminUsers.Error (List WikiAdminUsers.ListedUser)))
     , wikiAuditLogs :
         Dict Wiki.Slug (Dict String (RemoteData () (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent))))
+    , wikiTodos :
+        Dict Wiki.Slug (RemoteData () (Result () (List WikiTodos.TableRow)))
     }
 
 
@@ -54,6 +57,7 @@ type Action
     | AskForWikiAuditLog Wiki.Slug WikiAuditLog.AuditLogFilter
     | RefreshWikiAuditLog Wiki.Slug WikiAuditLog.AuditLogFilter
     | AskForSubmissionDetails Wiki.Slug String
+    | AskForWikiTodos Wiki.Slug
 
 
 empty : Store
@@ -67,6 +71,7 @@ empty =
     , reviewSubmissionDetails = Dict.empty
     , wikiUsers = Dict.empty
     , wikiAuditLogs = Dict.empty
+    , wikiTodos = Dict.empty
     }
 
 
@@ -80,6 +85,7 @@ type alias Config toBackend =
     , requestWikiUsers : Wiki.Slug -> toBackend
     , requestWikiAuditLog : Wiki.Slug -> WikiAuditLog.AuditLogFilter -> toBackend
     , requestSubmissionDetails : Wiki.Slug -> String -> toBackend
+    , requestWikiTodos : Wiki.Slug -> toBackend
     }
 
 
@@ -117,6 +123,33 @@ perform config action store =
                     ( { store | wikiDetails = Dict.insert slug Loading store.wikiDetails }
                     , Effect.Lamdera.sendToBackend (config.requestWikiFrontendDetails slug)
                     )
+
+        AskForWikiTodos wikiSlug ->
+            let
+                startLoad : ( Store, Command FrontendOnly toBackend msg )
+                startLoad =
+                    ( { store
+                        | wikiTodos =
+                            Dict.insert wikiSlug Loading store.wikiTodos
+                      }
+                    , Effect.Lamdera.sendToBackend (config.requestWikiTodos wikiSlug)
+                    )
+            in
+            case Dict.get wikiSlug store.wikiTodos |> join of
+                Success (Ok _) ->
+                    ( store, Command.none )
+
+                Success (Err _) ->
+                    startLoad
+
+                Loading ->
+                    ( store, Command.none )
+
+                Failure _ ->
+                    startLoad
+
+                NotAsked ->
+                    startLoad
 
         AskForPageFrontendDetails wikiSlug pageSlug ->
             let
