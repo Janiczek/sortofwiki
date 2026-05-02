@@ -1397,6 +1397,7 @@ init url key =
             { key = key
             , colorThemePreference = ColorTheme.Fixed ColorTheme.Light
             , systemColorTheme = ColorTheme.Light
+            , currentUrl = url
             , route = Route.WikiList
             , store = Store.empty
             , contributorWikiSessions = Dict.empty
@@ -1462,6 +1463,7 @@ init url key =
             { key = key
             , colorThemePreference = ColorTheme.Fixed ColorTheme.Light
             , systemColorTheme = ColorTheme.Light
+            , currentUrl = url
             , route = route
             , store = Store.empty
             , contributorWikiSessions = Dict.empty
@@ -2077,7 +2079,8 @@ update msg model =
                 baseNext : Model
                 baseNext =
                     { model
-                        | route = route
+                        | currentUrl = url
+                        , route = route
                         , navigationFragment = url.fragment
                         , store = storeForRoute
                         , registerDraft = emptyRegisterDraft
@@ -8333,9 +8336,9 @@ viewHostAdminLogin model =
         , Html.main_
             [ Attr.class "login-shell-main" ]
             [ Html.div [ Attr.class "login-shell-brand" ]
-                [ Html.h1 [ Attr.class "m-0 text-[2.2rem] leading-[1.2] text-[var(--auth-card-heading)] [font-family:var(--font-serif)]" ]
+                [ Html.h1 [ Attr.class "m-0 text-[2.2rem] leading-[1.2] text-[var(--login-shell-heading)] [font-family:var(--font-serif)]" ]
                     [ Html.text "SortOfWiki Admin" ]
-                , Html.p [ Attr.class "m-0 text-[0.8125rem] text-[var(--auth-card-fg-muted)] [font-family:var(--font-ui)]" ]
+                , Html.p [ Attr.class "m-0 text-[0.8125rem] text-[var(--login-shell-muted)] [font-family:var(--font-ui)]" ]
                     [ Html.text "Platform administration login" ]
                 ]
             , Html.div [ Attr.class "login-shell-card" ]
@@ -9696,59 +9699,91 @@ viewLoginFeedback maybeResult =
         maybeResult
 
 
-viewRegisterLoaded : Wiki.Slug -> RegisterDraft -> Html Msg
-viewRegisterLoaded wikiSlug draft =
+viewRegisterLoaded : Wiki.Slug -> String -> RegisterDraft -> Url -> Html Msg
+viewRegisterLoaded wikiSlug wikiName draft currentUrl =
     Html.div
         [ Attr.id "wiki-register-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
-        , UI.formCenteredCardAttr
+        , Attr.class "login-shell-page"
         ]
-        [ Html.form
-            [ Attr.id "wiki-register-form"
-            , Events.onSubmit RegisterFormSubmitted
-            ]
-            [ Html.div []
-                [ UI.contentLabel [ Attr.for "wiki-register-username" ]
-                    [ Html.text "Username" ]
-                , Html.input
-                    [ Attr.id "wiki-register-username"
-                    , Attr.type_ "text"
-                    , Attr.value draft.username
-                    , Events.onInput RegisterFormUsernameChanged
-                    , Attr.disabled draft.inFlight
-                    , UI.formTextInputAttr
+        [ Html.div [ Attr.class "login-shell-bg" ] []
+        , Html.main_
+            [ Attr.class "login-shell-main" ]
+            [ Html.div [ Attr.class "login-shell-brand" ]
+                [ Html.h1 [ Attr.class "m-0 text-[2.2rem] leading-[1.2] text-[var(--login-shell-heading)] [font-family:var(--font-serif)]" ]
+                    [ Html.text wikiName ]
+                , Html.p [ Attr.class "m-0 text-[0.8125rem] text-[var(--login-shell-muted)] [font-family:var(--font-ui)]" ]
+                    [ Html.text "Create an account" ]
+                ]
+            , Html.div [ Attr.class "login-shell-card" ]
+                [ Html.form
+                    [ Attr.id "wiki-register-form"
+                    , Attr.class "flex flex-col"
+                    , Events.onSubmit RegisterFormSubmitted
                     ]
-                    []
-                ]
-            , Html.div []
-                [ UI.contentLabel [ Attr.for "wiki-register-password" ]
-                    [ Html.text "Password" ]
-                , Html.input
-                    [ Attr.id "wiki-register-password"
-                    , Attr.type_ "password"
-                    , Attr.value draft.password
-                    , Events.onInput RegisterFormPasswordChanged
-                    , Attr.disabled draft.inFlight
-                    , UI.formTextInputAttr
+                    [ Html.div [ Attr.class "mb-2" ]
+                        [ UI.contentLabel
+                            [ Attr.for "wiki-register-username"
+                            , Attr.class "ml-[0.15rem] text-[0.8125rem]"
+                            , Attr.style "color" "var(--auth-card-fg-muted)"
+                            ]
+                            [ Html.text "Username" ]
+                        , Html.input
+                            [ Attr.id "wiki-register-username"
+                            , Attr.type_ "text"
+                            , Attr.value draft.username
+                            , Events.onInput RegisterFormUsernameChanged
+                            , Attr.disabled draft.inFlight
+                            , UI.classAttr (UI.formTextInputClass ++ " w-full")
+                            ]
+                            []
+                        ]
+                    , Html.div [ Attr.class "mb-2" ]
+                        [ UI.contentLabel
+                            [ Attr.for "wiki-register-password"
+                            , Attr.class "ml-[0.15rem] text-[0.8125rem]"
+                            , Attr.style "color" "var(--auth-card-fg-muted)"
+                            ]
+                            [ Html.text "Password" ]
+                        , Html.input
+                            [ Attr.id "wiki-register-password"
+                            , Attr.type_ "password"
+                            , Attr.value draft.password
+                            , Events.onInput RegisterFormPasswordChanged
+                            , Attr.disabled draft.inFlight
+                            , UI.classAttr (UI.formTextInputClass ++ " w-full")
+                            ]
+                            []
+                        ]
+                    , UI.Button.button
+                        [ Attr.id "wiki-register-submit"
+                        , Attr.type_ "submit"
+                        , Attr.disabled draft.inFlight
+                        , Attr.class "w-full mt-1"
+                        ]
+                        [ Html.text "Create account" ]
                     ]
-                    []
+                , Html.div [ Attr.class "mt-3" ] [ viewRegisterFeedback draft.lastResult ]
                 ]
-            , UI.Button.button
-                [ Attr.id "wiki-register-submit"
-                , Attr.type_ "submit"
-                , Attr.disabled draft.inFlight
+            , Html.footer [ Attr.class "mt-4 text-[0.8125rem] text-[var(--login-shell-muted)] [font-family:var(--font-ui)]" ]
+                [ Html.div [ Attr.class "flex items-center justify-between gap-3 px-1" ]
+                    [ Html.div []
+                        [ Html.text "Already have an account? "
+                        , Html.a
+                            [ Attr.id "wiki-register-login-link"
+                            , Attr.href (Wiki.loginUrlPath wikiSlug)
+                            , Attr.class "text-[var(--login-shell-link)] underline underline-offset-2 hover:text-[var(--login-shell-link-hover)]"
+                            ]
+                            [ Html.text "Log in" ]
+                        ]
+                    , Html.a
+                        (Attr.class "text-[var(--login-shell-link)] no-underline hover:underline hover:text-[var(--login-shell-link-hover)]"
+                            :: UI.Link.outsideHttpAttrs currentUrl "https://github.com/janiczek/sortofwiki"
+                        )
+                        [ Html.text "Source" ]
+                    ]
                 ]
-                [ Html.text "Create account" ]
             ]
-        , UI.contentParagraph []
-            [ Html.text "Already have an account? "
-            , UI.Link.contentLink
-                [ Attr.id "wiki-register-login-link"
-                , Attr.href (Wiki.loginUrlPath wikiSlug)
-                ]
-                [ Html.text "Log in" ]
-            ]
-        , viewRegisterFeedback draft.lastResult
         ]
 
 
@@ -9757,8 +9792,8 @@ viewRegisterRoute model wikiSlug =
     case Store.get_ wikiSlug model.store.wikiDetails of
         RemoteData.Success _ ->
             case Store.get wikiSlug model.store.wikiCatalog of
-                RemoteData.Success _ ->
-                    viewRegisterLoaded wikiSlug model.registerDraft
+                RemoteData.Success catalogEntry ->
+                    viewRegisterLoaded wikiSlug catalogEntry.name model.registerDraft model.currentUrl
 
                 RemoteData.Failure _ ->
                     viewNotFound
@@ -9779,20 +9814,20 @@ viewRegisterRoute model wikiSlug =
             viewWikiRegisterLoading
 
 
-viewLoginLoaded : Wiki.Slug -> String -> LoginDraft -> Html Msg
-viewLoginLoaded wikiSlug wikiName draft =
+viewLoginLoaded : Wiki.Slug -> String -> LoginDraft -> Url -> Html Msg
+viewLoginLoaded wikiSlug wikiName draft currentUrl =
     Html.div
         [ Attr.id "wiki-login-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
-        , UI.formCenteredCardAttr
+        , Attr.class "login-shell-page"
         ]
         [ Html.div [ Attr.class "login-shell-bg" ] []
         , Html.main_
             [ Attr.class "login-shell-main" ]
             [ Html.div [ Attr.class "login-shell-brand" ]
-                [ Html.h1 [ Attr.class "m-0 text-[2.2rem] leading-[1.2] text-[var(--auth-card-heading)] [font-family:var(--font-serif)]" ]
+                [ Html.h1 [ Attr.class "m-0 text-[2.2rem] leading-[1.2] text-[var(--login-shell-heading)] [font-family:var(--font-serif)]" ]
                     [ Html.text wikiName ]
-                , Html.p [ Attr.class "m-0 text-[0.8125rem] text-[var(--auth-card-fg-muted)] [font-family:var(--font-ui)]" ]
+                , Html.p [ Attr.class "m-0 text-[0.8125rem] text-[var(--login-shell-muted)] [font-family:var(--font-ui)]" ]
                     [ Html.text "Part of SortOfWiki" ]
                 ]
             , Html.div [ Attr.class "login-shell-card" ]
@@ -9845,17 +9880,21 @@ viewLoginLoaded wikiSlug wikiName draft =
                     ]
                 , Html.div [ Attr.class "mt-3" ] [ viewLoginFeedback draft.lastResult ]
                 ]
-            , Html.footer [ Attr.class "mt-4 text-[0.8125rem] text-[var(--auth-card-fg-muted)] [font-family:var(--font-ui)]" ]
+            , Html.footer [ Attr.class "mt-4 text-[0.8125rem] text-[var(--login-shell-muted)] [font-family:var(--font-ui)]" ]
                 [ Html.div [ Attr.class "flex items-center justify-between gap-3 px-1" ]
                     [ Html.div []
                         [ Html.text "Need an account? "
-                        , UI.Link.subtleLink
+                        , Html.a
                             [ Attr.id "wiki-login-register-link"
                             , Attr.href (Wiki.registerUrlPath wikiSlug)
+                            , Attr.class "text-[var(--login-shell-link)] underline underline-offset-2 hover:text-[var(--login-shell-link-hover)]"
                             ]
                             [ Html.text "Register" ]
                         ]
-                    , Html.a [ Attr.class "text-[var(--link)] no-underline hover:underline", Attr.href "https://github.com/janiczek/sortofwiki" ]
+                    , Html.a
+                        (Attr.class "text-[var(--login-shell-link)] no-underline hover:underline hover:text-[var(--login-shell-link-hover)]"
+                            :: UI.Link.outsideHttpAttrs currentUrl "https://github.com/janiczek/sortofwiki"
+                        )
                         [ Html.text "Source" ]
                     ]
                 ]
@@ -9869,7 +9908,7 @@ viewLoginRoute model wikiSlug =
         RemoteData.Success _ ->
             case Store.get wikiSlug model.store.wikiCatalog of
                 RemoteData.Success catalogEntry ->
-                    viewLoginLoaded wikiSlug catalogEntry.name model.loginDraft
+                    viewLoginLoaded wikiSlug catalogEntry.name model.loginDraft model.currentUrl
 
                 RemoteData.Failure _ ->
                     viewNotFound
@@ -9950,8 +9989,8 @@ viewNewPageSubmitFeedback wikiSlug draft =
         ]
 
 
-viewSubmitNewLoaded : Wiki.Slug -> (Page.Slug -> Bool) -> Bool -> NewPageSubmitDraft -> WikiMarkdownEditorPane -> Html Msg
-viewSubmitNewLoaded wikiSlug publishedSlugExists showUntrustedContributorDisclaimer draft editorPane =
+viewSubmitNewLoaded : Wiki.Slug -> Url -> (Page.Slug -> Bool) -> Bool -> NewPageSubmitDraft -> WikiMarkdownEditorPane -> Html Msg
+viewSubmitNewLoaded wikiSlug currentUrl publishedSlugExists showUntrustedContributorDisclaimer draft editorPane =
     let
         formBusy : Bool
         formBusy =
@@ -10037,7 +10076,7 @@ viewSubmitNewLoaded wikiSlug publishedSlugExists showUntrustedContributorDisclai
                                 [ Attr.class "h-full max-h-none"
                                 , UI.markdownPreviewScrollMinFlexFullHeightAttr
                                 ]
-                                [ PageMarkdown.viewPreview "content-preview" wikiSlug publishedSlugExists draft.markdownBody ]
+                                [ PageMarkdown.viewPreview "content-preview" wikiSlug currentUrl publishedSlugExists draft.markdownBody ]
                             ]
                         ]
                     ]
@@ -10078,6 +10117,7 @@ viewSubmitNewRoute model wikiSlug =
             case Store.get wikiSlug model.store.wikiCatalog of
                 RemoteData.Success _ ->
                     viewSubmitNewLoaded wikiSlug
+                        model.currentUrl
                         (publishedSlugExistsFromWikiDetails wikiDetails)
                         (contributorLoggedInOnWikiSlug wikiSlug model && not (wikiSessionTrustedOnWiki wikiSlug model))
                         model.newPageSubmitDraft
@@ -10165,6 +10205,7 @@ viewPageEditSubmitFeedback wikiSlug pageSlug draft =
 
 viewSubmitEditLoaded :
     Wiki.Slug
+    -> Url
     -> Page.Slug
     -> Bool
     -> (Page.Slug -> Bool)
@@ -10172,7 +10213,7 @@ viewSubmitEditLoaded :
     -> PageEditSubmitDraft
     -> WikiMarkdownEditorPane
     -> Html Msg
-viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publishedSlugExists pageDetails draft editorPane =
+viewSubmitEditLoaded wikiSlug currentUrl pageSlug showUntrustedContributorDisclaimer publishedSlugExists pageDetails draft editorPane =
     let
         formBusy : Bool
         formBusy =
@@ -10239,7 +10280,7 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
                                 ++ " min-h-0 h-full flex-1 max-h-none opacity-75 px-4 pt-2"
                             )
                         ]
-                        [ PageMarkdown.viewPreview "wiki-submit-edit-original-preview" wikiSlug publishedSlugExists originalMarkdown ]
+                        [ PageMarkdown.viewPreview "wiki-submit-edit-original-preview" wikiSlug currentUrl publishedSlugExists originalMarkdown ]
                     ]
                 ]
 
@@ -10339,7 +10380,7 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
                                                     ++ " min-h-0 h-full flex-1 max-h-none px-4 pt-2"
                                                 )
                                             ]
-                                            [ PageMarkdown.viewPreview "wiki-submit-edit-new-preview" wikiSlug publishedSlugExists draft.markdownBody ]
+                                            [ PageMarkdown.viewPreview "wiki-submit-edit-new-preview" wikiSlug currentUrl publishedSlugExists draft.markdownBody ]
                                         ]
                                    ]
                             )
@@ -10424,6 +10465,7 @@ viewSubmitEditRoute model wikiSlug pageSlug =
 
                                 Just _ ->
                                     viewSubmitEditLoaded wikiSlug
+                                        model.currentUrl
                                         pageSlug
                                         (contributorLoggedInOnWikiSlug wikiSlug model && not (wikiSessionTrustedOnWiki wikiSlug model))
                                         (publishedSlugExistsFromWikiDetails wikiDetails)
@@ -10629,11 +10671,12 @@ viewSubmitDeleteRoute model wikiSlug pageSlug =
 
 viewSubmissionDetailBody :
     Wiki.Slug
+    -> Url
     -> (Page.Slug -> Bool)
     -> SubmissionDetailEditDraft
     -> RemoteData () (Result Submission.DetailsError Submission.ContributorView)
     -> Html Msg
-viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
+viewSubmissionDetailBody wikiSlug currentUrl publishedSlugExists interaction remote =
     case remote of
         RemoteData.NotAsked ->
             viewWikiSubmitNewLoading
@@ -10674,7 +10717,7 @@ viewSubmissionDetailBody wikiSlug publishedSlugExists interaction remote =
                 comparePreview previewId markdown =
                     Html.div
                         [ UI.classAttr UI.markdownPreviewScrollClass ]
-                        [ PageMarkdown.viewPreview previewId wikiSlug publishedSlugExists markdown ]
+                        [ PageMarkdown.viewPreview previewId wikiSlug currentUrl publishedSlugExists markdown ]
 
                 newPageSlugField : Html Msg
                 newPageSlugField =
@@ -11639,6 +11682,7 @@ viewWikiAdminAuditDiffRoute wikiSlug wikiDetails eventIndex model =
                 , UI.hostAdminAuditDiffPageShellAttr
                 ]
                 [ viewAuditLogDiffReadonly
+                    model.currentUrl
                     wikiSlug
                     (publishedSlugExistsFromWikiDetails wikiDetails)
                     (SubmissionReviewDetail.NewPageDiff
@@ -11656,6 +11700,7 @@ viewWikiAdminAuditDiffRoute wikiSlug wikiDetails eventIndex model =
                 [ UI.contentParagraph []
                     [ UI.Link.subtleLink [ Attr.href (Wiki.adminAuditUrlPath wikiSlug) ] [ Html.text "Back to audit log" ] ]
                 , viewAuditLogDiffReadonly
+                    model.currentUrl
                     wikiSlug
                     (publishedSlugExistsFromWikiDetails wikiDetails)
                     (SubmissionReviewDetail.EditPageDiff diffBody)
@@ -11693,6 +11738,7 @@ viewHostAdminAuditDiffRoute eventIndex model =
                 , UI.hostAdminAuditDiffPageShellAttr
                 ]
                 [ viewAuditLogDiffReadonly
+                    model.currentUrl
                     wikiSlug
                     publishedSlugExists
                     (SubmissionReviewDetail.NewPageDiff
@@ -11718,6 +11764,7 @@ viewHostAdminAuditDiffRoute eventIndex model =
                 , UI.hostAdminAuditDiffPageShellAttr
                 ]
                 [ viewAuditLogDiffReadonly
+                    model.currentUrl
                     wikiSlug
                     publishedSlugExists
                     (SubmissionReviewDetail.EditPageDiff diffBody)
@@ -11733,22 +11780,23 @@ viewHostAdminAuditDiffRoute eventIndex model =
 
 viewSubmissionReviewDiff :
     Wiki.Slug
+    -> Url
     -> (Page.Slug -> Bool)
     -> SubmissionReviewDetail.SubmissionReviewDetail
     -> Html Msg
-viewSubmissionReviewDiff wikiSlug publishedSlugExists detail =
+viewSubmissionReviewDiff wikiSlug currentUrl publishedSlugExists detail =
     let
         reviewPreview : String -> String -> Html Msg
         reviewPreview previewId markdown =
             Html.div
                 [ UI.classAttr UI.markdownPreviewScrollClass ]
-                [ PageMarkdown.viewPreview previewId wikiSlug publishedSlugExists markdown ]
+                [ PageMarkdown.viewPreview previewId wikiSlug currentUrl publishedSlugExists markdown ]
 
         reviewPreviewInDiffCell : String -> String -> Html Msg
         reviewPreviewInDiffCell previewId markdown =
             Html.div
                 [ UI.markdownPreviewScrollMinFlexFullHeightAttr ]
-                [ PageMarkdown.viewPreview previewId wikiSlug publishedSlugExists markdown ]
+                [ PageMarkdown.viewPreview previewId wikiSlug currentUrl publishedSlugExists markdown ]
 
         reviewReadonlyTextarea : String -> String -> List (Attribute Msg) -> Html Msg
         reviewReadonlyTextarea elementId markdown extraAttrs =
@@ -11837,11 +11885,12 @@ viewSubmissionReviewDiff wikiSlug publishedSlugExists detail =
 
 
 viewAuditLogDiffReadonly :
-    Wiki.Slug
+    Url
+    -> Wiki.Slug
     -> (Page.Slug -> Bool)
     -> SubmissionReviewDetail.SubmissionReviewDetail
     -> Html Msg
-viewAuditLogDiffReadonly wikiSlug publishedSlugExists detail =
+viewAuditLogDiffReadonly currentUrl wikiSlug publishedSlugExists detail =
     let
         readonlyTextarea : String -> String -> String -> Html Msg
         readonlyTextarea elementId markdown extraClass =
@@ -11868,7 +11917,7 @@ viewAuditLogDiffReadonly wikiSlug publishedSlugExists detail =
                 , UI.markdownPreviewScrollMinFlexFullHeightAttr
                 , Attr.class "px-4 pt-2"
                 ]
-                [ PageMarkdown.viewPreview previewId wikiSlug publishedSlugExists markdown ]
+                [ PageMarkdown.viewPreview previewId wikiSlug currentUrl publishedSlugExists markdown ]
 
         sectionCell : String -> Html Msg -> Html Msg
         sectionCell heading body =
@@ -12009,10 +12058,11 @@ viewAuditLogDiffReadonly wikiSlug publishedSlugExists detail =
 
 viewReviewSubmissionDetailBody :
     Wiki.Slug
+    -> Url
     -> (Page.Slug -> Bool)
     -> RemoteData () (Result SubmissionReviewDetail.ReviewSubmissionDetailError SubmissionReviewDetail.SubmissionReviewDetail)
     -> Html Msg
-viewReviewSubmissionDetailBody wikiSlug publishedSlugExists remote =
+viewReviewSubmissionDetailBody wikiSlug currentUrl publishedSlugExists remote =
     case remote of
         RemoteData.NotAsked ->
             viewWikiReviewQueueLoading
@@ -12033,7 +12083,7 @@ viewReviewSubmissionDetailBody wikiSlug publishedSlugExists remote =
                 ]
 
         RemoteData.Success (Ok d) ->
-            viewSubmissionReviewDiff wikiSlug publishedSlugExists d
+            viewSubmissionReviewDiff wikiSlug currentUrl publishedSlugExists d
 
 
 viewReviewDecisionForm : Model -> Wiki.Slug -> String -> Html Msg
@@ -12195,6 +12245,7 @@ viewReviewDetailRoute model wikiSlug submissionId =
                         ]
                         [ viewReviewSubmissionDetailBody
                             wikiSlug
+                            model.currentUrl
                             (publishedSlugExistsFromWikiDetails wikiDetails)
                             (Store.get_ ( wikiSlug, submissionId ) model.store.reviewSubmissionDetails)
                         , viewReviewDecisionForm model wikiSlug submissionId
@@ -12232,6 +12283,7 @@ viewSubmissionDetailRoute model wikiSlug submissionId =
                         ]
                         [ viewSubmissionDetailBody
                             wikiSlug
+                            model.currentUrl
                             (publishedSlugExistsFromWikiDetails wikiDetails)
                             model.submissionDetailEditDraft
                             (Store.get_ ( wikiSlug, submissionId ) model.store.submissionDetails)
@@ -12593,14 +12645,14 @@ viewTaggedPagesWithTag wikiSlug taggedPageSlugs =
             ]
 
 
-viewPublishedPage : Wiki.Slug -> Page.Slug -> Page.FrontendDetails -> (Page.Slug -> Bool) -> Html Msg
-viewPublishedPage wikiSlug pageSlug pageDetails publishedSlugExists =
+viewPublishedPage : Wiki.Slug -> Page.Slug -> Page.FrontendDetails -> (Page.Slug -> Bool) -> Url -> Html Msg
+viewPublishedPage wikiSlug pageSlug pageDetails publishedSlugExists currentUrl =
     Html.div
         [ Attr.id "page-published-page"
         , Attr.attribute "data-wiki-slug" wikiSlug
         , Attr.attribute "data-page-slug" pageSlug
         ]
-        [ PageMarkdown.view wikiSlug publishedSlugExists pageDetails
+        [ PageMarkdown.view wikiSlug currentUrl publishedSlugExists pageDetails
         , viewTaggedPagesWithTag wikiSlug pageDetails.taggedPageSlugs
         ]
 
@@ -12639,7 +12691,7 @@ viewPublishedPageRoute model wikiSlug pageSlug =
                         RemoteData.Success pageDetails ->
                             case pageDetails.maybeMarkdownSource of
                                 Just _ ->
-                                    viewPublishedPage wikiSlug pageSlug pageDetails (publishedSlugExistsFromWikiDetails wikiDetails)
+                                    viewPublishedPage wikiSlug pageSlug pageDetails (publishedSlugExistsFromWikiDetails wikiDetails) model.currentUrl
 
                                 Nothing ->
                                     viewMissingPublishedPage wikiSlug
@@ -12690,7 +12742,7 @@ viewWikiTodosRoute model wikiSlug =
         RemoteData.Failure _ ->
             viewNotFound
 
-        RemoteData.Success wikiDetails ->
+        RemoteData.Success _ ->
             case Store.get wikiSlug model.store.wikiCatalog of
                 RemoteData.NotAsked ->
                     viewWikiHomeLoading
@@ -13664,6 +13716,9 @@ routeUsesAuthShell : Route -> Bool
 routeUsesAuthShell route =
     case route of
         Route.WikiLogin _ _ ->
+            True
+
+        Route.WikiRegister _ ->
             True
 
         Route.HostAdmin _ ->

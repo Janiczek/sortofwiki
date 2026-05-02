@@ -5,8 +5,9 @@ uses link destination regex that forbids raw `(` and `)` (unless angle-wrapped).
 tokenization and yield nested links. Rewriting to percent-encoded `%28` / `%29` keeps one link and matches `hrefRegex`.
 
 TODO: this will not be needed once
-https://github.com/dillonkearns/elm-markdown/pull/154 lands in a new
+<https://github.com/dillonkearns/elm-markdown/pull/154> lands in a new
 elm-markdown version.
+
 -}
 
 
@@ -23,10 +24,6 @@ wrapHelp fromIndex source =
 
         Just openAt ->
             let
-                prefix : String
-                prefix =
-                    String.left openAt source
-
                 afterOpen : String
                 afterOpen =
                     String.dropLeft (openAt + 2) source
@@ -37,6 +34,10 @@ wrapHelp fromIndex source =
 
                 Just parsed ->
                     let
+                        prefix : String
+                        prefix =
+                            String.left openAt source
+
                         writtenInner : String
                         writtenInner =
                             if parsed.needsWrap then
@@ -105,17 +106,9 @@ parseAngleBracketInner leadingWs afterWs =
 
                 Just j ->
                     let
-                        destInner : String
-                        destInner =
-                            String.left j afterLt
-
                         afterGt : String
                         afterGt =
                             String.dropLeft (j + 1) afterLt
-
-                        totalLeading : String
-                        totalLeading =
-                            leadingWs ++ innerLeading
                     in
                     case parseSuffixAfterDestination afterGt of
                         Nothing ->
@@ -123,6 +116,14 @@ parseAngleBracketInner leadingWs afterWs =
 
                         Just suffix ->
                             let
+                                destInner : String
+                                destInner =
+                                    String.left j afterLt
+
+                                totalLeading : String
+                                totalLeading =
+                                    leadingWs ++ innerLeading
+
                                 middle : String
                                 middle =
                                     totalLeading ++ "<" ++ destInner ++ ">" ++ suffix
@@ -281,11 +282,11 @@ parseSuffixTrimmed trimmed =
 
 readEscapedUntilClosingParen : String -> Maybe String
 readEscapedUntilClosingParen remaining =
-    readEscapedUntilHelpClosing remaining ""
+    readEscapedUntilHelpClosing remaining
 
 
-readEscapedUntilHelpClosing : String -> String -> Maybe String
-readEscapedUntilHelpClosing remaining acc =
+readEscapedUntilHelpClosing : String -> Maybe String
+readEscapedUntilHelpClosing remaining =
     case String.uncons remaining of
         Nothing ->
             Nothing
@@ -295,14 +296,14 @@ readEscapedUntilHelpClosing remaining acc =
                 Nothing ->
                     Nothing
 
-                Just ( c, rest2 ) ->
-                    readEscapedUntilHelpClosing rest2 (acc ++ "\\" ++ String.fromChar c)
+                Just ( _, rest2 ) ->
+                    readEscapedUntilHelpClosing rest2
 
         Just ( ')', rest ) ->
             Just rest
 
-        Just ( c, rest ) ->
-            readEscapedUntilHelpClosing rest (acc ++ String.fromChar c)
+        Just ( _, rest ) ->
+            readEscapedUntilHelpClosing rest
 
 
 readEscapedUntil : Char -> String -> Maybe ( String, String )
@@ -353,12 +354,18 @@ splitLeadingAsciiWhitespaceHelp s offset =
 
 isAsciiWhitespace : Char -> Bool
 isAsciiWhitespace c =
-    c == ' '
-        || c == '\t'
-        || c == '\n'
-        || c == '\r'
-        || c == '\u{000C}'
-        || c == '\u{000B}'
+    c
+        == ' '
+        || c
+        == '\t'
+        || c
+        == '\n'
+        || c
+        == '\u{000D}'
+        || c
+        == '\u{000C}'
+        || c
+        == '\u{000B}'
 
 
 {-| Encode literal parentheses so elm-markdown inline-link regex accepts the destination.

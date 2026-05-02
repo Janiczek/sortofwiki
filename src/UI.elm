@@ -72,11 +72,6 @@ module UI exposing
     , gridTwoColEditorStrAttr
     , headerClassForVerticalAlign
     , holyGrailLayout
-    , mobileSideNavDrawerId
-    , mobileWikiNavBackdropView
-    , mobileSideNavAsideAttrs
-    , mobileOnlySideNavAsideAttrs
-    , wikiListMobileChromeOuterAttr
     , hostAdminAuditDiffPageShellAttr
     , hostAdminAuditFiltersCardAttr
     , hostAdminAuditFiltersGridAttr
@@ -112,6 +107,7 @@ module UI exposing
     , layoutMainColumnClass
     , layoutMainColumnClassAuditFill
     , layoutMainColumnForRouteAttr
+    , mainContentPaddingAttr
     , markdownBlockQuoteAttr
     , markdownBlockQuoteClass
     , markdownCodeBlockCodeAttr
@@ -145,10 +141,13 @@ module UI exposing
     , markdownTodoClass
     , markdownUnorderedListAttr
     , markdownUnorderedListClass
-    , mainContentPaddingAttr
     , mb2Attr
     , mb3Attr
     , minW0Attr
+    , mobileOnlySideNavAsideAttrs
+    , mobileSideNavAsideAttrs
+    , mobileSideNavDrawerId
+    , mobileWikiNavBackdropView
     , mt3Mb3Attr
     , newPageEditorMarkdownPreviewCellAttr
     , newPageEditorMarkdownPreviewCellClass
@@ -163,10 +162,10 @@ module UI exposing
     , reviewRadioColumnAttr
     , reviewRadioRowAttr
     , rightRailSectionCards
-    , sideNavListAttr
-    , sideNavListClass
     , sideNavBottomSectionAttr
     , sideNavBottomSectionClass
+    , sideNavListAttr
+    , sideNavListClass
     , sideNavMainSectionAttr
     , sideNavMainSectionClass
     , sideNavNavAttr
@@ -178,10 +177,10 @@ module UI exposing
     , sidebarDesktopOnlyAttr
     , sidebarDesktopOnlyClass
     , sidebarM0Attr
+    , sidebarNavHorizontalIndentAttr
     , sidebarNavSectionBodyAttr
     , sidebarNavSectionBodyClass
     , sidebarNavSectionBodyStackAttr
-    , sidebarNavHorizontalIndentAttr
     , sidebarTocListIndentAttr
     , sidebarTocListRootAttr
     , stackAttr
@@ -224,6 +223,7 @@ module UI exposing
     , wikiCatalogCardTitleClass
     , wikiCatalogGridAttr
     , wikiCatalogGridClass
+    , wikiListMobileChromeOuterAttr
     , wikiRightRailSectionCardAttr
     , wikiRightRailSectionCardClass
     , wikiRightRailTocNudgeAttr
@@ -864,14 +864,13 @@ layoutMainColumnClass hasRightColumn trimRightPadding trimVerticalPadding =
             "min-h-0 h-full flex-1 min-w-0 overflow-y-auto overscroll-contain bg-[var(--bg)] px-[0.85rem] border-r border-[var(--border-subtle)] max-md:border-r-0 "
                 ++ verticalPaddingClass
 
-    else
-        if trimRightPadding then
-            "min-h-0 h-full flex-1 min-w-0 overflow-y-auto overscroll-contain bg-[var(--bg)] px-0 border-r-0 "
-                ++ verticalPaddingClass
+    else if trimRightPadding then
+        "min-h-0 h-full flex-1 min-w-0 overflow-y-auto overscroll-contain bg-[var(--bg)] px-0 border-r-0 "
+            ++ verticalPaddingClass
 
-        else
-            "min-h-0 h-full flex-1 min-w-0 overflow-y-auto overscroll-contain bg-[var(--bg)] pl-[0.85rem] pr-0 border-r-0 "
-                ++ verticalPaddingClass
+    else
+        "min-h-0 h-full flex-1 min-w-0 overflow-y-auto overscroll-contain bg-[var(--bg)] pl-[0.85rem] pr-0 border-r-0 "
+            ++ verticalPaddingClass
 
 
 {-| Main column when the route owns internal scrolling (audit log: filters fixed, table scrolls). Replaces outer `overflow-y-auto` with `overflow-hidden flex flex-col`.
@@ -896,14 +895,13 @@ layoutMainColumnClassAuditFill hasRightColumn trimRightPadding trimVerticalPaddi
             "min-h-0 h-full flex-1 min-w-0 flex flex-col overflow-hidden overscroll-contain bg-[var(--bg)] px-[0.85rem] border-r border-[var(--border-subtle)] max-md:border-r-0 "
                 ++ verticalPaddingClass
 
-    else
-        if trimRightPadding then
-            "min-h-0 h-full flex-1 min-w-0 flex flex-col overflow-hidden overscroll-contain bg-[var(--bg)] px-0 border-r-0 "
-                ++ verticalPaddingClass
+    else if trimRightPadding then
+        "min-h-0 h-full flex-1 min-w-0 flex flex-col overflow-hidden overscroll-contain bg-[var(--bg)] px-0 border-r-0 "
+            ++ verticalPaddingClass
 
-        else
-            "min-h-0 h-full flex-1 min-w-0 flex flex-col overflow-hidden overscroll-contain bg-[var(--bg)] pl-[0.85rem] pr-0 border-r-0 "
-                ++ verticalPaddingClass
+    else
+        "min-h-0 h-full flex-1 min-w-0 flex flex-col overflow-hidden overscroll-contain bg-[var(--bg)] pl-[0.85rem] pr-0 border-r-0 "
+            ++ verticalPaddingClass
 
 
 markdownPreviewScrollClass : String
@@ -1131,8 +1129,7 @@ wikiPageMobileRightRailSectionsWrapperAttrForJust collapsed =
         TW.cls "min-h-0 flex flex-1 flex-col max-md:hidden md:contents"
 
     else
-        {- Aside uses max-md:px-0 so Metadata row is edge-to-edge; restore inset for rail sections only on mobile.
-        -}
+        {- Aside uses max-md:px-0 so Metadata row is edge-to-edge; restore inset for rail sections only on mobile. -}
         TW.cls "min-h-0 flex flex-1 flex-col max-md:px-[0.85rem] md:contents"
 
 
@@ -1146,16 +1143,13 @@ wikiPageMobileRightRailAsideChildren wikiRail sections =
             rightRailSectionCards sections
 
         Just rail ->
-            List.concat
-                [ [ UI.WikiPageRightRailMobile.toggleRailButton
-                        { expanded = not rail.collapsed
-                        , onToggle = rail.onToggle
-                        }
-                  ]
-                , [ Html.div [ wikiPageMobileRightRailSectionsWrapperAttrForJust rail.collapsed ]
-                        (rightRailSectionCards sections)
-                  ]
-                ]
+            [ UI.WikiPageRightRailMobile.toggleRailButton
+                { expanded = not rail.collapsed
+                , onToggle = rail.onToggle
+                }
+            , Html.div [ wikiPageMobileRightRailSectionsWrapperAttrForJust rail.collapsed ]
+                (rightRailSectionCards sections)
+            ]
 
 
 rightRailSectionCards : List (Html msg) -> List (Html msg)

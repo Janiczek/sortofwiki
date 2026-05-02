@@ -13,8 +13,8 @@ import Test exposing (Test)
 import Time
 import Types exposing (ToBackend(..), ToFrontend(..))
 import Wiki
-import WikiUser
 import WikiSearch
+import WikiUser
 
 
 sessionKey : String
@@ -266,7 +266,7 @@ suite =
                         { base
                             | wikis = Dict.fromList [ ( "Demo", targetWiki ) ]
                             , wikiSearchIndexes = Dict.fromList [ ( "Demo", staleIndex ) ]
-                            , hostSessions = Set.fromList [ sessionKey ]
+                            , hostSessions = Set.singleton sessionKey
                         }
 
                     ( after, _ ) =
@@ -298,7 +298,7 @@ suite =
                         in
                         { base
                             | wikiSearchIndexes = Dict.singleton "Demo" staleIndex
-                            , hostSessions = Set.fromList [ sessionKey ]
+                            , hostSessions = Set.singleton sessionKey
                         }
 
                     ( after, _ ) =
@@ -360,7 +360,7 @@ suite =
                     model : Backend.Model
                     model =
                         { modelWithStaleSearchIndex
-                            | hostSessions = Set.fromList [ sessionKey ]
+                            | hostSessions = Set.singleton sessionKey
                         }
 
                     ( after, _ ) =
@@ -386,7 +386,7 @@ suite =
                     model : Backend.Model
                     model =
                         { modelWithStaleSearchIndex
-                            | hostSessions = Set.fromList [ sessionKey ]
+                            | hostSessions = Set.singleton sessionKey
                         }
 
                     ( after, _ ) =
@@ -405,7 +405,7 @@ suite =
                     model : Backend.Model
                     model =
                         { modelWithStaleSearchIndex
-                            | hostSessions = Set.fromList [ sessionKey ]
+                            | hostSessions = Set.singleton sessionKey
                         }
 
                     ( afterDeactivate, _ ) =
@@ -442,7 +442,7 @@ suite =
                             base =
                                 Tuple.first Backend.app_.init
                         in
-                        { base | hostSessions = Set.fromList [ sessionKey ] }
+                        { base | hostSessions = Set.singleton sessionKey }
 
                     ( after, _ ) =
                         Backend.updateFromFrontendWithTime
@@ -465,7 +465,7 @@ suite =
                             base =
                                 Tuple.first Backend.app_.init
                         in
-                        { base | hostSessions = Set.fromList [ sessionKey ] }
+                        { base | hostSessions = Set.singleton sessionKey }
 
                     ( after, _ ) =
                         Backend.updateFromFrontendWithTime

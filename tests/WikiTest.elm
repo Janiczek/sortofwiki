@@ -22,6 +22,7 @@ suite =
                             , name = "N"
                             , summary = "Blurb"
                             , active = True
+                            , contentVersion = 1
                             , pages = Dict.empty
                             }
                     in
@@ -59,6 +60,7 @@ suite =
                             , name = "A"
                             , summary = ""
                             , active = True
+                            , contentVersion = 1
                             , pages = Dict.empty
                             }
 
@@ -68,6 +70,7 @@ suite =
                             , name = "B"
                             , summary = ""
                             , active = False
+                            , contentVersion = 1
                             , pages = Dict.empty
                             }
                     in
@@ -88,6 +91,7 @@ suite =
                                 , name = "NA"
                                 , summary = ""
                                 , active = True
+                                , contentVersion = 1
                                 , pages = Dict.empty
                                 }
 
@@ -97,6 +101,7 @@ suite =
                                 , name = "NB"
                                 , summary = ""
                                 , active = False
+                                , contentVersion = 1
                                 , pages = Dict.empty
                                 }
                         in
@@ -223,6 +228,7 @@ suite =
                                     [ ( "a", [] )
                                     , ( "m", [] )
                                     ]
+                            , contentVersion = 1
                             , pendingReviewCountForTrustedViewer = Nothing
                             , viewerSession = Nothing
                             }
@@ -238,6 +244,7 @@ suite =
                             { pageSlugs = []
                             , publishedPageMarkdownSources = Dict.empty
                             , publishedPageTags = Dict.empty
+                            , contentVersion = 1
                             , pendingReviewCountForTrustedViewer = Nothing
                             , viewerSession = Nothing
                             }

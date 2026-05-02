@@ -11,6 +11,7 @@ import UI.FocusVisible
 import UI.Heading
 import UI.Link
 import Wiki
+import Url exposing (Url)
 import WikiPageMarkdownParse
 
 
@@ -19,14 +20,14 @@ Wiki links `[[page-slug]]` and `[[page-slug|label]]` in text become in-wiki link
 Headings receive GitHub-style `id` attributes so the table of contents can link to them.
 Use a distinct `containerId` when several previews appear on one page.
 -}
-viewPreview : String -> Wiki.Slug -> (Page.Slug -> Bool) -> String -> Html msg
-viewPreview containerId wikiSlug publishedSlugExists markdownSource =
+viewPreview : String -> Wiki.Slug -> Url -> (Page.Slug -> Bool) -> String -> Html msg
+viewPreview containerId wikiSlug currentUrl publishedSlugExists markdownSource =
     let
         body : List (Html msg)
         body =
             case
                 WikiPageMarkdownParse.blocksWithHeadingSlugs wikiSlug publishedSlugExists markdownSource
-                    |> Result.andThen (MarkdownRenderer.renderWithMeta htmlRendererWithHeadingIds)
+                    |> Result.andThen (MarkdownRenderer.renderWithMeta (htmlRendererWithHeadingIds currentUrl))
             of
                 Ok elements ->
                     elements
@@ -46,18 +47,18 @@ viewPreview containerId wikiSlug publishedSlugExists markdownSource =
 
 {-| Same as `viewPreview` with id `page-markdown` (published page body).
 -}
-view : Wiki.Slug -> (Page.Slug -> Bool) -> Page.FrontendDetails -> Html msg
-view wikiSlug publishedSlugExists pageDetails =
+view : Wiki.Slug -> Url -> (Page.Slug -> Bool) -> Page.FrontendDetails -> Html msg
+view wikiSlug currentUrl publishedSlugExists pageDetails =
     case pageDetails.maybeMarkdownSource of
         Just markdownSource ->
-            viewPreview "page-markdown" wikiSlug publishedSlugExists markdownSource
+            viewPreview "page-markdown" wikiSlug currentUrl publishedSlugExists markdownSource
 
         Nothing ->
             Html.text ""
 
 
-htmlRendererWithHeadingIds : Maybe String -> MarkdownRenderer.Renderer (Html msg)
-htmlRendererWithHeadingIds maybeSlug =
+htmlRendererWithHeadingIds : Url -> Maybe String -> MarkdownRenderer.Renderer (Html msg)
+htmlRendererWithHeadingIds currentUrl maybeSlug =
     let
         base : MarkdownRenderer.Renderer (Html msg)
         base =
@@ -108,8 +109,8 @@ htmlRendererWithHeadingIds maybeSlug =
 
                     _ ->
                         UI.Link.contentLink
-                            (Attr.href destination
-                                :: (title
+                            (UI.Link.outsideHttpAttrs currentUrl destination
+                                ++ (title
                                         |> Maybe.map Attr.title
                                         |> Maybe.map List.singleton
                                         |> Maybe.withDefault []

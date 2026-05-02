@@ -9,11 +9,25 @@ import ProgramTest.Query
 import Test exposing (Test)
 import Test.Html.Query
 import Test.Html.Selector
+import Url exposing (Url)
 
 
 wiki : String
 wiki =
     "Demo"
+
+
+pageMarkdownTestOrigin : Url
+pageMarkdownTestOrigin =
+    Url.fromString "http://localhost:8000/w/Demo/p/Home"
+        |> Maybe.withDefault
+            { protocol = Url.Http
+            , host = "localhost"
+            , port_ = Just 8000
+            , path = "/w/Demo/p/Home"
+            , query = Nothing
+            , fragment = Nothing
+            }
 
 
 allPagesExist : Page.Slug -> Bool
@@ -28,28 +42,28 @@ suite =
             [ Test.test "renders heading from markdown" <|
                 \() ->
                     Page.frontendDetails (Just "## Hello\n") [] [] []
-                        |> PageMarkdown.view wiki allPagesExist
+                        |> PageMarkdown.view wiki pageMarkdownTestOrigin allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "h2" ]
                         |> Test.Html.Query.has [ Test.Html.Selector.text "Hello" ]
             , Test.test "adds GitHub-style id on headings for TOC anchors" <|
                 \() ->
                     Page.frontendDetails (Just "## Hello\n") [] [] []
-                        |> PageMarkdown.view wiki allPagesExist
+                        |> PageMarkdown.view wiki pageMarkdownTestOrigin allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "h2" ]
                         |> Test.Html.Query.has [ Test.Html.Selector.attribute (Html.Attributes.id "hello") ]
             , Test.test "renders strong emphasis" <|
                 \() ->
                     Page.frontendDetails (Just "**bold**") [] [] []
-                        |> PageMarkdown.view wiki allPagesExist
+                        |> PageMarkdown.view wiki pageMarkdownTestOrigin allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "strong" ]
                         |> Test.Html.Query.has [ Test.Html.Selector.text "bold" ]
             , Test.test "renders [[page]] as same-wiki published page link" <|
                 \() ->
                     Page.frontendDetails (Just "Go to [[guides]].") [] [] []
-                        |> PageMarkdown.view wiki (\s -> String.toLower s == "guides")
+                        |> PageMarkdown.view wiki pageMarkdownTestOrigin (\s -> String.toLower s == "guides")
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "a" ]
                         |> Test.Html.Query.has
@@ -59,7 +73,7 @@ suite =
             , Test.test "renders [[slug|label]] with custom link text" <|
                 \() ->
                     Page.frontendDetails (Just "[[home|Start here]]") [] [] []
-                        |> PageMarkdown.view wiki (\s -> String.toLower s == "home")
+                        |> PageMarkdown.view wiki pageMarkdownTestOrigin (\s -> String.toLower s == "home")
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "a" ]
                         |> Test.Html.Query.has
@@ -69,14 +83,14 @@ suite =
             , Test.test "does not expand wiki link inside inline code" <|
                 \() ->
                     Page.frontendDetails (Just "Use `[[home]]` syntax.") [] [] []
-                        |> PageMarkdown.view wiki allPagesExist
+                        |> PageMarkdown.view wiki pageMarkdownTestOrigin allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "code" ]
                         |> Test.Html.Query.has [ Test.Html.Selector.text "[[home]]" ]
             , Test.test "renders TODO marker as styled inline text" <|
                 \() ->
                     Page.frontendDetails (Just "Ship {TODO: write docs} soon.") [] [] []
-                        |> PageMarkdown.view wiki allPagesExist
+                        |> PageMarkdown.view wiki pageMarkdownTestOrigin allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find
                             [ Test.Html.Selector.attribute (Html.Attributes.attribute "data-todo-text" "write docs") ]
@@ -87,7 +101,7 @@ suite =
             , Test.test "does not expand TODO marker inside inline code" <|
                 \() ->
                     Page.frontendDetails (Just "Use `{TODO: write docs}` syntax.") [] [] []
-                        |> PageMarkdown.view wiki allPagesExist
+                        |> PageMarkdown.view wiki pageMarkdownTestOrigin allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "code" ]
                         |> Test.Html.Query.has [ Test.Html.Selector.text "{TODO: write docs}" ]
@@ -98,7 +112,7 @@ suite =
                         []
                         []
                         []
-                        |> PageMarkdown.view wiki allPagesExist
+                        |> PageMarkdown.view wiki pageMarkdownTestOrigin allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "a" ]
                         |> Test.Html.Query.has
@@ -107,11 +121,20 @@ suite =
                                 (Html.Attributes.href
                                     "https://cs.wikipedia.org/wiki/Hani%C4%8Dka_%28d%C4%9Blost%C5%99eleck%C3%A1_tvrz%29"
                                 )
+                            , Test.Html.Selector.attribute (Html.Attributes.target "_blank")
+                            , Test.Html.Selector.attribute (Html.Attributes.rel "noopener noreferrer")
                             ]
+            , Test.test "same-origin absolute http link does not open in new tab" <|
+                \() ->
+                    Page.frontendDetails (Just "[stay](http://localhost:8000/w/Demo/p/Other)") [] [] []
+                        |> PageMarkdown.view wiki pageMarkdownTestOrigin allPagesExist
+                        |> Test.Html.Query.fromHtml
+                        |> Test.Html.Query.find [ Test.Html.Selector.tag "a" ]
+                        |> Test.Html.Query.hasNot [ Test.Html.Selector.attribute (Html.Attributes.target "_blank") ]
             , Test.test "renders $$...$$ as inline-equation custom element" <|
                 \() ->
                     Page.frontendDetails (Just "Inline $$x^2 + y^2$$ math.") [] [] []
-                        |> PageMarkdown.view wiki allPagesExist
+                        |> PageMarkdown.view wiki pageMarkdownTestOrigin allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find
                             [ Test.Html.Selector.tag "inline-equation"
@@ -121,7 +144,7 @@ suite =
             , Test.test "renders $$$...$$$ as block-equation custom element" <|
                 \() ->
                     Page.frontendDetails (Just "Before\n\n$$$x^2 + y^2$$$\n\nAfter") [] [] []
-                        |> PageMarkdown.view wiki allPagesExist
+                        |> PageMarkdown.view wiki pageMarkdownTestOrigin allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find
                             [ Test.Html.Selector.tag "block-equation"
@@ -131,7 +154,7 @@ suite =
             , Test.fuzz (Fuzz.map String.fromInt (Fuzz.intRange 0 999999)) "heading line with numeric title renders as h2 text" <|
                 \title ->
                     Page.frontendDetails (Just ("## " ++ title ++ "\n")) [] [] []
-                        |> PageMarkdown.view wiki allPagesExist
+                        |> PageMarkdown.view wiki pageMarkdownTestOrigin allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "h2" ]
                         |> Test.Html.Query.has [ Test.Html.Selector.text title ]
@@ -143,7 +166,7 @@ suite =
                             "pg" ++ String.fromInt n
                     in
                     Page.frontendDetails (Just ("[[" ++ slug ++ "]]")) [] [] []
-                        |> PageMarkdown.view wiki allPagesExist
+                        |> PageMarkdown.view wiki pageMarkdownTestOrigin allPagesExist
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "a" ]
                         |> Test.Html.Query.has
@@ -152,7 +175,7 @@ suite =
             , Test.test "[[missing]] uses missing-wiki-link styling when slug not published" <|
                 \() ->
                     Page.frontendDetails (Just "See [[ghost]].") [] [] []
-                        |> PageMarkdown.view wiki (\_ -> False)
+                        |> PageMarkdown.view wiki pageMarkdownTestOrigin (\_ -> False)
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "a" ]
                         |> Test.Html.Query.has
@@ -170,7 +193,7 @@ suite =
                         []
                         []
                         []
-                        |> PageMarkdown.view wiki (\slug -> List.member slug [ "AlgorithmsSkill", "CombatSkill" ])
+                        |> PageMarkdown.view wiki pageMarkdownTestOrigin (\slug -> List.member slug [ "AlgorithmsSkill", "CombatSkill" ])
                         |> Test.Html.Query.fromHtml
                         |> ProgramTest.Query.withinTag "table"
                             (ProgramTest.Query.expectAll
@@ -189,7 +212,7 @@ suite =
             [ Test.test "uses given container id" <|
                 \() ->
                     Html.div []
-                        [ PageMarkdown.viewPreview "custom-md-preview" wiki allPagesExist "# Hi\n" ]
+                        [ PageMarkdown.viewPreview "custom-md-preview" wiki pageMarkdownTestOrigin allPagesExist "# Hi\n" ]
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.id "custom-md-preview" ]
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "h1" ]

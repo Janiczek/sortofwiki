@@ -3,6 +3,7 @@ module UI.Link exposing
     , contentLink
     , listItemTight
     , missingLink
+    , outsideHttpAttrs
     , navListItem
     , navListItemMuted
     , navPrimary
@@ -11,8 +12,19 @@ module UI.Link exposing
     )
 
 import Html exposing (Attribute, Html)
+import Html.Attributes as Attr
+import MarkdownLinkTarget
 import TW
 import UI.FocusVisible
+import Url exposing (Url)
+
+
+{-| `href` plus `target`/`rel` when `href` resolves to another HTTP(S) origin than `currentUrl`.
+Use for hardcoded anchors and compose into `contentLink` / raw `Html.a` attribute lists.
+-}
+outsideHttpAttrs : Url -> String -> List (Attribute msg)
+outsideHttpAttrs currentUrl href =
+    Attr.href href :: MarkdownLinkTarget.attrsIfOutsideHttp currentUrl href
 
 
 contentLinkClass : String

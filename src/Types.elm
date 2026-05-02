@@ -368,6 +368,7 @@ type alias FrontendModel =
     { key : Effect.Browser.Navigation.Key
     , colorThemePreference : ColorThemePreference
     , systemColorTheme : ColorTheme
+    , currentUrl : Url
     , route : Route
     , navigationFragment : Maybe String
     , store : Store
