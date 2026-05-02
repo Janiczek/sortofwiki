@@ -90,7 +90,7 @@ chapter_ =
               )
             , ( "wikiRightRailSectionCardAttr (right-rail section wrapper)"
               , Html.div [ UI.wikiRightRailSectionCardAttr ]
-                    [ Html.h3 [ TW.cls "m-0 mb-1 text-[0.8125rem] font-semibold tracking-[0.04em] text-[var(--fg-muted)]" ]
+                    [ Html.h3 [ TW.cls "m-0 mb-1 text-[0.8125rem] font-semibold text-[var(--fg-muted)]" ]
                         [ Html.text "Section Card" ]
                     , Html.p [ TW.cls "m-0 text-[0.8125rem] text-[var(--fg-muted)]" ]
                         [ Html.text "Rounded card shell for right-rail ToC/tags/backlinks sections." ]

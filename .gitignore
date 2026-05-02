@@ -4,3 +4,4 @@ node_modules/
 index.html
 !book/index.html
 .cursor/hooks/x.json
+book.js

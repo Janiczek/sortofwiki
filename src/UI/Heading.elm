@@ -17,17 +17,9 @@ import Html exposing (Attribute, Html)
 import TW
 
 
-{-| Matches letter-spacing on sidebar section titles (`sidebarHeading`); reuse for ToC lines and markdown headings.
--}
-sidebarSubheadingTrackingClass : String
-sidebarSubheadingTrackingClass =
-    "tracking-[0.04em]"
-
-
 sidebarHeadingClass : String
 sidebarHeadingClass =
     "m-0 mb-[0.35rem] text-[0.8125rem] [font-family:var(--font-ui)] font-semibold "
-        ++ sidebarSubheadingTrackingClass
         ++ " text-[var(--fg-muted)]"
 
 
@@ -49,42 +41,36 @@ contentHeading2 attrs children =
 markdownHeading1Class : String
 markdownHeading1Class =
     "mt-[1.5rem] mb-[0.5rem] font-semibold leading-[1.2] first:mt-0 "
-        ++ sidebarSubheadingTrackingClass
         ++ " text-[var(--fg)] text-[2.5rem]"
 
 
 markdownHeading2Class : String
 markdownHeading2Class =
     "mt-[1.25rem] mb-[0.4rem] font-semibold leading-[1.3] first:mt-0 "
-        ++ sidebarSubheadingTrackingClass
         ++ " text-[var(--fg)] text-[2rem]"
 
 
 markdownHeading3Class : String
 markdownHeading3Class =
     "mt-[1rem] mb-[0.35rem] font-semibold leading-[1.35] first:mt-0 "
-        ++ sidebarSubheadingTrackingClass
         ++ " text-[var(--fg)] text-[1.5rem]"
 
 
 markdownHeading4Class : String
 markdownHeading4Class =
     "mt-[0.75rem] mb-[0.25rem] font-semibold leading-[1.35] first:mt-0 "
-        ++ sidebarSubheadingTrackingClass
         ++ " text-[var(--fg)] text-[1.25rem]"
 
 
 markdownHeading5Class : String
 markdownHeading5Class =
     "mt-[0.75rem] mb-[0.25rem] font-semibold leading-[1.35] first:mt-0 "
-        ++ sidebarSubheadingTrackingClass
         ++ " text-[var(--fg)] text-[1.125rem]"
 
 
 markdownHeading6Class : String
 markdownHeading6Class =
     "mt-[0.75rem] mb-[0.25rem] font-semibold leading-[1.35] first:mt-0 "
-        ++ sidebarSubheadingTrackingClass
         ++ " text-[var(--fg)] text-[1.0625rem]"
 
 
