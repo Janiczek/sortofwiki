@@ -2,7 +2,7 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 const XLINK_NS = "http://www.w3.org/1999/xlink";
 
 /** ParaGraphL iterations (GPU layout seed before Cola); wiki graph only. */
-const PARAGRAPHL_LAYOUT_TICKS = 100;
+const PARAGRAPHL_LAYOUT_TICKS = 95;
 
 /** Cola refinement ticks after ParaGraphL seeds positions (wiki graph). */
 const COLA_LAYOUT_TICKS = 5;
