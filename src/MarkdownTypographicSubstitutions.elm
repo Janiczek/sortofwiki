@@ -117,6 +117,7 @@ applySimpleSubstitutions text =
         |> String.replace "--" "–"
         |> String.replace "<-" "←"
         |> String.replace "->" "→"
+        |> String.replace "..." "…"
 
 
 applySmartQuotes : String -> String

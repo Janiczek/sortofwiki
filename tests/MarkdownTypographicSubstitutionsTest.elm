@@ -35,6 +35,12 @@ suite =
                         |> MarkdownTypographicSubstitutions.postProcessBlocksWithTypographicSubstitutions
                         |> Expect.equal
                             [ Block.Paragraph [ Block.Text "go ← then →" ] ]
+            , Test.test "replaces three dots with ellipsis character" <|
+                \() ->
+                    [ Block.Paragraph [ Block.Text "wait..." ] ]
+                        |> MarkdownTypographicSubstitutions.postProcessBlocksWithTypographicSubstitutions
+                        |> Expect.equal
+                            [ Block.Paragraph [ Block.Text "wait…" ] ]
             , Test.test "replaces straight double quotes with smart quotes" <|
                 \() ->
                     [ Block.Paragraph [ Block.Text "\"hello\" \"world\"" ] ]
@@ -55,10 +61,10 @@ suite =
                             [ Block.Paragraph [ Block.CodeSpan "a --- b -- c" ] ]
             , Test.test "does not replace arrows or quotes inside code span" <|
                 \() ->
-                    [ Block.Paragraph [ Block.CodeSpan "<- -> ' \" --- --" ] ]
+                    [ Block.Paragraph [ Block.CodeSpan "<- -> ' \" --- -- ..." ] ]
                         |> MarkdownTypographicSubstitutions.postProcessBlocksWithTypographicSubstitutions
                         |> Expect.equal
-                            [ Block.Paragraph [ Block.CodeSpan "<- -> ' \" --- --" ] ]
+                            [ Block.Paragraph [ Block.CodeSpan "<- -> ' \" --- -- ..." ] ]
             , Test.test "keeps thematic break parsed from standalone line" <|
                 \() ->
                     MarkdownParser.parse "---\n"

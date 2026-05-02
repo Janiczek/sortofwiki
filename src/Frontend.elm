@@ -10153,48 +10153,30 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
         originalMarkdown =
             pageDetails.maybeMarkdownSource |> Maybe.withDefault ""
 
-        publishedHeadingButton : Bool -> String -> Html Msg
-        publishedHeadingButton showIcon label =
-            let
-                iconNodes : List (Html Msg)
-                iconNodes =
-                    if showIcon then
-                        [ Html.span
-                            [ Attr.class
-                                ("absolute right-0 top-[-1px] inline-block text-[1rem] leading-none select-none scale-[1.5]"
-                                    ++ (if publishedRowCollapsed then
-                                            " translate-y-[-3px] translate-x-[-1px]"
-
-                                        else
-                                            " rotate-90"
-                                       )
-                                )
-                            , Attr.attribute "aria-hidden" "true"
-                            ]
-                            [ Html.text "▸" ]
-                        ]
-
-                    else
-                        []
-            in
+        publishedHeadingButton : String -> Html Msg
+        publishedHeadingButton label =
             Html.button
                 [ Attr.type_ "button"
                 , Attr.class "w-full appearance-none border-0 border-b border-[var(--border-subtle)] bg-transparent m-0 px-4 py-1 text-left leading-[1] cursor-pointer transition-colors hover:bg-[var(--chrome-bg-hover)] hover:text-[var(--fg)]"
                 , Events.onClick PageEditPublishedRowToggled
                 ]
                 [ Html.span [ Attr.class "relative inline-flex items-center -translate-y-[1px] text-[0.8125rem] font-semibold leading-tight text-[var(--fg-muted)]" ]
-                    (Html.span
-                        [ Attr.class
-                            (if showIcon then
-                                "pr-4"
-
-                             else
-                                ""
-                            )
-                        ]
+                    [ Html.span [ Attr.class "pr-4" ]
                         [ Html.text label ]
-                        :: iconNodes
-                    )
+                    , Html.span
+                        [ Attr.class
+                            ("absolute right-0 top-[-1px] inline-block text-[1rem] leading-none select-none scale-[1.5]"
+                                ++ (if publishedRowCollapsed then
+                                        " translate-y-[-3px] translate-x-[-1px]"
+
+                                    else
+                                        " rotate-90"
+                                   )
+                            )
+                        , Attr.attribute "aria-hidden" "true"
+                        ]
+                        [ Html.text "▸" ]
+                    ]
                 ]
 
         editPaneGridClass : String
@@ -10292,7 +10274,7 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
                 , contentChildren =
                     [ Html.section [ Attr.class "min-w-0 min-h-0 h-full flex-1 flex flex-col bg-[var(--input-bg)]" ]
                         [ UI.PanelHeader.view { kind = UI.PanelHeader.Primary, text = "EDITOR" }
-                        , publishedHeadingButton True "Published"
+                        , publishedHeadingButton "Published"
                         , Html.div [ Attr.class editPaneGridClass ]
                             (publishedMarkdownRow
                                 ++ [ UI.Heading.panelHeadingSecondary [ Attr.class yourEditHeadingClass ] [ Html.text "Your edit" ]
@@ -10313,7 +10295,7 @@ viewSubmitEditLoaded wikiSlug pageSlug showUntrustedContributorDisclaimer publis
                         ]
                     , Html.section [ Attr.class "min-w-0 min-h-0 h-full flex-1 flex flex-col bg-[var(--bg)]" ]
                         [ UI.PanelHeader.view { kind = UI.PanelHeader.Secondary, text = "LIVE PREVIEW" }
-                        , publishedHeadingButton False "Published preview"
+                        , publishedHeadingButton "Published preview"
                         , Html.div [ Attr.class editPaneGridClass ]
                             (publishedPreviewRow
                                 ++ [ UI.Heading.panelHeadingSecondary [ Attr.class yourPreviewHeadingClass ] [ Html.text "Your preview" ]
