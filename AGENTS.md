@@ -88,8 +88,6 @@ case bar of
 
 UI.* modules mustn't expose attributes (Tailwind class strings). They should expose `view` functions that can be used for various usages, and aren't specific to an usage.
 
-Each UI.* module needs to have its own elm-book chapter module that's referred to from book/src/Book.elm
-
 Minimize UI module (definitions, usages) in favor of UI.* modules.
 
 UI.Foo modules shouldn't import from UI at all. They should own their styles.
