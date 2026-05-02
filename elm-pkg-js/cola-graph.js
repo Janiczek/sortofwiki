@@ -1351,7 +1351,7 @@ function setupWikiGraphNavigator() {
     navigatorHost.style.position = "fixed";
     navigatorHost.style.right = Math.max(window.innerWidth - scrollRect.right + 8, 8) + "px";
     navigatorHost.style.top = Math.max(scrollRect.top + 8, 8) + "px";
-    navigatorHost.style.zIndex = "12";
+    navigatorHost.style.zIndex = "3"; // WikiGraphMinimap in UI.ZIndex
     navigatorHost.style.borderRadius = "0.625rem";
     navigatorHost.style.border = "1px solid var(--border-subtle, #8aa06a)";
     navigatorHost.style.background =

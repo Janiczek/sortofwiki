@@ -8,6 +8,7 @@ type ZIndexUsecase
     | WikiGraphMinimap
     | HeaderSearchLayer
     | HeaderSearchPopup
+    | MobileNavDrawer
 
 
 {-| Top: smaller z-index, bottom: larger z-index.
@@ -18,6 +19,7 @@ orderedUsecases =
     , AuditTableHeader
     , WikiGraphMinimap
     , HeaderSearchPopup
+    , MobileNavDrawer
     ]
 
 
