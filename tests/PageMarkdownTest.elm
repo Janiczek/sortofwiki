@@ -91,6 +91,23 @@ suite =
                         |> Test.Html.Query.fromHtml
                         |> Test.Html.Query.find [ Test.Html.Selector.tag "code" ]
                         |> Test.Html.Query.has [ Test.Html.Selector.text "{TODO: write docs}" ]
+            , Test.test "inline link URL may contain balanced parentheses (Wikipedia-style path)" <|
+                \() ->
+                    Page.frontendDetails
+                        (Just "[On Wikipedia](https://cs.wikipedia.org/wiki/Hani%C4%8Dka_(d%C4%9Blost%C5%99eleck%C3%A1_tvrz)).\n")
+                        []
+                        []
+                        []
+                        |> PageMarkdown.view wiki allPagesExist
+                        |> Test.Html.Query.fromHtml
+                        |> Test.Html.Query.find [ Test.Html.Selector.tag "a" ]
+                        |> Test.Html.Query.has
+                            [ Test.Html.Selector.text "On Wikipedia"
+                            , Test.Html.Selector.attribute
+                                (Html.Attributes.href
+                                    "https://cs.wikipedia.org/wiki/Hani%C4%8Dka_%28d%C4%9Blost%C5%99eleck%C3%A1_tvrz%29"
+                                )
+                            ]
             , Test.test "renders $$...$$ as inline-equation custom element" <|
                 \() ->
                     Page.frontendDetails (Just "Inline $$x^2 + y^2$$ math.") [] [] []

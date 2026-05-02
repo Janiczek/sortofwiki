@@ -3,6 +3,7 @@ module WikiPageMarkdownParse exposing (blocksWithHeadingSlugs)
 import Markdown.Block as Block
 import Markdown.Parser as MarkdownParser
 import MarkdownHeadingSlugs
+import MarkdownInlineLinkUrls
 import MarkdownMath
 import MarkdownTypographicSubstitutions
 import Page
@@ -17,6 +18,7 @@ blocksWithHeadingSlugs : Wiki.Slug -> (Page.Slug -> Bool) -> String -> Result St
 blocksWithHeadingSlugs wikiSlug publishedSlugExists source =
     source
         |> WikiLinkSyntax.escapeLabelPipesInWikiLinks
+        |> MarkdownInlineLinkUrls.wrapParenContainingDestinations
         |> MarkdownParser.parse
         |> Result.mapError (List.map MarkdownParser.deadEndToString >> String.join "\n")
         |> Result.map (WikiMarkdown.postProcessBlocksWithWikiLinks wikiSlug publishedSlugExists)
