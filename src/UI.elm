@@ -978,7 +978,7 @@ mobileSideNavDrawerId =
 
 mobileNavBackdropClass : String
 mobileNavBackdropClass =
-    "absolute inset-0 bg-black/35 md:hidden"
+    "absolute inset-0 bg-black/35 md:hidden " ++ UI.ZIndex.class UI.ZIndex.MobileNavDrawer
 
 
 mobileWikiNavBackdropView : msg -> Html msg
@@ -1021,7 +1021,8 @@ mobileSideNavAsideClass open =
                 "-translate-x-full "
     in
     translateClass
-        ++ "mobile-side-nav-drawer absolute left-0 top-0 bottom-0 max-md:w-fit max-md:min-w-[max(200px,50%)] max-md:max-w-[100dvw] flex flex-col min-h-0 overflow-y-auto overscroll-contain leading-[1.35] text-[var(--fg)] text-[0.8125rem] bg-[var(--chrome-bg)] border-r border-[var(--border-subtle)] py-[0.85rem] pl-[max(0.85rem,env(safe-area-inset-left))] pr-[0.65rem] pb-[env(safe-area-inset-bottom)] transition-transform duration-200 ease-out motion-reduce:transition-none motion-reduce:duration-0 shadow-[4px_0_24px_rgba(0,0,0,0.12)] md:shadow-none md:static md:inset-auto md:top-auto md:bottom-auto md:h-auto md:self-stretch md:w-[12.5rem] md:max-w-none md:translate-x-0 md:flex-shrink-0 md:overflow-y-auto md:py-[0.85rem] md:pl-[0.85rem] md:pr-0 md:pb-[0.85rem]"
+        ++ UI.ZIndex.class UI.ZIndex.MobileNavDrawer
+        ++ " mobile-side-nav-drawer absolute left-0 top-0 bottom-0 max-md:w-fit max-md:min-w-[max(200px,50%)] max-md:max-w-[100dvw] flex flex-col min-h-0 overflow-y-auto overscroll-contain leading-[1.35] text-[var(--fg)] text-[0.8125rem] bg-[var(--chrome-bg)] border-r border-[var(--border-subtle)] py-[0.85rem] pl-[max(0.85rem,env(safe-area-inset-left))] pr-[0.65rem] pb-[env(safe-area-inset-bottom)] transition-transform duration-200 ease-out motion-reduce:transition-none motion-reduce:duration-0 shadow-[4px_0_24px_rgba(0,0,0,0.12)] md:shadow-none md:static md:inset-auto md:top-auto md:bottom-auto md:h-auto md:self-stretch md:w-[12.5rem] md:max-w-none md:translate-x-0 md:flex-shrink-0 md:overflow-y-auto md:py-[0.85rem] md:pl-[0.85rem] md:pr-0 md:pb-[0.85rem]"
 
 
 wikiChromeInnerGridClass : Bool -> String
