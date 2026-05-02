@@ -234,6 +234,7 @@ import Html.Attributes as Attr
 import Html.Events as Events
 import Json.Decode
 import TW
+import UI.WikiPageRightRailMobile
 import UI.ZIndex
 
 
@@ -1063,6 +1064,7 @@ holyGrailLayout :
     , mainAttributes : List (Attribute msg)
     , mainBody : Html msg
     , rightRailSections : List (Html msg)
+    , wikiPageMobileRightRail : Maybe { collapsed : Bool, onToggle : msg }
     }
     -> Html msg
 holyGrailLayout config =
@@ -1089,12 +1091,71 @@ holyGrailLayout config =
                             []
 
                           else
-                            [ Html.aside [ sidebarContainerAttr ] (rightRailSectionCards config.rightRailSections) ]
+                            [ Html.aside [ wikiPageMobileRightRailAsideAttr config.wikiPageMobileRightRail ]
+                                (wikiPageMobileRightRailAsideChildren config.wikiPageMobileRightRail config.rightRailSections)
+                            ]
                         ]
                     )
               ]
             ]
         )
+
+
+wikiPageMobileRightRailAsideAttr : Maybe { collapsed : Bool, onToggle : msg } -> Attribute msg
+wikiPageMobileRightRailAsideAttr wikiRail =
+    case wikiRail of
+        Just rail ->
+            if rail.collapsed then
+                TW.cls
+                    (sidebarContainerClass
+                        ++ " max-md:max-h-none max-md:flex-shrink-0 max-md:overflow-visible max-md:gap-y-0 max-md:py-0 max-md:px-0"
+                    )
+
+            else
+                TW.cls
+                    (sidebarContainerClass
+                        ++ " max-md:px-0 max-md:pt-0 max-md:pb-[0.85rem]"
+                    )
+
+        Nothing ->
+            sidebarContainerAttr
+
+
+wikiPageMobileRightRailSectionsWrapperAttrForJust : Bool -> Attribute msg
+wikiPageMobileRightRailSectionsWrapperAttrForJust collapsed =
+    {- Mobile: wrapper stacks toggle + rail and handles collapsed visibility.
+       Desktop (`md:`): `contents` removes box so inner rail grid keeps `md:contents`
+       and aside `gap-y` applies between section cards unchanged.
+    -}
+    if collapsed then
+        TW.cls "min-h-0 flex flex-1 flex-col max-md:hidden md:contents"
+
+    else
+        {- Aside uses max-md:px-0 so Metadata row is edge-to-edge; restore inset for rail sections only on mobile.
+        -}
+        TW.cls "min-h-0 flex flex-1 flex-col max-md:px-[0.85rem] md:contents"
+
+
+wikiPageMobileRightRailAsideChildren :
+    Maybe { collapsed : Bool, onToggle : msg }
+    -> List (Html msg)
+    -> List (Html msg)
+wikiPageMobileRightRailAsideChildren wikiRail sections =
+    case wikiRail of
+        Nothing ->
+            rightRailSectionCards sections
+
+        Just rail ->
+            List.concat
+                [ [ UI.WikiPageRightRailMobile.toggleRailButton
+                        { expanded = not rail.collapsed
+                        , onToggle = rail.onToggle
+                        }
+                  ]
+                , [ Html.div [ wikiPageMobileRightRailSectionsWrapperAttrForJust rail.collapsed ]
+                        (rightRailSectionCards sections)
+                  ]
+                ]
 
 
 rightRailSectionCards : List (Html msg) -> List (Html msg)

@@ -380,6 +380,23 @@ publishedSlugExistsFromWikiDetails details refSlug =
     List.any (\s -> String.toLower s == String.toLower refSlug) details.pageSlugs
 
 
+wikiPageMobileRightRailCollapsedOnUrlChange : Route -> Route -> Bool -> Bool
+wikiPageMobileRightRailCollapsedOnUrlChange oldRoute newRoute previousCollapsed =
+    case ( oldRoute, newRoute ) of
+        ( Route.WikiPage oldW oldP, Route.WikiPage newW newP ) ->
+            if oldW == newW && oldP == newP then
+                previousCollapsed
+
+            else
+                False
+
+        ( _, Route.WikiPage _ _ ) ->
+            False
+
+        _ ->
+            previousCollapsed
+
+
 wikiSideNavSlugIfActive : Model -> Maybe Wiki.Slug
 wikiSideNavSlugIfActive model =
     let
@@ -1426,6 +1443,7 @@ init url key =
             , hostAdminWikiImportPendingSlug = Nothing
             , hostAdminWikisNotice = Nothing
             , sideNavOpen = False
+            , wikiPageMobileRightRailCollapsed = False
             , wikiMarkdownEditorPane = EditorWrite
             , navigationFragment = Nothing
             }
@@ -1524,6 +1542,7 @@ init url key =
             , hostAdminWikiImportPendingSlug = Nothing
             , hostAdminWikisNotice = Nothing
             , sideNavOpen = False
+            , wikiPageMobileRightRailCollapsed = False
             , wikiMarkdownEditorPane = EditorWrite
             , navigationFragment = url.fragment
             }
@@ -2198,6 +2217,8 @@ update msg model =
                         , hostAdminWikisNotice = Nothing
                         , sideNavOpen = False
                         , wikiMarkdownEditorPane = EditorWrite
+                        , wikiPageMobileRightRailCollapsed =
+                            wikiPageMobileRightRailCollapsedOnUrlChange model.route route model.wikiPageMobileRightRailCollapsed
                     }
 
                 next : Model
@@ -2796,6 +2817,18 @@ update msg model =
             ( { model | pageEditSubmitDraft = { d | publishedRowCollapsed = not d.publishedRowCollapsed } }
             , Command.none
             )
+
+        WikiPageMobileRightRailToggled ->
+            case model.route of
+                Route.WikiPage _ _ ->
+                    ( { model
+                        | wikiPageMobileRightRailCollapsed = not model.wikiPageMobileRightRailCollapsed
+                      }
+                    , Command.none
+                    )
+
+                _ ->
+                    ( model, Command.none )
 
         PageEditSubmitFormSubmitted ->
             case model.route of
@@ -13790,6 +13823,22 @@ viewMainAppBody model =
                 rightRail : { hasRightColumn : Bool, sections : List (Html Msg) }
                 rightRail =
                     viewWikiRightRail model
+
+                wikiPageMobileRightRail : Maybe { collapsed : Bool, onToggle : Msg }
+                wikiPageMobileRightRail =
+                    case model.route of
+                        Route.WikiPage _ _ ->
+                            if rightRail.hasRightColumn then
+                                Just
+                                    { collapsed = model.wikiPageMobileRightRailCollapsed
+                                    , onToggle = WikiPageMobileRightRailToggled
+                                    }
+
+                            else
+                                Nothing
+
+                        _ ->
+                            Nothing
             in
             [ viewAppHeader model
             , UI.holyGrailLayout
@@ -13809,6 +13858,7 @@ viewMainAppBody model =
                     ]
                 , mainBody = viewMainColumnBody model
                 , rightRailSections = rightRail.sections
+                , wikiPageMobileRightRail = wikiPageMobileRightRail
                 }
             ]
 

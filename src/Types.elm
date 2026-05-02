@@ -415,6 +415,7 @@ type alias FrontendModel =
     , hostAdminWikiImportPendingSlug : Maybe Wiki.Slug
     , hostAdminWikisNotice : Maybe String
     , sideNavOpen : Bool
+    , wikiPageMobileRightRailCollapsed : Bool
     , wikiMarkdownEditorPane : WikiMarkdownEditorPane
     }
 
@@ -444,6 +445,7 @@ type FrontendMsg
     | PageEditSubmitMarkdownChanged String
     | PageEditSubmitTagsChanged String
     | PageEditPublishedRowToggled
+    | WikiPageMobileRightRailToggled
     | PageEditSubmitFormSubmitted
     | PageDeleteSubmitReasonChanged String
     | PageDeleteRequestDeletionSubmitted
