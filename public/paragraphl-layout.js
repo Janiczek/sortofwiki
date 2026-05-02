@@ -201,6 +201,15 @@
     return out;
   }
 
+  /** GLSL ES 1.0: literals without '.' are int; min(int, float) has no overload. */
+  function glslFloatLiteral(n) {
+    var s = String(n);
+    if (/^[+-]?\d+$/.test(s)) {
+      return s + ".0";
+    }
+    return s;
+  }
+
   function FruchtermanReingoldGL() {
     var self = this;
 
@@ -297,7 +306,7 @@
         "      float dist = sqrt(xDist * xDist + yDist * yDist) + 0.01;\n" +
         "      if (dist > 0.0) {\n" +
         "        float repulsiveF = " +
-        this.k_2.toString() +
+        glslFloatLiteral(this.k_2) +
         " / dist;\n" +
         "        dx += xDist / dist * repulsiveF;\n" +
         "        dy += yDist / dist * repulsiveF;\n" +
@@ -331,7 +340,7 @@
         "    float yDist = node_i.g - node_j.g;\n" +
         "    float dist = sqrt(xDist * xDist + yDist * yDist) + 0.01;\n" +
         "    float attractiveF = dist * dist / " +
-        this.k +
+        glslFloatLiteral(this.k) +
         ";\n" +
         "    if (dist > 0.0) {\n" +
         "      dx -= xDist / dist * attractiveF;\n" +
@@ -340,20 +349,20 @@
         "  }\n" +
         "  float d = sqrt(node_i.r * node_i.r + node_i.g * node_i.g);\n" +
         "  float gf = " +
-        String(0.01 * this.k * self.config.gravity) +
+        glslFloatLiteral(0.01 * this.k * self.config.gravity) +
         " * d;\n" +
         "  dx -= gf * node_i.r / d;\n" +
         "  dy -= gf * node_i.g / d;\n" +
         "  dx *= " +
-        String(self.config.speed) +
+        glslFloatLiteral(self.config.speed) +
         ";\n" +
         "  dy *= " +
-        String(self.config.speed) +
+        glslFloatLiteral(self.config.speed) +
         ";\n" +
         "  float dist = sqrt(dx * dx + dy * dy);\n" +
         "  if (dist > 0.0) {\n" +
         "    float limitedDist = min(" +
-        String(this.maxDisplace * self.config.speed) +
+        glslFloatLiteral(this.maxDisplace * self.config.speed) +
         ", dist);\n" +
         "    gl_FragColor.r += dx / dist * limitedDist;\n" +
         "    gl_FragColor.g += dy / dist * limitedDist;\n" +
