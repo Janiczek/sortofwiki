@@ -1,6 +1,8 @@
 const SVG_NS = "http://www.w3.org/2000/svg";
 const XLINK_NS = "http://www.w3.org/1999/xlink";
 
+const LAYOUT_MAX_TICKS = 100;
+
 function isPrimaryUnmodifiedClick(event) {
   return (
     event.button === 0 &&
@@ -520,6 +522,229 @@ function nodeHoverFill(node, darkMode, host) {
   return darkMode ? tableRowHover : "#eef5e7";
 }
 
+function createLayoutProgressUI(maxTicks) {
+  const wrap = document.createElement("div");
+  wrap.className = "layout-progress";
+  wrap.setAttribute("role", "status");
+  wrap.setAttribute("aria-live", "polite");
+  const label = document.createElement("span");
+  label.className = "layout-progress-label";
+  const progress = document.createElement("progress");
+  progress.className = "layout-progress-bar";
+  progress.max = maxTicks;
+  progress.value = 0;
+  label.textContent = "Loading… 0/" + maxTicks;
+  wrap.appendChild(label);
+  wrap.appendChild(progress);
+  return {
+    root: wrap,
+    setTickIndex: function setTickIndex(tickIndex) {
+      const n = Math.min(Math.max(tickIndex, 0), maxTicks);
+      progress.value = n;
+      label.textContent = "Loading… " + n + "/" + maxTicks;
+    },
+    remove: function remove() {
+      if (wrap.parentNode) {
+        wrap.parentNode.removeChild(wrap);
+      }
+    },
+  };
+}
+
+function appendGraphSvgToColaHost(host, graph, nodes, links, darkMode) {
+  const positionedNodes = nodes.filter(function (node) {
+    return Number.isFinite(node.x) && Number.isFinite(node.y);
+  });
+
+  if (positionedNodes.length === 0) {
+    const message = document.createElement("div");
+    message.textContent = "Graph layout failed.";
+    host._root.appendChild(message);
+    return;
+  }
+
+  const bounds = positionedNodes.reduce(
+    function (acc, node) {
+      const left = node.x - node.width / 2;
+      const right = node.x + node.width / 2;
+      const top = node.y - node.height / 2;
+      const bottom = node.y + node.height / 2;
+      return {
+        minX: Math.min(acc.minX, left),
+        maxX: Math.max(acc.maxX, right),
+        minY: Math.min(acc.minY, top),
+        maxY: Math.max(acc.maxY, bottom),
+      };
+    },
+    { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
+  );
+
+  const padX = 48;
+  const padY = 42;
+  const minX = bounds.minX - padX;
+  const minY = bounds.minY - padY;
+  const vbWidth = Math.max(bounds.maxX - bounds.minX + padX * 2, 320);
+  const vbHeight = Math.max(bounds.maxY - bounds.minY + padY * 2, 240);
+
+  const svg = document.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", `${minX} ${minY} ${vbWidth} ${vbHeight}`);
+  svg.setAttribute("width", String(Math.round(vbWidth)));
+  svg.setAttribute("height", String(Math.round(vbHeight)));
+  svg.setAttribute("data-intrinsic-size", "true");
+  svg.setAttribute("aria-label", `${graph.graphName || "wiki"} graph`);
+
+  const defs = document.createElementNS(SVG_NS, "defs");
+  const marker = document.createElementNS(SVG_NS, "marker");
+  marker.setAttribute("id", "arrowhead");
+  marker.setAttribute("markerWidth", "8");
+  marker.setAttribute("markerHeight", "8");
+  marker.setAttribute("refX", "7");
+  marker.setAttribute("refY", "4");
+  marker.setAttribute("orient", "auto");
+  marker.setAttribute("markerUnits", "strokeWidth");
+  const markerPath = document.createElementNS(SVG_NS, "path");
+  markerPath.setAttribute("d", "M 0 0 L 8 4 L 0 8 z");
+  markerPath.setAttribute("fill", darkMode ? "#95a37f" : "#6b7280");
+  marker.appendChild(markerPath);
+  defs.appendChild(marker);
+  svg.appendChild(defs);
+
+  links.forEach(function (link) {
+    const source = resolveNodeRef(link.source, nodes);
+    const target = resolveNodeRef(link.target, nodes);
+    if (!source || !target) {
+      return;
+    }
+    if (
+      !Number.isFinite(source.x) ||
+      !Number.isFinite(source.y) ||
+      !Number.isFinite(target.x) ||
+      !Number.isFinite(target.y)
+    ) {
+      return;
+    }
+    const points = edgeEndpoints(source, target);
+
+    const line = document.createElementNS(SVG_NS, "line");
+    line.setAttribute("x1", String(points.x1));
+    line.setAttribute("y1", String(points.y1));
+    line.setAttribute("x2", String(points.x2));
+    line.setAttribute("y2", String(points.y2));
+    line.setAttribute("stroke", edgeColor(link, darkMode));
+    line.setAttribute("stroke-width", link.deemphasized ? "0.9" : "1.25");
+    line.setAttribute("opacity", link.deemphasized ? "0.85" : "1");
+    if (link.kind === "tag") {
+      line.setAttribute("stroke-dasharray", "5 4");
+    }
+    if (link.direction === "directed") {
+      line.setAttribute("marker-end", "url(#arrowhead)");
+    }
+    svg.appendChild(line);
+  });
+
+  nodes.forEach(
+    function (node) {
+      const palette = nodePalette(node, darkMode, host);
+      const hoverFill = nodeHoverFill(node, darkMode, host);
+      let parsedNodeUrl = null;
+      try {
+        parsedNodeUrl = new URL(node.href, window.location.href);
+      } catch (_) {
+        parsedNodeUrl = null;
+      }
+      const visualWidth = Number.isFinite(node.visualWidth)
+        ? node.visualWidth
+        : node.width;
+      const visualHeight = Number.isFinite(node.visualHeight)
+        ? node.visualHeight
+        : node.height;
+      const nodeLink = document.createElementNS(SVG_NS, "a");
+      nodeLink.setAttribute("class", "node");
+      if (parsedNodeUrl) {
+        nodeLink.setAttribute("href", parsedNodeUrl.href);
+        nodeLink.setAttributeNS(XLINK_NS, "xlink:href", parsedNodeUrl.href);
+      }
+      nodeLink.setAttribute("target", "_self");
+
+      const group = document.createElementNS(SVG_NS, "g");
+      group.setAttribute("transform", `translate(${node.x},${node.y})`);
+
+      const rect = document.createElementNS(SVG_NS, "rect");
+      rect.setAttribute("x", String(-visualWidth / 2));
+      rect.setAttribute("y", String(-visualHeight / 2));
+      rect.setAttribute("width", String(visualWidth));
+      rect.setAttribute("height", String(visualHeight));
+      rect.setAttribute("rx", "5");
+      rect.setAttribute("ry", "5");
+      rect.setAttribute("fill", palette.fill);
+      rect.setAttribute("stroke", palette.stroke);
+      rect.setAttribute("stroke-width", String(nodePenWidth(node)));
+      if (palette.dash) {
+        rect.setAttribute("stroke-dasharray", palette.dash);
+      }
+      group.appendChild(rect);
+
+      group.addEventListener("mouseenter", function onNodeEnter() {
+        rect.setAttribute("fill", hoverFill);
+      });
+      group.addEventListener("mouseleave", function onNodeLeave() {
+        rect.setAttribute("fill", palette.fill);
+      });
+
+      if (palette.focusRing) {
+        const ring = document.createElementNS(SVG_NS, "rect");
+        ring.setAttribute("x", String(-visualWidth / 2 - 3));
+        ring.setAttribute("y", String(-visualHeight / 2 - 3));
+        ring.setAttribute("width", String(visualWidth + 6));
+        ring.setAttribute("height", String(visualHeight + 6));
+        ring.setAttribute("rx", "8");
+        ring.setAttribute("ry", "8");
+        ring.setAttribute("fill", "none");
+        ring.setAttribute("stroke", palette.focusRing);
+        ring.setAttribute("stroke-width", "1");
+        ring.setAttribute("pointer-events", "none");
+        group.appendChild(ring);
+      }
+
+      const label = document.createElementNS(SVG_NS, "text");
+      label.setAttribute("x", "0");
+      label.setAttribute("y", "4");
+      label.setAttribute("text-anchor", "middle");
+      label.setAttribute("fill", palette.text);
+      label.textContent = node.id;
+      group.appendChild(label);
+
+      const title = document.createElementNS(SVG_NS, "title");
+      title.textContent = node.id;
+      group.appendChild(title);
+
+      nodeLink.addEventListener("click", function onNodeClick(event) {
+        if (!isPrimaryUnmodifiedClick(event)) {
+          return;
+        }
+
+        if (!parsedNodeUrl) {
+          return;
+        }
+
+        if (!isSameOriginPathNavigation(parsedNodeUrl)) {
+          return;
+        }
+
+        event.preventDefault();
+        event.stopPropagation();
+        navigateInSpa(parsedNodeUrl);
+      });
+
+      nodeLink.appendChild(group);
+      svg.appendChild(nodeLink);
+    },
+    host
+  );
+
+  host._root.appendChild(svg);
+}
+
 class ColaGraphElement extends HTMLElement {
   static get observedAttributes() {
     return [
@@ -633,6 +858,8 @@ class ColaGraphElement extends HTMLElement {
       return;
     }
     this._lastRenderKey = renderKey;
+    this._layoutGeneration = (this._layoutGeneration || 0) + 1;
+    const layoutGeneration = this._layoutGeneration;
     this._root.innerHTML = "";
 
     const style = document.createElement("style");
@@ -662,6 +889,28 @@ class ColaGraphElement extends HTMLElement {
         font-size: ${NODE_FONT_SIZE}px;
         pointer-events: none;
         user-select: none;
+      }
+      .layout-progress {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
+        margin-bottom: 0.5rem;
+        padding: 0.15rem 0 0.25rem;
+      }
+      .layout-progress-label {
+        font-family: 'Source Serif 4', system-ui, sans-serif;
+        font-size: 12px;
+        color: var(--fg-muted, #5c6b52);
+      }
+      .layout-progress-bar {
+        width: 100%;
+        height: 8px;
+        border-radius: 4px;
+        overflow: hidden;
+        accent-color: var(--focus-ring, #7c3aed);
       }
     `;
     this._root.appendChild(style);
@@ -747,205 +996,47 @@ class ColaGraphElement extends HTMLElement {
         .avoidOverlaps(true)
         .start(90, 0, 0, 0, false);
 
-      for (let i = 0; i < 350; i += 1) {
-        if (layout.tick()) {
-          break;
+      const progressUI = createLayoutProgressUI(LAYOUT_MAX_TICKS);
+      this._root.appendChild(progressUI.root);
+      progressUI.setTickIndex(0);
+
+      const host = this;
+      let tickIndex = 0;
+
+      const finishAfterLayout = function finishAfterLayout() {
+        if (layoutGeneration !== host._layoutGeneration) {
+          return;
         }
-      }
+        progressUI.setTickIndex(LAYOUT_MAX_TICKS);
+        progressUI.remove();
+        if (cacheContext && graph.graphName === "wiki") {
+          writeCachedWikiGraphPayload(cacheContext, nodes);
+        }
+        appendGraphSvgToColaHost(host, graph, nodes, links, darkMode);
+      };
 
-      if (cacheContext && graph.graphName === "wiki") {
-        writeCachedWikiGraphPayload(cacheContext, nodes);
-      }
-    }
+      const tickStep = function tickStep() {
+        if (layoutGeneration !== host._layoutGeneration) {
+          return;
+        }
+        if (tickIndex >= LAYOUT_MAX_TICKS) {
+          finishAfterLayout();
+          return;
+        }
+        progressUI.setTickIndex(tickIndex);
+        if (layout.tick()) {
+          finishAfterLayout();
+          return;
+        }
+        tickIndex += 1;
+        window.requestAnimationFrame(tickStep);
+      };
 
-    const positionedNodes = nodes.filter(function (node) {
-      return Number.isFinite(node.x) && Number.isFinite(node.y);
-    });
-
-    if (positionedNodes.length === 0) {
-      const message = document.createElement("div");
-      message.textContent = "Graph layout failed.";
-      this._root.appendChild(message);
+      window.requestAnimationFrame(tickStep);
       return;
     }
 
-    const bounds = positionedNodes.reduce(
-      function (acc, node) {
-        const left = node.x - node.width / 2;
-        const right = node.x + node.width / 2;
-        const top = node.y - node.height / 2;
-        const bottom = node.y + node.height / 2;
-        return {
-          minX: Math.min(acc.minX, left),
-          maxX: Math.max(acc.maxX, right),
-          minY: Math.min(acc.minY, top),
-          maxY: Math.max(acc.maxY, bottom),
-        };
-      },
-      { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity }
-    );
-
-    const padX = 48;
-    const padY = 42;
-    const minX = bounds.minX - padX;
-    const minY = bounds.minY - padY;
-    const vbWidth = Math.max(bounds.maxX - bounds.minX + padX * 2, 320);
-    const vbHeight = Math.max(bounds.maxY - bounds.minY + padY * 2, 240);
-
-    const svg = document.createElementNS(SVG_NS, "svg");
-    svg.setAttribute("viewBox", `${minX} ${minY} ${vbWidth} ${vbHeight}`);
-    svg.setAttribute("width", String(Math.round(vbWidth)));
-    svg.setAttribute("height", String(Math.round(vbHeight)));
-    svg.setAttribute("data-intrinsic-size", "true");
-    svg.setAttribute("aria-label", `${graph.graphName || "wiki"} graph`);
-
-    const defs = document.createElementNS(SVG_NS, "defs");
-    const marker = document.createElementNS(SVG_NS, "marker");
-    marker.setAttribute("id", "arrowhead");
-    marker.setAttribute("markerWidth", "8");
-    marker.setAttribute("markerHeight", "8");
-    marker.setAttribute("refX", "7");
-    marker.setAttribute("refY", "4");
-    marker.setAttribute("orient", "auto");
-    marker.setAttribute("markerUnits", "strokeWidth");
-    const markerPath = document.createElementNS(SVG_NS, "path");
-    markerPath.setAttribute("d", "M 0 0 L 8 4 L 0 8 z");
-    markerPath.setAttribute("fill", darkMode ? "#95a37f" : "#6b7280");
-    marker.appendChild(markerPath);
-    defs.appendChild(marker);
-    svg.appendChild(defs);
-
-    links.forEach(function (link) {
-      const source = resolveNodeRef(link.source, nodes);
-      const target = resolveNodeRef(link.target, nodes);
-      if (!source || !target) {
-        return;
-      }
-      if (
-        !Number.isFinite(source.x) ||
-        !Number.isFinite(source.y) ||
-        !Number.isFinite(target.x) ||
-        !Number.isFinite(target.y)
-      ) {
-        return;
-      }
-      const points = edgeEndpoints(source, target);
-
-      const line = document.createElementNS(SVG_NS, "line");
-      line.setAttribute("x1", String(points.x1));
-      line.setAttribute("y1", String(points.y1));
-      line.setAttribute("x2", String(points.x2));
-      line.setAttribute("y2", String(points.y2));
-      line.setAttribute("stroke", edgeColor(link, darkMode));
-      line.setAttribute("stroke-width", link.deemphasized ? "0.9" : "1.25");
-      line.setAttribute("opacity", link.deemphasized ? "0.85" : "1");
-      if (link.kind === "tag") {
-        line.setAttribute("stroke-dasharray", "5 4");
-      }
-      if (link.direction === "directed") {
-        line.setAttribute("marker-end", "url(#arrowhead)");
-      }
-      svg.appendChild(line);
-    });
-
-    nodes.forEach(function (node) {
-      const palette = nodePalette(node, darkMode, this);
-      const hoverFill = nodeHoverFill(node, darkMode, this);
-      let parsedNodeUrl = null;
-      try {
-        parsedNodeUrl = new URL(node.href, window.location.href);
-      } catch (_) {
-        parsedNodeUrl = null;
-      }
-      const visualWidth = Number.isFinite(node.visualWidth)
-        ? node.visualWidth
-        : node.width;
-      const visualHeight = Number.isFinite(node.visualHeight)
-        ? node.visualHeight
-        : node.height;
-      const nodeLink = document.createElementNS(SVG_NS, "a");
-      nodeLink.setAttribute("class", "node");
-      if (parsedNodeUrl) {
-        nodeLink.setAttribute("href", parsedNodeUrl.href);
-        nodeLink.setAttributeNS(XLINK_NS, "xlink:href", parsedNodeUrl.href);
-      }
-      nodeLink.setAttribute("target", "_self");
-
-      const group = document.createElementNS(SVG_NS, "g");
-      group.setAttribute("transform", `translate(${node.x},${node.y})`);
-
-      const rect = document.createElementNS(SVG_NS, "rect");
-      rect.setAttribute("x", String(-visualWidth / 2));
-      rect.setAttribute("y", String(-visualHeight / 2));
-      rect.setAttribute("width", String(visualWidth));
-      rect.setAttribute("height", String(visualHeight));
-      rect.setAttribute("rx", "5");
-      rect.setAttribute("ry", "5");
-      rect.setAttribute("fill", palette.fill);
-      rect.setAttribute("stroke", palette.stroke);
-      rect.setAttribute("stroke-width", String(nodePenWidth(node)));
-      if (palette.dash) {
-        rect.setAttribute("stroke-dasharray", palette.dash);
-      }
-      group.appendChild(rect);
-
-      group.addEventListener("mouseenter", function onNodeEnter() {
-        rect.setAttribute("fill", hoverFill);
-      });
-      group.addEventListener("mouseleave", function onNodeLeave() {
-        rect.setAttribute("fill", palette.fill);
-      });
-
-      if (palette.focusRing) {
-        const ring = document.createElementNS(SVG_NS, "rect");
-        ring.setAttribute("x", String(-visualWidth / 2 - 3));
-        ring.setAttribute("y", String(-visualHeight / 2 - 3));
-        ring.setAttribute("width", String(visualWidth + 6));
-        ring.setAttribute("height", String(visualHeight + 6));
-        ring.setAttribute("rx", "8");
-        ring.setAttribute("ry", "8");
-        ring.setAttribute("fill", "none");
-        ring.setAttribute("stroke", palette.focusRing);
-        ring.setAttribute("stroke-width", "1");
-        ring.setAttribute("pointer-events", "none");
-        group.appendChild(ring);
-      }
-
-      const label = document.createElementNS(SVG_NS, "text");
-      label.setAttribute("x", "0");
-      label.setAttribute("y", "4");
-      label.setAttribute("text-anchor", "middle");
-      label.setAttribute("fill", palette.text);
-      label.textContent = node.id;
-      group.appendChild(label);
-
-      const title = document.createElementNS(SVG_NS, "title");
-      title.textContent = node.id;
-      group.appendChild(title);
-
-      nodeLink.addEventListener("click", function onNodeClick(event) {
-        if (!isPrimaryUnmodifiedClick(event)) {
-          return;
-        }
-
-        if (!parsedNodeUrl) {
-          return;
-        }
-
-        if (!isSameOriginPathNavigation(parsedNodeUrl)) {
-          return;
-        }
-
-        event.preventDefault();
-        event.stopPropagation();
-        navigateInSpa(parsedNodeUrl);
-      });
-
-      nodeLink.appendChild(group);
-      svg.appendChild(nodeLink);
-    });
-
-    this._root.appendChild(svg);
+    appendGraphSvgToColaHost(this, graph, nodes, links, darkMode);
 
   }
 }
