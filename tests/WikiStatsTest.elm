@@ -126,9 +126,11 @@ suite =
                             , missingPageCount = 2
                             , totalPublishedLinks = 30
                             , totalTags = 5
+                            , totalPublishedWords = 1200
                             , topPagesByRevision = [ { pageSlug = "A", revision = 3 } ]
                             , topPagesByInLinks = []
                             , topPagesByOutLinks = []
+                            , topPagesByWords = []
                             , avgRevisionPerPage = 1.5
                             , dailyAccumulatedSnapshots = []
                             }
@@ -154,6 +156,9 @@ suite =
                         , \_ -> s1.topPagesByEditEvents |> Expect.equal s2.topPagesByEditEvents
                         , \_ -> s1.topPagesByInLinks |> Expect.equal s2.topPagesByInLinks
                         , \_ -> s1.topPagesByOutLinks |> Expect.equal s2.topPagesByOutLinks
+                        , \_ -> s1.totalPublishedWords |> Expect.equal s2.totalPublishedWords
+                        , \_ -> s1.topPagesByWords |> Expect.equal s2.topPagesByWords
+                        , \_ -> s1.dailyWordsWritten |> Expect.equal s2.dailyWordsWritten
                         , \_ -> s1.dailyAccumulatedSnapshots |> Expect.equal s2.dailyAccumulatedSnapshots
                         ]
                         ()
@@ -176,9 +181,11 @@ suite =
                             , missingPageCount = 0
                             , totalPublishedLinks = 0
                             , totalTags = 0
+                            , totalPublishedWords = n * 10
                             , topPagesByRevision = []
                             , topPagesByInLinks = []
                             , topPagesByOutLinks = []
+                            , topPagesByWords = []
                             , avgRevisionPerPage = 0.0
                             , dailyAccumulatedSnapshots = []
                             }
@@ -197,9 +204,64 @@ suite =
                         , \_ -> s1.topPagesByViews |> Expect.equal s2.topPagesByViews
                         , \_ -> s1.topPagesByInLinks |> Expect.equal s2.topPagesByInLinks
                         , \_ -> s1.topPagesByOutLinks |> Expect.equal s2.topPagesByOutLinks
+                        , \_ -> s1.totalPublishedWords |> Expect.notEqual s2.totalPublishedWords
+                        , \_ -> s1.topPagesByWords |> Expect.equal s2.topPagesByWords
+                        , \_ -> s1.dailyWordsWritten |> Expect.equal s2.dailyWordsWritten
                         , \_ -> s1.dailyAccumulatedSnapshots |> Expect.equal s2.dailyAccumulatedSnapshots
                         ]
                         ()
+            , Test.test "merge dailyWordsWritten is day-over-day delta of snapshot publishedWords" <|
+                \() ->
+                    let
+                        wikiSlug : String
+                        wikiSlug =
+                            "Demo"
+
+                        wiki : Wiki.Wiki
+                        wiki =
+                            Wiki.wikiWithPages wikiSlug "" Dict.empty
+
+                        day0 : Time.Posix
+                        day0 =
+                            Time.millisToPosix 0
+
+                        day1 : Time.Posix
+                        day1 =
+                            Time.millisToPosix 86400000
+
+                        events : List WikiAuditLog.AuditEvent
+                        events =
+                            [ { kind = WikiAuditLog.TrustedPublishedNewPage { pageSlug = "A", markdown = "alpha beta" }
+                              , at = day0
+                              , actorUsername = "alice"
+                              }
+                            , { kind = WikiAuditLog.TrustedPublishedNewPage { pageSlug = "B", markdown = "gamma delta epsilon" }
+                              , at = day1
+                              , actorUsername = "alice"
+                              }
+                            ]
+
+                        asOf : Time.Posix
+                        asOf =
+                            Time.millisToPosix 86400000
+
+                        fromWiki : WikiStats.FromWiki
+                        fromWiki =
+                            WikiStats.buildFromWiki wikiSlug wiki Dict.empty events asOf
+
+                        fromAudit : WikiStats.FromAudit
+                        fromAudit =
+                            WikiStats.buildFromAudit asOf events
+
+                        summary : WikiStats.Summary
+                        summary =
+                            WikiStats.merge fromWiki fromAudit (WikiStats.buildFromViews Dict.empty)
+                    in
+                    summary.dailyWordsWritten
+                        |> Expect.equal
+                            [ { day = "1970-01-01", wordsChange = 2 }
+                            , { day = "1970-01-02", wordsChange = 3 }
+                            ]
             ]
         , Test.describe "buildFromWiki"
             [ Test.test "daily accumulated snapshots grow with trusted new pages on distinct UTC days" <|
@@ -223,11 +285,11 @@ suite =
 
                         events : List WikiAuditLog.AuditEvent
                         events =
-                            [ { kind = WikiAuditLog.TrustedPublishedNewPage { pageSlug = "A", markdown = "# A" }
+                            [ { kind = WikiAuditLog.TrustedPublishedNewPage { pageSlug = "A", markdown = "alpha beta" }
                               , at = day0
                               , actorUsername = "alice"
                               }
-                            , { kind = WikiAuditLog.TrustedPublishedNewPage { pageSlug = "B", markdown = "# B" }
+                            , { kind = WikiAuditLog.TrustedPublishedNewPage { pageSlug = "B", markdown = "gamma delta epsilon" }
                               , at = day1
                               , actorUsername = "alice"
                               }
@@ -246,6 +308,10 @@ suite =
                             fromWiki.dailyAccumulatedSnapshots
                                 |> List.map .publishedPages
                                 |> Expect.equal [ 1, 2 ]
+                        , \_ ->
+                            fromWiki.dailyAccumulatedSnapshots
+                                |> List.map .publishedWords
+                                |> Expect.equal [ 2, 5 ]
                         , \_ ->
                             fromWiki.publishedPageCount
                                 |> Expect.equal 0
@@ -292,7 +358,7 @@ suite =
                             fromWiki.dailyAccumulatedSnapshots
                                 |> List.reverse
                                 |> List.head
-                                |> Maybe.withDefault { day = "", publishedPages = 0, missingPages = 0, todos = 0 }
+                                |> Maybe.withDefault { day = "", publishedPages = 0, missingPages = 0, todos = 0, publishedWords = 0 }
                     in
                     Expect.all
                         [ \_ -> snap.publishedPages |> Expect.equal 1
@@ -339,6 +405,40 @@ suite =
                                 |> List.head
                                 |> Maybe.map .outLinkCount
                                 |> Expect.equal (Just 2)
+                        ]
+                        ()
+            , Test.test "total and top pages by words use published markdown bodies" <|
+                \() ->
+                    let
+                        wikiSlug : String
+                        wikiSlug =
+                            "Demo"
+
+                        wiki : Wiki.Wiki
+                        wiki =
+                            Wiki.wikiWithPages wikiSlug
+                                ""
+                                (Dict.fromList
+                                    [ ( "Short", Page.withPublished "Short" "one" )
+                                    , ( "Long", Page.withPublished "Long" "aa bb cc dd ee" )
+                                    ]
+                                )
+
+                        fromWiki : WikiStats.FromWiki
+                        fromWiki =
+                            WikiStats.buildFromWiki wikiSlug wiki Dict.empty [] (Time.millisToPosix 0)
+                    in
+                    Expect.all
+                        [ \_ -> fromWiki.totalPublishedWords |> Expect.equal 6
+                        , \_ ->
+                            fromWiki.topPagesByWords
+                                |> List.map .pageSlug
+                                |> Expect.equal [ "Long", "Short" ]
+                        , \_ ->
+                            fromWiki.topPagesByWords
+                                |> List.head
+                                |> Maybe.map .wordCount
+                                |> Expect.equal (Just 5)
                         ]
                         ()
             , Test.test "without daily snapshots plus withDailyAccumulatedSnapshots matches buildFromWiki" <|

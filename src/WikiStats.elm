@@ -29,6 +29,7 @@ Cached `FromWiki` from `buildFromWikiWithoutDailySnapshots` keeps `dailyAccumula
 
 import Date
 import Dict exposing (Dict)
+import MarkdownWords
 import Page
 import PageLinkRefs
 import Set exposing (Set)
@@ -52,6 +53,7 @@ type alias DailyAccumulatedSnapshot =
     , publishedPages : Int
     , missingPages : Int
     , todos : Int
+    , publishedWords : Int
     }
 
 
@@ -65,6 +67,7 @@ Fields owned here:
   - `totalTags`
   - `topPagesByRevision`
   - `topPagesByInLinks` / `topPagesByOutLinks` (markdown + tags)
+  - `totalPublishedWords` / `topPagesByWords` (`MarkdownWords.count` on published body)
   - `avgRevisionPerPage`
 
 -}
@@ -73,9 +76,11 @@ type alias FromWiki =
     , missingPageCount : Int
     , totalPublishedLinks : Int
     , totalTags : Int
+    , totalPublishedWords : Int
     , topPagesByRevision : List { pageSlug : String, revision : Int }
     , topPagesByInLinks : List { pageSlug : String, inLinkCount : Int }
     , topPagesByOutLinks : List { pageSlug : String, outLinkCount : Int }
+    , topPagesByWords : List { pageSlug : String, wordCount : Int }
     , avgRevisionPerPage : Float
     , dailyAccumulatedSnapshots : List DailyAccumulatedSnapshot
     }
@@ -117,11 +122,14 @@ type alias Summary =
     , missingPageCount : Int
     , totalPublishedLinks : Int
     , totalTags : Int
+    , totalPublishedWords : Int
     , topPagesByRevision : List { pageSlug : String, revision : Int }
     , topPagesByInLinks : List { pageSlug : String, inLinkCount : Int }
     , topPagesByOutLinks : List { pageSlug : String, outLinkCount : Int }
+    , topPagesByWords : List { pageSlug : String, wordCount : Int }
     , avgRevisionPerPage : Float
     , dailyActivityCounts : List { day : String, creates : Int, edits : Int, deletes : Int }
+    , dailyWordsWritten : List { day : String, wordsChange : Int }
     , topPagesByEditEvents : List { pageSlug : String, editCount : Int }
     , topPagesByViews : List { pageSlug : String, viewCount : Int }
     , dailyAccumulatedSnapshots : List DailyAccumulatedSnapshot
@@ -136,15 +144,38 @@ merge fromWiki fromAudit fromViews =
     , missingPageCount = fromWiki.missingPageCount
     , totalPublishedLinks = fromWiki.totalPublishedLinks
     , totalTags = fromWiki.totalTags
+    , totalPublishedWords = fromWiki.totalPublishedWords
     , topPagesByRevision = fromWiki.topPagesByRevision
     , topPagesByInLinks = fromWiki.topPagesByInLinks
     , topPagesByOutLinks = fromWiki.topPagesByOutLinks
+    , topPagesByWords = fromWiki.topPagesByWords
     , avgRevisionPerPage = fromWiki.avgRevisionPerPage
     , dailyActivityCounts = fromAudit.dailyActivityCounts
+    , dailyWordsWritten = dailyWordsWrittenFromSnapshots fromWiki.dailyAccumulatedSnapshots
     , topPagesByEditEvents = fromAudit.topPagesByEditEvents
     , topPagesByViews = fromViews.topPagesByViews
     , dailyAccumulatedSnapshots = fromWiki.dailyAccumulatedSnapshots
     }
+
+
+{-| Per UTC day: end-of-day total published word count minus previous end-of-day total (first day vs zero).
+-}
+dailyWordsWrittenFromSnapshots : List DailyAccumulatedSnapshot -> List { day : String, wordsChange : Int }
+dailyWordsWrittenFromSnapshots snaps =
+    let
+        step :
+            DailyAccumulatedSnapshot
+            -> ( Int, List { day : String, wordsChange : Int } )
+            -> ( Int, List { day : String, wordsChange : Int } )
+        step snap ( prevTotal, acc ) =
+            ( snap.publishedWords
+            , { day = snap.day, wordsChange = snap.publishedWords - prevTotal } :: acc
+            )
+    in
+    snaps
+        |> List.foldl step ( 0, [] )
+        |> Tuple.second
+        |> List.reverse
 
 
 {-| Same field math as `buildFromWiki` but skips `dailyAccumulatedSnapshots` (empty list).
@@ -293,6 +324,27 @@ buildFromWikiCurrentSnapshot wikiSlug wiki =
                 |> List.sortBy (\r -> negate r.outLinkCount)
                 |> List.take topN
 
+        topPagesByWords : List { pageSlug : String, wordCount : Int }
+        topPagesByWords =
+            publishedPairs
+                |> List.map
+                    (\( slug, page ) ->
+                        { pageSlug = slug
+                        , wordCount =
+                            page
+                                |> Page.publishedMarkdownForLinks
+                                |> MarkdownWords.count
+                        }
+                    )
+                |> List.sortBy (\r -> negate r.wordCount)
+                |> List.take topN
+
+        totalPublishedWords : Int
+        totalPublishedWords =
+            publishedPairs
+                |> List.map (Tuple.second >> Page.publishedMarkdownForLinks >> MarkdownWords.count)
+                |> List.sum
+
         publishedPageCount : Int
         publishedPageCount =
             List.length publishedPairs
@@ -316,9 +368,11 @@ buildFromWikiCurrentSnapshot wikiSlug wiki =
     , missingPageCount = List.length missingPageSlugs
     , totalPublishedLinks = totalPublishedLinks
     , totalTags = totalTags
+    , totalPublishedWords = totalPublishedWords
     , topPagesByRevision = topPagesByRevision
     , topPagesByInLinks = topPagesByInLinks
     , topPagesByOutLinks = topPagesByOutLinks
+    , topPagesByWords = topPagesByWords
     , avgRevisionPerPage = avgRevisionPerPage
     , dailyAccumulatedSnapshots = []
     }
@@ -513,11 +567,19 @@ wikiTotalsSnapshot wikiSlug wiki =
         todos : Int
         todos =
             List.length todoSummary.todos
+
+        publishedWords : Int
+        publishedWords =
+            sources
+                |> Dict.values
+                |> List.map MarkdownWords.count
+                |> List.sum
     in
     { day = ""
     , publishedPages = publishedPages
     , missingPages = missingPages
     , todos = todos
+    , publishedWords = publishedWords
     }
 
 

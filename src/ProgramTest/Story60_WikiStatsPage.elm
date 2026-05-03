@@ -41,6 +41,9 @@ endToEndTests =
                         , ProgramTest.Query.expectHasText "Published pages"
                         , ProgramTest.Query.expectHasText "Top pages by in-links"
                         , ProgramTest.Query.expectHasText "Top pages by out-links"
+                        , ProgramTest.Query.expectHasText "Words written"
+                        , ProgramTest.Query.expectHasText "Words written (daily)"
+                        , ProgramTest.Query.expectHasText "Top pages by words"
                         , ProgramTest.Query.expectHasText "Totals over time"
                         ]
                     )

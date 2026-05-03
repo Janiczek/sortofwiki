@@ -14113,11 +14113,12 @@ viewWikiStatsSummary wikiSlug stats model =
         [ Html.div [ UI.classAttr "space-y-6" ]
             [ Html.section [ UI.classAttr "space-y-3" ]
                 [ Html.h2 [ UI.classAttr "text-[1rem] font-semibold" ] [ Html.text "Overview" ]
-                , Html.dl [ UI.classAttr "grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-5" ]
+                , Html.dl [ UI.classAttr "grid grid-cols-2 gap-2 sm:gap-3 sm:grid-cols-3 lg:grid-cols-6" ]
                     [ viewStatItem "Published pages" (String.fromInt stats.publishedPageCount)
                     , viewStatItem "Missing pages" (String.fromInt stats.missingPageCount)
                     , viewStatItem "Total links" (String.fromInt stats.totalPublishedLinks)
                     , viewStatItem "Total tags" (String.fromInt stats.totalTags)
+                    , viewStatItem "Words written" (String.fromInt stats.totalPublishedWords)
                     , viewStatItem "Avg revisions/page" (String.fromFloat (toFloat (round (stats.avgRevisionPerPage * 10)) / 10))
                     ]
                 ]
@@ -14160,6 +14161,18 @@ viewWikiStatsSummary wikiSlug stats model =
                         wikiSlug
                     ]
                 , Html.section [ UI.classAttr "w-fit max-w-full space-y-3" ]
+                    [ Html.h2 [ UI.classAttr "text-[1rem] font-semibold" ] [ Html.text "Top pages by words" ]
+                    , viewRankedList
+                        stats.topPagesByWords
+                        (\r ->
+                            { slug = r.pageSlug
+                            , count = r.wordCount
+                            , unit = "words"
+                            }
+                        )
+                        wikiSlug
+                    ]
+                , Html.section [ UI.classAttr "w-fit max-w-full space-y-3" ]
                     [ Html.h2 [ UI.classAttr "text-[1rem] font-semibold" ] [ Html.text "Top pages by in-links" ]
                     , viewRankedList
                         stats.topPagesByInLinks
@@ -14195,6 +14208,7 @@ viewWikiStatsSummary wikiSlug stats model =
                         , onHoverChange = WikiStatsDailyActivityHoverChanged
                         }
                         stats.dailyActivityCounts
+                        stats.dailyWordsWritten
                 ]
             , Html.section [ UI.classAttr "space-y-3" ]
                 [ Html.h2 [ UI.classAttr "text-[1rem] font-semibold" ] [ Html.text "Totals over time" ]
