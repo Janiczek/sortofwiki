@@ -8975,43 +8975,43 @@ viewAppHeader model =
                                                             _ ->
                                                                 Dict.empty
                                                 in
-                                                Html.ul
-                                                    [ Attr.id "header-search-popup-results"
-                                                    , Attr.class "m-0 p-0 list-none"
+                                                Html.div
+                                                    [ Attr.class "-mx-2 -mt-2 -mb-2" ]
+                                                    [ Html.ul
+                                                        [ Attr.id "header-search-popup-results"
+                                                        , Attr.class "m-0 p-0 list-none"
+                                                        ]
+                                                        (headerSearchResults
+                                                            |> List.take 5
+                                                            |> List.map
+                                                                (\result ->
+                                                                    Html.li
+                                                                        [ Attr.class "m-0 p-0 border-b border-[var(--border-subtle)] last:border-b-0" ]
+                                                                        [ UI.Link.searchPopupResultRow
+                                                                            [ Attr.href (Wiki.publishedPageUrlPath wikiSlug result.pageSlug)
+                                                                            , Attr.attribute "data-search-page-slug" result.pageSlug
+                                                                            ]
+                                                                            [ UI.Link.searchPopupResultTitle
+                                                                                [ viewHighlightedText model.headerSearchQuery result.pageSlug ]
+                                                                            , UI.Link.searchPopupResultExcerpt
+                                                                                [ Dict.get result.pageSlug headerSearchMarkdownSources
+                                                                                    |> Maybe.withDefault ""
+                                                                                    |> excerptFromMarkdown model.headerSearchQuery
+                                                                                    |> viewSearchExcerpt
+                                                                                ]
+                                                                            ]
+                                                                        ]
+                                                                )
+                                                        )
+                                                    , Html.div [ Attr.class "mt-2 border-t border-[var(--border-subtle)]" ]
+                                                        [ UI.Link.searchPopupShowAllRow
+                                                            [ Attr.id "header-search-open-page"
+                                                            , Attr.href (searchUrlWithQuery wikiSlug model.headerSearchQuery)
+                                                            , Events.onClick (HeaderSearchQueryChanged "")
+                                                            ]
+                                                            [ Html.text "Show all results" ]
+                                                        ]
                                                     ]
-                                                    (headerSearchResults
-                                                        |> List.take 5
-                                                        |> List.map
-                                                            (\result ->
-                                                                Html.li
-                                                                    [ Attr.class "m-0 -mx-2 px-2 border-b border-[var(--border-subtle)] pb-2 mb-2 last:mb-0 last:pb-0 last:border-b-0" ]
-                                                                    [ UI.Link.subtleLink
-                                                                        [ Attr.href (Wiki.publishedPageUrlPath wikiSlug result.pageSlug)
-                                                                        , Attr.attribute "data-search-page-slug" result.pageSlug
-                                                                        ]
-                                                                        [ Html.span
-                                                                            [ Attr.class "block text-[0.8125rem]" ]
-                                                                            [ viewHighlightedText model.headerSearchQuery result.pageSlug ]
-                                                                        ]
-                                                                    , Html.p
-                                                                        [ Attr.class "mt-0.5 mb-0 text-[0.76rem] text-[var(--fg-muted)] leading-snug" ]
-                                                                        [ Dict.get result.pageSlug headerSearchMarkdownSources
-                                                                            |> Maybe.withDefault ""
-                                                                            |> excerptFromMarkdown model.headerSearchQuery
-                                                                            |> viewSearchExcerpt
-                                                                        ]
-                                                                    ]
-                                                            )
-                                                    )
-                                        , Html.div [ Attr.class "mt-2 -mx-2 px-2 border-t border-[var(--border-subtle)] pt-2" ]
-                                            [ UI.Link.subtleLink
-                                                [ Attr.id "header-search-open-page"
-                                                , Attr.href (searchUrlWithQuery wikiSlug model.headerSearchQuery)
-                                                , Attr.class "text-[0.8125rem] [font-family:var(--font-ui)]"
-                                                , Events.onClick (HeaderSearchQueryChanged "")
-                                                ]
-                                                [ Html.text "Show all results" ]
-                                            ]
                                         ]
 
                             Nothing ->

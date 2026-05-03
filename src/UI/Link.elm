@@ -7,6 +7,10 @@ module UI.Link exposing
     , navListItemMuted
     , navPrimary
     , outsideHttpAttrs
+    , searchPopupResultExcerpt
+    , searchPopupResultRow
+    , searchPopupResultTitle
+    , searchPopupShowAllRow
     , sidebarLink
     , subtleLink
     )
@@ -114,6 +118,44 @@ missingLink attrs children =
 subtleLink : List (Attribute msg) -> List (Html msg) -> Html msg
 subtleLink attrs children =
     Html.a (TW.cls "text-[var(--link)] text-[0.8125rem] underline underline-offset-2" :: attrs) children
+
+
+searchPopupResultRowClass : String
+searchPopupResultRowClass =
+    "group block w-full cursor-pointer no-underline transition-colors hover:bg-[var(--link-bg-hover)] py-2 px-2"
+
+
+{-| Full-width row in header search dropdown: title + excerpt share one hit target and hover affordance.
+-}
+searchPopupResultRow : List (Attribute msg) -> List (Html msg) -> Html msg
+searchPopupResultRow attrs children =
+    Html.a (UI.FocusVisible.on (TW.cls searchPopupResultRowClass :: attrs)) children
+
+
+searchPopupResultTitle : List (Html msg) -> Html msg
+searchPopupResultTitle children =
+    Html.span
+        [ TW.cls "block text-[0.8125rem] text-[var(--link)] group-hover:text-[var(--link-hover)]" ]
+        children
+
+
+searchPopupResultExcerpt : List (Html msg) -> Html msg
+searchPopupResultExcerpt children =
+    Html.p
+        [ TW.cls "mt-0.5 mb-0 text-[0.76rem] text-[var(--fg-muted)] leading-snug" ]
+        children
+
+
+searchPopupShowAllRowClass : String
+searchPopupShowAllRowClass =
+    "block w-full cursor-pointer text-[0.8125rem] text-[var(--link)] [font-family:var(--font-ui)] underline underline-offset-2 transition-colors hover:bg-[var(--link-bg-hover)] hover:text-[var(--link-hover)] py-2 px-2"
+
+
+{-| Footer row in header search popup: full-width hit area and hover for “show all results”.
+-}
+searchPopupShowAllRow : List (Attribute msg) -> List (Html msg) -> Html msg
+searchPopupShowAllRow attrs children =
+    Html.a (UI.FocusVisible.on (TW.cls searchPopupShowAllRowClass :: attrs)) children
 
 
 listItemTight : List (Attribute msg) -> List (Html msg) -> Html msg
