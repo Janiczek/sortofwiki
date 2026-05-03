@@ -17,5 +17,13 @@ suite =
                 \() ->
                     PageTodos.todoTexts "Use `{TODO: nope}` here.\n\n```elm\n{TODO: also nope}\n```"
                         |> Expect.equal []
+            , Test.test "collects TODOs from GFM pipe table cells" <|
+                \() ->
+                    PageTodos.todoTexts "| a | b |\n| - | - |\n| x | {TODO: in table} |"
+                        |> Expect.equal [ "in table" ]
+            , Test.test "collects TODOs from table row that also has wiki link with display pipe" <|
+                \() ->
+                    PageTodos.todoTexts "| h1 | h2 |\n| - | - |\n| [[A|B]] | {TODO: in cell} |\n"
+                        |> Expect.equal [ "in cell" ]
             ]
         ]

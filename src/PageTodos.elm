@@ -3,11 +3,12 @@ module PageTodos exposing (todoTexts)
 import Markdown.Block as Block
 import Markdown.Parser as MarkdownParser
 import TodoSyntax
+import WikiLinkSyntax
 
 
 todoTexts : String -> List String
 todoTexts markdown =
-    case MarkdownParser.parse markdown of
+    case MarkdownParser.parse (WikiLinkSyntax.escapeLabelPipesInWikiLinks markdown) of
         Ok blocks ->
             todoTextsFromBlocks blocks
 
@@ -67,8 +68,25 @@ todoTextsFromListItem (Block.ListItem _ children) =
 todoTextsFromHtml : Block.Html Block.Block -> List String
 todoTextsFromHtml html =
     case html of
-        Block.HtmlElement _ _ children ->
-            todoTextsFromBlocks children
+        Block.HtmlElement name attrs children ->
+            let
+                fromSortofwikiTodo : List String
+                fromSortofwikiTodo =
+                    if name == "sortofwiki-todo" then
+                        attrs
+                            |> List.filterMap
+                                (\attr ->
+                                    if attr.name == "data-todo" then
+                                        Just attr.value
+
+                                    else
+                                        Nothing
+                                )
+
+                    else
+                        []
+            in
+            fromSortofwikiTodo ++ todoTextsFromBlocks children
 
         Block.HtmlComment _ ->
             []

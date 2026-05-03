@@ -76,6 +76,12 @@ viewGreeting name =
 
 ---
 
+## Table
+
+| Header A | Header B |
+|----------|----------|
+| [[About|About this wiki]] | {TODO: table row with wikilink pipe} |
+
 ## Escaping and entities
 
 Use \\*asterisks\\* literally and show an ampersand entity: &amp;.

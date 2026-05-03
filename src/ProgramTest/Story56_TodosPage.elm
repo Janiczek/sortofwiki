@@ -29,6 +29,17 @@ todosUrl =
     }
 
 
+markdownPlaygroundUrl : Url
+markdownPlaygroundUrl =
+    { protocol = Http
+    , host = "localhost"
+    , port_ = Just 8000
+    , path = "/w/Demo/p/MarkdownPlayground"
+    , query = Nothing
+    , fragment = Nothing
+    }
+
+
 endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
     ProgramTest.Start.bothViewports
@@ -51,6 +62,11 @@ endToEndTests =
                             (ProgramTest.Query.expectHasText "explain contributor roles")
                         ]
                     )
+                , client.update 100 (UrlChanged markdownPlaygroundUrl)
+                , client.checkView 150
+                    (ProgramTest.Query.withinId "page-todos"
+                        (ProgramTest.Query.expectHasText "table row with wikilink pipe")
+                    )
                 , client.update 100 (UrlChanged homeUrl)
                 , client.checkView 150 (ProgramTest.Query.expectHasNotId "page-todos")
                 , client.update 100 (UrlChanged todosUrl)
@@ -62,6 +78,7 @@ endToEndTests =
                                 , "About"
                                 , "add contributor examples"
                                 , "MarkdownPlayground"
+                                , "table row with wikilink pipe"
                                 , "TodoGap"
                                 ]
                             )
