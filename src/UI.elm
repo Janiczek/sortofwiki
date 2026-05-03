@@ -100,6 +100,7 @@ module UI exposing
     , hostAdminWikiSlugClass
     , inputTextAttr
     , inputTextFullAttr
+    , keyedMainBodyWrapperAttr
     , layoutHolyGrailAttr
     , layoutHolyGrailClass
     , layoutLeftNavAsideAttr
@@ -232,6 +233,7 @@ module UI exposing
 import Html exposing (Attribute, Html)
 import Html.Attributes as Attr
 import Html.Events as Events
+import Html.Keyed
 import Json.Decode
 import TW
 import UI.WikiPageRightRailMobile
@@ -968,6 +970,13 @@ mainContentPaddingAttr =
     TW.cls "px-[0.85rem] py-[0.85rem]"
 
 
+{-| Wrapper for `Html.Keyed` around main column body: `display:contents` so layout matches unwrapped single child.
+-}
+keyedMainBodyWrapperAttr : Attribute msg
+keyedMainBodyWrapperAttr =
+    TW.cls "contents"
+
+
 {-| `id` on the mobile off-canvas nav panel for focus management.
 -}
 mobileSideNavDrawerId : String
@@ -1060,6 +1069,7 @@ holyGrailLayout :
     , onCloseMobileNav : msg
     , leftNav : Html msg
     , mainAttributes : List (Attribute msg)
+    , mainContentKey : String
     , mainBody : Html msg
     , rightRailSections : List (Html msg)
     , wikiPageMobileRightRail : Maybe { collapsed : Bool, onToggle : msg }
@@ -1084,7 +1094,12 @@ holyGrailLayout config =
               , Html.div
                     [ TW.cls (wikiChromeInnerGridClass config.hasRightColumn) ]
                     (List.concat
-                        [ [ Html.main_ config.mainAttributes [ config.mainBody ] ]
+                        [ [ Html.main_ config.mainAttributes
+                                [ Html.Keyed.node "div"
+                                    [ keyedMainBodyWrapperAttr ]
+                                    [ ( config.mainContentKey, config.mainBody ) ]
+                                ]
+                          ]
                         , if List.isEmpty config.rightRailSections then
                             []
 

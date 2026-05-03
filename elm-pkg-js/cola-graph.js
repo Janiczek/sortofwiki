@@ -10,6 +10,12 @@ const COLA_LAYOUT_TICKS = 5;
 /** Cola ticks for page graph — circle seed, no ParaGraphL. */
 const PAGE_GRAPH_COLA_TICKS = 10;
 
+/** Wiki graph minimap: disconnect observers / listeners when leaving the graph route. */
+let wikiGraphSvgReadyObserver = null;
+let wikiGraphNavigatorTeardown = null;
+/** Doc `MutationObserver` can fire synchronously during setup; coalesce to one pass per tick. */
+let wikiGraphNavigatorLayoutScheduled = false;
+
 function layoutNodesOnCircle(nodes) {
   const n = nodes.length;
   const radius = 80 + n * 6;
@@ -1241,19 +1247,54 @@ function syncMiniGraphPreview(miniPreview, graphHost) {
   miniPreview.appendChild(clonedSvg);
 }
 
+function teardownWikiGraphNavigator() {
+  if (wikiGraphSvgReadyObserver) {
+    wikiGraphSvgReadyObserver.disconnect();
+    wikiGraphSvgReadyObserver = null;
+  }
+  if (wikiGraphNavigatorTeardown) {
+    wikiGraphNavigatorTeardown();
+    wikiGraphNavigatorTeardown = null;
+  }
+  const graphHostOrphan = document.getElementById("wiki-graph");
+  if (graphHostOrphan && graphHostOrphan.dataset.sowGraphNavigatorWaitingForSvg === "1") {
+    delete graphHostOrphan.dataset.sowGraphNavigatorWaitingForSvg;
+  }
+}
+
 function setupWikiGraphNavigator() {
+  if (wikiGraphNavigatorLayoutScheduled) {
+    return;
+  }
+  wikiGraphNavigatorLayoutScheduled = true;
+  queueMicrotask(function flushWikiGraphNavigatorLayout() {
+    wikiGraphNavigatorLayoutScheduled = false;
+    setupWikiGraphNavigatorImpl();
+  });
+}
+
+function setupWikiGraphNavigatorImpl() {
   const page = document.getElementById("wiki-graph-page");
   if (!page) {
+    teardownWikiGraphNavigator();
     return;
   }
 
+  const graphEmpty = document.getElementById("wiki-graph-empty");
   const navigatorHost = document.getElementById("wiki-graph-navigator");
   const graphHost = document.getElementById("wiki-graph");
   const horizontalScrollRegion =
     document.getElementById("wiki-graph-scroll-region") ||
     document.getElementById("app-main-scroll");
   const verticalScrollRegion = document.getElementById("app-main-scroll");
-  if (!navigatorHost || !graphHost || !horizontalScrollRegion || !verticalScrollRegion) {
+  if (
+    graphEmpty ||
+    !navigatorHost ||
+    !graphHost ||
+    !horizontalScrollRegion ||
+    !verticalScrollRegion
+  ) {
+    teardownWikiGraphNavigator();
     return;
   }
 
@@ -1275,14 +1316,20 @@ function setupWikiGraphNavigator() {
       return;
     }
 
+    if (wikiGraphSvgReadyObserver) {
+      wikiGraphSvgReadyObserver.disconnect();
+    }
+
     const readyObserver = new MutationObserver(function onGraphReadyMutation() {
       if (!isGraphSvgReady()) {
         return;
       }
       readyObserver.disconnect();
+      wikiGraphSvgReadyObserver = null;
       delete graphHost.dataset.sowGraphNavigatorWaitingForSvg;
-      setupWikiGraphNavigator();
+      setupWikiGraphNavigatorImpl();
     });
+    wikiGraphSvgReadyObserver = readyObserver;
     readyObserver.observe(root, { childList: true, subtree: true });
     graphHost.dataset.sowGraphNavigatorWaitingForSvg = "1";
     return;
@@ -1291,6 +1338,8 @@ function setupWikiGraphNavigator() {
   if (navigatorHost.dataset.sowGraphNavigatorBound === "1") {
     return;
   }
+
+  teardownWikiGraphNavigator();
 
   let miniSurface = navigatorHost.querySelector("[data-sow-nav='surface']");
   let miniPreview = navigatorHost.querySelector("[data-sow-nav='preview']");
@@ -1309,7 +1358,14 @@ function setupWikiGraphNavigator() {
   }
 
   const state = { dragging: false, previewDirty: true };
+  let disposed = false;
+  let frameRequested = false;
+  let rafId = 0;
+
   const render = function renderNavigator() {
+    if (disposed) {
+      return;
+    }
     const scrollRect = verticalScrollRegion.getBoundingClientRect();
     const contentWidth = Math.max(
       horizontalScrollRegion.scrollWidth || 0,
@@ -1413,19 +1469,25 @@ function setupWikiGraphNavigator() {
     viewport.style.pointerEvents = "none";
   };
 
-  let frameRequested = false;
   const scheduleRender = function scheduleRender() {
-    if (frameRequested) {
+    if (disposed || frameRequested) {
       return;
     }
     frameRequested = true;
-    window.requestAnimationFrame(function onFrame() {
+    rafId = window.requestAnimationFrame(function onFrame() {
       frameRequested = false;
+      rafId = 0;
+      if (disposed) {
+        return;
+      }
       render();
     });
   };
 
   const panToClientPoint = function panToClientPoint(clientX, clientY) {
+    if (disposed) {
+      return;
+    }
     const surfaceRect = miniSurface.getBoundingClientRect();
     const xRatio = clamp(
       (clientX - surfaceRect.left) / Math.max(surfaceRect.width, 1),
@@ -1466,7 +1528,7 @@ function setupWikiGraphNavigator() {
     scheduleRender();
   };
 
-  navigatorHost.addEventListener("pointerdown", function onPointerDown(event) {
+  const onPointerDown = function onPointerDown(event) {
     event.preventDefault();
     state.dragging = true;
     navigatorHost.style.cursor = "grabbing";
@@ -1474,17 +1536,17 @@ function setupWikiGraphNavigator() {
       navigatorHost.setPointerCapture(event.pointerId);
     }
     panToClientPoint(event.clientX, event.clientY);
-  });
+  };
 
-  navigatorHost.addEventListener("pointermove", function onPointerMove(event) {
+  const onPointerMove = function onPointerMove(event) {
     if (!state.dragging) {
       return;
     }
     event.preventDefault();
     panToClientPoint(event.clientX, event.clientY);
-  });
+  };
 
-  navigatorHost.addEventListener("pointerup", function onPointerUp(event) {
+  const onPointerUp = function onPointerUp(event) {
     state.dragging = false;
     navigatorHost.style.cursor = "grab";
     if (navigatorHost.releasePointerCapture) {
@@ -1494,20 +1556,17 @@ function setupWikiGraphNavigator() {
         /* no-op */
       }
     }
-  });
+  };
 
-  navigatorHost.addEventListener("pointercancel", function onPointerCancel() {
+  const onPointerCancel = function onPointerCancel() {
     state.dragging = false;
     navigatorHost.style.cursor = "grab";
-  });
+  };
 
-  horizontalScrollRegion.addEventListener("scroll", scheduleRender, {
-    passive: true,
-  });
+  const scrollOpts = { passive: true };
+  horizontalScrollRegion.addEventListener("scroll", scheduleRender, scrollOpts);
   if (verticalScrollRegion !== horizontalScrollRegion) {
-    verticalScrollRegion.addEventListener("scroll", scheduleRender, {
-      passive: true,
-    });
+    verticalScrollRegion.addEventListener("scroll", scheduleRender, scrollOpts);
   }
   window.addEventListener("resize", scheduleRender);
 
@@ -1519,8 +1578,9 @@ function setupWikiGraphNavigator() {
     attributes: true,
     attributeFilter: ["data-graph"],
   });
+  let shadowObserver = null;
   if (graphHost.shadowRoot) {
-    const shadowObserver = new MutationObserver(function onGraphShadowMutation() {
+    shadowObserver = new MutationObserver(function onGraphShadowMutation() {
       state.previewDirty = true;
       scheduleRender();
     });
@@ -1529,6 +1589,34 @@ function setupWikiGraphNavigator() {
       subtree: true,
     });
   }
+
+  wikiGraphNavigatorTeardown = function wikiGraphNavigatorTeardownInner() {
+    disposed = true;
+    if (rafId) {
+      window.cancelAnimationFrame(rafId);
+      rafId = 0;
+    }
+    frameRequested = false;
+    horizontalScrollRegion.removeEventListener("scroll", scheduleRender, scrollOpts);
+    if (verticalScrollRegion !== horizontalScrollRegion) {
+      verticalScrollRegion.removeEventListener("scroll", scheduleRender, scrollOpts);
+    }
+    window.removeEventListener("resize", scheduleRender);
+    navigatorHost.removeEventListener("pointerdown", onPointerDown);
+    navigatorHost.removeEventListener("pointermove", onPointerMove);
+    navigatorHost.removeEventListener("pointerup", onPointerUp);
+    navigatorHost.removeEventListener("pointercancel", onPointerCancel);
+    observer.disconnect();
+    if (shadowObserver) {
+      shadowObserver.disconnect();
+    }
+    delete navigatorHost.dataset.sowGraphNavigatorBound;
+  };
+
+  navigatorHost.addEventListener("pointerdown", onPointerDown);
+  navigatorHost.addEventListener("pointermove", onPointerMove);
+  navigatorHost.addEventListener("pointerup", onPointerUp);
+  navigatorHost.addEventListener("pointercancel", onPointerCancel);
 
   navigatorHost.dataset.sowGraphNavigatorBound = "1";
   scheduleRender();

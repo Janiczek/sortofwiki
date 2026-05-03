@@ -29,6 +29,7 @@ import HostAdmin
 import Html exposing (Attribute, Html)
 import Html.Attributes as Attr
 import Html.Events as Events
+import Html.Keyed
 import Json.Decode
 import Lamdera
 import Markdown.Block as Block
@@ -14921,7 +14922,10 @@ viewMainAppBody model =
                                 [ Attr.id UI.appMainScrollRegionId
                                 , Attr.class "flex-1 min-h-0 min-w-0 overflow-y-auto overscroll-contain bg-[var(--chrome-bg)] px-0 border-r-0 py-0"
                                 ]
-                                [ viewMainColumnBody model ]
+                                [ Html.Keyed.node "div"
+                                    [ UI.keyedMainBodyWrapperAttr ]
+                                    [ ( Route.navUrlPath model.route, viewMainColumnBody model ) ]
+                                ]
                             , viewWikiListBottomSiteAdminLink model
                             ]
                       ]
@@ -14967,6 +14971,7 @@ viewMainAppBody model =
                         , trimVerticalPadding = True
                         }
                     ]
+                , mainContentKey = Route.navUrlPath model.route
                 , mainBody = viewMainColumnBody model
                 , rightRailSections = rightRail.sections
                 , wikiPageMobileRightRail = wikiPageMobileRightRail
