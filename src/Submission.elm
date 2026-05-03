@@ -1145,8 +1145,10 @@ isUnicodeLetter c =
 isUpperLetter : Char -> Bool
 isUpperLetter c =
     isUnicodeLetter c
-        && c == Char.toUpper c
-        && c /= Char.toLower c
+        && c
+        == Char.toUpper c
+        && c
+        /= Char.toLower c
 
 
 {-| Max length after trim (wiki and page slugs).

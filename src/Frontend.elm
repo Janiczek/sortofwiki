@@ -8,6 +8,7 @@ module Frontend exposing
 
 import Browser
 import Browser.Navigation
+import CacheVersion
 import ColorTheme
 import ContributorAccount
 import ContributorWikiSession exposing (ContributorWikiSession)
@@ -4833,6 +4834,152 @@ update msg model =
                     ( model, Command.none )
 
 
+invalidateSoftCachesForVersions : Wiki.Slug -> CacheVersion.Versions -> Store -> Store
+invalidateSoftCachesForVersions wikiSlug versions store =
+    let
+        wikiStatsNext : Dict Wiki.Slug (Store.Versioned CacheVersion.Versions (Maybe WikiStats.Summary))
+        wikiStatsNext =
+            case Dict.get wikiSlug store.wikiStats of
+                Just cached ->
+                    if CacheVersion.same cached.version versions then
+                        store.wikiStats
+
+                    else
+                        Dict.remove wikiSlug store.wikiStats
+
+                Nothing ->
+                    store.wikiStats
+
+        wikiTodosNext : Dict Wiki.Slug (Store.Versioned Int (Result () (List WikiTodos.TableRow)))
+        wikiTodosNext =
+            case Dict.get wikiSlug store.wikiTodos of
+                Just cached ->
+                    if cached.version >= versions.contentVersion then
+                        store.wikiTodos
+
+                    else
+                        Dict.remove wikiSlug store.wikiTodos
+
+                Nothing ->
+                    store.wikiTodos
+
+        wikiAuditLogsNext : Dict Wiki.Slug (Dict String (Store.Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent))))
+        wikiAuditLogsNext =
+            case Dict.get wikiSlug store.wikiAuditLogs of
+                Just inner ->
+                    if inner |> Dict.values |> List.all (\cached -> cached.version >= versions.auditVersion) then
+                        store.wikiAuditLogs
+
+                    else
+                        Dict.remove wikiSlug store.wikiAuditLogs
+
+                Nothing ->
+                    store.wikiAuditLogs
+    in
+    { store
+        | wikiStats = wikiStatsNext
+        , wikiTodos = wikiTodosNext
+        , wikiAuditLogs = wikiAuditLogsNext
+    }
+
+
+renameWikiSlugInRoute : Wiki.Slug -> Wiki.Slug -> Route -> Route
+renameWikiSlugInRoute oldSlug newSlug route =
+    let
+        rename : Wiki.Slug -> Wiki.Slug
+        rename wikiSlug =
+            if wikiSlug == oldSlug then
+                newSlug
+
+            else
+                wikiSlug
+    in
+    case route of
+        Route.WikiList ->
+            Route.WikiList
+
+        Route.HostAdmin maybeReturnPath ->
+            Route.HostAdmin maybeReturnPath
+
+        Route.HostAdminWikis ->
+            Route.HostAdminWikis
+
+        Route.HostAdminWikiNew ->
+            Route.HostAdminWikiNew
+
+        Route.HostAdminWikiDetail wikiSlug ->
+            Route.HostAdminWikiDetail (rename wikiSlug)
+
+        Route.HostAdminAudit ->
+            Route.HostAdminAudit
+
+        Route.HostAdminAuditDiff wikiSlug atMillis ->
+            Route.HostAdminAuditDiff (rename wikiSlug) atMillis
+
+        Route.HostAdminBackup ->
+            Route.HostAdminBackup
+
+        Route.WikiHome wikiSlug ->
+            Route.WikiHome (rename wikiSlug)
+
+        Route.WikiTodos wikiSlug ->
+            Route.WikiTodos (rename wikiSlug)
+
+        Route.WikiGraph wikiSlug ->
+            Route.WikiGraph (rename wikiSlug)
+
+        Route.WikiSearch wikiSlug ->
+            Route.WikiSearch (rename wikiSlug)
+
+        Route.WikiStats wikiSlug ->
+            Route.WikiStats (rename wikiSlug)
+
+        Route.WikiPage wikiSlug pageSlug ->
+            Route.WikiPage (rename wikiSlug) pageSlug
+
+        Route.WikiPageGraph wikiSlug pageSlug ->
+            Route.WikiPageGraph (rename wikiSlug) pageSlug
+
+        Route.WikiLogin wikiSlug maybeRedirect ->
+            Route.WikiLogin (rename wikiSlug) maybeRedirect
+
+        Route.WikiRegister wikiSlug ->
+            Route.WikiRegister (rename wikiSlug)
+
+        Route.WikiSubmitNew wikiSlug ->
+            Route.WikiSubmitNew (rename wikiSlug)
+
+        Route.WikiSubmitEdit wikiSlug pageSlug ->
+            Route.WikiSubmitEdit (rename wikiSlug) pageSlug
+
+        Route.WikiSubmitDelete wikiSlug pageSlug ->
+            Route.WikiSubmitDelete (rename wikiSlug) pageSlug
+
+        Route.WikiSubmissionDetail wikiSlug submissionId ->
+            Route.WikiSubmissionDetail (rename wikiSlug) submissionId
+
+        Route.WikiMySubmissions wikiSlug ->
+            Route.WikiMySubmissions (rename wikiSlug)
+
+        Route.WikiReview wikiSlug ->
+            Route.WikiReview (rename wikiSlug)
+
+        Route.WikiReviewDetail wikiSlug submissionId ->
+            Route.WikiReviewDetail (rename wikiSlug) submissionId
+
+        Route.WikiAdminUsers wikiSlug ->
+            Route.WikiAdminUsers (rename wikiSlug)
+
+        Route.WikiAdminAudit wikiSlug ->
+            Route.WikiAdminAudit (rename wikiSlug)
+
+        Route.WikiAdminAuditDiff wikiSlug atMillis ->
+            Route.WikiAdminAuditDiff (rename wikiSlug) atMillis
+
+        Route.NotFound url ->
+            Route.NotFound url
+
+
 updateFromBackend : ToFrontend -> Model -> ( Model, Command FrontendOnly ToBackend Msg )
 updateFromBackend msg model =
     case msg of
@@ -4857,6 +5004,52 @@ updateFromBackend msg model =
             , Command.none
             )
 
+        WikiCacheInvalidated wikiSlug versions ->
+            ( { model
+                | store = invalidateSoftCachesForVersions wikiSlug versions model.store
+              }
+            , Command.none
+            )
+                |> runRouteStoreActions
+
+        WikiSlugRenamed oldSlug newSlug ->
+            let
+                nextRoute : Route
+                nextRoute =
+                    renameWikiSlugInRoute oldSlug newSlug model.route
+
+                nextStore : Store
+                nextStore =
+                    Store.renameWikiSlug oldSlug newSlug model.store
+
+                nextContributorWikiSessions : Dict Wiki.Slug ContributorWikiSession
+                nextContributorWikiSessions =
+                    case Dict.get oldSlug model.contributorWikiSessions of
+                        Nothing ->
+                            Dict.remove oldSlug model.contributorWikiSessions
+
+                        Just session ->
+                            model.contributorWikiSessions
+                                |> Dict.remove oldSlug
+                                |> Dict.insert newSlug session
+
+                routeCmd : Command FrontendOnly ToBackend Msg
+                routeCmd =
+                    if nextRoute == model.route then
+                        Command.none
+
+                    else
+                        Effect.Browser.Navigation.replaceUrl model.key (Route.navUrlPath nextRoute)
+            in
+            ( { model
+                | route = nextRoute
+                , store = nextStore
+                , contributorWikiSessions = nextContributorWikiSessions
+              }
+            , routeCmd
+            )
+                |> runRouteStoreActions
+
         WikiFrontendDetailsResponse wikiSlug maybeDetails ->
             let
                 store : Store
@@ -4866,6 +5059,35 @@ updateFromBackend msg model =
                 nextContributorWikiSessions : Dict Wiki.Slug ContributorWikiSession
                 nextContributorWikiSessions =
                     syncContributorWikiSessionFromFrontendDetails wikiSlug maybeDetails model.contributorWikiSessions
+
+                publishedPagesNext : Dict ( Wiki.Slug, Page.Slug ) (RemoteData () Page.FrontendDetails)
+                publishedPagesNext =
+                    case maybeDetails of
+                        Just details ->
+                            case Dict.get wikiSlug store.wikiDetails of
+                                Just (RemoteData.Success previousDetails) ->
+                                    if previousDetails.contentVersion == details.contentVersion then
+                                        store.publishedPages
+
+                                    else
+                                        store.publishedPages
+                                            |> Dict.filter (\( w, _ ) _ -> w /= wikiSlug)
+
+                                Just RemoteData.NotAsked ->
+                                    store.publishedPages
+
+                                Just RemoteData.Loading ->
+                                    store.publishedPages
+
+                                Just (RemoteData.Failure _) ->
+                                    store.publishedPages
+
+                                Nothing ->
+                                    store.publishedPages
+
+                        Nothing ->
+                            store.publishedPages
+                                |> Dict.filter (\( w, _ ) _ -> w /= wikiSlug)
 
                 newStore : Store
                 newStore =
@@ -4877,6 +5099,8 @@ updateFromBackend msg model =
                                         |> Dict.insert wikiSlug (RemoteData.succeed details)
                                 , wikiTodos =
                                     Dict.remove wikiSlug store.wikiTodos
+                                , publishedPages =
+                                    publishedPagesNext
                             }
 
                         Nothing ->
@@ -4886,6 +5110,8 @@ updateFromBackend msg model =
                                         |> Dict.insert wikiSlug (RemoteData.Failure ())
                                 , wikiTodos =
                                     Dict.remove wikiSlug store.wikiTodos
+                                , publishedPages =
+                                    publishedPagesNext
                             }
 
                 nextModel : Model
@@ -4898,7 +5124,7 @@ updateFromBackend msg model =
             ( nextModel, contributorRouteRefreshCmd wikiSlug nextModel )
                 |> runRouteStoreActions
 
-        WikiTodosResponse wikiSlug result ->
+        WikiTodosResponse wikiSlug version result ->
             let
                 store : Store
                 store =
@@ -4908,12 +5134,15 @@ updateFromBackend msg model =
                 nextStore =
                     { store
                         | wikiTodos =
-                            Dict.insert wikiSlug (RemoteData.succeed result) store.wikiTodos
+                            Dict.insert wikiSlug { version = version, value = RemoteData.succeed result } store.wikiTodos
                     }
             in
             ( { model | store = nextStore }, Command.none )
 
-        WikiStatsResponse wikiSlug maybeSummary ->
+        WikiTodosUnchanged ->
+            ( model, Command.none )
+
+        WikiStatsResponse wikiSlug versions maybeSummary ->
             let
                 store : Store
                 store =
@@ -4923,10 +5152,13 @@ updateFromBackend msg model =
                 nextStore =
                     { store
                         | wikiStats =
-                            Dict.insert wikiSlug (RemoteData.succeed maybeSummary) store.wikiStats
+                            Dict.insert wikiSlug { version = versions, value = RemoteData.succeed maybeSummary } store.wikiStats
                     }
             in
             ( { model | store = nextStore }, Command.none )
+
+        WikiStatsUnchanged ->
+            ( model, Command.none )
 
         PageFrontendDetailsResponse wikiSlug pageSlug maybeDetails ->
             let
@@ -5134,7 +5366,7 @@ updateFromBackend msg model =
             )
                 |> runRouteStoreActions
 
-        WikiAuditLogResponse wikiSlug filter result ->
+        WikiAuditLogResponse wikiSlug filter version result ->
             let
                 store : Store
                 store =
@@ -5144,14 +5376,14 @@ updateFromBackend msg model =
                 cacheKey =
                     WikiAuditLog.auditLogFilterCacheKey filter
 
-                inner0 : Dict String (RemoteData () (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent)))
+                inner0 : Dict String (Store.Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent)))
                 inner0 =
                     Dict.get wikiSlug store.wikiAuditLogs
                         |> Maybe.withDefault Dict.empty
 
-                inner1 : Dict String (RemoteData () (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent)))
+                inner1 : Dict String (Store.Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent)))
                 inner1 =
-                    Dict.insert cacheKey (RemoteData.succeed result) inner0
+                    Dict.insert cacheKey { version = version, value = RemoteData.succeed result } inner0
 
                 nextStore : Store
                 nextStore =
@@ -5162,6 +5394,9 @@ updateFromBackend msg model =
             in
             ( { model | store = nextStore }, Command.none )
                 |> runRouteStoreActions
+
+        WikiAuditLogUnchanged _ ->
+            ( model, Command.none )
 
         PromoteContributorToTrustedResponse wikiSlug result ->
             case result of
@@ -12944,7 +13179,7 @@ viewWikiTodosRoute model wikiSlug =
                     viewNotFound
 
                 RemoteData.Success _ ->
-                    case Store.get_ wikiSlug model.store.wikiTodos of
+                    case Store.getWikiTodos wikiSlug model.store of
                         RemoteData.NotAsked ->
                             viewWikiHomeLoading
 
@@ -13453,8 +13688,8 @@ viewWikiStatsSummary wikiSlug stats model =
                     ]
                 ]
             , Html.div
-                [ UI.classAttr "grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-4" ]
-                [ Html.section [ UI.classAttr "min-w-0 space-y-3" ]
+                [ UI.classAttr "flex flex-wrap items-start gap-6 md:gap-4" ]
+                [ Html.section [ UI.classAttr "w-fit max-w-full space-y-3" ]
                     [ Html.h2 [ UI.classAttr "text-[1rem] font-semibold" ] [ Html.text "Top pages by revision count" ]
                     , viewRankedList
                         stats.topPagesByRevision
@@ -13466,7 +13701,7 @@ viewWikiStatsSummary wikiSlug stats model =
                         )
                         wikiSlug
                     ]
-                , Html.section [ UI.classAttr "min-w-0 space-y-3" ]
+                , Html.section [ UI.classAttr "w-fit max-w-full space-y-3" ]
                     [ Html.h2 [ UI.classAttr "text-[1rem] font-semibold" ] [ Html.text "Top pages by edit events" ]
                     , viewRankedList
                         stats.topPagesByEditEvents
@@ -13478,7 +13713,7 @@ viewWikiStatsSummary wikiSlug stats model =
                         )
                         wikiSlug
                     ]
-                , Html.section [ UI.classAttr "min-w-0 space-y-3" ]
+                , Html.section [ UI.classAttr "w-fit max-w-full space-y-3" ]
                     [ Html.h2 [ UI.classAttr "text-[1rem] font-semibold" ] [ Html.text "Top pages by views" ]
                     , viewRankedList
                         stats.topPagesByViews
@@ -13490,7 +13725,7 @@ viewWikiStatsSummary wikiSlug stats model =
                         )
                         wikiSlug
                     ]
-                , Html.section [ UI.classAttr "min-w-0 space-y-3" ]
+                , Html.section [ UI.classAttr "w-fit max-w-full space-y-3" ]
                     [ Html.h2 [ UI.classAttr "text-[1rem] font-semibold" ] [ Html.text "Top pages by in-links" ]
                     , viewRankedList
                         stats.topPagesByInLinks
@@ -13502,7 +13737,7 @@ viewWikiStatsSummary wikiSlug stats model =
                         )
                         wikiSlug
                     ]
-                , Html.section [ UI.classAttr "min-w-0 space-y-3" ]
+                , Html.section [ UI.classAttr "w-fit max-w-full space-y-3" ]
                     [ Html.h2 [ UI.classAttr "text-[1rem] font-semibold" ] [ Html.text "Top pages by out-links" ]
                     , viewRankedList
                         stats.topPagesByOutLinks
@@ -13530,7 +13765,7 @@ viewWikiStatsSummary wikiSlug stats model =
             , Html.section [ UI.classAttr "space-y-3" ]
                 [ Html.h2 [ UI.classAttr "text-[1rem] font-semibold" ] [ Html.text "Totals over time" ]
                 , Html.p [ UI.classAttr "text-[0.8125rem] text-[var(--fg-subtle)]" ]
-                    [ Html.text "End-of-day totals replayed from the audit log (last 30 UTC days that have any audit activity)." ]
+                    [ Html.text "End-of-day totals replayed from full available audit log history." ]
                 , if List.isEmpty stats.dailyAccumulatedSnapshots then
                     Html.p [ UI.classAttr "text-[0.8125rem] text-[var(--fg-subtle)]" ] [ Html.text "No audit-based history to chart yet." ]
 
@@ -13626,6 +13861,7 @@ viewWikiGraphPage wikiSlug wikiDetails =
 
           else
             let
+                graphData : UI.Graph.Graph
                 graphData =
                     WikiGraph.graphFromSummary wikiSlug graphSummary
             in
@@ -13712,6 +13948,7 @@ immediatePublishedPageGraphDescription =
 immediatePublishedPageGraphviz : String -> Wiki.Slug -> Page.Slug -> Wiki.FrontendDetails -> Html Msg
 immediatePublishedPageGraphviz graphvizId wikiSlug pageSlug wikiDetails =
     let
+        graphData : UI.Graph.Graph
         graphData =
             PageGraph.graph wikiSlug pageSlug wikiDetails.publishedPageMarkdownSources wikiDetails.publishedPageTags
     in

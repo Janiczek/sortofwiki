@@ -47,6 +47,7 @@ suite =
               <|
                 \pairs ->
                     let
+                        tops : List { pageSlug : String, viewCount : Int }
                         tops =
                             pairs
                                 |> Dict.fromList
@@ -61,33 +62,40 @@ suite =
         , Test.describe "buildFromAudit"
             [ Test.test "empty events yields empty results" <|
                 \() ->
-                    WikiStats.buildFromAudit []
+                    WikiStats.buildFromAudit (Time.millisToPosix 0) []
                         |> (\r -> ( r.dailyActivityCounts, r.topPagesByEditEvents ))
                         |> Expect.equal ( [], [] )
             , Test.test "TrustedPublishedPageEdit increments daily edits" <|
                 \() ->
-                    WikiStats.buildFromAudit
+                    WikiStats.buildFromAudit (Time.millisToPosix 0)
                         [ auditEvent (WikiAuditLog.TrustedPublishedPageEdit { pageSlug = "Guide", beforeMarkdown = "old", afterMarkdown = "new" }) ]
                         |> .dailyActivityCounts
                         |> List.map .edits
                         |> Expect.equal [ 1 ]
             , Test.test "TrustedPublishedNewPage increments daily creates" <|
                 \() ->
-                    WikiStats.buildFromAudit
+                    WikiStats.buildFromAudit (Time.millisToPosix 0)
                         [ auditEvent (WikiAuditLog.TrustedPublishedNewPage { pageSlug = "NewPage", markdown = "# NewPage" }) ]
                         |> .dailyActivityCounts
                         |> List.map .creates
                         |> Expect.equal [ 1 ]
             , Test.test "TrustedPublishedPageDelete increments daily deletes" <|
                 \() ->
-                    WikiStats.buildFromAudit
+                    WikiStats.buildFromAudit (Time.millisToPosix 0)
                         [ auditEvent (WikiAuditLog.TrustedPublishedPageDelete { pageSlug = "OldPage", reason = "outdated" }) ]
                         |> .dailyActivityCounts
                         |> List.map .deletes
                         |> Expect.equal [ 1 ]
+            , Test.test "fills zero creates on UTC days between last activity and asOf" <|
+                \() ->
+                    WikiStats.buildFromAudit (Time.millisToPosix (2 * 86400000))
+                        [ auditEvent (WikiAuditLog.TrustedPublishedNewPage { pageSlug = "A", markdown = "# A" }) ]
+                        |> .dailyActivityCounts
+                        |> List.map .creates
+                        |> Expect.equal [ 1, 0, 0 ]
             , Test.test "ApprovedPublishedPageEdit counted as edit in top pages" <|
                 \() ->
-                    WikiStats.buildFromAudit
+                    WikiStats.buildFromAudit (Time.millisToPosix 0)
                         [ auditEvent (WikiAuditLog.ApprovedPublishedPageEdit { submissionId = "s1", pageSlug = "Guide" }) ]
                         |> .topPagesByEditEvents
                         |> Expect.equal [ { pageSlug = "Guide", editCount = 1 } ]
@@ -97,12 +105,13 @@ suite =
               <|
                 \slugs ->
                     let
+                        events : List WikiAuditLog.AuditEvent
                         events =
                             slugs
                                 |> List.map
                                     (\s -> auditEvent (WikiAuditLog.TrustedPublishedPageEdit { pageSlug = s, beforeMarkdown = "", afterMarkdown = "" }))
                     in
-                    WikiStats.buildFromAudit events
+                    WikiStats.buildFromAudit (Time.millisToPosix 0) events
                         |> .dailyActivityCounts
                         |> List.all (\r -> r.creates >= 0 && r.edits >= 0 && r.deletes >= 0)
                         |> Expect.equal True
@@ -130,9 +139,11 @@ suite =
                             , topPagesByEditEvents = [ { pageSlug = "A", editCount = 5 } ]
                             }
 
+                        s1 : WikiStats.Summary
                         s1 =
                             WikiStats.merge fromWiki fromAudit { topPagesByViews = [ { pageSlug = "A", viewCount = 100 } ] }
 
+                        s2 : WikiStats.Summary
                         s2 =
                             WikiStats.merge fromWiki fromAudit { topPagesByViews = [ { pageSlug = "B", viewCount = 9999 } ] }
                     in
@@ -172,9 +183,11 @@ suite =
                             , dailyAccumulatedSnapshots = []
                             }
 
+                        s1 : WikiStats.Summary
                         s1 =
                             WikiStats.merge (makeWiki 1) fromAudit fromViews
 
+                        s2 : WikiStats.Summary
                         s2 =
                             WikiStats.merge (makeWiki 999) fromAudit fromViews
                     in
@@ -220,9 +233,13 @@ suite =
                               }
                             ]
 
+                        asOf : Time.Posix
+                        asOf =
+                            Time.millisToPosix 86400000
+
                         fromWiki : WikiStats.FromWiki
                         fromWiki =
-                            WikiStats.buildFromWiki wikiSlug wiki Dict.empty events
+                            WikiStats.buildFromWiki wikiSlug wiki Dict.empty events asOf
                     in
                     Expect.all
                         [ \_ ->
@@ -268,7 +285,7 @@ suite =
 
                         fromWiki : WikiStats.FromWiki
                         fromWiki =
-                            WikiStats.buildFromWiki wikiSlug wiki Dict.empty events
+                            WikiStats.buildFromWiki wikiSlug wiki Dict.empty events day0
 
                         snap : WikiStats.DailyAccumulatedSnapshot
                         snap =
@@ -301,12 +318,13 @@ suite =
 
                         wiki : Wiki.Wiki
                         wiki =
-                            Wiki.wikiWithPages wikiSlug ""
+                            Wiki.wikiWithPages wikiSlug
+                                ""
                                 (Dict.fromList [ ( "A", pageA ), ( "B", pageB ) ])
 
                         fromWiki : WikiStats.FromWiki
                         fromWiki =
-                            WikiStats.buildFromWiki wikiSlug wiki Dict.empty []
+                            WikiStats.buildFromWiki wikiSlug wiki Dict.empty [] (Time.millisToPosix 0)
                     in
                     Expect.all
                         [ \_ ->

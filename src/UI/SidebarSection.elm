@@ -18,5 +18,5 @@ section cfg =
         , TW.cls "max-w-[52rem]"
         ]
         [ UI.Heading.sidebarHeading cfg.title
-        , cfg.body 
+        , cfg.body
         ]

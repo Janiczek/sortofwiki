@@ -285,9 +285,12 @@ suite =
                     renderedGraph.nodes
                         |> List.any
                             (\node ->
-                                node.id == "MissingFocus"
-                                    && node.href == "/w/Demo/p/MissingFocus"
-                                    && node.kind == UI.Graph.MissingFocusedNode
+                                node.id
+                                    == "MissingFocus"
+                                    && node.href
+                                    == "/w/Demo/p/MissingFocus"
+                                    && node.kind
+                                    == UI.Graph.MissingFocusedNode
                             )
                         |> Expect.equal True
             ]

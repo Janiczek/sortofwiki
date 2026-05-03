@@ -10,8 +10,8 @@ import UI
 import UI.FocusVisible
 import UI.Heading
 import UI.Link
-import Wiki
 import Url exposing (Url)
+import Wiki
 import WikiPageMarkdownParse
 
 

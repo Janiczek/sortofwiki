@@ -2,14 +2,18 @@ module Store exposing
     ( Action(..)
     , Config
     , Store
+    , Versioned
     , empty
     , get
     , getWikiAuditLog
     , getWikiStats
+    , getWikiTodos
     , get_
     , perform
+    , renameWikiSlug
     )
 
+import CacheVersion
 import Dict exposing (Dict)
 import Effect.Command as Command exposing (Command, FrontendOnly)
 import Effect.Lamdera
@@ -42,11 +46,17 @@ type alias Store =
     , wikiUsers :
         Dict Wiki.Slug (RemoteData () (Result WikiAdminUsers.Error (List WikiAdminUsers.ListedUser)))
     , wikiAuditLogs :
-        Dict Wiki.Slug (Dict String (RemoteData () (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent))))
+        Dict Wiki.Slug (Dict String (Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent))))
     , wikiTodos :
-        Dict Wiki.Slug (RemoteData () (Result () (List WikiTodos.TableRow)))
+        Dict Wiki.Slug (Versioned Int (Result () (List WikiTodos.TableRow)))
     , wikiStats :
-        Dict Wiki.Slug (RemoteData () (Maybe WikiStats.Summary))
+        Dict Wiki.Slug (Versioned CacheVersion.Versions (Maybe WikiStats.Summary))
+    }
+
+
+type alias Versioned version value =
+    { version : version
+    , value : RemoteData () value
     }
 
 
@@ -89,10 +99,10 @@ type alias Config toBackend =
     , requestReviewQueue : Wiki.Slug -> toBackend
     , requestReviewSubmissionDetail : Wiki.Slug -> String -> toBackend
     , requestWikiUsers : Wiki.Slug -> toBackend
-    , requestWikiAuditLog : Wiki.Slug -> WikiAuditLog.AuditLogFilter -> toBackend
+    , requestWikiAuditLog : Wiki.Slug -> WikiAuditLog.AuditLogFilter -> Maybe Int -> toBackend
     , requestSubmissionDetails : Wiki.Slug -> String -> toBackend
-    , requestWikiTodos : Wiki.Slug -> toBackend
-    , requestWikiStats : Wiki.Slug -> toBackend
+    , requestWikiTodos : Wiki.Slug -> Maybe Int -> toBackend
+    , requestWikiStats : Wiki.Slug -> Maybe CacheVersion.Versions -> toBackend
     }
 
 
@@ -137,27 +147,32 @@ perform config action store =
                 startLoad =
                     ( { store
                         | wikiTodos =
-                            Dict.insert wikiSlug Loading store.wikiTodos
+                            Dict.insert wikiSlug { version = 0, value = Loading } store.wikiTodos
                       }
-                    , Effect.Lamdera.sendToBackend (config.requestWikiTodos wikiSlug)
+                    , Effect.Lamdera.sendToBackend (config.requestWikiTodos wikiSlug Nothing)
                     )
             in
-            case Dict.get wikiSlug store.wikiTodos |> join of
-                Success (Ok _) ->
-                    ( store
-                    , Effect.Lamdera.sendToBackend (config.requestWikiTodos wikiSlug)
-                    )
+            case Dict.get wikiSlug store.wikiTodos of
+                Just cached ->
+                    case cached.value of
+                        Success (Ok _) ->
+                            ( store
+                            , Effect.Lamdera.sendToBackend (config.requestWikiTodos wikiSlug (Just cached.version))
+                            )
 
-                Success (Err _) ->
-                    startLoad
+                        Success (Err _) ->
+                            startLoad
 
-                Loading ->
-                    ( store, Command.none )
+                        Loading ->
+                            ( store, Command.none )
 
-                Failure _ ->
-                    startLoad
+                        Failure _ ->
+                            startLoad
 
-                NotAsked ->
+                        NotAsked ->
+                            startLoad
+
+                Nothing ->
                     startLoad
 
         AskForPageFrontendDetails wikiSlug pageSlug ->
@@ -338,7 +353,7 @@ perform config action store =
                 cacheKey =
                     WikiAuditLog.auditLogFilterCacheKey filter
 
-                inner0 : Dict String (RemoteData () (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent)))
+                inner0 : Dict String (Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent)))
                 inner0 =
                     Dict.get wikiSlug store.wikiAuditLogs
                         |> Maybe.withDefault Dict.empty
@@ -346,32 +361,36 @@ perform config action store =
                 startLoad : ( Store, Command FrontendOnly toBackend msg )
                 startLoad =
                     let
-                        inner1 : Dict String (RemoteData () (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent)))
+                        inner1 : Dict String (Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent)))
                         inner1 =
-                            Dict.insert cacheKey Loading inner0
+                            Dict.insert cacheKey { version = 0, value = Loading } inner0
                     in
                     ( { store
                         | wikiAuditLogs =
                             Dict.insert wikiSlug inner1 store.wikiAuditLogs
                       }
-                    , Effect.Lamdera.sendToBackend (config.requestWikiAuditLog wikiSlug filter)
+                    , Effect.Lamdera.sendToBackend (config.requestWikiAuditLog wikiSlug filter Nothing)
                     )
             in
             case Dict.get cacheKey inner0 of
-                Just (Success (Ok _)) ->
-                    ( store, Command.none )
+                Just cached ->
+                    case cached.value of
+                        Success (Ok _) ->
+                            ( store
+                            , Effect.Lamdera.sendToBackend (config.requestWikiAuditLog wikiSlug filter (Just cached.version))
+                            )
 
-                Just (Success (Err _)) ->
-                    startLoad
+                        Success (Err _) ->
+                            startLoad
 
-                Just Loading ->
-                    ( store, Command.none )
+                        Loading ->
+                            ( store, Command.none )
 
-                Just (Failure _) ->
-                    startLoad
+                        Failure _ ->
+                            startLoad
 
-                Just NotAsked ->
-                    startLoad
+                        NotAsked ->
+                            startLoad
 
                 Nothing ->
                     startLoad
@@ -382,20 +401,20 @@ perform config action store =
                 cacheKey =
                     WikiAuditLog.auditLogFilterCacheKey filter
 
-                inner0 : Dict String (RemoteData () (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent)))
+                inner0 : Dict String (Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent)))
                 inner0 =
                     Dict.get wikiSlug store.wikiAuditLogs
                         |> Maybe.withDefault Dict.empty
 
-                inner1 : Dict String (RemoteData () (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent)))
+                inner1 : Dict String (Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent)))
                 inner1 =
-                    Dict.insert cacheKey Loading inner0
+                    Dict.insert cacheKey { version = 0, value = Loading } inner0
             in
             ( { store
                 | wikiAuditLogs =
                     Dict.insert wikiSlug inner1 store.wikiAuditLogs
               }
-            , Effect.Lamdera.sendToBackend (config.requestWikiAuditLog wikiSlug filter)
+            , Effect.Lamdera.sendToBackend (config.requestWikiAuditLog wikiSlug filter Nothing)
             )
 
         AskForWikiStats wikiSlug ->
@@ -404,24 +423,29 @@ perform config action store =
                 startLoad =
                     ( { store
                         | wikiStats =
-                            Dict.insert wikiSlug Loading store.wikiStats
+                            Dict.insert wikiSlug { version = CacheVersion.zero, value = Loading } store.wikiStats
                       }
-                    , Effect.Lamdera.sendToBackend (config.requestWikiStats wikiSlug)
+                    , Effect.Lamdera.sendToBackend (config.requestWikiStats wikiSlug Nothing)
                     )
             in
-            case Dict.get wikiSlug store.wikiStats |> join of
-                Loading ->
-                    ( store, Command.none )
+            case Dict.get wikiSlug store.wikiStats of
+                Just cached ->
+                    case cached.value of
+                        Loading ->
+                            ( store, Command.none )
 
-                Success _ ->
-                    ( store
-                    , Effect.Lamdera.sendToBackend (config.requestWikiStats wikiSlug)
-                    )
+                        Success _ ->
+                            ( store
+                            , Effect.Lamdera.sendToBackend (config.requestWikiStats wikiSlug (Just cached.version))
+                            )
 
-                Failure _ ->
-                    startLoad
+                        Failure _ ->
+                            startLoad
 
-                NotAsked ->
+                        NotAsked ->
+                            startLoad
+
+                Nothing ->
                     startLoad
 
 
@@ -440,8 +464,8 @@ getWikiAuditLog wikiSlug filter store =
                 Nothing ->
                     NotAsked
 
-                Just remote ->
-                    remote
+                Just cached ->
+                    cached.value
 
 
 get : comparable -> RemoteData f (Dict comparable b) -> RemoteData f b
@@ -478,7 +502,73 @@ get_ key dict =
 getWikiStats : Wiki.Slug -> Store -> RemoteData () (Maybe WikiStats.Summary)
 getWikiStats wikiSlug store =
     Dict.get wikiSlug store.wikiStats
+        |> Maybe.map .value
         |> Maybe.withDefault NotAsked
+
+
+getWikiTodos : Wiki.Slug -> Store -> RemoteData () (Result () (List WikiTodos.TableRow))
+getWikiTodos wikiSlug store =
+    Dict.get wikiSlug store.wikiTodos
+        |> Maybe.map .value
+        |> Maybe.withDefault NotAsked
+
+
+renameWikiSlug : Wiki.Slug -> Wiki.Slug -> Store -> Store
+renameWikiSlug oldSlug newSlug store =
+    let
+        remapDictKey : comparable -> comparable -> Dict comparable value -> Dict comparable value
+        remapDictKey oldKey newKey dict =
+            case Dict.get oldKey dict of
+                Nothing ->
+                    Dict.remove oldKey dict
+
+                Just value ->
+                    dict
+                        |> Dict.remove oldKey
+                        |> Dict.insert newKey value
+    in
+    { store
+        | wikiDetails = remapDictKey oldSlug newSlug store.wikiDetails
+        , publishedPages =
+            store.publishedPages
+                |> Dict.foldl
+                    (\( wikiSlug, pageSlug ) value acc ->
+                        if wikiSlug == oldSlug then
+                            Dict.insert ( newSlug, pageSlug ) value acc
+
+                        else
+                            Dict.insert ( wikiSlug, pageSlug ) value acc
+                    )
+                    Dict.empty
+        , reviewQueues = remapDictKey oldSlug newSlug store.reviewQueues
+        , myPendingSubmissions = remapDictKey oldSlug newSlug store.myPendingSubmissions
+        , submissionDetails =
+            store.submissionDetails
+                |> Dict.foldl
+                    (\( wikiSlug, submissionId ) value acc ->
+                        if wikiSlug == oldSlug then
+                            Dict.insert ( newSlug, submissionId ) value acc
+
+                        else
+                            Dict.insert ( wikiSlug, submissionId ) value acc
+                    )
+                    Dict.empty
+        , reviewSubmissionDetails =
+            store.reviewSubmissionDetails
+                |> Dict.foldl
+                    (\( wikiSlug, submissionId ) value acc ->
+                        if wikiSlug == oldSlug then
+                            Dict.insert ( newSlug, submissionId ) value acc
+
+                        else
+                            Dict.insert ( wikiSlug, submissionId ) value acc
+                    )
+                    Dict.empty
+        , wikiUsers = remapDictKey oldSlug newSlug store.wikiUsers
+        , wikiAuditLogs = remapDictKey oldSlug newSlug store.wikiAuditLogs
+        , wikiTodos = remapDictKey oldSlug newSlug store.wikiTodos
+        , wikiStats = remapDictKey oldSlug newSlug store.wikiStats
+    }
 
 
 join : Maybe (RemoteData f b) -> RemoteData f b

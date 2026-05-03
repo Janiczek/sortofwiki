@@ -44,4 +44,3 @@ toggleRailButton { expanded, onToggle } =
                 [ Html.text "▸" ]
             ]
         ]
-

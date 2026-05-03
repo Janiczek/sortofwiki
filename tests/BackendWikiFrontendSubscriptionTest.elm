@@ -192,6 +192,15 @@ suite =
                                             (WikiFrontendDetailsResponse "Demo" demoPayload)
                                         ]
                                     ]
+                                , Command.batch
+                                    [ Effect.Lamdera.sendToFrontend demoListenerClient
+                                        (WikiCacheInvalidated "Demo"
+                                            { contentVersion = 7
+                                            , auditVersion = 8
+                                            , viewsVersion = 0
+                                            }
+                                        )
+                                    ]
                                 ]
                             )
             ]

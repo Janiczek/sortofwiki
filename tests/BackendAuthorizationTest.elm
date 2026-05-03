@@ -108,7 +108,7 @@ suite =
                     , ( "RequestReviewQueue", RequestReviewQueue "Demo" )
                     , ( "RequestReviewSubmissionDetail", RequestReviewSubmissionDetail "Demo" "sub_1" )
                     , ( "RequestWikiUsers", RequestWikiUsers "Demo" )
-                    , ( "RequestWikiAuditLog", RequestWikiAuditLog "Demo" WikiAuditLog.emptyAuditLogFilter )
+                    , ( "RequestWikiAuditLog", RequestWikiAuditLog "Demo" WikiAuditLog.emptyAuditLogFilter Nothing )
                     , ( "PromoteContributorToTrusted", PromoteContributorToTrusted "Demo" "x" )
                     , ( "DemoteTrustedToContributor", DemoteTrustedToContributor "Demo" "x" )
                     , ( "GrantWikiAdmin", GrantWikiAdmin "Demo" "x" )
@@ -157,7 +157,7 @@ suite =
                         expectUnchanged demoContributorOnDemo (RequestWikiUsers "Demo")
                 , Test.test "RequestWikiAuditLog returns forbidden without changing model" <|
                     \() ->
-                        expectUnchanged demoContributorOnDemo (RequestWikiAuditLog "Demo" WikiAuditLog.emptyAuditLogFilter)
+                        expectUnchanged demoContributorOnDemo (RequestWikiAuditLog "Demo" WikiAuditLog.emptyAuditLogFilter Nothing)
                 , Test.test "RequestHostAuditLog leaves model unchanged without host session" <|
                     \() ->
                         expectUnchanged demoContributorOnDemo (RequestHostAuditLog WikiAuditLog.emptyHostAuditLogFilter)

@@ -1,6 +1,7 @@
 module Backend exposing (Model, Msg, app, app_, updateFromFrontendWithTime)
 
 import BackendDataExport
+import CacheVersion
 import ContributorAccount
 import ContributorWikiSession
 import Dict exposing (Dict)
@@ -65,6 +66,28 @@ applyHostedWikiSlugRename oldSlug newSlug nextWiki model =
                     model.pageViewCounts
                         |> Dict.remove oldSlug
                         |> Dict.insert newSlug counts
+
+        nextAuditVersions : Dict Wiki.Slug Int
+        nextAuditVersions =
+            case Dict.get oldSlug model.wikiAuditVersions of
+                Nothing ->
+                    Dict.remove oldSlug model.wikiAuditVersions
+
+                Just version ->
+                    model.wikiAuditVersions
+                        |> Dict.remove oldSlug
+                        |> Dict.insert newSlug version
+
+        nextViewsVersions : Dict Wiki.Slug Int
+        nextViewsVersions =
+            case Dict.get oldSlug model.wikiViewsVersions of
+                Nothing ->
+                    Dict.remove oldSlug model.wikiViewsVersions
+
+                Just version ->
+                    model.wikiViewsVersions
+                        |> Dict.remove oldSlug
+                        |> Dict.insert newSlug version
     in
     { model
         | wikis =
@@ -75,6 +98,7 @@ applyHostedWikiSlugRename oldSlug newSlug nextWiki model =
         , contributorSessions = WikiUser.remapSessionsForWikiSlugRename oldSlug newSlug model.contributorSessions
         , submissions = Submission.remapWikiSlugInSubmissions oldSlug newSlug model.submissions
         , wikiAuditEvents = nextAudit
+        , wikiAuditVersions = nextAuditVersions
         , pendingReviewCounts =
             PendingReviewCount.remapSlugInPendingCounts oldSlug newSlug model.pendingReviewCounts
         , pendingReviewClients =
@@ -91,6 +115,7 @@ applyHostedWikiSlugRename oldSlug newSlug nextWiki model =
                 |> Dict.insert newSlug
                     (WikiTodos.tableRows newSlug (Wiki.frontendDetails nextWiki).publishedPageMarkdownSources)
         , pageViewCounts = nextPageViewCounts
+        , wikiViewsVersions = nextViewsVersions
         , wikiStatsCache = Dict.remove oldSlug model.wikiStatsCache
     }
 
@@ -121,12 +146,12 @@ withWikiTodosCache wikiSlug wiki model =
     }
 
 
-withWikiSearchAndTodosCaches : Wiki.Slug -> Wiki -> Model -> Model
-withWikiSearchAndTodosCaches wikiSlug wiki model =
+withWikiSearchAndTodosCaches : Wiki.Slug -> Wiki -> Time.Posix -> Model -> Model
+withWikiSearchAndTodosCaches wikiSlug wiki now model =
     model
         |> withWikiSearchIndex wikiSlug wiki
         |> withWikiTodosCache wikiSlug wiki
-        |> withWikiStatsWikiCache wikiSlug wiki
+        |> withWikiStatsWikiCache wikiSlug wiki now
 
 
 withRebuiltAllWikiSearchIndexes : Model -> Model
@@ -147,16 +172,16 @@ withRebuiltAllWikiTodosCaches model =
     }
 
 
-withRebuiltAllSearchAndTodosCaches : Model -> Model
-withRebuiltAllSearchAndTodosCaches model =
+withRebuiltAllSearchAndTodosCaches : Time.Posix -> Model -> Model
+withRebuiltAllSearchAndTodosCaches now model =
     model
         |> withRebuiltAllWikiSearchIndexes
         |> withRebuiltAllWikiTodosCaches
-        |> withRebuiltAllWikiStatsCaches
+        |> withRebuiltAllWikiStatsCaches now
 
 
-withWikiStatsWikiCache : Wiki.Slug -> Wiki -> Model -> Model
-withWikiStatsWikiCache wikiSlug wiki model =
+withWikiStatsWikiCache : Wiki.Slug -> Wiki -> Time.Posix -> Model -> Model
+withWikiStatsWikiCache wikiSlug wiki now model =
     let
         auditEvents : List WikiAuditLog.AuditEvent
         auditEvents =
@@ -165,7 +190,7 @@ withWikiStatsWikiCache wikiSlug wiki model =
 
         fromWiki : WikiStats.FromWiki
         fromWiki =
-            WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents
+            WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents now
 
         partitions : WikiStatsPartitions
         partitions =
@@ -181,15 +206,15 @@ withWikiStatsWikiCache wikiSlug wiki model =
                                 |> Maybe.withDefault Dict.empty
                     in
                     { fromWiki = fromWiki
-                    , fromAudit = WikiStats.buildFromAudit auditEvents
+                    , fromAudit = WikiStats.buildFromAudit now auditEvents
                     , fromViews = WikiStats.buildFromViews viewCounts
                     }
     in
     { model | wikiStatsCache = Dict.insert wikiSlug partitions model.wikiStatsCache }
 
 
-withWikiStatsAuditCache : Wiki.Slug -> Model -> Model
-withWikiStatsAuditCache wikiSlug model =
+withWikiStatsAuditCache : Wiki.Slug -> Time.Posix -> Model -> Model
+withWikiStatsAuditCache wikiSlug now model =
     let
         auditEvents : List WikiAuditLog.AuditEvent
         auditEvents =
@@ -198,7 +223,7 @@ withWikiStatsAuditCache wikiSlug model =
 
         fromAudit : WikiStats.FromAudit
         fromAudit =
-            WikiStats.buildFromAudit auditEvents
+            WikiStats.buildFromAudit now auditEvents
 
         partitions : WikiStatsPartitions
         partitions =
@@ -209,10 +234,10 @@ withWikiStatsAuditCache wikiSlug model =
                         fromWiki =
                             case Dict.get wikiSlug model.wikis of
                                 Just wiki ->
-                                    WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents
+                                    WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents now
 
                                 Nothing ->
-                                    WikiStats.buildFromWiki wikiSlug (Wiki.wikiWithPages wikiSlug "" Dict.empty) model.submissions auditEvents
+                                    WikiStats.buildFromWiki wikiSlug (Wiki.wikiWithPages wikiSlug "" Dict.empty) model.submissions auditEvents now
                     in
                     { existing | fromAudit = fromAudit, fromWiki = fromWiki }
 
@@ -227,10 +252,10 @@ withWikiStatsAuditCache wikiSlug model =
                         fromWiki =
                             case Dict.get wikiSlug model.wikis of
                                 Just wiki ->
-                                    WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents
+                                    WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents now
 
                                 Nothing ->
-                                    WikiStats.buildFromWiki wikiSlug (Wiki.wikiWithPages wikiSlug "" Dict.empty) model.submissions auditEvents
+                                    WikiStats.buildFromWiki wikiSlug (Wiki.wikiWithPages wikiSlug "" Dict.empty) model.submissions auditEvents now
                     in
                     { fromWiki = fromWiki
                     , fromAudit = fromAudit
@@ -240,8 +265,32 @@ withWikiStatsAuditCache wikiSlug model =
     { model | wikiStatsCache = Dict.insert wikiSlug partitions model.wikiStatsCache }
 
 
-withWikiStatsViewsCache : Wiki.Slug -> Model -> Model
-withWikiStatsViewsCache wikiSlug model =
+withWikiStatsViewsCacheHit : Wiki.Slug -> Model -> Model
+withWikiStatsViewsCacheHit wikiSlug model =
+    case Dict.get wikiSlug model.wikiStatsCache of
+        Just existing ->
+            let
+                viewCounts : Dict Page.Slug Int
+                viewCounts =
+                    Dict.get wikiSlug model.pageViewCounts
+                        |> Maybe.withDefault Dict.empty
+
+                fromViews : WikiStats.FromViews
+                fromViews =
+                    WikiStats.buildFromViews viewCounts
+
+                partitions : WikiStatsPartitions
+                partitions =
+                    { existing | fromViews = fromViews }
+            in
+            { model | wikiStatsCache = Dict.insert wikiSlug partitions model.wikiStatsCache }
+
+        Nothing ->
+            model
+
+
+withWikiStatsViewsCacheMiss : Wiki.Slug -> Time.Posix -> Model -> Model
+withWikiStatsViewsCacheMiss wikiSlug now model =
     let
         viewCounts : Dict Page.Slug Int
         viewCounts =
@@ -252,38 +301,32 @@ withWikiStatsViewsCache wikiSlug model =
         fromViews =
             WikiStats.buildFromViews viewCounts
 
-        partitions : WikiStatsPartitions
-        partitions =
-            case Dict.get wikiSlug model.wikiStatsCache of
-                Just existing ->
-                    { existing | fromViews = fromViews }
+        auditEvents : List WikiAuditLog.AuditEvent
+        auditEvents =
+            Dict.get wikiSlug model.wikiAuditEvents
+                |> Maybe.withDefault []
+
+        fromWiki : WikiStats.FromWiki
+        fromWiki =
+            case Dict.get wikiSlug model.wikis of
+                Just wiki ->
+                    WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents now
 
                 Nothing ->
-                    let
-                        auditEvents : List WikiAuditLog.AuditEvent
-                        auditEvents =
-                            Dict.get wikiSlug model.wikiAuditEvents
-                                |> Maybe.withDefault []
+                    WikiStats.buildFromWiki wikiSlug (Wiki.wikiWithPages wikiSlug "" Dict.empty) model.submissions auditEvents now
 
-                        fromWiki : WikiStats.FromWiki
-                        fromWiki =
-                            case Dict.get wikiSlug model.wikis of
-                                Just wiki ->
-                                    WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents
-
-                                Nothing ->
-                                    WikiStats.buildFromWiki wikiSlug (Wiki.wikiWithPages wikiSlug "" Dict.empty) model.submissions auditEvents
-                    in
-                    { fromWiki = fromWiki
-                    , fromAudit = WikiStats.buildFromAudit auditEvents
-                    , fromViews = fromViews
-                    }
+        partitions : WikiStatsPartitions
+        partitions =
+            { fromWiki = fromWiki
+            , fromAudit = WikiStats.buildFromAudit now auditEvents
+            , fromViews = fromViews
+            }
     in
     { model | wikiStatsCache = Dict.insert wikiSlug partitions model.wikiStatsCache }
 
 
-withRebuiltAllWikiStatsCaches : Model -> Model
-withRebuiltAllWikiStatsCaches model =
+withRebuiltAllWikiStatsCaches : Time.Posix -> Model -> Model
+withRebuiltAllWikiStatsCaches now model =
     let
         nextCache : Dict Wiki.Slug WikiStatsPartitions
         nextCache =
@@ -301,8 +344,8 @@ withRebuiltAllWikiStatsCaches model =
                                 Dict.get wikiSlug model.pageViewCounts
                                     |> Maybe.withDefault Dict.empty
                         in
-                        { fromWiki = WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents
-                        , fromAudit = WikiStats.buildFromAudit auditEvents
+                        { fromWiki = WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents now
+                        , fromAudit = WikiStats.buildFromAudit now auditEvents
                         , fromViews = WikiStats.buildFromViews viewCounts
                         }
                     )
@@ -310,8 +353,49 @@ withRebuiltAllWikiStatsCaches model =
     { model | wikiStatsCache = nextCache }
 
 
-incrementPageView : Wiki.Slug -> Page.Slug -> Model -> Model
-incrementPageView wikiSlug pageSlug model =
+cacheVersionsForWiki : Wiki.Slug -> Model -> CacheVersion.Versions
+cacheVersionsForWiki wikiSlug model =
+    { contentVersion =
+        model.wikis
+            |> Dict.get wikiSlug
+            |> Maybe.map .contentVersion
+            |> Maybe.withDefault 0
+    , auditVersion =
+        Dict.get wikiSlug model.wikiAuditVersions
+            |> Maybe.withDefault
+                (model.wikiAuditEvents
+                    |> Dict.get wikiSlug
+                    |> Maybe.map List.length
+                    |> Maybe.withDefault 0
+                )
+    , viewsVersion =
+        Dict.get wikiSlug model.wikiViewsVersions
+            |> Maybe.withDefault 0
+    }
+
+
+bumpAuditVersion : Wiki.Slug -> Model -> Model
+bumpAuditVersion wikiSlug model =
+    { model
+        | wikiAuditVersions =
+            Dict.update wikiSlug
+                (\maybeVersion -> Just (Maybe.withDefault 0 maybeVersion + 1))
+                model.wikiAuditVersions
+    }
+
+
+bumpViewsVersion : Wiki.Slug -> Model -> Model
+bumpViewsVersion wikiSlug model =
+    { model
+        | wikiViewsVersions =
+            Dict.update wikiSlug
+                (\maybeVersion -> Just (Maybe.withDefault 0 maybeVersion + 1))
+                model.wikiViewsVersions
+    }
+
+
+incrementPageView : Wiki.Slug -> Page.Slug -> Time.Posix -> Model -> Model
+incrementPageView wikiSlug pageSlug now model =
     let
         wikiCounts : Dict Page.Slug Int
         wikiCounts =
@@ -323,9 +407,18 @@ incrementPageView wikiSlug pageSlug model =
             Dict.update pageSlug
                 (\mv -> Just (Maybe.withDefault 0 mv + 1))
                 wikiCounts
+
+        pageViewUpdated : Model
+        pageViewUpdated =
+            { model | pageViewCounts = Dict.insert wikiSlug newWikiCounts model.pageViewCounts }
+                |> bumpViewsVersion wikiSlug
     in
-    { model | pageViewCounts = Dict.insert wikiSlug newWikiCounts model.pageViewCounts }
-        |> withWikiStatsViewsCache wikiSlug
+    case Dict.get wikiSlug pageViewUpdated.wikiStatsCache of
+        Just _ ->
+            withWikiStatsViewsCacheHit wikiSlug pageViewUpdated
+
+        Nothing ->
+            withWikiStatsViewsCacheMiss wikiSlug now pageViewUpdated
 
 
 pendingCountForWiki : Wiki.Slug -> Model -> Int
@@ -502,7 +595,8 @@ recordAudit now wikiSlug actorId kind model =
                     WikiAuditLog.append wikiSlug now actor kind model.wikiAuditEvents
             }
     in
-    withWikiStatsAuditCache wikiSlug nextModel
+    withWikiStatsAuditCache wikiSlug now nextModel
+        |> bumpAuditVersion wikiSlug
 
 
 {-| Push fresh `Wiki.frontendDetails` so all clients keep tag maps and link sources aligned after publish/delete.
@@ -528,6 +622,49 @@ broadcastWikiFrontendDetails wikiSlug model =
         |> Command.batch
 
 
+broadcastWikiCacheInvalidated : Wiki.Slug -> Model -> Command BackendOnly ToFrontend Msg
+broadcastWikiCacheInvalidated wikiSlug model =
+    let
+        msg : ToFrontend
+        msg =
+            WikiCacheInvalidated wikiSlug (cacheVersionsForWiki wikiSlug model)
+    in
+    WikiFrontendSubscription.listenerSessionsForWiki wikiSlug model.wikiFrontendClients
+        |> Dict.values
+        |> List.concatMap Set.toList
+        |> List.map
+            (\targetClientId ->
+                Effect.Lamdera.sendToFrontend
+                    (Effect.Lamdera.clientIdFromString targetClientId)
+                    msg
+            )
+        |> Command.batch
+
+
+broadcastWikiCatalog : Model -> Command BackendOnly ToFrontend Msg
+broadcastWikiCatalog model =
+    Effect.Lamdera.broadcast (WikiCatalogResponse (Wiki.publicCatalogDict model.wikis))
+
+
+broadcastWikiSlugRenamed : Wiki.Slug -> Wiki.Slug -> Model -> Command BackendOnly ToFrontend Msg
+broadcastWikiSlugRenamed oldSlug newSlug model =
+    let
+        msg : ToFrontend
+        msg =
+            WikiSlugRenamed oldSlug newSlug
+    in
+    WikiFrontendSubscription.listenerSessionsForWiki newSlug model.wikiFrontendClients
+        |> Dict.values
+        |> List.concatMap Set.toList
+        |> List.map
+            (\targetClientId ->
+                Effect.Lamdera.sendToFrontend
+                    (Effect.Lamdera.clientIdFromString targetClientId)
+                    msg
+            )
+        |> Command.batch
+
+
 init : ( Model, Command BackendOnly ToFrontend Msg )
 init =
     ( { wikis = Dict.empty
@@ -537,12 +674,14 @@ init =
       , submissions = Dict.empty
       , nextSubmissionCounter = 1
       , wikiAuditEvents = Dict.empty
+      , wikiAuditVersions = Dict.empty
       , pendingReviewCounts = PendingReviewCount.emptyCountMap
       , pendingReviewClients = PendingReviewCount.emptyClientSets
       , wikiFrontendClients = WikiFrontendSubscription.emptyClientSets
       , wikiSearchIndexes = Dict.empty
       , wikiTodosCaches = Dict.empty
       , pageViewCounts = Dict.empty
+      , wikiViewsVersions = Dict.empty
       , wikiStatsCache = Dict.empty
       }
     , Command.none
@@ -635,24 +774,29 @@ updateFromFrontendWithTime sessionId clientId msg now model =
             , Effect.Lamdera.sendToFrontend clientId (WikiFrontendDetailsResponse slug payload)
             )
 
-        RequestWikiTodos slug ->
+        RequestWikiTodos slug maybeKnownVersion ->
             let
                 respond : Model -> List WikiTodos.TableRow -> ( Model, Command BackendOnly ToFrontend Msg )
                 respond m rows =
                     ( m
-                    , Effect.Lamdera.sendToFrontend clientId (WikiTodosResponse slug (Ok rows))
+                    , Effect.Lamdera.sendToFrontend clientId (WikiTodosResponse slug (cacheVersionsForWiki slug m).contentVersion (Ok rows))
                     )
             in
             case Dict.get slug model.wikis of
                 Nothing ->
                     ( model
-                    , Effect.Lamdera.sendToFrontend clientId (WikiTodosResponse slug (Err ()))
+                    , Effect.Lamdera.sendToFrontend clientId (WikiTodosResponse slug 0 (Err ()))
                     )
 
                 Just wiki ->
                     if not wiki.active then
                         ( model
-                        , Effect.Lamdera.sendToFrontend clientId (WikiTodosResponse slug (Err ()))
+                        , Effect.Lamdera.sendToFrontend clientId (WikiTodosResponse slug wiki.contentVersion (Err ()))
+                        )
+
+                    else if maybeKnownVersion == Just wiki.contentVersion then
+                        ( model
+                        , Effect.Lamdera.sendToFrontend clientId WikiTodosUnchanged
                         )
 
                     else
@@ -693,18 +837,30 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                 nextModel =
                     case maybeDetails of
                         Just _ ->
-                            incrementPageView wikiSlug pageSlug model
+                            incrementPageView wikiSlug pageSlug now model
 
                         Nothing ->
                             model
             in
             ( nextModel
-            , Effect.Lamdera.sendToFrontend clientId
-                (PageFrontendDetailsResponse wikiSlug pageSlug maybeDetails)
+            , Command.batch
+                [ Effect.Lamdera.sendToFrontend clientId
+                    (PageFrontendDetailsResponse wikiSlug pageSlug maybeDetails)
+                , case maybeDetails of
+                    Just _ ->
+                        broadcastWikiCacheInvalidated wikiSlug nextModel
+
+                    Nothing ->
+                        Command.none
+                ]
             )
 
-        RequestWikiStats wikiSlug ->
+        RequestWikiStats wikiSlug maybeKnownVersions ->
             let
+                versions : CacheVersion.Versions
+                versions =
+                    cacheVersionsForWiki wikiSlug model
+
                 maybeSummary : Maybe WikiStats.Summary
                 maybeSummary =
                     case Dict.get wikiSlug model.wikis of
@@ -735,16 +891,29 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                         Dict.get wikiSlug model.pageViewCounts
                                                             |> Maybe.withDefault Dict.empty
                                                 in
-                                                { fromWiki = WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents
-                                                , fromAudit = WikiStats.buildFromAudit auditEvents
+                                                { fromWiki = WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents now
+                                                , fromAudit = WikiStats.buildFromAudit now auditEvents
                                                 , fromViews = WikiStats.buildFromViews viewCounts
                                                 }
                                 in
                                 Just (WikiStats.merge partitions.fromWiki partitions.fromAudit partitions.fromViews)
             in
-            ( model
-            , Effect.Lamdera.sendToFrontend clientId (WikiStatsResponse wikiSlug maybeSummary)
-            )
+            case maybeKnownVersions of
+                Just knownVersions ->
+                    if CacheVersion.same knownVersions versions then
+                        ( model
+                        , Effect.Lamdera.sendToFrontend clientId WikiStatsUnchanged
+                        )
+
+                    else
+                        ( model
+                        , Effect.Lamdera.sendToFrontend clientId (WikiStatsResponse wikiSlug versions maybeSummary)
+                        )
+
+                Nothing ->
+                    ( model
+                    , Effect.Lamdera.sendToFrontend clientId (WikiStatsResponse wikiSlug versions maybeSummary)
+                    )
 
         RequestWikiSearch wikiSlug rawQuery ->
             let
@@ -919,30 +1088,40 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                         |> Ok
                                         |> respond
 
-        RequestWikiAuditLog wikiSlug filter ->
+        RequestWikiAuditLog wikiSlug filter maybeKnownVersion ->
             let
+                version : Int
+                version =
+                    (cacheVersionsForWiki wikiSlug model).auditVersion
+
                 respond : Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent) -> ( Model, Command BackendOnly ToFrontend Msg )
                 respond res =
                     ( model
                     , Effect.Lamdera.sendToFrontend clientId
-                        (WikiAuditLogResponse wikiSlug filter res)
+                        (WikiAuditLogResponse wikiSlug filter version res)
                     )
             in
-            case Dict.get wikiSlug model.wikis of
-                Nothing ->
-                    respond (Err WikiAuditLog.WikiNotFound)
+            if maybeKnownVersion == Just version then
+                ( model
+                , Effect.Lamdera.sendToFrontend clientId (WikiAuditLogUnchanged wikiSlug)
+                )
 
-                Just w ->
-                    if not w.active then
-                        respond (Err WikiAuditLog.WikiInactive)
+            else
+                case Dict.get wikiSlug model.wikis of
+                    Nothing ->
+                        respond (Err WikiAuditLog.WikiNotFound)
 
-                    else
-                        model.wikiAuditEvents
-                            |> Dict.get wikiSlug
-                            |> Maybe.withDefault []
-                            |> WikiAuditLog.filterEvents filter
-                            |> Ok
-                            |> respond
+                    Just w ->
+                        if not w.active then
+                            respond (Err WikiAuditLog.WikiInactive)
+
+                        else
+                            model.wikiAuditEvents
+                                |> Dict.get wikiSlug
+                                |> Maybe.withDefault []
+                                |> WikiAuditLog.filterEvents filter
+                                |> Ok
+                                |> respond
 
         PromoteContributorToTrusted wikiSlug rawTargetUsername ->
             let
@@ -1023,6 +1202,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                     [ Effect.Lamdera.sendToFrontend clientId
                                                         (PromoteContributorToTrustedResponse wikiSlug (Ok ()))
                                                     , refreshTrustedListenerWikiFrontendDetails wikiSlug nextModel promotedSessionKeys
+                                                    , broadcastWikiCacheInvalidated wikiSlug nextModel
                                                     ]
                                                 )
 
@@ -1111,6 +1291,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                     [ Effect.Lamdera.sendToFrontend clientId
                                                         (DemoteTrustedToContributorResponse wikiSlug (Ok ()))
                                                     , refreshTrustedListenerWikiFrontendDetails wikiSlug nextModelEvicted refreshSessions
+                                                    , broadcastWikiCacheInvalidated wikiSlug nextModelEvicted
                                                     ]
                                                 )
 
@@ -1166,17 +1347,35 @@ updateFromFrontendWithTime sessionId clientId msg now model =
 
                                             Ok nextContributors ->
                                                 let
+                                                    targetAccountIdMaybe : Maybe ContributorAccount.Id
+                                                    targetAccountIdMaybe =
+                                                        WikiContributors.contributorAccountIdForNormalizedUsername wikiSlug normalizedTarget nextContributors
+
                                                     nextModel0 : Model
                                                     nextModel0 =
                                                         { model | contributors = nextContributors }
+
+                                                    nextModel : Model
+                                                    nextModel =
+                                                        recordAudit now
+                                                            wikiSlug
+                                                            accountId
+                                                            (WikiAuditLog.GrantedWikiAdmin { targetUsername = normalizedTarget })
+                                                            nextModel0
+
+                                                    refreshSessions : List String
+                                                    refreshSessions =
+                                                        targetAccountIdMaybe
+                                                            |> Maybe.map (\tid -> WikiUser.sessionKeysForContributorOnWiki wikiSlug tid model.contributorSessions)
+                                                            |> Maybe.withDefault []
                                                 in
-                                                ( recordAudit now
-                                                    wikiSlug
-                                                    accountId
-                                                    (WikiAuditLog.GrantedWikiAdmin { targetUsername = normalizedTarget })
-                                                    nextModel0
-                                                , Effect.Lamdera.sendToFrontend clientId
-                                                    (GrantWikiAdminResponse wikiSlug (Ok ()))
+                                                ( nextModel
+                                                , Command.batch
+                                                    [ Effect.Lamdera.sendToFrontend clientId
+                                                        (GrantWikiAdminResponse wikiSlug (Ok ()))
+                                                    , refreshTrustedListenerWikiFrontendDetails wikiSlug nextModel refreshSessions
+                                                    , broadcastWikiCacheInvalidated wikiSlug nextModel
+                                                    ]
                                                 )
 
         RevokeWikiAdmin wikiSlug rawTargetUsername ->
@@ -1231,17 +1430,35 @@ updateFromFrontendWithTime sessionId clientId msg now model =
 
                                             Ok nextContributors ->
                                                 let
+                                                    targetAccountIdMaybe : Maybe ContributorAccount.Id
+                                                    targetAccountIdMaybe =
+                                                        WikiContributors.contributorAccountIdForNormalizedUsername wikiSlug normalizedTarget nextContributors
+
                                                     nextModel0 : Model
                                                     nextModel0 =
                                                         { model | contributors = nextContributors }
+
+                                                    nextModel : Model
+                                                    nextModel =
+                                                        recordAudit now
+                                                            wikiSlug
+                                                            accountId
+                                                            (WikiAuditLog.RevokedWikiAdmin { targetUsername = normalizedTarget })
+                                                            nextModel0
+
+                                                    refreshSessions : List String
+                                                    refreshSessions =
+                                                        targetAccountIdMaybe
+                                                            |> Maybe.map (\tid -> WikiUser.sessionKeysForContributorOnWiki wikiSlug tid model.contributorSessions)
+                                                            |> Maybe.withDefault []
                                                 in
-                                                ( recordAudit now
-                                                    wikiSlug
-                                                    accountId
-                                                    (WikiAuditLog.RevokedWikiAdmin { targetUsername = normalizedTarget })
-                                                    nextModel0
-                                                , Effect.Lamdera.sendToFrontend clientId
-                                                    (RevokeWikiAdminResponse wikiSlug (Ok ()))
+                                                ( nextModel
+                                                , Command.batch
+                                                    [ Effect.Lamdera.sendToFrontend clientId
+                                                        (RevokeWikiAdminResponse wikiSlug (Ok ()))
+                                                    , refreshTrustedListenerWikiFrontendDetails wikiSlug nextModel refreshSessions
+                                                    , broadcastWikiCacheInvalidated wikiSlug nextModel
+                                                    ]
                                                 )
 
         RequestReviewSubmissionDetail wikiSlug submissionId ->
@@ -1508,7 +1725,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                             | wikis = Dict.insert wikiSlug nextWiki model.wikis
                                                             , submissions = submissionsAfterDraftCleanup
                                                         }
-                                                            |> withWikiSearchAndTodosCaches wikiSlug nextWiki
+                                                            |> withWikiSearchAndTodosCaches wikiSlug nextWiki now
 
                                                     nextModel : Model
                                                     nextModel =
@@ -1527,6 +1744,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                     [ Effect.Lamdera.sendToFrontend clientId
                                                         (SubmitNewPageResponse wikiSlug (Ok Submission.NewPagePublishedImmediately))
                                                     , broadcastWikiFrontendDetails wikiSlug nextModel
+                                                    , broadcastWikiCacheInvalidated wikiSlug nextModel
                                                     ]
                                                 )
 
@@ -1630,7 +1848,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                     { model
                                                         | wikis = Dict.insert wikiSlug nextWiki model.wikis
                                                     }
-                                                        |> withWikiSearchAndTodosCaches wikiSlug nextWiki
+                                                        |> withWikiSearchAndTodosCaches wikiSlug nextWiki now
 
                                                 nextModel : Model
                                                 nextModel =
@@ -1650,6 +1868,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                 [ Effect.Lamdera.sendToFrontend clientId
                                                     (SubmitPageEditResponse wikiSlug (Ok Submission.EditPublishedImmediately))
                                                 , broadcastWikiFrontendDetails wikiSlug nextModel
+                                                , broadcastWikiCacheInvalidated wikiSlug nextModel
                                                 ]
                                             )
 
@@ -1840,7 +2059,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                         { model
                                                             | wikis = Dict.insert wikiSlug nextWiki model.wikis
                                                         }
-                                                            |> withWikiSearchAndTodosCaches wikiSlug nextWiki
+                                                            |> withWikiSearchAndTodosCaches wikiSlug nextWiki now
 
                                                     nextModel : Model
                                                     nextModel =
@@ -1859,6 +2078,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                     [ Effect.Lamdera.sendToFrontend clientId
                                                         (DeletePublishedPageImmediatelyResponse wikiSlug (Ok ()))
                                                     , broadcastWikiFrontendDetails wikiSlug nextModel
+                                                    , broadcastWikiCacheInvalidated wikiSlug nextModel
                                                     ]
                                                 )
 
@@ -2554,7 +2774,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                                     | wikis = Dict.insert wikiSlug approved.wiki model.wikis
                                                                     , submissions = submissionsAfterApproval
                                                                 }
-                                                                    |> withWikiSearchAndTodosCaches wikiSlug approved.wiki
+                                                                    |> withWikiSearchAndTodosCaches wikiSlug approved.wiki now
 
                                                             approvedAuditKind : WikiAuditLog.AuditEventKind
                                                             approvedAuditKind =
@@ -2593,6 +2813,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                                 (ApproveSubmissionResponse wikiSlug submissionId (Ok ()))
                                                             , sendPendingReviewCountToTrustedSubscribers wikiSlug nextModel
                                                             , broadcastWikiFrontendDetails wikiSlug nextModel
+                                                            , broadcastWikiCacheInvalidated wikiSlug nextModel
                                                             ]
                                                         )
 
@@ -2679,6 +2900,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                             [ Effect.Lamdera.sendToFrontend clientId
                                                                 (RejectSubmissionResponse wikiSlug submissionId (Ok ()))
                                                             , sendPendingReviewCountToTrustedSubscribers wikiSlug nextModel
+                                                            , broadcastWikiCacheInvalidated wikiSlug nextModel
                                                             ]
                                                         )
 
@@ -2765,6 +2987,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                             [ Effect.Lamdera.sendToFrontend clientId
                                                                 (RequestSubmissionChangesResponse wikiSlug submissionId (Ok ()))
                                                             , sendPendingReviewCountToTrustedSubscribers wikiSlug nextModel
+                                                            , broadcastWikiCacheInvalidated wikiSlug nextModel
                                                             ]
                                                         )
 
@@ -2883,7 +3106,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                 modelWithWiki : Model
                                                 modelWithWiki =
                                                     { model | wikis = Dict.insert slug wiki model.wikis }
-                                                        |> withWikiSearchAndTodosCaches slug wiki
+                                                        |> withWikiSearchAndTodosCaches slug wiki now
                                             in
                                             case
                                                 WikiContributors.seedAdminContributorAtWiki
@@ -2914,8 +3137,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                     , Command.batch
                                                         [ Effect.Lamdera.sendToFrontend clientId
                                                             (CreateHostedWikiResponse (Ok (Wiki.catalogEntry nextWiki)))
-                                                        , Effect.Lamdera.broadcast
-                                                            (WikiCatalogResponse (Wiki.publicCatalogDict nextModel.wikis))
+                                                        , broadcastWikiCatalog nextModel
                                                         ]
                                                     )
 
@@ -2999,11 +3221,14 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                         nextModel : Model
                                                         nextModel =
                                                             { model | wikis = Dict.insert wikiSlug nextWiki model.wikis }
-                                                                |> withWikiSearchAndTodosCaches wikiSlug nextWiki
+                                                                |> withWikiSearchAndTodosCaches wikiSlug nextWiki now
                                                     in
                                                     ( nextModel
-                                                    , Effect.Lamdera.sendToFrontend clientId
-                                                        (UpdateHostedWikiMetadataResponse wikiSlug (Ok (Wiki.catalogEntry nextWiki)))
+                                                    , Command.batch
+                                                        [ Effect.Lamdera.sendToFrontend clientId
+                                                            (UpdateHostedWikiMetadataResponse wikiSlug (Ok (Wiki.catalogEntry nextWiki)))
+                                                        , broadcastWikiCatalog nextModel
+                                                        ]
                                                     )
 
                                                 else if Dict.member newSlug model.wikis then
@@ -3016,8 +3241,14 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                             applyHostedWikiSlugRename wikiSlug newSlug nextWiki model
                                                     in
                                                     ( nextModel
-                                                    , Effect.Lamdera.sendToFrontend clientId
-                                                        (UpdateHostedWikiMetadataResponse wikiSlug (Ok (Wiki.catalogEntry nextWiki)))
+                                                    , Command.batch
+                                                        [ Effect.Lamdera.sendToFrontend clientId
+                                                            (UpdateHostedWikiMetadataResponse wikiSlug (Ok (Wiki.catalogEntry nextWiki)))
+                                                        , broadcastWikiCatalog nextModel
+                                                        , broadcastWikiSlugRenamed wikiSlug newSlug nextModel
+                                                        , broadcastWikiFrontendDetails newSlug nextModel
+                                                        , broadcastWikiCacheInvalidated newSlug nextModel
+                                                        ]
                                                     )
 
         DeactivateHostedWiki wikiSlug ->
@@ -3050,11 +3281,16 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                             nextModel : Model
                             nextModel =
                                 { model | wikis = Dict.insert wikiSlug nextWiki model.wikis }
-                                    |> withWikiSearchAndTodosCaches wikiSlug nextWiki
+                                    |> withWikiSearchAndTodosCaches wikiSlug nextWiki now
                         in
                         ( nextModel
-                        , Effect.Lamdera.sendToFrontend clientId
-                            (DeactivateHostedWikiResponse wikiSlug (Ok (Wiki.catalogEntry nextWiki)))
+                        , Command.batch
+                            [ Effect.Lamdera.sendToFrontend clientId
+                                (DeactivateHostedWikiResponse wikiSlug (Ok (Wiki.catalogEntry nextWiki)))
+                            , broadcastWikiCatalog nextModel
+                            , broadcastWikiFrontendDetails wikiSlug nextModel
+                            , broadcastWikiCacheInvalidated wikiSlug nextModel
+                            ]
                         )
 
         ReactivateHostedWiki wikiSlug ->
@@ -3087,11 +3323,16 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                             nextModel : Model
                             nextModel =
                                 { model | wikis = Dict.insert wikiSlug nextWiki model.wikis }
-                                    |> withWikiSearchAndTodosCaches wikiSlug nextWiki
+                                    |> withWikiSearchAndTodosCaches wikiSlug nextWiki now
                         in
                         ( nextModel
-                        , Effect.Lamdera.sendToFrontend clientId
-                            (ReactivateHostedWikiResponse wikiSlug (Ok (Wiki.catalogEntry nextWiki)))
+                        , Command.batch
+                            [ Effect.Lamdera.sendToFrontend clientId
+                                (ReactivateHostedWikiResponse wikiSlug (Ok (Wiki.catalogEntry nextWiki)))
+                            , broadcastWikiCatalog nextModel
+                            , broadcastWikiFrontendDetails wikiSlug nextModel
+                            , broadcastWikiCacheInvalidated wikiSlug nextModel
+                            ]
                         )
 
         DeleteHostedWiki wikiSlug confirmationPhrase ->
@@ -3142,12 +3383,17 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                         , wikiSearchIndexes = Dict.remove wikiSlug model.wikiSearchIndexes
                                         , wikiTodosCaches = Dict.remove wikiSlug model.wikiTodosCaches
                                         , pageViewCounts = Dict.remove wikiSlug model.pageViewCounts
+                                        , wikiAuditVersions = Dict.remove wikiSlug model.wikiAuditVersions
+                                        , wikiViewsVersions = Dict.remove wikiSlug model.wikiViewsVersions
                                         , wikiStatsCache = Dict.remove wikiSlug model.wikiStatsCache
                                     }
                             in
                             ( nextModel
-                            , Effect.Lamdera.sendToFrontend clientId
-                                (DeleteHostedWikiResponse wikiSlug (Ok ()))
+                            , Command.batch
+                                [ Effect.Lamdera.sendToFrontend clientId
+                                    (DeleteHostedWikiResponse wikiSlug (Ok ()))
+                                , broadcastWikiCatalog nextModel
+                                ]
                             )
 
         RequestHostAdminDataExport ->
@@ -3197,7 +3443,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                             nextModel : Model
                             nextModel =
                                 BackendDataExport.applySnapshotToBackendModel snap model.hostSessions
-                                    |> withRebuiltAllSearchAndTodosCaches
+                                    |> withRebuiltAllSearchAndTodosCaches now
                         in
                         ( nextModel
                         , Effect.Lamdera.sendToFrontend clientId (HostAdminDataImportResponse (Ok ()))
@@ -3277,7 +3523,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                         let
                                             rebuiltModel : Model
                                             rebuiltModel =
-                                                withRebuiltAllSearchAndTodosCaches nextModel
+                                                withRebuiltAllSearchAndTodosCaches now nextModel
                                         in
                                         ( rebuiltModel
                                         , Command.batch
@@ -3327,7 +3573,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                 let
                                     rebuiltModel : Model
                                     rebuiltModel =
-                                        withRebuiltAllSearchAndTodosCaches nextModel
+                                        withRebuiltAllSearchAndTodosCaches now nextModel
                                 in
                                 ( rebuiltModel
                                 , Command.batch

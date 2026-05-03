@@ -22,6 +22,7 @@ Each partition is rebuilt only when its source data changes:
 
 -}
 
+import Date
 import Dict exposing (Dict)
 import Page
 import PageLinkRefs
@@ -39,7 +40,7 @@ topN =
     10
 
 
-{-| End-of-day totals replayed from audit (UTC day keys), last window used for charts.
+{-| End-of-day totals replayed from audit (UTC day keys), one row per calendar day in chart range.
 -}
 type alias DailyAccumulatedSnapshot =
     { day : String
@@ -145,9 +146,11 @@ merge fromWiki fromAudit fromViews =
 
 `submissions` + `auditEvents` are used only for `dailyAccumulatedSnapshots` (replay).
 
+`asOf` is server UTC “today” for chart ranges (inclusive end day).
+
 -}
-buildFromWiki : Wiki.Slug -> Wiki.Wiki -> Dict String Submission.Submission -> List WikiAuditLog.AuditEvent -> FromWiki
-buildFromWiki wikiSlug wiki submissions auditEvents =
+buildFromWiki : Wiki.Slug -> Wiki.Wiki -> Dict String Submission.Submission -> List WikiAuditLog.AuditEvent -> Time.Posix -> FromWiki
+buildFromWiki wikiSlug wiki submissions auditEvents asOf =
     let
         publishedPairs : List ( Page.Slug, Page.Page )
         publishedPairs =
@@ -272,7 +275,7 @@ buildFromWiki wikiSlug wiki submissions auditEvents =
 
         dailyAccumulatedSnapshots : List DailyAccumulatedSnapshot
         dailyAccumulatedSnapshots =
-            buildDailyAccumulatedSnapshots wikiSlug submissions auditEvents
+            buildDailyAccumulatedSnapshots wikiSlug submissions auditEvents asOf
     in
     { publishedPageCount = publishedPageCount
     , missingPageCount = List.length missingPageSlugs
@@ -309,12 +312,35 @@ uniqueSortedEventDays events =
         |> List.sort
 
 
-last30Ascending : List String -> List String
-last30Ascending sortedDays =
-    sortedDays
-        |> List.reverse
-        |> List.take 30
-        |> List.reverse
+{-| UTC calendar days from first audit event day through `asOf` day (inclusive), ascending.
+
+Empty when there are no audit events.
+
+-}
+utcChartDaysAscending : Time.Posix -> List WikiAuditLog.AuditEvent -> List String
+utcChartDaysAscending asOf events =
+    case uniqueSortedEventDays events |> List.head of
+        Nothing ->
+            []
+
+        Just firstDayStr ->
+            let
+                lastDayStr : String
+                lastDayStr =
+                    posixToUtcDayString asOf
+            in
+            case ( Date.fromIsoString firstDayStr, Date.fromIsoString lastDayStr ) of
+                ( Ok firstDate, Ok lastDate ) ->
+                    case Date.compare firstDate lastDate of
+                        GT ->
+                            []
+
+                        _ ->
+                            Date.range Date.Day 1 firstDate (Date.add Date.Days 1 lastDate)
+                                |> List.map Date.toIsoString
+
+                _ ->
+                    []
 
 
 submissionByIdString : Dict String Submission.Submission -> String -> Maybe Submission.Submission
@@ -483,8 +509,8 @@ snapshotAtEndOfDay wikiSlug submissions sortedEvents day =
     { snap | day = day }
 
 
-buildDailyAccumulatedSnapshots : Wiki.Slug -> Dict String Submission.Submission -> List WikiAuditLog.AuditEvent -> List DailyAccumulatedSnapshot
-buildDailyAccumulatedSnapshots wikiSlug submissions auditEvents =
+buildDailyAccumulatedSnapshots : Wiki.Slug -> Dict String Submission.Submission -> List WikiAuditLog.AuditEvent -> Time.Posix -> List DailyAccumulatedSnapshot
+buildDailyAccumulatedSnapshots wikiSlug submissions auditEvents asOf =
     let
         sorted : List WikiAuditLog.AuditEvent
         sorted =
@@ -492,8 +518,7 @@ buildDailyAccumulatedSnapshots wikiSlug submissions auditEvents =
 
         days : List String
         days =
-            uniqueSortedEventDays auditEvents
-                |> last30Ascending
+            utcChartDaysAscending asOf auditEvents
     in
     days
         |> List.map (snapshotAtEndOfDay wikiSlug submissions sorted)
@@ -503,12 +528,15 @@ buildDailyAccumulatedSnapshots wikiSlug submissions auditEvents =
 
 Pure; no I/O. Day keys are UTC `YYYY-MM-DD` strings derived from event timestamps.
 
+`dailyActivityCounts` lists every UTC day from the first audit day through `asOf` (inclusive),
+with zeros on quiet days.
+
 Only page-content events count (creates, edits, deletes via both trusted-publish and
 approved-submission paths); moderation events (promote, reject, etc.) are excluded.
 
 -}
-buildFromAudit : List WikiAuditLog.AuditEvent -> FromAudit
-buildFromAudit events =
+buildFromAudit : Time.Posix -> List WikiAuditLog.AuditEvent -> FromAudit
+buildFromAudit asOf events =
     let
         isEditForPage : WikiAuditLog.AuditEventKind -> Maybe String
         isEditForPage kind =
@@ -614,8 +642,8 @@ buildFromAudit events =
                 WikiAuditLog.RevokedWikiAdmin _ ->
                     Nothing
 
-        dailyActivityCounts : List { day : String, creates : Int, edits : Int, deletes : Int }
-        dailyActivityCounts =
+        activityByDay : Dict String { creates : Int, edits : Int, deletes : Int }
+        activityByDay =
             events
                 |> List.foldl
                     (\event acc ->
@@ -651,9 +679,16 @@ buildFromAudit events =
                                     acc
                     )
                     Dict.empty
-                |> Dict.toList
-                |> List.sortBy Tuple.first
-                |> List.map (\( day, counts ) -> { day = day, creates = counts.creates, edits = counts.edits, deletes = counts.deletes })
+
+        dailyActivityCounts : List { day : String, creates : Int, edits : Int, deletes : Int }
+        dailyActivityCounts =
+            utcChartDaysAscending asOf events
+                |> List.map
+                    (\day ->
+                        Dict.get day activityByDay
+                            |> Maybe.withDefault { creates = 0, edits = 0, deletes = 0 }
+                            |> (\counts -> { day = day, creates = counts.creates, edits = counts.edits, deletes = counts.deletes })
+                    )
     in
     { dailyActivityCounts = dailyActivityCounts
     , topPagesByEditEvents = topPagesByEditEvents

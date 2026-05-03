@@ -29,6 +29,7 @@ module Types exposing
     , emptySubmissionDetailEditDraft
     )
 
+import CacheVersion
 import ColorTheme exposing (ColorTheme, ColorThemePreference)
 import ContributorAccount
 import ContributorWikiSession exposing (ContributorWikiSession)
@@ -109,16 +110,16 @@ type alias RequestSubmissionChangesPayload =
 
 type ToBackend
     = RequestWikiCatalog
-    | RequestWikiStats Wiki.Slug
+    | RequestWikiStats Wiki.Slug (Maybe CacheVersion.Versions)
     | RequestWikiFrontendDetails Wiki.Slug
-    | RequestWikiTodos Wiki.Slug
+    | RequestWikiTodos Wiki.Slug (Maybe Int)
     | RequestPageFrontendDetails Wiki.Slug Page.Slug
     | RequestWikiSearch Wiki.Slug String
     | RequestMyPendingSubmissions Wiki.Slug
     | RequestReviewQueue Wiki.Slug
     | RequestReviewSubmissionDetail Wiki.Slug String
     | RequestWikiUsers Wiki.Slug
-    | RequestWikiAuditLog Wiki.Slug WikiAuditLog.AuditLogFilter
+    | RequestWikiAuditLog Wiki.Slug WikiAuditLog.AuditLogFilter (Maybe Int)
     | PromoteContributorToTrusted Wiki.Slug String
     | DemoteTrustedToContributor Wiki.Slug String
     | GrantWikiAdmin Wiki.Slug String
@@ -158,17 +159,22 @@ type ToBackend
 
 type ToFrontend
     = WikiCatalogResponse (Dict Wiki.Slug Wiki.CatalogEntry)
-    | WikiStatsResponse Wiki.Slug (Maybe WikiStats.Summary)
+    | WikiStatsResponse Wiki.Slug CacheVersion.Versions (Maybe WikiStats.Summary)
+    | WikiStatsUnchanged
+    | WikiCacheInvalidated Wiki.Slug CacheVersion.Versions
+    | WikiSlugRenamed Wiki.Slug Wiki.Slug
     | PendingReviewCountUpdated Wiki.Slug Int
     | WikiFrontendDetailsResponse Wiki.Slug (Maybe Wiki.FrontendDetails)
-    | WikiTodosResponse Wiki.Slug (Result () (List WikiTodos.TableRow))
+    | WikiTodosResponse Wiki.Slug Int (Result () (List WikiTodos.TableRow))
+    | WikiTodosUnchanged
     | PageFrontendDetailsResponse Wiki.Slug Page.Slug (Maybe Page.FrontendDetails)
     | WikiSearchResponse Wiki.Slug String (List WikiSearch.ResultItem)
     | MyPendingSubmissionsResponse Wiki.Slug (Result Submission.MyPendingSubmissionsError (List Submission.MyPendingSubmissionListItem))
     | ReviewQueueResponse Wiki.Slug (Result Submission.ReviewQueueError (List Submission.ReviewQueueItem))
     | ReviewSubmissionDetailResponse Wiki.Slug String (Result SubmissionReviewDetail.ReviewSubmissionDetailError SubmissionReviewDetail.SubmissionReviewDetail)
     | WikiUsersResponse Wiki.Slug (Result WikiAdminUsers.Error (List WikiAdminUsers.ListedUser))
-    | WikiAuditLogResponse Wiki.Slug WikiAuditLog.AuditLogFilter (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent))
+    | WikiAuditLogResponse Wiki.Slug WikiAuditLog.AuditLogFilter Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent))
+    | WikiAuditLogUnchanged Wiki.Slug
     | PromoteContributorToTrustedResponse Wiki.Slug (Result WikiAdminUsers.PromoteContributorError ())
     | DemoteTrustedToContributorResponse Wiki.Slug (Result WikiAdminUsers.DemoteTrustedError ())
     | GrantWikiAdminResponse Wiki.Slug (Result WikiAdminUsers.GrantTrustedToAdminError ())
@@ -221,12 +227,14 @@ type alias BackendModel =
     , submissions : Dict String Submission.Submission
     , nextSubmissionCounter : Int
     , wikiAuditEvents : Dict Wiki.Slug (List WikiAuditLog.AuditEvent)
+    , wikiAuditVersions : Dict Wiki.Slug Int
     , pendingReviewCounts : Dict Wiki.Slug Int
     , pendingReviewClients : PendingReviewCount.PendingReviewClientSets
     , wikiFrontendClients : WikiFrontendSubscription.WikiFrontendClientSets
     , wikiSearchIndexes : Dict Wiki.Slug WikiSearch.PrefixIndex
     , wikiTodosCaches : Dict Wiki.Slug (List WikiTodos.TableRow)
     , pageViewCounts : Dict Wiki.Slug (Dict Page.Slug Int)
+    , wikiViewsVersions : Dict Wiki.Slug Int
     , wikiStatsCache : Dict Wiki.Slug WikiStatsPartitions
     }
 

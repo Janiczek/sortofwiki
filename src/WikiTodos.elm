@@ -27,7 +27,7 @@ type alias Summary =
     }
 
 
-{-| One row in wiki /todos table: either a {TODO:…} from a page or a missing \[\[link\]\] target.
+{-| One row in wiki /todos table: either a {TODO:…} from a page or a missing [[link]] target.
 -}
 type alias TableRow =
     { itemText : String

@@ -135,6 +135,9 @@ applySnapshotToBackendModel snapshot keptHostSessions =
     , submissions = snapshot.submissions
     , nextSubmissionCounter = nextSubmissionCounterFromSubmissions snapshot.submissions
     , wikiAuditEvents = snapshot.wikiAuditEvents
+    , wikiAuditVersions =
+        snapshot.wikiAuditEvents
+            |> Dict.map (\_ events -> List.length events)
     , pendingReviewCounts =
         PendingReviewCount.recallFromSubmissions snapshot.submissions
     , pendingReviewClients = PendingReviewCount.emptyClientSets
@@ -142,6 +145,9 @@ applySnapshotToBackendModel snapshot keptHostSessions =
     , wikiSearchIndexes = Dict.empty
     , wikiTodosCaches = Dict.empty
     , pageViewCounts = snapshot.pageViewCounts
+    , wikiViewsVersions =
+        snapshot.pageViewCounts
+            |> Dict.map (\_ counts -> counts |> Dict.values |> List.sum)
     , wikiStatsCache = Dict.empty
     }
 
@@ -1069,6 +1075,12 @@ applyWikiSnapshotMerge wikiSlug snap model =
                         pendingCounts : Dict Wiki.Slug Int
                         pendingCounts =
                             PendingReviewCount.recallFromSubmissions mergedSubmissions
+
+                        importedPageViewCounts : Dict Page.Slug Int
+                        importedPageViewCounts =
+                            snap.pageViewCounts
+                                |> Dict.get wikiSlug
+                                |> Maybe.withDefault Dict.empty
                     in
                     Ok
                         { model
@@ -1080,6 +1092,7 @@ applyWikiSnapshotMerge wikiSlug snap model =
                             , submissions = mergedSubmissions
                             , nextSubmissionCounter = nextCounter
                             , wikiAuditEvents = Dict.insert wikiSlug remappedAudit model.wikiAuditEvents
+                            , wikiAuditVersions = Dict.insert wikiSlug (List.length remappedAudit) model.wikiAuditVersions
                             , pendingReviewCounts = pendingCounts
                             , pendingReviewClients =
                                 PendingReviewCount.removeWikiSubscribers wikiSlug model.pendingReviewClients
@@ -1087,8 +1100,12 @@ applyWikiSnapshotMerge wikiSlug snap model =
                                 WikiFrontendSubscription.removeWikiSubscribers wikiSlug model.wikiFrontendClients
                             , pageViewCounts =
                                 Dict.insert wikiSlug
-                                    (snap.pageViewCounts |> Dict.get wikiSlug |> Maybe.withDefault Dict.empty)
+                                    importedPageViewCounts
                                     model.pageViewCounts
+                            , wikiViewsVersions =
+                                Dict.insert wikiSlug
+                                    (importedPageViewCounts |> Dict.values |> List.sum)
+                                    model.wikiViewsVersions
                             , wikiStatsCache = Dict.remove wikiSlug model.wikiStatsCache
                         }
 

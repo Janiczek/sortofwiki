@@ -1,5 +1,6 @@
 module StoreTest exposing (suite)
 
+import CacheVersion
 import Dict exposing (Dict)
 import Effect.Command as Command
 import Effect.Lamdera
@@ -22,6 +23,14 @@ import WikiAuditLog
 emptyAuditFilterCacheKey : String
 emptyAuditFilterCacheKey =
     WikiAuditLog.auditLogFilterCacheKey WikiAuditLog.emptyAuditLogFilter
+
+
+versions : CacheVersion.Versions
+versions =
+    { contentVersion = 3
+    , auditVersion = 4
+    , viewsVersion = 5
+    }
 
 
 suite : Test
@@ -145,10 +154,10 @@ suite =
                               , wikiUsers = Dict.empty
                               , wikiAuditLogs = Dict.empty
                               , wikiTodos =
-                                    Dict.singleton "demo" RemoteData.Loading
+                                    Dict.singleton "demo" { version = 0, value = RemoteData.Loading }
                               , wikiStats = Dict.empty
                               }
-                            , Effect.Lamdera.sendToBackend (RequestWikiTodos "demo")
+                            , Effect.Lamdera.sendToBackend (RequestWikiTodos "demo" Nothing)
                             )
             , Test.test "AskForWikiTodos refetches when already Success Ok" <|
                 \() ->
@@ -165,7 +174,7 @@ suite =
                             , wikiUsers = Dict.empty
                             , wikiAuditLogs = Dict.empty
                             , wikiTodos =
-                                Dict.singleton "demo" (RemoteData.succeed (Ok []))
+                                Dict.singleton "demo" { version = 3, value = RemoteData.succeed (Ok []) }
                             , wikiStats = Dict.empty
                             }
                     in
@@ -173,7 +182,7 @@ suite =
                         |> Store.perform Frontend.storeConfig (Store.AskForWikiTodos "demo")
                         |> Expect.equal
                             ( store
-                            , Effect.Lamdera.sendToBackend (RequestWikiTodos "demo")
+                            , Effect.Lamdera.sendToBackend (RequestWikiTodos "demo" (Just 3))
                             )
             , Test.test "AskForWikiStats starts load from empty" <|
                 \() ->
@@ -191,9 +200,9 @@ suite =
                               , wikiAuditLogs = Dict.empty
                               , wikiTodos = Dict.empty
                               , wikiStats =
-                                    Dict.singleton "demo" RemoteData.Loading
+                                    Dict.singleton "demo" { version = CacheVersion.zero, value = RemoteData.Loading }
                               }
-                            , Effect.Lamdera.sendToBackend (RequestWikiStats "demo")
+                            , Effect.Lamdera.sendToBackend (RequestWikiStats "demo" Nothing)
                             )
             , Test.test "AskForWikiStats refetches when already Success (stale view counts)" <|
                 \() ->
@@ -211,14 +220,14 @@ suite =
                             , wikiAuditLogs = Dict.empty
                             , wikiTodos = Dict.empty
                             , wikiStats =
-                                Dict.singleton "demo" (RemoteData.succeed Nothing)
+                                Dict.singleton "demo" { version = versions, value = RemoteData.succeed Nothing }
                             }
                     in
                     store
                         |> Store.perform Frontend.storeConfig (Store.AskForWikiStats "demo")
                         |> Expect.equal
                             ( store
-                            , Effect.Lamdera.sendToBackend (RequestWikiStats "demo")
+                            , Effect.Lamdera.sendToBackend (RequestWikiStats "demo" (Just versions))
                             )
             , Test.test "AskForSubmissionDetails starts load from empty" <|
                 \() ->
@@ -236,7 +245,7 @@ suite =
                               , wikiUsers = Dict.empty
                               , wikiAuditLogs = Dict.empty
                               , wikiTodos = Dict.empty
-                            , wikiStats = Dict.empty
+                              , wikiStats = Dict.empty
                               }
                             , Effect.Lamdera.sendToBackend (RequestSubmissionDetails "demo" "sub_1")
                             )
@@ -499,7 +508,7 @@ suite =
                               , wikiUsers = Dict.empty
                               , wikiAuditLogs = Dict.empty
                               , wikiTodos = Dict.empty
-                            , wikiStats = Dict.empty
+                              , wikiStats = Dict.empty
                               }
                             , Effect.Lamdera.sendToBackend (RequestReviewSubmissionDetail "demo" "sub_1")
                             )
@@ -578,7 +587,7 @@ suite =
                               , wikiUsers = Dict.singleton "demo" RemoteData.Loading
                               , wikiAuditLogs = Dict.empty
                               , wikiTodos = Dict.empty
-                            , wikiStats = Dict.empty
+                              , wikiStats = Dict.empty
                               }
                             , Effect.Lamdera.sendToBackend (RequestWikiUsers "demo")
                             )
@@ -648,13 +657,13 @@ suite =
                               , wikiUsers = Dict.empty
                               , wikiAuditLogs =
                                     Dict.singleton "demo"
-                                        (Dict.singleton emptyAuditFilterCacheKey RemoteData.Loading)
+                                        (Dict.singleton emptyAuditFilterCacheKey { version = 0, value = RemoteData.Loading })
                               , wikiTodos = Dict.empty
-                            , wikiStats = Dict.empty
+                              , wikiStats = Dict.empty
                               }
-                            , Effect.Lamdera.sendToBackend (RequestWikiAuditLog "demo" WikiAuditLog.emptyAuditLogFilter)
+                            , Effect.Lamdera.sendToBackend (RequestWikiAuditLog "demo" WikiAuditLog.emptyAuditLogFilter Nothing)
                             )
-            , Test.test "AskForWikiAuditLog skips when already Success Ok" <|
+            , Test.test "AskForWikiAuditLog revalidates when already Success Ok" <|
                 \() ->
                     let
                         store : Store
@@ -669,14 +678,17 @@ suite =
                             , wikiUsers = Dict.empty
                             , wikiAuditLogs =
                                 Dict.singleton "demo"
-                                    (Dict.singleton emptyAuditFilterCacheKey (RemoteData.succeed (Ok [])))
+                                    (Dict.singleton emptyAuditFilterCacheKey { version = 4, value = RemoteData.succeed (Ok []) })
                             , wikiTodos = Dict.empty
                             , wikiStats = Dict.empty
                             }
                     in
                     store
                         |> Store.perform Frontend.storeConfig (Store.AskForWikiAuditLog "demo" WikiAuditLog.emptyAuditLogFilter)
-                        |> Expect.equal ( store, Command.none )
+                        |> Expect.equal
+                            ( store
+                            , Effect.Lamdera.sendToBackend (RequestWikiAuditLog "demo" WikiAuditLog.emptyAuditLogFilter (Just 4))
+                            )
             , Test.test "AskForWikiAuditLog refetches after prior error result" <|
                 \() ->
                     let
@@ -692,7 +704,7 @@ suite =
                             , wikiUsers = Dict.empty
                             , wikiAuditLogs =
                                 Dict.singleton "demo"
-                                    (Dict.singleton emptyAuditFilterCacheKey (RemoteData.succeed (Err WikiAuditLog.Forbidden)))
+                                    (Dict.singleton emptyAuditFilterCacheKey { version = 4, value = RemoteData.succeed (Err WikiAuditLog.Forbidden) })
                             , wikiTodos = Dict.empty
                             , wikiStats = Dict.empty
                             }
@@ -703,9 +715,9 @@ suite =
                             ( { store
                                 | wikiAuditLogs =
                                     Dict.singleton "demo"
-                                        (Dict.singleton emptyAuditFilterCacheKey RemoteData.Loading)
+                                        (Dict.singleton emptyAuditFilterCacheKey { version = 0, value = RemoteData.Loading })
                               }
-                            , Effect.Lamdera.sendToBackend (RequestWikiAuditLog "demo" WikiAuditLog.emptyAuditLogFilter)
+                            , Effect.Lamdera.sendToBackend (RequestWikiAuditLog "demo" WikiAuditLog.emptyAuditLogFilter Nothing)
                             )
             , Test.test "RefreshWikiAuditLog sends even when same filter already Success Ok" <|
                 \() ->
@@ -722,7 +734,7 @@ suite =
                             , wikiUsers = Dict.empty
                             , wikiAuditLogs =
                                 Dict.singleton "demo"
-                                    (Dict.singleton emptyAuditFilterCacheKey (RemoteData.succeed (Ok [])))
+                                    (Dict.singleton emptyAuditFilterCacheKey { version = 4, value = RemoteData.succeed (Ok []) })
                             , wikiTodos = Dict.empty
                             , wikiStats = Dict.empty
                             }
@@ -733,9 +745,9 @@ suite =
                             ( { store
                                 | wikiAuditLogs =
                                     Dict.singleton "demo"
-                                        (Dict.singleton emptyAuditFilterCacheKey RemoteData.Loading)
+                                        (Dict.singleton emptyAuditFilterCacheKey { version = 0, value = RemoteData.Loading })
                               }
-                            , Effect.Lamdera.sendToBackend (RequestWikiAuditLog "demo" WikiAuditLog.emptyAuditLogFilter)
+                            , Effect.Lamdera.sendToBackend (RequestWikiAuditLog "demo" WikiAuditLog.emptyAuditLogFilter Nothing)
                             )
             ]
         ]

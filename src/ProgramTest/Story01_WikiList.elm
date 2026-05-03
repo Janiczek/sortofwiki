@@ -10,46 +10,46 @@ endToEndTests : List ProgramTest.Start.EndToEndTest
 endToEndTests =
     List.concat
         [ ProgramTest.Start.bothViewports
-        { baseName = "See list of wikis on /"
-        , config = ProgramTest.Config.demoWikiPagesOnly
-        , sessionId = "session-anonymous-viewer"
-        , path = "/"
-        , connectClientMs = Nothing
-        , clientSteps =
-            \client ->
-                [ client.checkView 100
-                    (ProgramTest.Query.expectAll
-                        [ ProgramTest.Query.headingIs "SortOfWiki"
-                        , ProgramTest.Query.subheadingIs "Wikis"
-                        , ProgramTest.Query.withinLayoutHeader
-                            (ProgramTest.Query.expectLink
-                                { href = Wiki.wikiListUrlPath
-                                , label = "SortOfWiki"
-                                }
-                            )
-                        , ProgramTest.Query.expectWikiCard { slug = "Demo", title = "Demo Wiki" }
-                        , ProgramTest.Query.expectWikiCard { slug = "ElmTips", title = "Elm Tips" }
-                        ]
-                    )
-                ]
-        }
-    , ProgramTest.Start.bothViewports
-        { baseName = "Empty hosted catalog shows a clear message on /"
-        , config = ProgramTest.Config.emptyConfig
-        , sessionId = "session-empty-catalog-viewer"
-        , path = "/"
-        , connectClientMs = Nothing
-        , clientSteps =
-            \client ->
-                [ client.checkView 100
-                    (ProgramTest.Query.expectAll
-                        [ ProgramTest.Query.headingIs "SortOfWiki"
-                        , ProgramTest.Query.subheadingIs "Wikis"
-                        , ProgramTest.Query.withinId "catalog-empty"
-                            (ProgramTest.Query.expectHasText "There are no wikis yet.")
-                        , ProgramTest.Query.expectHasNotText "Loading…"
-                        ]
-                    )
-                ]
-        }
+            { baseName = "See list of wikis on /"
+            , config = ProgramTest.Config.demoWikiPagesOnly
+            , sessionId = "session-anonymous-viewer"
+            , path = "/"
+            , connectClientMs = Nothing
+            , clientSteps =
+                \client ->
+                    [ client.checkView 100
+                        (ProgramTest.Query.expectAll
+                            [ ProgramTest.Query.headingIs "SortOfWiki"
+                            , ProgramTest.Query.subheadingIs "Wikis"
+                            , ProgramTest.Query.withinLayoutHeader
+                                (ProgramTest.Query.expectLink
+                                    { href = Wiki.wikiListUrlPath
+                                    , label = "SortOfWiki"
+                                    }
+                                )
+                            , ProgramTest.Query.expectWikiCard { slug = "Demo", title = "Demo Wiki" }
+                            , ProgramTest.Query.expectWikiCard { slug = "ElmTips", title = "Elm Tips" }
+                            ]
+                        )
+                    ]
+            }
+        , ProgramTest.Start.bothViewports
+            { baseName = "Empty hosted catalog shows a clear message on /"
+            , config = ProgramTest.Config.emptyConfig
+            , sessionId = "session-empty-catalog-viewer"
+            , path = "/"
+            , connectClientMs = Nothing
+            , clientSteps =
+                \client ->
+                    [ client.checkView 100
+                        (ProgramTest.Query.expectAll
+                            [ ProgramTest.Query.headingIs "SortOfWiki"
+                            , ProgramTest.Query.subheadingIs "Wikis"
+                            , ProgramTest.Query.withinId "catalog-empty"
+                                (ProgramTest.Query.expectHasText "There are no wikis yet.")
+                            , ProgramTest.Query.expectHasNotText "Loading…"
+                            ]
+                        )
+                    ]
+            }
         ]

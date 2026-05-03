@@ -3,10 +3,10 @@ module UI.Link exposing
     , contentLink
     , listItemTight
     , missingLink
-    , outsideHttpAttrs
     , navListItem
     , navListItemMuted
     , navPrimary
+    , outsideHttpAttrs
     , sidebarLink
     , subtleLink
     )

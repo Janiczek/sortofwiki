@@ -1,7 +1,8 @@
 module WikiTodosTest exposing (suite)
 
-import Dict
+import Dict exposing (Dict)
 import Expect
+import Page
 import Test exposing (Test)
 import WikiTodos
 
@@ -49,6 +50,7 @@ suite =
             [ Test.test "matches sorted missing pages then todos" <|
                 \() ->
                     let
+                        sources : Dict Page.Slug String
                         sources =
                             Dict.fromList
                                 [ ( "About", "{TODO: explain roles}\n\n[[TodoGap]]" )

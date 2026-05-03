@@ -3,8 +3,8 @@ module Wiki exposing
     , FrontendDetails
     , Slug
     , Wiki
-    , adminAuditUrlPath
     , adminAuditDiffUrlPath
+    , adminAuditUrlPath
     , adminUsersUrlPath
     , applyPublishedMarkdownEdit
     , catalogEntry
@@ -12,8 +12,8 @@ module Wiki exposing
     , frontendDetails
     , frontendDetailsForViewer
     , graphUrlPath
-    , hostAdminAuditUrlPath
     , hostAdminAuditDiffUrlPath
+    , hostAdminAuditUrlPath
     , hostAdminBackupUrlPath
     , hostAdminLoginUrlPathWithRedirect
     , hostAdminNewWikiUrlPath

@@ -54,7 +54,7 @@ suite =
                         Backend.updateFromFrontendWithTime
                             (Effect.Lamdera.sessionIdFromString sessionKey)
                             clientId
-                            (RequestWikiTodos "Demo")
+                            (RequestWikiTodos "Demo" Nothing)
                             (Time.millisToPosix 0)
                             pagesFixture
                 in
@@ -64,7 +64,7 @@ suite =
                             |> Expect.equal
                                 (Effect.Lamdera.sendToFrontend
                                     clientId
-                                    (WikiTodosResponse "Demo" (Ok expectedDemoRows))
+                                    (WikiTodosResponse "Demo" 6 (Ok expectedDemoRows))
                                 )
                     , \_ ->
                         Dict.get "Demo" after.wikiTodosCaches
@@ -78,7 +78,7 @@ suite =
                         Backend.updateFromFrontendWithTime
                             (Effect.Lamdera.sessionIdFromString sessionKey)
                             clientId
-                            (RequestWikiTodos "NoSuchWiki")
+                            (RequestWikiTodos "NoSuchWiki" Nothing)
                             (Time.millisToPosix 0)
                             pagesFixture
                 in
@@ -86,6 +86,6 @@ suite =
                     |> Expect.equal
                         (Effect.Lamdera.sendToFrontend
                             clientId
-                            (WikiTodosResponse "NoSuchWiki" (Err ()))
+                            (WikiTodosResponse "NoSuchWiki" 0 (Err ()))
                         )
         ]

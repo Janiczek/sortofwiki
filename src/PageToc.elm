@@ -5,10 +5,10 @@ import Html.Attributes as Attr
 import Markdown.Block as Block
 import Page
 import UI
+import UI.Heading
+import UI.Link
 import Wiki
 import WikiPageMarkdownParse
-import UI.Link
-import UI.Heading
 
 
 {-| One heading line in the in-page table of contents.

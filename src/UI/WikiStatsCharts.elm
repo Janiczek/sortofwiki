@@ -12,14 +12,9 @@ import Html.Attributes as HA
 import WikiStats
 
 
-{-| Last 30 UTC days, chronological (same window as the charts).
--}
-recentActivityRows : List { day : String, creates : Int, edits : Int, deletes : Int } -> List { day : String, creates : Float, edits : Float, deletes : Float }
-recentActivityRows rows =
+activityRowsToFloats : List { day : String, creates : Int, edits : Int, deletes : Int } -> List { day : String, creates : Float, edits : Float, deletes : Float }
+activityRowsToFloats rows =
     rows
-        |> List.reverse
-        |> List.take 30
-        |> List.reverse
         |> List.map
             (\r ->
                 { day = r.day
@@ -43,11 +38,11 @@ viewDailyActivityCharts :
     -> Html msg
 viewDailyActivityCharts config rows =
     let
-        recent : List { day : String, creates : Float, edits : Float, deletes : Float }
-        recent =
-            recentActivityRows rows
+        chartRows : List { day : String, creates : Float, edits : Float, deletes : Float }
+        chartRows =
+            activityRowsToFloats rows
     in
-    if List.isEmpty recent then
+    if List.isEmpty chartRows then
         Html.text ""
 
     else
@@ -57,7 +52,7 @@ viewDailyActivityCharts config rows =
                 let
                     peak : Float
                     peak =
-                        recent
+                        chartRows
                             |> List.concatMap (\r -> [ r.creates, r.edits, r.deletes ])
                             |> List.maximum
                             |> Maybe.withDefault 0
@@ -68,26 +63,25 @@ viewDailyActivityCharts config rows =
             [ HA.class "grid grid-cols-1 gap-2 md:grid-cols-3"
             , HA.style "width" "100%"
             ]
-            [ compactMetricChart "Creates" "var(--chip-on-bg)" sharedYMax (List.map (\r -> { day = r.day, value = r.creates }) recent)
+            [ compactMetricChart "Creates"
+                "var(--chip-on-bg)"
+                sharedYMax
+                (List.map (\r -> { day = r.day, value = r.creates }) chartRows)
                 config.hoveredBar
                 config.onHoverChange
-            , compactMetricChart "Edits" "var(--link)" sharedYMax (List.map (\r -> { day = r.day, value = r.edits }) recent)
+            , compactMetricChart "Edits"
+                "var(--link)"
+                sharedYMax
+                (List.map (\r -> { day = r.day, value = r.edits }) chartRows)
                 config.hoveredBar
                 config.onHoverChange
-            , compactMetricChart "Deletes" "var(--danger-btn-bg)" sharedYMax (List.map (\r -> { day = r.day, value = r.deletes }) recent)
+            , compactMetricChart "Deletes"
+                "var(--danger-btn-bg)"
+                sharedYMax
+                (List.map (\r -> { day = r.day, value = r.deletes }) chartRows)
                 config.hoveredBar
                 config.onHoverChange
             ]
-
-
-{-| Last 30 UTC snapshot rows (same window idea as daily activity charts).
--}
-recentSnapshotRows : List WikiStats.DailyAccumulatedSnapshot -> List WikiStats.DailyAccumulatedSnapshot
-recentSnapshotRows rows =
-    rows
-        |> List.reverse
-        |> List.take 30
-        |> List.reverse
 
 
 {-| Three bar charts: cumulative published pages, missing pages, and TODO items (replay from audit).
@@ -99,19 +93,14 @@ viewDailyAccumulatedCharts :
     -> List WikiStats.DailyAccumulatedSnapshot
     -> Html msg
 viewDailyAccumulatedCharts config rows =
-    let
-        recent : List WikiStats.DailyAccumulatedSnapshot
-        recent =
-            recentSnapshotRows rows
-    in
-    if List.isEmpty recent then
+    if List.isEmpty rows then
         Html.text ""
 
     else
         let
             yMaxPublished : Float
             yMaxPublished =
-                recent
+                rows
                     |> List.map (.publishedPages >> toFloat)
                     |> List.maximum
                     |> Maybe.withDefault 0
@@ -119,7 +108,7 @@ viewDailyAccumulatedCharts config rows =
 
             yMaxMissing : Float
             yMaxMissing =
-                recent
+                rows
                     |> List.map (.missingPages >> toFloat)
                     |> List.maximum
                     |> Maybe.withDefault 0
@@ -127,7 +116,7 @@ viewDailyAccumulatedCharts config rows =
 
             yMaxTodos : Float
             yMaxTodos =
-                recent
+                rows
                     |> List.map (.todos >> toFloat)
                     |> List.maximum
                     |> Maybe.withDefault 0
@@ -137,16 +126,32 @@ viewDailyAccumulatedCharts config rows =
             [ HA.class "grid grid-cols-1 gap-2 md:grid-cols-3"
             , HA.style "width" "100%"
             ]
-            [ compactMetricChart "Published pages (cumulative)" "var(--chip-on-bg)" yMaxPublished (List.map (\r -> { day = r.day, value = toFloat r.publishedPages }) recent)
+            [ compactMetricChart "Published pages (cumulative)"
+                "var(--chip-on-bg)"
+                yMaxPublished
+                (List.map (\r -> { day = r.day, value = toFloat r.publishedPages }) rows)
                 config.hoveredBar
                 config.onHoverChange
-            , compactMetricChart "Missing pages (cumulative)" "var(--link)" yMaxMissing (List.map (\r -> { day = r.day, value = toFloat r.missingPages }) recent)
+            , compactMetricChart "Missing pages (cumulative)"
+                "var(--danger-btn-bg)"
+                yMaxMissing
+                (List.map (\r -> { day = r.day, value = toFloat r.missingPages }) rows)
                 config.hoveredBar
                 config.onHoverChange
-            , compactMetricChart "TODO items (cumulative)" "var(--danger-btn-bg)" yMaxTodos (List.map (\r -> { day = r.day, value = toFloat r.todos }) recent)
+            , compactMetricChart "TODO items (cumulative)"
+                "var(--danger-btn-bg)"
+                yMaxTodos
+                (List.map (\r -> { day = r.day, value = toFloat r.todos }) rows)
                 config.hoveredBar
                 config.onHoverChange
             ]
+
+
+{-| Lighter bar fill when bin matches hover (same as `color-mix` elsewhere in this module).
+-}
+barFillHovered : String -> String
+barFillHovered base =
+    "color-mix(in srgb, " ++ base ++ " 62%, white)"
 
 
 gridLineColor : String
@@ -169,6 +174,16 @@ compactMetricChart :
     -> Html msg
 compactMetricChart title color yMax data maybeHover onHoverChange =
     let
+        chartWidth : Int
+        chartWidth =
+            List.length data
+                |> (\n -> max 260 (min 4000 (n * 4)))
+
+        xTickAmount : Int
+        xTickAmount =
+            List.length data
+                |> (\n -> max 4 (min 14 (n // 25 + 4)))
+
         hoverInfoText : String
         hoverInfoText =
             case maybeHover of
@@ -183,6 +198,7 @@ compactMetricChart title color yMax data maybeHover onHoverChange =
                     "Hover bar for day count"
 
         -- `CE.getNearestX CI.bins`: nearest column by x only (full bin width), not distance to short bar geometry.
+        hoverDecoder : List (CI.Many { day : String, value : Float } x) -> Maybe { metric : String, day : String, count : Int }
         hoverDecoder binsHit =
             binsHit
                 |> List.head
@@ -216,7 +232,7 @@ compactMetricChart title color yMax data maybeHover onHoverChange =
             , HA.style "overflow-x" "auto"
             ]
             [ C.chart
-                [ CA.width 260
+                [ CA.width (toFloat chartWidth)
                 , CA.height 168
                 , CA.margin { top = 4, right = 14, bottom = 58, left = 26 }
                 , CA.padding { top = 4, right = 2, bottom = 4, left = 4 }
@@ -228,7 +244,7 @@ compactMetricChart title color yMax data maybeHover onHoverChange =
                 , CE.onMouseMove (hoverDecoder >> onHoverChange) (CE.getNearestX CI.bins)
                 , CE.onMouseLeave (onHoverChange Nothing)
                 ]
-                [ C.xTicks [ CA.amount (List.length data |> min 8), CA.color axisLineColor ]
+                [ C.xTicks [ CA.amount xTickAmount, CA.color axisLineColor ]
                 , C.yTicks [ CA.amount 3, CA.color axisLineColor ]
                 , C.yLabels [ CA.amount 3, CA.fontSize 7, CA.color "var(--fg-muted)" ]
                 , C.xAxis [ CA.color axisLineColor, CA.noArrow ]
@@ -239,7 +255,21 @@ compactMetricChart title color yMax data maybeHover onHoverChange =
                     , CA.margin 0.18
                     , CA.roundTop 0.12
                     ]
-                    [ C.bar .value [ CA.color color ] ]
+                    [ C.bar .value [ CA.color color ]
+                        |> C.variation
+                            (\_ datum ->
+                                case maybeHover of
+                                    Just hover ->
+                                        if hover.metric == title && hover.day == datum.day then
+                                            [ CA.color (barFillHovered color) ]
+
+                                        else
+                                            []
+
+                                    Nothing ->
+                                        []
+                            )
+                    ]
                     data
                 , C.binLabels .day
                     [ CA.moveDown 28
