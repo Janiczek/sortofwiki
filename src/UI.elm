@@ -640,7 +640,7 @@ sideNavBottomSectionClass =
 
 sideNavMainSectionClass : String
 sideNavMainSectionClass =
-    "min-h-0 md:flex-1"
+    "min-h-0 md:flex-1 md:overflow-y-auto md:overscroll-contain"
 
 
 wikiCatalogGridClass : String
