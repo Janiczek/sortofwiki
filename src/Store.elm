@@ -46,7 +46,7 @@ type alias Store =
     , wikiUsers :
         Dict Wiki.Slug (RemoteData () (Result WikiAdminUsers.Error (List WikiAdminUsers.ListedUser)))
     , wikiAuditLogs :
-        Dict Wiki.Slug (Dict String (Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent))))
+        Dict Wiki.Slug (Dict String (Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEventSummary))))
     , wikiTodos :
         Dict Wiki.Slug (Versioned Int (Result () (List WikiTodos.TableRow)))
     , wikiStats :
@@ -353,7 +353,7 @@ perform config action store =
                 cacheKey =
                     WikiAuditLog.auditLogFilterCacheKey filter
 
-                inner0 : Dict String (Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent)))
+                inner0 : Dict String (Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEventSummary)))
                 inner0 =
                     Dict.get wikiSlug store.wikiAuditLogs
                         |> Maybe.withDefault Dict.empty
@@ -361,7 +361,7 @@ perform config action store =
                 startLoad : ( Store, Command FrontendOnly toBackend msg )
                 startLoad =
                     let
-                        inner1 : Dict String (Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent)))
+                        inner1 : Dict String (Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEventSummary)))
                         inner1 =
                             Dict.insert cacheKey { version = 0, value = Loading } inner0
                     in
@@ -401,12 +401,12 @@ perform config action store =
                 cacheKey =
                     WikiAuditLog.auditLogFilterCacheKey filter
 
-                inner0 : Dict String (Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent)))
+                inner0 : Dict String (Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEventSummary)))
                 inner0 =
                     Dict.get wikiSlug store.wikiAuditLogs
                         |> Maybe.withDefault Dict.empty
 
-                inner1 : Dict String (Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent)))
+                inner1 : Dict String (Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEventSummary)))
                 inner1 =
                     Dict.insert cacheKey { version = 0, value = Loading } inner0
             in
@@ -453,7 +453,7 @@ getWikiAuditLog :
     Wiki.Slug
     -> WikiAuditLog.AuditLogFilter
     -> Store
-    -> RemoteData () (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent))
+    -> RemoteData () (Result WikiAuditLog.Error (List WikiAuditLog.AuditEventSummary))
 getWikiAuditLog wikiSlug filter store =
     case Dict.get wikiSlug store.wikiAuditLogs of
         Nothing ->

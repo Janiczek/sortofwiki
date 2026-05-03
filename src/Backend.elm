@@ -1094,7 +1094,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                 version =
                     (cacheVersionsForWiki wikiSlug model).auditVersion
 
-                respond : Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent) -> ( Model, Command BackendOnly ToFrontend Msg )
+                respond : Result WikiAuditLog.Error (List WikiAuditLog.AuditEventSummary) -> ( Model, Command BackendOnly ToFrontend Msg )
                 respond res =
                     ( model
                     , Effect.Lamdera.sendToFrontend clientId
@@ -1120,8 +1120,47 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                 |> Dict.get wikiSlug
                                 |> Maybe.withDefault []
                                 |> WikiAuditLog.filterEvents filter
+                                |> List.map WikiAuditLog.eventSummaryFromEvent
                                 |> Ok
                                 |> respond
+
+        RequestWikiAuditEventDiff wikiSlug filter rowIndex ->
+            let
+                respondDiff : Result WikiAuditLog.EventDiffError WikiAuditLog.TrustedPublishAuditDiff -> ( Model, Command BackendOnly ToFrontend Msg )
+                respondDiff res =
+                    ( model
+                    , Effect.Lamdera.sendToFrontend clientId
+                        (WikiAuditEventDiffResponse wikiSlug filter rowIndex res)
+                    )
+            in
+            case Dict.get wikiSlug model.wikis of
+                Nothing ->
+                    respondDiff (Err WikiAuditLog.DiffWikiNotFound)
+
+                Just w ->
+                    if not w.active then
+                        respondDiff (Err WikiAuditLog.DiffWikiInactive)
+
+                    else
+                        let
+                            events : List WikiAuditLog.AuditEvent
+                            events =
+                                model.wikiAuditEvents
+                                    |> Dict.get wikiSlug
+                                    |> Maybe.withDefault []
+                                    |> WikiAuditLog.filterEvents filter
+                        in
+                        case List.drop rowIndex events of
+                            [] ->
+                                respondDiff (Err WikiAuditLog.DiffRowNotFound)
+
+                            ev :: _ ->
+                                case WikiAuditLog.trustedPublishDiffFromKind ev.kind of
+                                    Nothing ->
+                                        respondDiff (Err WikiAuditLog.DiffRowNotDiffable)
+
+                                    Just body ->
+                                        respondDiff (Ok body)
 
         PromoteContributorToTrusted wikiSlug rawTargetUsername ->
             let
@@ -3040,7 +3079,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                     Effect.Lamdera.sessionIdToString sessionId
 
                 respond :
-                    Result HostAdmin.ProtectedError (List WikiAuditLog.ScopedAuditEvent)
+                    Result HostAdmin.ProtectedError (List WikiAuditLog.ScopedAuditEventSummary)
                     -> ( Model, Command BackendOnly ToFrontend Msg )
                 respond res =
                     ( model
@@ -3051,8 +3090,46 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                 model.wikiAuditEvents
                     |> WikiAuditLog.allScopedEventsFromDict
                     |> WikiAuditLog.filterScopedEvents filter
+                    |> List.map WikiAuditLog.scopedEventSummaryFromScoped
                     |> Ok
                     |> respond
+
+            else
+                respond (Err HostAdmin.NotHostAuthenticated)
+
+        RequestHostAuditEventDiff filter rowIndex ->
+            let
+                sessionKey : String
+                sessionKey =
+                    Effect.Lamdera.sessionIdToString sessionId
+
+                respond :
+                    Result HostAdmin.ProtectedError (Result WikiAuditLog.EventDiffError WikiAuditLog.TrustedPublishAuditDiff)
+                    -> ( Model, Command BackendOnly ToFrontend Msg )
+                respond res =
+                    ( model
+                    , Effect.Lamdera.sendToFrontend clientId (HostAuditEventDiffResponse filter rowIndex res)
+                    )
+            in
+            if Set.member sessionKey model.hostSessions then
+                let
+                    scoped : List WikiAuditLog.ScopedAuditEvent
+                    scoped =
+                        model.wikiAuditEvents
+                            |> WikiAuditLog.allScopedEventsFromDict
+                            |> WikiAuditLog.filterScopedEvents filter
+                in
+                case List.drop rowIndex scoped of
+                    [] ->
+                        respond (Ok (Err WikiAuditLog.DiffRowNotFound))
+
+                    ev :: _ ->
+                        case WikiAuditLog.trustedPublishDiffFromKind ev.kind of
+                            Nothing ->
+                                respond (Ok (Err WikiAuditLog.DiffRowNotDiffable))
+
+                            Just body ->
+                                respond (Ok (Ok body))
 
             else
                 respond (Err HostAdmin.NotHostAuthenticated)

@@ -74,6 +74,65 @@ suite =
                         |> WikiAuditLog.eventKindUserText
                         |> Expect.equal "Trusted publish: deleted page gone — obsolete"
             ]
+        , Test.describe "eventKindSummaryUserText"
+            [ Test.test "TrustedPublishedNewPageSummary matches char-count style of full kind" <|
+                \() ->
+                    WikiAuditLog.TrustedPublishedNewPageSummary { pageSlug = "n", markdownCharCount = 5 }
+                        |> WikiAuditLog.eventKindSummaryUserText
+                        |> Expect.equal "Trusted publish: created page n (5 chars)"
+            , Test.test "TrustedPublishedPageEditSummary matches before/after length style" <|
+                \() ->
+                    WikiAuditLog.TrustedPublishedPageEditSummary
+                        { pageSlug = "h", beforeCharCount = 6, afterCharCount = 5 }
+                        |> WikiAuditLog.eventKindSummaryUserText
+                        |> Expect.equal "Trusted publish: edited page h (before: 6 chars, after: 5 chars)"
+            , Test.test "TrustedPublishedPageDeleteSummary includes trimmed reason" <|
+                \() ->
+                    WikiAuditLog.TrustedPublishedPageDeleteSummary { pageSlug = "gone", reason = "  x  " }
+                        |> WikiAuditLog.eventKindSummaryUserText
+                        |> Expect.equal "Trusted publish: deleted page gone — x"
+            ]
+        , Test.describe "eventSummaryFromEvent"
+            [ Test.test "drops trusted new-page markdown from summary kind" <|
+                \() ->
+                    let
+                        ev : WikiAuditLog.AuditEvent
+                        ev =
+                            { at = Time.millisToPosix 0
+                            , actorUsername = "t"
+                            , kind =
+                                WikiAuditLog.TrustedPublishedNewPage
+                                    { pageSlug = "p"
+                                    , markdown = "SECRET BODY"
+                                    }
+                            }
+                    in
+                    (WikiAuditLog.eventSummaryFromEvent ev).kind
+                        |> Expect.equal
+                            (WikiAuditLog.TrustedPublishedNewPageSummary
+                                { pageSlug = "p", markdownCharCount = 11 }
+                            )
+            , Test.test "drops trusted edit before/after markdown from summary kind" <|
+                \() ->
+                    let
+                        ev : WikiAuditLog.AuditEvent
+                        ev =
+                            { at = Time.millisToPosix 0
+                            , actorUsername = "t"
+                            , kind =
+                                WikiAuditLog.TrustedPublishedPageEdit
+                                    { pageSlug = "p"
+                                    , beforeMarkdown = "OLD"
+                                    , afterMarkdown = "NEW"
+                                    }
+                            }
+                    in
+                    (WikiAuditLog.eventSummaryFromEvent ev).kind
+                        |> Expect.equal
+                            (WikiAuditLog.TrustedPublishedPageEditSummary
+                                { pageSlug = "p", beforeCharCount = 3, afterCharCount = 3 }
+                            )
+            ]
         , Test.describe "formatEventRowText"
             [ Test.test "includes UTC YYYY-MM-DD HH:mm:ss, actor, and kind text" <|
                 \() ->

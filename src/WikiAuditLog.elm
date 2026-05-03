@@ -1,28 +1,41 @@
 module WikiAuditLog exposing
-    ( AuditEvent
+    ( AuditDiffCacheKey
+    , AuditEvent
     , AuditEventKind(..)
     , AuditEventKindFilterTag(..)
+    , AuditEventKindSummary(..)
+    , AuditEventSummary
     , AuditLogFilter
     , Error(..)
+    , EventDiffError(..)
     , HostAuditLogFilter
     , ScopedAuditEvent
+    , ScopedAuditEventSummary
+    , TrustedPublishAuditDiff(..)
     , allScopedEventsFromDict
     , append
+    , auditDiffCacheKey
     , auditLogFilterCacheKey
     , emptyAuditLogFilter
     , emptyHostAuditLogFilter
     , errorToUserText
+    , eventDiffErrorToUserText
     , eventKindFilterTagOptions
     , eventKindFilterTagToString
+    , eventKindSummaryUserText
     , eventKindUserText
     , eventMatchesFilter
-    , eventUtcTimestampString
-    , eventUtcTimestampStringScoped
+    , eventSummaryFromEvent
+    , eventUtcTimestampStringFromSummary
+    , eventUtcTimestampStringScopedSummary
     , filterEvents
     , filterScopedEvents
     , formatEventRowText
+    , hostAuditDiffCacheKey
     , hostAuditLogFilterCacheKey
     , scopedEventMatchesFilter
+    , scopedEventSummaryFromScoped
+    , trustedPublishDiffFromKind
     )
 
 import Dict exposing (Dict)
@@ -212,6 +225,122 @@ relatedPageSlugForKind kind =
             Just pageSlug
 
 
+eventKindToSummary : AuditEventKind -> AuditEventKindSummary
+eventKindToSummary kind =
+    case kind of
+        ApprovedSubmission r ->
+            ApprovedSubmissionSummary r
+
+        ApprovedPublishedNewPage r ->
+            ApprovedPublishedNewPageSummary r
+
+        ApprovedPublishedPageEdit r ->
+            ApprovedPublishedPageEditSummary r
+
+        ApprovedPublishedPageDelete r ->
+            ApprovedPublishedPageDeleteSummary r
+
+        RejectedSubmission r ->
+            RejectedSubmissionSummary r
+
+        RequestedSubmissionChanges r ->
+            RequestedSubmissionChangesSummary r
+
+        PromotedContributorToTrusted r ->
+            PromotedContributorToTrustedSummary r
+
+        DemotedTrustedToContributor r ->
+            DemotedTrustedToContributorSummary r
+
+        GrantedWikiAdmin r ->
+            GrantedWikiAdminSummary r
+
+        RevokedWikiAdmin r ->
+            RevokedWikiAdminSummary r
+
+        TrustedPublishedNewPage { pageSlug, markdown } ->
+            TrustedPublishedNewPageSummary
+                { pageSlug = pageSlug
+                , markdownCharCount = String.length markdown
+                }
+
+        TrustedPublishedPageEdit { pageSlug, beforeMarkdown, afterMarkdown } ->
+            TrustedPublishedPageEditSummary
+                { pageSlug = pageSlug
+                , beforeCharCount = String.length beforeMarkdown
+                , afterCharCount = String.length afterMarkdown
+                }
+
+        TrustedPublishedPageDelete { pageSlug, reason } ->
+            TrustedPublishedPageDeleteSummary { pageSlug = pageSlug, reason = reason }
+
+
+eventSummaryFromEvent : AuditEvent -> AuditEventSummary
+eventSummaryFromEvent e =
+    { at = e.at
+    , actorUsername = e.actorUsername
+    , kind = eventKindToSummary e.kind
+    }
+
+
+scopedEventSummaryFromScoped : ScopedAuditEvent -> ScopedAuditEventSummary
+scopedEventSummaryFromScoped e =
+    { wikiSlug = e.wikiSlug
+    , at = e.at
+    , actorUsername = e.actorUsername
+    , kind = eventKindToSummary e.kind
+    }
+
+
+trustedPublishDiffFromKind : AuditEventKind -> Maybe TrustedPublishAuditDiff
+trustedPublishDiffFromKind kind =
+    case kind of
+        TrustedPublishedNewPage { pageSlug, markdown } ->
+            Just (TrustedPublishNewPageDiff { pageSlug = pageSlug, markdown = markdown })
+
+        TrustedPublishedPageEdit { pageSlug, beforeMarkdown, afterMarkdown } ->
+            Just
+                (TrustedPublishPageEditDiff
+                    { pageSlug = pageSlug
+                    , beforeMarkdown = beforeMarkdown
+                    , afterMarkdown = afterMarkdown
+                    }
+                )
+
+        ApprovedSubmission _ ->
+            Nothing
+
+        ApprovedPublishedNewPage _ ->
+            Nothing
+
+        ApprovedPublishedPageEdit _ ->
+            Nothing
+
+        ApprovedPublishedPageDelete _ ->
+            Nothing
+
+        RejectedSubmission _ ->
+            Nothing
+
+        RequestedSubmissionChanges _ ->
+            Nothing
+
+        PromotedContributorToTrusted _ ->
+            Nothing
+
+        DemotedTrustedToContributor _ ->
+            Nothing
+
+        GrantedWikiAdmin _ ->
+            Nothing
+
+        RevokedWikiAdmin _ ->
+            Nothing
+
+        TrustedPublishedPageDelete _ ->
+            Nothing
+
+
 kindMatchesFilterTag : AuditEventKind -> AuditEventKindFilterTag -> Bool
 kindMatchesFilterTag kind tag =
     case ( kind, tag ) of
@@ -320,6 +449,80 @@ type alias ScopedAuditEvent =
     }
 
 
+{-| [`AuditEventKind`](#AuditEventKind) without trusted-publish **markdown** (no before/after/new-page bodies).
+List responses still carry small metadata: markdown character counts, edit before/after lengths, and delete reason text.
+-}
+type AuditEventKindSummary
+    = ApprovedSubmissionSummary { submissionId : String, pageSlug : String }
+    | ApprovedPublishedNewPageSummary { submissionId : String, pageSlug : String }
+    | ApprovedPublishedPageEditSummary { submissionId : String, pageSlug : String }
+    | ApprovedPublishedPageDeleteSummary { submissionId : String, pageSlug : String }
+    | RejectedSubmissionSummary { submissionId : String, pageSlug : String }
+    | RequestedSubmissionChangesSummary { submissionId : String, pageSlug : String }
+    | PromotedContributorToTrustedSummary { targetUsername : String }
+    | DemotedTrustedToContributorSummary { targetUsername : String }
+    | GrantedWikiAdminSummary { targetUsername : String }
+    | RevokedWikiAdminSummary { targetUsername : String }
+    | TrustedPublishedNewPageSummary { pageSlug : String, markdownCharCount : Int }
+    | TrustedPublishedPageEditSummary { pageSlug : String, beforeCharCount : Int, afterCharCount : Int }
+    | TrustedPublishedPageDeleteSummary { pageSlug : String, reason : String }
+
+
+{-| Metadata row for audit tables and list API payloads.
+-}
+type alias AuditEventSummary =
+    { at : Time.Posix
+    , actorUsername : String
+    , kind : AuditEventKindSummary
+    }
+
+
+{-| Scoped audit list item without trusted body payloads.
+-}
+type alias ScopedAuditEventSummary =
+    { wikiSlug : Wiki.Slug
+    , at : Time.Posix
+    , actorUsername : String
+    , kind : AuditEventKindSummary
+    }
+
+
+{-| Trusted direct-publish diff payload (fetched separately from list metadata).
+-}
+type TrustedPublishAuditDiff
+    = TrustedPublishNewPageDiff { pageSlug : String, markdown : String }
+    | TrustedPublishPageEditDiff { pageSlug : String, beforeMarkdown : String, afterMarkdown : String }
+
+
+type EventDiffError
+    = DiffWikiNotFound
+    | DiffWikiInactive
+    | DiffRowNotFound
+    | DiffRowNotDiffable
+
+
+type alias AuditDiffCacheKey =
+    String
+
+
+auditDiffCacheKey : Wiki.Slug -> AuditLogFilter -> Int -> AuditDiffCacheKey
+auditDiffCacheKey wikiSlug filter rowIndex =
+    wikiSlug
+        ++ "\u{001E}"
+        ++ auditLogFilterCacheKey filter
+        ++ "\u{001E}"
+        ++ String.fromInt rowIndex
+
+
+hostAuditDiffCacheKey : HostAuditLogFilter -> Int -> AuditDiffCacheKey
+hostAuditDiffCacheKey filter rowIndex =
+    "host"
+        ++ "\u{001E}"
+        ++ hostAuditLogFilterCacheKey filter
+        ++ "\u{001E}"
+        ++ String.fromInt rowIndex
+
+
 {-| Like [`AuditLogFilter`](#AuditLogFilter) plus optional wiki slug substring (case-insensitive).
 -}
 type alias HostAuditLogFilter =
@@ -414,15 +617,6 @@ allScopedEventsFromDict dict =
         []
         dict
         |> List.sortBy (\e -> Time.posixToMillis e.at)
-
-
-eventUtcTimestampStringScoped : ScopedAuditEvent -> String
-eventUtcTimestampStringScoped e =
-    eventUtcTimestampString
-        { at = e.at
-        , actorUsername = e.actorUsername
-        , kind = e.kind
-        }
 
 
 type Error
@@ -640,3 +834,118 @@ formatEventRowText e =
         ++ e.actorUsername
         ++ " — "
         ++ eventKindUserText e.kind
+
+
+eventUtcTimestampStringFromSummary : AuditEventSummary -> String
+eventUtcTimestampStringFromSummary s =
+    posixUtcToYyyyMmDdHhMmSs s.at
+
+
+eventUtcTimestampStringScopedSummary : ScopedAuditEventSummary -> String
+eventUtcTimestampStringScopedSummary e =
+    eventUtcTimestampStringFromSummary
+        { at = e.at
+        , actorUsername = e.actorUsername
+        , kind = e.kind
+        }
+
+
+eventKindSummaryUserText : AuditEventKindSummary -> String
+eventKindSummaryUserText kind =
+    case kind of
+        ApprovedSubmissionSummary { submissionId, pageSlug } ->
+            "Approved submission "
+                ++ submissionId
+                ++ " (page "
+                ++ pageSlug
+                ++ ")"
+
+        ApprovedPublishedNewPageSummary { submissionId, pageSlug } ->
+            "Approved new page "
+                ++ pageSlug
+                ++ " (submission "
+                ++ submissionId
+                ++ ")"
+
+        ApprovedPublishedPageEditSummary { submissionId, pageSlug } ->
+            "Approved edit to "
+                ++ pageSlug
+                ++ " (submission "
+                ++ submissionId
+                ++ ")"
+
+        ApprovedPublishedPageDeleteSummary { submissionId, pageSlug } ->
+            "Approved deletion of "
+                ++ pageSlug
+                ++ " (submission "
+                ++ submissionId
+                ++ ")"
+
+        RejectedSubmissionSummary { submissionId, pageSlug } ->
+            "Rejected submission "
+                ++ submissionId
+                ++ " (page "
+                ++ pageSlug
+                ++ ")"
+
+        RequestedSubmissionChangesSummary { submissionId, pageSlug } ->
+            "Requested changes on submission "
+                ++ submissionId
+                ++ " (page "
+                ++ pageSlug
+                ++ ")"
+
+        PromotedContributorToTrustedSummary { targetUsername } ->
+            "Promoted contributor " ++ targetUsername ++ " to trusted"
+
+        DemotedTrustedToContributorSummary { targetUsername } ->
+            "Demoted trusted contributor " ++ targetUsername ++ " to contributor"
+
+        GrantedWikiAdminSummary { targetUsername } ->
+            "Granted wiki admin to " ++ targetUsername
+
+        RevokedWikiAdminSummary { targetUsername } ->
+            "Revoked wiki admin from " ++ targetUsername
+
+        TrustedPublishedNewPageSummary { pageSlug, markdownCharCount } ->
+            "Trusted publish: created page "
+                ++ pageSlug
+                ++ " ("
+                ++ String.fromInt markdownCharCount
+                ++ " chars)"
+
+        TrustedPublishedPageEditSummary { pageSlug, beforeCharCount, afterCharCount } ->
+            "Trusted publish: edited page "
+                ++ pageSlug
+                ++ " (before: "
+                ++ String.fromInt beforeCharCount
+                ++ " chars, after: "
+                ++ String.fromInt afterCharCount
+                ++ " chars"
+                ++ ")"
+
+        TrustedPublishedPageDeleteSummary { pageSlug, reason } ->
+            "Trusted publish: deleted page "
+                ++ pageSlug
+                ++ (if String.isEmpty (String.trim reason) then
+                        ""
+
+                    else
+                        " — " ++ String.trim reason
+                   )
+
+
+eventDiffErrorToUserText : EventDiffError -> String
+eventDiffErrorToUserText err =
+    case err of
+        DiffWikiNotFound ->
+            "This wiki was not found."
+
+        DiffWikiInactive ->
+            "This wiki is currently paused."
+
+        DiffRowNotFound ->
+            "That audit row is not available (list may have changed)."
+
+        DiffRowNotDiffable ->
+            "Diff details are not available for this audit event."

@@ -741,6 +741,67 @@ runStoreActions store actions =
         |> (\( s, cmds ) -> ( s, Command.batch cmds ))
 
 
+clearAuditDiffEntriesForWiki : Wiki.Slug -> Dict WikiAuditLog.AuditDiffCacheKey v -> Dict WikiAuditLog.AuditDiffCacheKey v
+clearAuditDiffEntriesForWiki wikiSlug =
+    Dict.filter (\k _ -> not (String.startsWith (wikiSlug ++ "\u{001E}") k))
+
+
+clearHostAuditDiffEntries : Dict WikiAuditLog.AuditDiffCacheKey v -> Dict WikiAuditLog.AuditDiffCacheKey v
+clearHostAuditDiffEntries =
+    Dict.filter (\k _ -> not (String.startsWith "host\u{001E}" k))
+
+
+remapAuditDiffWikiSlugKeys : Wiki.Slug -> Wiki.Slug -> Dict WikiAuditLog.AuditDiffCacheKey v -> Dict WikiAuditLog.AuditDiffCacheKey v
+remapAuditDiffWikiSlugKeys oldSlug newSlug dict =
+    let
+        oldPrefix : String
+        oldPrefix =
+            oldSlug ++ "\u{001E}"
+
+        newPrefix : String
+        newPrefix =
+            newSlug ++ "\u{001E}"
+    in
+    Dict.foldl
+        (\k v acc ->
+            if String.startsWith oldPrefix k then
+                Dict.insert (String.replace oldPrefix newPrefix k) v acc
+
+            else
+                Dict.insert k v acc
+        )
+        Dict.empty
+        dict
+
+
+auditDiffFetchCmdForRoute : Model -> Command FrontendOnly ToBackend Msg
+auditDiffFetchCmdForRoute model =
+    case model.route of
+        Route.WikiAdminAuditDiff wikiSlug rowIdx ->
+            Effect.Lamdera.sendToBackend
+                (RequestWikiAuditEventDiff wikiSlug model.wikiAdminAuditAppliedFilter rowIdx)
+
+        Route.HostAdminAuditDiff _ rowIdx ->
+            Effect.Lamdera.sendToBackend
+                (RequestHostAuditEventDiff model.hostAdminAuditAppliedFilter rowIdx)
+
+        _ ->
+            Command.none
+
+
+shouldSkipAuditDiffFetch : WikiAuditLog.AuditDiffCacheKey -> Model -> Bool
+shouldSkipAuditDiffFetch key m =
+    case Dict.get key m.auditTrustedPublishDiffByKey of
+        Just RemoteData.Loading ->
+            True
+
+        Just (RemoteData.Success _) ->
+            True
+
+        _ ->
+            False
+
+
 runRouteStoreActions :
     ( Model, Command FrontendOnly ToBackend Msg )
     -> ( Model, Command FrontendOnly ToBackend Msg )
@@ -750,9 +811,52 @@ runRouteStoreActions ( model, cmd ) =
             Route.storeActions model.route
                 |> runStoreActions model.store
 
+        baseModel : Model
+        baseModel =
+            { model | store = store }
+
+        ( diffPatchedModel, auditDiffCmd ) =
+            case baseModel.route of
+                Route.WikiAdminAuditDiff wikiSlug rowIdx ->
+                    let
+                        k : WikiAuditLog.AuditDiffCacheKey
+                        k =
+                            WikiAuditLog.auditDiffCacheKey wikiSlug baseModel.wikiAdminAuditAppliedFilter rowIdx
+                    in
+                    if shouldSkipAuditDiffFetch k baseModel then
+                        ( baseModel, Command.none )
+
+                    else
+                        ( { baseModel
+                            | auditTrustedPublishDiffByKey =
+                                Dict.insert k RemoteData.Loading baseModel.auditTrustedPublishDiffByKey
+                          }
+                        , auditDiffFetchCmdForRoute baseModel
+                        )
+
+                Route.HostAdminAuditDiff _ rowIdx ->
+                    let
+                        k : WikiAuditLog.AuditDiffCacheKey
+                        k =
+                            WikiAuditLog.hostAuditDiffCacheKey baseModel.hostAdminAuditAppliedFilter rowIdx
+                    in
+                    if shouldSkipAuditDiffFetch k baseModel then
+                        ( baseModel, Command.none )
+
+                    else
+                        ( { baseModel
+                            | auditTrustedPublishDiffByKey =
+                                Dict.insert k RemoteData.Loading baseModel.auditTrustedPublishDiffByKey
+                          }
+                        , auditDiffFetchCmdForRoute baseModel
+                        )
+
+                _ ->
+                    ( baseModel, Command.none )
+
         hostWikisCmd : Command FrontendOnly ToBackend Msg
         hostWikisCmd =
-            case model.route of
+            case diffPatchedModel.route of
                 Route.HostAdminWikis ->
                     Effect.Lamdera.sendToBackend RequestHostWikiList
 
@@ -772,10 +876,10 @@ runRouteStoreActions ( model, cmd ) =
                     Effect.Lamdera.sendToBackend (RequestHostWikiDetail slug)
 
                 Route.HostAdminAudit ->
-                    Effect.Lamdera.sendToBackend (RequestHostAuditLog model.hostAdminAuditAppliedFilter)
+                    Effect.Lamdera.sendToBackend (RequestHostAuditLog diffPatchedModel.hostAdminAuditAppliedFilter)
 
                 Route.HostAdminAuditDiff _ _ ->
-                    Effect.Lamdera.sendToBackend (RequestHostAuditLog model.hostAdminAuditAppliedFilter)
+                    Effect.Lamdera.sendToBackend (RequestHostAuditLog diffPatchedModel.hostAdminAuditAppliedFilter)
 
                 Route.WikiHome _ ->
                     Command.none
@@ -793,7 +897,7 @@ runRouteStoreActions ( model, cmd ) =
                     Command.none
 
                 Route.WikiSearch _ ->
-                    requestWikiSearchCmd model.wikiSearchPageQuery model.route
+                    requestWikiSearchCmd diffPatchedModel.wikiSearchPageQuery diffPatchedModel.route
 
                 Route.WikiStats _ ->
                     Command.none
@@ -837,8 +941,8 @@ runRouteStoreActions ( model, cmd ) =
                 Route.NotFound _ ->
                     Command.none
     in
-    ( { model | store = store }
-    , Command.batch [ cmd, storeCmd, hostWikisCmd ]
+    ( diffPatchedModel
+    , Command.batch [ cmd, storeCmd, hostWikisCmd, auditDiffCmd ]
     )
 
 
@@ -1458,6 +1562,7 @@ init url key =
             , wikiMarkdownEditorPane = EditorWrite
             , wikiStatsDailyActivityHover = Nothing
             , navigationFragment = Nothing
+            , auditTrustedPublishDiffByKey = Dict.empty
             }
 
         ( route, maybeContributorReplace ) =
@@ -1559,6 +1664,7 @@ init url key =
             , wikiMarkdownEditorPane = EditorWrite
             , wikiStatsDailyActivityHover = Nothing
             , navigationFragment = url.fragment
+            , auditTrustedPublishDiffByKey = Dict.empty
             }
     in
     ( model, navCmd )
@@ -2247,6 +2353,13 @@ update msg model =
                         , wikiStatsDailyActivityHover = Nothing
                         , wikiPageMobileRightRailCollapsed =
                             wikiPageMobileRightRailCollapsedOnUrlChange model.route route model.wikiPageMobileRightRailCollapsed
+                        , auditTrustedPublishDiffByKey =
+                            case route of
+                                Route.WikiLogin slug _ ->
+                                    clearAuditDiffEntriesForWiki slug model.auditTrustedPublishDiffByKey
+
+                                _ ->
+                                    model.auditTrustedPublishDiffByKey
                     }
 
                 next : Model
@@ -4863,7 +4976,7 @@ invalidateSoftCachesForVersions wikiSlug versions store =
                 Nothing ->
                     store.wikiTodos
 
-        wikiAuditLogsNext : Dict Wiki.Slug (Dict String (Store.Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent))))
+        wikiAuditLogsNext : Dict Wiki.Slug (Dict String (Store.Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEventSummary))))
         wikiAuditLogsNext =
             case Dict.get wikiSlug store.wikiAuditLogs of
                 Just inner ->
@@ -5007,6 +5120,7 @@ updateFromBackend msg model =
         WikiCacheInvalidated wikiSlug versions ->
             ( { model
                 | store = invalidateSoftCachesForVersions wikiSlug versions model.store
+                , auditTrustedPublishDiffByKey = clearAuditDiffEntriesForWiki wikiSlug model.auditTrustedPublishDiffByKey
               }
             , Command.none
             )
@@ -5045,6 +5159,7 @@ updateFromBackend msg model =
                 | route = nextRoute
                 , store = nextStore
                 , contributorWikiSessions = nextContributorWikiSessions
+                , auditTrustedPublishDiffByKey = remapAuditDiffWikiSlugKeys oldSlug newSlug model.auditTrustedPublishDiffByKey
               }
             , routeCmd
             )
@@ -5376,12 +5491,12 @@ updateFromBackend msg model =
                 cacheKey =
                     WikiAuditLog.auditLogFilterCacheKey filter
 
-                inner0 : Dict String (Store.Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent)))
+                inner0 : Dict String (Store.Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEventSummary)))
                 inner0 =
                     Dict.get wikiSlug store.wikiAuditLogs
                         |> Maybe.withDefault Dict.empty
 
-                inner1 : Dict String (Store.Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent)))
+                inner1 : Dict String (Store.Versioned Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEventSummary)))
                 inner1 =
                     Dict.insert cacheKey { version = version, value = RemoteData.succeed result } inner0
 
@@ -5391,9 +5506,26 @@ updateFromBackend msg model =
                         | wikiAuditLogs =
                             Dict.insert wikiSlug inner1 store.wikiAuditLogs
                     }
+
+                nextDiffCache : Dict WikiAuditLog.AuditDiffCacheKey (RemoteData () (Result WikiAuditLog.EventDiffError WikiAuditLog.TrustedPublishAuditDiff))
+                nextDiffCache =
+                    clearAuditDiffEntriesForWiki wikiSlug model.auditTrustedPublishDiffByKey
             in
-            ( { model | store = nextStore }, Command.none )
+            ( { model | store = nextStore, auditTrustedPublishDiffByKey = nextDiffCache }, Command.none )
                 |> runRouteStoreActions
+
+        WikiAuditEventDiffResponse wikiSlug filter rowIndex result ->
+            let
+                k : WikiAuditLog.AuditDiffCacheKey
+                k =
+                    WikiAuditLog.auditDiffCacheKey wikiSlug filter rowIndex
+            in
+            ( { model
+                | auditTrustedPublishDiffByKey =
+                    Dict.insert k (RemoteData.succeed result) model.auditTrustedPublishDiffByKey
+              }
+            , Command.none
+            )
 
         WikiAuditLogUnchanged _ ->
             ( model, Command.none )
@@ -5415,7 +5547,11 @@ updateFromBackend msg model =
                                     Dict.remove wikiSlug store.wikiAuditLogs
                             }
                     in
-                    ( { model | store = nextStore, adminPromoteError = Nothing }
+                    ( { model
+                        | store = nextStore
+                        , adminPromoteError = Nothing
+                        , auditTrustedPublishDiffByKey = clearAuditDiffEntriesForWiki wikiSlug model.auditTrustedPublishDiffByKey
+                      }
                     , Effect.Lamdera.sendToBackend (RequestWikiUsers wikiSlug)
                     )
 
@@ -5441,7 +5577,11 @@ updateFromBackend msg model =
                                     Dict.remove wikiSlug store.wikiAuditLogs
                             }
                     in
-                    ( { model | store = nextStore, adminDemoteError = Nothing }
+                    ( { model
+                        | store = nextStore
+                        , adminDemoteError = Nothing
+                        , auditTrustedPublishDiffByKey = clearAuditDiffEntriesForWiki wikiSlug model.auditTrustedPublishDiffByKey
+                      }
                     , Effect.Lamdera.sendToBackend (RequestWikiUsers wikiSlug)
                     )
 
@@ -5467,7 +5607,11 @@ updateFromBackend msg model =
                                     Dict.remove wikiSlug store.wikiAuditLogs
                             }
                     in
-                    ( { model | store = nextStore, adminGrantAdminError = Nothing }
+                    ( { model
+                        | store = nextStore
+                        , adminGrantAdminError = Nothing
+                        , auditTrustedPublishDiffByKey = clearAuditDiffEntriesForWiki wikiSlug model.auditTrustedPublishDiffByKey
+                      }
                     , Effect.Lamdera.sendToBackend (RequestWikiUsers wikiSlug)
                     )
 
@@ -5493,7 +5637,11 @@ updateFromBackend msg model =
                                     Dict.remove wikiSlug store.wikiAuditLogs
                             }
                     in
-                    ( { model | store = nextStore, adminRevokeAdminError = Nothing }
+                    ( { model
+                        | store = nextStore
+                        , adminRevokeAdminError = Nothing
+                        , auditTrustedPublishDiffByKey = clearAuditDiffEntriesForWiki wikiSlug model.auditTrustedPublishDiffByKey
+                      }
                     , Effect.Lamdera.sendToBackend (RequestWikiUsers wikiSlug)
                     )
 
@@ -5567,12 +5715,26 @@ updateFromBackend msg model =
                     else
                         store
 
+                nextDiffCache : Dict WikiAuditLog.AuditDiffCacheKey (RemoteData () (Result WikiAuditLog.EventDiffError WikiAuditLog.TrustedPublishAuditDiff))
+                nextDiffCache =
+                    if d.inFlight then
+                        case result of
+                            Ok _ ->
+                                clearAuditDiffEntriesForWiki wikiSlug model.auditTrustedPublishDiffByKey
+
+                            Err _ ->
+                                model.auditTrustedPublishDiffByKey
+
+                    else
+                        model.auditTrustedPublishDiffByKey
+
                 nextModel : Model
                 nextModel =
                     { model
                         | registerDraft = nextDraft
                         , contributorWikiSessions = nextContributorWikiSessions
                         , store = nextStore
+                        , auditTrustedPublishDiffByKey = nextDiffCache
                     }
 
                 afterRegisterCmd : Command FrontendOnly ToBackend Msg
@@ -5655,12 +5817,26 @@ updateFromBackend msg model =
                     else
                         store
 
+                nextDiffCacheLogin : Dict WikiAuditLog.AuditDiffCacheKey (RemoteData () (Result WikiAuditLog.EventDiffError WikiAuditLog.TrustedPublishAuditDiff))
+                nextDiffCacheLogin =
+                    if d.inFlight then
+                        case result of
+                            Ok _ ->
+                                clearAuditDiffEntriesForWiki wikiSlug model.auditTrustedPublishDiffByKey
+
+                            Err _ ->
+                                model.auditTrustedPublishDiffByKey
+
+                    else
+                        model.auditTrustedPublishDiffByKey
+
                 nextModel : Model
                 nextModel =
                     { model
                         | loginDraft = nextDraft
                         , contributorWikiSessions = nextContributorWikiSessions
                         , store = nextStore
+                        , auditTrustedPublishDiffByKey = nextDiffCacheLogin
                     }
 
                 afterLoginCmd : Command FrontendOnly ToBackend Msg
@@ -5704,6 +5880,7 @@ updateFromBackend msg model =
                 | contributorWikiSessions = Dict.remove loggedOutWiki model.contributorWikiSessions
                 , store = nextStore
                 , submissionDetailEditDraft = emptySubmissionDetailEditDraft
+                , auditTrustedPublishDiffByKey = clearAuditDiffEntriesForWiki loggedOutWiki model.auditTrustedPublishDiffByKey
               }
             , navCmd
             )
@@ -7043,9 +7220,11 @@ updateFromBackend msg model =
                                 ( { model
                                     | hostAdminAuditLog = RemoteData.Success result
                                     , hostAdminSessionAuthenticated = True
+                                    , auditTrustedPublishDiffByKey = clearHostAuditDiffEntries model.auditTrustedPublishDiffByKey
                                   }
                                 , Command.none
                                 )
+                                    |> runRouteStoreActions
 
                 Route.HostAdminAuditDiff _ _ ->
                     let
@@ -7076,12 +7255,40 @@ updateFromBackend msg model =
                                 ( { model
                                     | hostAdminAuditLog = RemoteData.Success result
                                     , hostAdminSessionAuthenticated = True
+                                    , auditTrustedPublishDiffByKey = clearHostAuditDiffEntries model.auditTrustedPublishDiffByKey
                                   }
                                 , Command.none
                                 )
+                                    |> runRouteStoreActions
 
                 _ ->
                     ( model, Command.none )
+
+        HostAuditEventDiffResponse filter rowIndex hostResult ->
+            let
+                k : WikiAuditLog.AuditDiffCacheKey
+                k =
+                    WikiAuditLog.hostAuditDiffCacheKey filter rowIndex
+            in
+            case hostResult of
+                Err HostAdmin.NotHostAuthenticated ->
+                    ( { model
+                        | hostAdminAuditLog = RemoteData.succeed (Err HostAdmin.NotHostAuthenticated)
+                        , hostAdminSessionAuthenticated = False
+                        , route = Route.HostAdmin (Just Wiki.hostAdminAuditUrlPath)
+                        , auditTrustedPublishDiffByKey = Dict.remove k model.auditTrustedPublishDiffByKey
+                      }
+                    , Effect.Browser.Navigation.replaceUrl model.key
+                        (Wiki.hostAdminLoginUrlPathWithRedirect Wiki.hostAdminAuditUrlPath)
+                    )
+
+                Ok inner ->
+                    ( { model
+                        | auditTrustedPublishDiffByKey =
+                            Dict.insert k (RemoteData.succeed inner) model.auditTrustedPublishDiffByKey
+                      }
+                    , Command.none
+                    )
 
         CreateHostedWikiResponse result ->
             let
@@ -9002,7 +9209,7 @@ type alias AuditTableRow =
     { wikiSlug : Wiki.Slug
     , at : Time.Posix
     , actorUsername : String
-    , kind : WikiAuditLog.AuditEventKind
+    , kind : WikiAuditLog.AuditEventKindSummary
     , utcTimestamp : String
     }
 
@@ -9051,7 +9258,7 @@ viewAuditEventsTable config rows =
 
 
 viewHostAdminAuditBody :
-    RemoteData () (Result HostAdmin.ProtectedError (List WikiAuditLog.ScopedAuditEvent))
+    RemoteData () (Result HostAdmin.ProtectedError (List WikiAuditLog.ScopedAuditEventSummary))
     -> Html Msg
 viewHostAdminAuditBody remote =
     case remote of
@@ -9093,16 +9300,16 @@ viewHostAdminAuditBody remote =
                             , at = ev.at
                             , actorUsername = ev.actorUsername
                             , kind = ev.kind
-                            , utcTimestamp = WikiAuditLog.eventUtcTimestampStringScoped ev
+                            , utcTimestamp = WikiAuditLog.eventUtcTimestampStringScopedSummary ev
                             }
                         )
                 )
 
 
-viewAuditEventKindCell : Bool -> Int -> Wiki.Slug -> WikiAuditLog.AuditEventKind -> Html Msg
+viewAuditEventKindCell : Bool -> Int -> Wiki.Slug -> WikiAuditLog.AuditEventKindSummary -> Html Msg
 viewAuditEventKindCell isHostAuditView eventIndex wikiSlug kind =
     case kind of
-        WikiAuditLog.TrustedPublishedNewPage { pageSlug, markdown } ->
+        WikiAuditLog.TrustedPublishedNewPageSummary { pageSlug } ->
             let
                 diffHref : String
                 diffHref =
@@ -9114,13 +9321,7 @@ viewAuditEventKindCell isHostAuditView eventIndex wikiSlug kind =
             in
             Html.span
                 [ UI.viewDiffKindInlineAttr ]
-                [ Html.text
-                    ("Trusted publish: created page "
-                        ++ pageSlug
-                        ++ " ("
-                        ++ String.fromInt (String.length markdown)
-                        ++ " chars)"
-                    )
+                [ Html.text (WikiAuditLog.eventKindSummaryUserText kind)
                 , UI.Link.subtleLink
                     [ Attr.href diffHref
                     , Attr.id ("wiki-audit-view-diff-create-" ++ pageSlug)
@@ -9128,7 +9329,7 @@ viewAuditEventKindCell isHostAuditView eventIndex wikiSlug kind =
                     [ Html.text "View diff" ]
                 ]
 
-        WikiAuditLog.TrustedPublishedPageEdit { pageSlug, beforeMarkdown, afterMarkdown } ->
+        WikiAuditLog.TrustedPublishedPageEditSummary _ ->
             let
                 diffHref : String
                 diffHref =
@@ -9140,22 +9341,14 @@ viewAuditEventKindCell isHostAuditView eventIndex wikiSlug kind =
             in
             Html.span
                 [ UI.viewDiffKindInlineAttr ]
-                [ Html.text
-                    ("Trusted publish: edited page "
-                        ++ pageSlug
-                        ++ " (before: "
-                        ++ String.fromInt (String.length beforeMarkdown)
-                        ++ " chars, after: "
-                        ++ String.fromInt (String.length afterMarkdown)
-                        ++ " chars)"
-                    )
+                [ Html.text (WikiAuditLog.eventKindSummaryUserText kind)
                 , UI.Link.subtleLink
                     [ Attr.href diffHref ]
                     [ Html.text "View diff" ]
                 ]
 
         _ ->
-            Html.text (WikiAuditLog.eventKindUserText kind)
+            Html.text (WikiAuditLog.eventKindSummaryUserText kind)
 
 
 viewHostAdminAuditKindChip : Model -> ( WikiAuditLog.AuditEventKindFilterTag, String ) -> Html Msg
@@ -11892,7 +12085,7 @@ viewWikiAdminAuditLoading =
 
 viewWikiAdminAuditBody :
     Wiki.Slug
-    -> RemoteData () (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent))
+    -> RemoteData () (Result WikiAuditLog.Error (List WikiAuditLog.AuditEventSummary))
     -> Html Msg
 viewWikiAdminAuditBody wikiSlug remote =
     case remote of
@@ -11932,7 +12125,7 @@ viewWikiAdminAuditBody wikiSlug remote =
                             , at = ev.at
                             , actorUsername = ev.actorUsername
                             , kind = ev.kind
-                            , utcTimestamp = WikiAuditLog.eventUtcTimestampString ev
+                            , utcTimestamp = WikiAuditLog.eventUtcTimestampStringFromSummary ev
                             }
                         )
                 )
@@ -12024,177 +12217,152 @@ type TrustedAuditDiffBody
     | TrustedAuditEditDiffBody_ TrustedAuditEditDiffBody
 
 
-trustedAuditDiffFromEvent : WikiAuditLog.AuditEvent -> Maybe TrustedAuditDiffBody
-trustedAuditDiffFromEvent ev =
-    case ev.kind of
-        WikiAuditLog.TrustedPublishedNewPage { pageSlug, markdown } ->
-            Just
-                (TrustedAuditNewPageDiffBody
-                    { pageSlug = pageSlug
-                    , markdown = markdown
-                    }
-                )
+trustedPublishAuditDiffToTrustedAuditDiffBody : WikiAuditLog.TrustedPublishAuditDiff -> TrustedAuditDiffBody
+trustedPublishAuditDiffToTrustedAuditDiffBody d =
+    case d of
+        WikiAuditLog.TrustedPublishNewPageDiff b ->
+            TrustedAuditNewPageDiffBody
+                { pageSlug = b.pageSlug
+                , markdown = b.markdown
+                }
 
-        WikiAuditLog.TrustedPublishedPageEdit { pageSlug, beforeMarkdown, afterMarkdown } ->
-            Just
-                (TrustedAuditEditDiffBody_
-                    { pageSlug = pageSlug
-                    , beforeMarkdown = beforeMarkdown
-                    , afterMarkdown = afterMarkdown
-                    }
-                )
-
-        _ ->
-            Nothing
-
-
-trustedAuditDiffFromScopedEvent : WikiAuditLog.ScopedAuditEvent -> Maybe TrustedAuditDiffBody
-trustedAuditDiffFromScopedEvent ev =
-    trustedAuditDiffFromEvent
-        { at = ev.at
-        , actorUsername = ev.actorUsername
-        , kind = ev.kind
-        }
-
-
-findWikiAuditDiffByIndex : Model -> Wiki.Slug -> Int -> Maybe TrustedAuditDiffBody
-findWikiAuditDiffByIndex model wikiSlug eventIndex =
-    case Store.getWikiAuditLog wikiSlug model.wikiAdminAuditAppliedFilter model.store of
-        Success (Ok events) ->
-            events
-                |> List.drop eventIndex
-                |> List.head
-                |> Maybe.andThen trustedAuditDiffFromEvent
-
-        _ ->
-            Nothing
-
-
-findHostAuditDiffByIndex : Model -> Int -> Maybe ( Wiki.Slug, TrustedAuditDiffBody )
-findHostAuditDiffByIndex model eventIndex =
-    case model.hostAdminAuditLog of
-        Success (Ok scopedEvents) ->
-            scopedEvents
-                |> List.drop eventIndex
-                |> List.head
-                |> Maybe.andThen
-                    (\ev ->
-                        trustedAuditDiffFromScopedEvent ev
-                            |> Maybe.map (\body -> ( ev.wikiSlug, body ))
-                    )
-
-        _ ->
-            Nothing
+        WikiAuditLog.TrustedPublishPageEditDiff b ->
+            TrustedAuditEditDiffBody_
+                { pageSlug = b.pageSlug
+                , beforeMarkdown = b.beforeMarkdown
+                , afterMarkdown = b.afterMarkdown
+                }
 
 
 viewWikiAdminAuditDiffRoute : Wiki.Slug -> Wiki.FrontendDetails -> Int -> Model -> Html Msg
 viewWikiAdminAuditDiffRoute wikiSlug wikiDetails eventIndex model =
     let
-        maybeDiffBody : Maybe TrustedAuditDiffBody
-        maybeDiffBody =
-            findWikiAuditDiffByIndex model wikiSlug eventIndex
+        cacheKey : WikiAuditLog.AuditDiffCacheKey
+        cacheKey =
+            WikiAuditLog.auditDiffCacheKey wikiSlug model.wikiAdminAuditAppliedFilter eventIndex
+
+        remote : RemoteData () (Result WikiAuditLog.EventDiffError WikiAuditLog.TrustedPublishAuditDiff)
+        remote =
+            Dict.get cacheKey model.auditTrustedPublishDiffByKey
+                |> Maybe.withDefault RemoteData.NotAsked
     in
-    case maybeDiffBody of
-        Just (TrustedAuditNewPageDiffBody diffBody) ->
-            Html.div
-                [ Attr.id "wiki-admin-audit-diff-page"
-                , UI.hostAdminAuditDiffPageShellAttr
-                ]
-                [ viewAuditLogDiffReadonly
-                    model.currentUrl
-                    wikiSlug
-                    (publishedSlugExistsFromWikiDetails wikiDetails)
-                    (SubmissionReviewDetail.NewPageDiff
-                        { pageSlug = diffBody.pageSlug
-                        , proposedMarkdown = diffBody.markdown
-                        }
-                    )
-                ]
+    case remote of
+        RemoteData.NotAsked ->
+            viewAuditLoading "wiki-admin-audit-diff-loading"
 
-        Just (TrustedAuditEditDiffBody_ diffBody) ->
-            Html.div
-                [ Attr.id "wiki-admin-audit-diff-page"
-                , UI.hostAdminAuditDiffPageShellAttr
-                ]
-                [ UI.contentParagraph []
-                    [ UI.Link.subtleLink [ Attr.href (Wiki.adminAuditUrlPath wikiSlug) ] [ Html.text "Back to audit log" ] ]
-                , viewAuditLogDiffReadonly
-                    model.currentUrl
-                    wikiSlug
-                    (publishedSlugExistsFromWikiDetails wikiDetails)
-                    (SubmissionReviewDetail.EditPageDiff diffBody)
-                ]
+        RemoteData.Loading ->
+            viewAuditLoading "wiki-admin-audit-diff-loading"
 
-        Nothing ->
+        RemoteData.Failure _ ->
+            viewAuditError "wiki-admin-audit-diff-error" "Could not load diff."
+
+        RemoteData.Success (Err e) ->
             Html.div
                 [ Attr.id "wiki-admin-audit-diff-missing" ]
                 [ UI.contentParagraph []
-                    [ Html.text "Diff details not available for this audit event." ]
+                    [ Html.text (WikiAuditLog.eventDiffErrorToUserText e) ]
                 ]
 
+        RemoteData.Success (Ok diffPayload) ->
+            case trustedPublishAuditDiffToTrustedAuditDiffBody diffPayload of
+                TrustedAuditNewPageDiffBody diffBody ->
+                    Html.div
+                        [ Attr.id "wiki-admin-audit-diff-page"
+                        , UI.hostAdminAuditDiffPageShellAttr
+                        ]
+                        [ viewAuditLogDiffReadonly
+                            model.currentUrl
+                            wikiSlug
+                            (publishedSlugExistsFromWikiDetails wikiDetails)
+                            (SubmissionReviewDetail.NewPageDiff
+                                { pageSlug = diffBody.pageSlug
+                                , proposedMarkdown = diffBody.markdown
+                                }
+                            )
+                        ]
 
-viewHostAdminAuditDiffRoute : Int -> Model -> Html Msg
-viewHostAdminAuditDiffRoute eventIndex model =
+                TrustedAuditEditDiffBody_ diffBody ->
+                    Html.div
+                        [ Attr.id "wiki-admin-audit-diff-page"
+                        , UI.hostAdminAuditDiffPageShellAttr
+                        ]
+                        [ UI.contentParagraph []
+                            [ UI.Link.subtleLink [ Attr.href (Wiki.adminAuditUrlPath wikiSlug) ] [ Html.text "Back to audit log" ] ]
+                        , viewAuditLogDiffReadonly
+                            model.currentUrl
+                            wikiSlug
+                            (publishedSlugExistsFromWikiDetails wikiDetails)
+                            (SubmissionReviewDetail.EditPageDiff diffBody)
+                        ]
+
+
+viewHostAdminAuditDiffRoute : Wiki.Slug -> Int -> Model -> Html Msg
+viewHostAdminAuditDiffRoute rowWikiSlug eventIndex model =
     let
-        maybeDiffBody : Maybe ( Wiki.Slug, TrustedAuditDiffBody )
-        maybeDiffBody =
-            findHostAuditDiffByIndex model eventIndex
+        cacheKey : WikiAuditLog.AuditDiffCacheKey
+        cacheKey =
+            WikiAuditLog.hostAuditDiffCacheKey model.hostAdminAuditAppliedFilter eventIndex
+
+        remote : RemoteData () (Result WikiAuditLog.EventDiffError WikiAuditLog.TrustedPublishAuditDiff)
+        remote =
+            Dict.get cacheKey model.auditTrustedPublishDiffByKey
+                |> Maybe.withDefault RemoteData.NotAsked
+
+        publishedSlugExistsFor : Wiki.Slug -> Page.Slug -> Bool
+        publishedSlugExistsFor wikiSlug pageSlug =
+            case Store.get_ wikiSlug model.store.wikiDetails of
+                Success wikiDetails ->
+                    publishedSlugExistsFromWikiDetails wikiDetails pageSlug
+
+                _ ->
+                    False
     in
-    case maybeDiffBody of
-        Just ( wikiSlug, TrustedAuditNewPageDiffBody diffBody ) ->
-            let
-                publishedSlugExists : Page.Slug -> Bool
-                publishedSlugExists =
-                    case Store.get_ wikiSlug model.store.wikiDetails of
-                        Success wikiDetails ->
-                            publishedSlugExistsFromWikiDetails wikiDetails
+    case remote of
+        RemoteData.NotAsked ->
+            viewAuditLoading "host-admin-audit-diff-loading"
 
-                        _ ->
-                            \_ -> False
-            in
-            Html.div
-                [ Attr.id "host-admin-audit-diff-page"
-                , UI.hostAdminAuditDiffPageShellAttr
-                ]
-                [ viewAuditLogDiffReadonly
-                    model.currentUrl
-                    wikiSlug
-                    publishedSlugExists
-                    (SubmissionReviewDetail.NewPageDiff
-                        { pageSlug = diffBody.pageSlug
-                        , proposedMarkdown = diffBody.markdown
-                        }
-                    )
-                ]
+        RemoteData.Loading ->
+            viewAuditLoading "host-admin-audit-diff-loading"
 
-        Just ( wikiSlug, TrustedAuditEditDiffBody_ diffBody ) ->
-            let
-                publishedSlugExists : Page.Slug -> Bool
-                publishedSlugExists =
-                    case Store.get_ wikiSlug model.store.wikiDetails of
-                        Success wikiDetails ->
-                            publishedSlugExistsFromWikiDetails wikiDetails
+        RemoteData.Failure _ ->
+            viewAuditError "host-admin-audit-diff-error" "Could not load diff."
 
-                        _ ->
-                            \_ -> False
-            in
-            Html.div
-                [ Attr.id "host-admin-audit-diff-page"
-                , UI.hostAdminAuditDiffPageShellAttr
-                ]
-                [ viewAuditLogDiffReadonly
-                    model.currentUrl
-                    wikiSlug
-                    publishedSlugExists
-                    (SubmissionReviewDetail.EditPageDiff diffBody)
-                ]
-
-        Nothing ->
+        RemoteData.Success (Err e) ->
             Html.div
                 [ Attr.id "host-admin-audit-diff-missing" ]
                 [ UI.contentParagraph []
-                    [ Html.text "Diff details not available for this audit event." ]
+                    [ Html.text (WikiAuditLog.eventDiffErrorToUserText e) ]
                 ]
+
+        RemoteData.Success (Ok diffPayload) ->
+            case trustedPublishAuditDiffToTrustedAuditDiffBody diffPayload of
+                TrustedAuditNewPageDiffBody diffBody ->
+                    Html.div
+                        [ Attr.id "host-admin-audit-diff-page"
+                        , UI.hostAdminAuditDiffPageShellAttr
+                        ]
+                        [ viewAuditLogDiffReadonly
+                            model.currentUrl
+                            rowWikiSlug
+                            (publishedSlugExistsFor rowWikiSlug)
+                            (SubmissionReviewDetail.NewPageDiff
+                                { pageSlug = diffBody.pageSlug
+                                , proposedMarkdown = diffBody.markdown
+                                }
+                            )
+                        ]
+
+                TrustedAuditEditDiffBody_ diffBody ->
+                    Html.div
+                        [ Attr.id "host-admin-audit-diff-page"
+                        , UI.hostAdminAuditDiffPageShellAttr
+                        ]
+                        [ viewAuditLogDiffReadonly
+                            model.currentUrl
+                            rowWikiSlug
+                            (publishedSlugExistsFor rowWikiSlug)
+                            (SubmissionReviewDetail.EditPageDiff diffBody)
+                        ]
 
 
 viewSubmissionReviewDiff :
@@ -13998,8 +14166,8 @@ viewBody model =
         Route.HostAdminAudit ->
             viewHostAdminAudit model
 
-        Route.HostAdminAuditDiff _ atMillis ->
-            viewHostAdminAuditDiffRoute atMillis model
+        Route.HostAdminAuditDiff wikiSlug atMillis ->
+            viewHostAdminAuditDiffRoute wikiSlug atMillis model
 
         Route.HostAdminBackup ->
             viewHostAdminBackupPage model
