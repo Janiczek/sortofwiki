@@ -80,6 +80,15 @@ suite =
 
                         Nothing ->
                             Expect.fail "url"
+            , Test.test "anonymous opening wiki audit log is not redirected" <|
+                \() ->
+                    case Url.fromString "https://example.com/w/Demo/admin/audit" of
+                        Just u ->
+                            RouteAccess.contributorForcedRedirect anon u (Route.WikiAdminAudit "Demo")
+                                |> Expect.equal Nothing
+
+                        Nothing ->
+                            Expect.fail "url"
             , Test.test "anonymous opening my submissions redirects with return path" <|
                 \() ->
                     case Url.fromString "https://example.com/w/Demo/submissions" of
@@ -125,6 +134,10 @@ suite =
             , Test.test "wiki home yields nothing" <|
                 \() ->
                     RouteAccess.contributorRestrictedReturnPath (Route.WikiHome "Demo")
+                        |> Expect.equal Nothing
+            , Test.test "wiki audit log yields nothing (public route)" <|
+                \() ->
+                    RouteAccess.contributorRestrictedReturnPath (Route.WikiAdminAudit "Demo")
                         |> Expect.equal Nothing
             ]
         ]

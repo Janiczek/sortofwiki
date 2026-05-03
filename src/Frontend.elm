@@ -9651,7 +9651,7 @@ documentTitle ({ store, route } as model) =
         Route.WikiAdminAudit slug ->
             case Store.get slug store.wikiCatalog of
                 RemoteData.Success summary ->
-                    "Admin audit — " ++ summary.name ++ " — SortOfWiki"
+                    "Audit log — " ++ summary.name ++ " — SortOfWiki"
 
                 RemoteData.Failure _ ->
                     "404 — SortOfWiki"
@@ -9665,7 +9665,7 @@ documentTitle ({ store, route } as model) =
         Route.WikiAdminAuditDiff slug _ ->
             case Store.get slug store.wikiCatalog of
                 RemoteData.Success summary ->
-                    "Admin audit diff — " ++ summary.name ++ " — SortOfWiki"
+                    "Audit diff — " ++ summary.name ++ " — SortOfWiki"
 
                 RemoteData.Failure _ ->
                     "404 — SortOfWiki"

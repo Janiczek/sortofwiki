@@ -89,6 +89,10 @@ wikiNavLinks wikiSlug maybeRole =
               , linkRoute = Route.WikiTodos wikiSlug
               , linkEmphasized = False
               }
+            , { linkLabel = "Audit log"
+              , linkRoute = Route.WikiAdminAudit wikiSlug
+              , linkEmphasized = False
+              }
             ]
     in
     case maybeRole of
@@ -122,11 +126,7 @@ wikiNavLinks wikiSlug maybeRole =
                   else
                     []
                 , if WikiRole.canAccessWikiAdminUsers role then
-                    [ { linkLabel = "Audit log"
-                      , linkRoute = Route.WikiAdminAudit wikiSlug
-                      , linkEmphasized = False
-                      }
-                    , { linkLabel = "Admin"
+                    [ { linkLabel = "Admin"
                       , linkRoute = Route.WikiAdminUsers wikiSlug
                       , linkEmphasized = False
                       }

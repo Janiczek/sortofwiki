@@ -689,29 +689,12 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                         respond (Err WikiAuditLog.WikiInactive)
 
                     else
-                        let
-                            sessionKey : String
-                            sessionKey =
-                                Effect.Lamdera.sessionIdToString sessionId
-                        in
-                        case WikiUser.sessionContributorOnWiki sessionKey wikiSlug model.contributorSessions of
-                            WikiUser.SessionNotLoggedIn ->
-                                respond (Err WikiAuditLog.NotLoggedIn)
-
-                            WikiUser.SessionWrongWiki ->
-                                respond (Err WikiAuditLog.WrongWikiSession)
-
-                            WikiUser.SessionHasAccount accountId ->
-                                if not (WikiContributors.isAdminForWiki wikiSlug accountId model.contributors) then
-                                    respond (Err WikiAuditLog.Forbidden)
-
-                                else
-                                    model.wikiAuditEvents
-                                        |> Dict.get wikiSlug
-                                        |> Maybe.withDefault []
-                                        |> WikiAuditLog.filterEvents filter
-                                        |> Ok
-                                        |> respond
+                        model.wikiAuditEvents
+                            |> Dict.get wikiSlug
+                            |> Maybe.withDefault []
+                            |> WikiAuditLog.filterEvents filter
+                            |> Ok
+                            |> respond
 
         PromoteContributorToTrusted wikiSlug rawTargetUsername ->
             let

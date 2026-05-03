@@ -140,12 +140,6 @@ canAccess ctx route =
             ctx.contributorOnActiveWiki
                 |> Maybe.map WikiRole.isTrustedModerator
                 |> Maybe.withDefault False
-
-        wikiAdminOk : Bool
-        wikiAdminOk =
-            ctx.contributorOnActiveWiki
-                |> Maybe.map WikiRole.canAccessWikiAdminUsers
-                |> Maybe.withDefault False
     in
     case route of
         WikiList ->
@@ -225,13 +219,20 @@ canAccess ctx route =
             slugOk wikiSlug && trustedOk
 
         WikiAdminUsers wikiSlug ->
+            let
+                wikiAdminOk : Bool
+                wikiAdminOk =
+                    ctx.contributorOnActiveWiki
+                        |> Maybe.map WikiRole.canAccessWikiAdminUsers
+                        |> Maybe.withDefault False
+            in
             slugOk wikiSlug && wikiAdminOk
 
         WikiAdminAudit wikiSlug ->
-            slugOk wikiSlug && wikiAdminOk
+            slugOk wikiSlug
 
         WikiAdminAuditDiff wikiSlug _ ->
-            slugOk wikiSlug && wikiAdminOk
+            slugOk wikiSlug
 
         NotFound _ ->
             False

@@ -392,8 +392,6 @@ eventUtcTimestampStringScoped e =
 type Error
     = WikiNotFound
     | WikiInactive
-    | NotLoggedIn
-    | WrongWikiSession
     | Forbidden
 
 
@@ -405,12 +403,6 @@ errorToUserText err =
 
         WikiInactive ->
             "This wiki is currently paused."
-
-        NotLoggedIn ->
-            "You must be logged in to view the audit log."
-
-        WrongWikiSession ->
-            "Switch to this wiki while logged in to view its audit log."
 
         Forbidden ->
             "Only wiki admins can view the audit log."

@@ -22,6 +22,7 @@ type ContributorRouteRedirect
 
 {-| When anonymous (or logged in on another wiki), restricted wiki routes redirect to login with return path.
 Logged-in contributors without sufficient role still reach the route so the server can respond with an error instead of a client-only redirect — except `WikiMySubmissions`, where trusted/admin are sent to wiki home.
+`WikiAdminAudit` / `WikiAdminAuditDiff` are public (same as wiki home): no client redirect; backend serves data for active wikis.
 -}
 contributorForcedRedirect : Dict Wiki.Slug ContributorWikiSession -> Url -> Route -> Maybe ContributorRouteRedirect
 contributorForcedRedirect sessions url route =
@@ -86,25 +87,11 @@ contributorForcedRedirect sessions url route =
             else
                 Just (ToContributorLogin wikiSlug returnPath)
 
-        Route.WikiAdminAudit wikiSlug ->
-            if adminHere wikiSlug then
-                Nothing
+        Route.WikiAdminAudit _ ->
+            Nothing
 
-            else if loggedInHere wikiSlug then
-                Nothing
-
-            else
-                Just (ToContributorLogin wikiSlug returnPath)
-
-        Route.WikiAdminAuditDiff wikiSlug _ ->
-            if adminHere wikiSlug then
-                Nothing
-
-            else if loggedInHere wikiSlug then
-                Nothing
-
-            else
-                Just (ToContributorLogin wikiSlug returnPath)
+        Route.WikiAdminAuditDiff _ _ ->
+            Nothing
 
         Route.WikiSubmitNew wikiSlug ->
             if loggedInHere wikiSlug then
@@ -211,11 +198,11 @@ contributorRestrictedReturnPath route =
         Route.WikiAdminUsers wikiSlug ->
             Just ( wikiSlug, Wiki.adminUsersUrlPath wikiSlug )
 
-        Route.WikiAdminAudit wikiSlug ->
-            Just ( wikiSlug, Wiki.adminAuditUrlPath wikiSlug )
+        Route.WikiAdminAudit _ ->
+            Nothing
 
-        Route.WikiAdminAuditDiff wikiSlug atMillis ->
-            Just ( wikiSlug, Wiki.adminAuditDiffUrlPath wikiSlug atMillis )
+        Route.WikiAdminAuditDiff _ _ ->
+            Nothing
 
         Route.WikiSubmitNew wikiSlug ->
             Just ( wikiSlug, Wiki.submitNewPageUrlPath wikiSlug )
