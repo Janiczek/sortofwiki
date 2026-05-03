@@ -7,6 +7,7 @@ module Wiki exposing
     , adminAuditUrlPath
     , adminUsersUrlPath
     , applyPublishedMarkdownEdit
+    , canonicalPublishedSlugIfOnWiki
     , catalogEntry
     , catalogUrlPath
     , frontendDetails
@@ -85,6 +86,15 @@ type alias FrontendDetails =
     , pendingReviewCountForTrustedViewer : Maybe Int
     , viewerSession : Maybe ContributorWikiSession
     }
+
+
+{-| If `suggestedSlug` matches a published page case-insensitively, return that slug as stored on the wiki.
+-}
+canonicalPublishedSlugIfOnWiki : Page.Slug -> List Page.Slug -> Maybe Page.Slug
+canonicalPublishedSlugIfOnWiki suggestedSlug pageSlugs =
+    pageSlugs
+        |> List.filter (\s -> String.toLower s == String.toLower suggestedSlug)
+        |> List.head
 
 
 catalogEntry : Wiki -> CatalogEntry

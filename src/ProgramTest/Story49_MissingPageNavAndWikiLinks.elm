@@ -3,8 +3,10 @@ module ProgramTest.Story49_MissingPageNavAndWikiLinks exposing (endToEndTests)
 import Effect.Browser.Dom
 import ProgramTest.Actions
 import ProgramTest.Config
+import ProgramTest.Model
 import ProgramTest.Query
 import ProgramTest.Start
+import Route
 import Types exposing (FrontendMsg(..))
 import Url exposing (Protocol(..), Url)
 import Wiki
@@ -28,6 +30,17 @@ submitNewNoQueryUrl =
     , port_ = Just 8000
     , path = Wiki.submitNewPageUrlPath "Demo"
     , query = Nothing
+    , fragment = Nothing
+    }
+
+
+submitNewExistingPageUrl : Url
+submitNewExistingPageUrl =
+    { protocol = Http
+    , host = "localhost"
+    , port_ = Just 8000
+    , path = Wiki.submitNewPageUrlPath "Demo"
+    , query = Just "page=Guides"
     , fragment = Nothing
     }
 
@@ -97,6 +110,58 @@ endToEndTests =
                             (ProgramTest.Query.expectHasDataAttributes
                                 [ ( "data-wiki-slug", "Demo" )
                                 , ( "data-page-slug", "Návsí" )
+                                ]
+                            )
+                        )
+                    ]
+            }
+        , ProgramTest.Start.bothViewports
+            { baseName = "49 — anonymous cold /submit/new?page= for existing page replaces URL to published page"
+            , config = ProgramTest.Config.demoWikiPagesOnly
+            , sessionId = "session-story49-submit-new-redirect-anon-existing"
+            , path = Wiki.submitNewPageUrlPathWithSuggestedSlug "Demo" "Guides"
+            , connectClientMs = Nothing
+            , clientSteps =
+                \client ->
+                    [ client.checkView 800
+                        (ProgramTest.Query.withinId "page-published-page"
+                            (ProgramTest.Query.expectHasDataAttributes
+                                [ ( "data-wiki-slug", "Demo" )
+                                , ( "data-page-slug", "Guides" )
+                                ]
+                            )
+                        )
+                    , client.checkModel 100
+                        (ProgramTest.Model.expectRoute (Route.WikiPage "Demo" "Guides")
+                            "submit/new?page=Guides for published slug becomes WikiPage"
+                        )
+                    ]
+            }
+        , ProgramTest.Start.bothViewports
+            { baseName = "49 — logged-in /submit/new?page= for existing page redirects when details already loaded"
+            , config = ProgramTest.Config.demoWikiPagesOnly
+            , sessionId = "session-story49-submit-new-redirect-logged-in"
+            , path = "/w/Demo/p/Guides"
+            , connectClientMs = Nothing
+            , clientSteps =
+                \client ->
+                    [ client.checkView 200
+                        (ProgramTest.Query.withinId "page-published-page"
+                            (ProgramTest.Query.expectHasDataAttributes
+                                [ ( "data-page-slug", "Guides" )
+                                ]
+                            )
+                        )
+                    , client.update 100 (UrlChanged submitNewExistingPageUrl)
+                    , client.checkModel 200
+                        (ProgramTest.Model.expectRoute (Route.WikiPage "Demo" "Guides")
+                            "in-memory wiki details: existing ?page= sends user to published route"
+                        )
+                    , client.checkView 200
+                        (ProgramTest.Query.withinId "page-published-page"
+                            (ProgramTest.Query.expectHasDataAttributes
+                                [ ( "data-wiki-slug", "Demo" )
+                                , ( "data-page-slug", "Guides" )
                                 ]
                             )
                         )

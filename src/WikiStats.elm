@@ -7,7 +7,9 @@ module WikiStats exposing
     , buildFromAudit
     , buildFromViews
     , buildFromWiki
+    , buildFromWikiWithoutDailySnapshots
     , merge
+    , withDailyAccumulatedSnapshots
     )
 
 {-| Partitioned wiki stats cache.
@@ -17,6 +19,9 @@ Each partition is rebuilt only when its source data changes:
   - **FromWiki**: pages dict mutations (publish, approve, delete, import)
   - **FromAudit**: audit log append (recordAudit / import)
   - **FromViews**: page-view counter increments
+
+Cached `FromWiki` from `buildFromWikiWithoutDailySnapshots` keeps `dailyAccumulatedSnapshots` empty;
+`RequestWikiStats` attaches dailies via `withDailyAccumulatedSnapshots` before `merge`.
 
 `Summary` = `merge fromWiki fromAudit fromViews` (pure, total).
 
@@ -142,6 +147,34 @@ merge fromWiki fromAudit fromViews =
     }
 
 
+{-| Same field math as `buildFromWiki` but skips `dailyAccumulatedSnapshots` (empty list).
+
+Backend caches this shape; expensive replay runs in `withDailyAccumulatedSnapshots` on stats read.
+
+`submissions`, `auditEvents`, and `asOf` are unused — same arity as `buildFromWiki` for call-site uniformity.
+
+-}
+buildFromWikiWithoutDailySnapshots : Wiki.Slug -> Wiki.Wiki -> FromWiki
+buildFromWikiWithoutDailySnapshots wikiSlug wiki =
+    buildFromWikiCurrentSnapshot wikiSlug wiki
+
+
+{-| Fill `dailyAccumulatedSnapshots` from audit replay (JIT for stats responses).
+-}
+withDailyAccumulatedSnapshots :
+    Wiki.Slug
+    -> Dict String Submission.Submission
+    -> List WikiAuditLog.AuditEvent
+    -> Time.Posix
+    -> FromWiki
+    -> FromWiki
+withDailyAccumulatedSnapshots wikiSlug submissions auditEvents asOf fromWiki =
+    { fromWiki
+        | dailyAccumulatedSnapshots =
+            buildDailyAccumulatedSnapshots wikiSlug submissions auditEvents asOf
+    }
+
+
 {-| Build `FromWiki` from the current wiki snapshot.
 
 `submissions` + `auditEvents` are used only for `dailyAccumulatedSnapshots` (replay).
@@ -151,6 +184,12 @@ merge fromWiki fromAudit fromViews =
 -}
 buildFromWiki : Wiki.Slug -> Wiki.Wiki -> Dict String Submission.Submission -> List WikiAuditLog.AuditEvent -> Time.Posix -> FromWiki
 buildFromWiki wikiSlug wiki submissions auditEvents asOf =
+    buildFromWikiWithoutDailySnapshots wikiSlug wiki
+        |> withDailyAccumulatedSnapshots wikiSlug submissions auditEvents asOf
+
+
+buildFromWikiCurrentSnapshot : Wiki.Slug -> Wiki.Wiki -> FromWiki
+buildFromWikiCurrentSnapshot wikiSlug wiki =
     let
         publishedPairs : List ( Page.Slug, Page.Page )
         publishedPairs =
@@ -272,10 +311,6 @@ buildFromWiki wikiSlug wiki submissions auditEvents asOf =
                             |> List.sum
                 in
                 toFloat totalRevisions / toFloat publishedPageCount
-
-        dailyAccumulatedSnapshots : List DailyAccumulatedSnapshot
-        dailyAccumulatedSnapshots =
-            buildDailyAccumulatedSnapshots wikiSlug submissions auditEvents asOf
     in
     { publishedPageCount = publishedPageCount
     , missingPageCount = List.length missingPageSlugs
@@ -285,7 +320,7 @@ buildFromWiki wikiSlug wiki submissions auditEvents asOf =
     , topPagesByInLinks = topPagesByInLinks
     , topPagesByOutLinks = topPagesByOutLinks
     , avgRevisionPerPage = avgRevisionPerPage
-    , dailyAccumulatedSnapshots = dailyAccumulatedSnapshots
+    , dailyAccumulatedSnapshots = []
     }
 
 

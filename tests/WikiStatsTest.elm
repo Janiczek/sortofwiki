@@ -341,5 +341,50 @@ suite =
                                 |> Expect.equal (Just 2)
                         ]
                         ()
+            , Test.test "without daily snapshots plus withDailyAccumulatedSnapshots matches buildFromWiki" <|
+                \() ->
+                    let
+                        wikiSlug : String
+                        wikiSlug =
+                            "Demo"
+
+                        wiki : Wiki.Wiki
+                        wiki =
+                            Wiki.wikiWithPages wikiSlug "" Dict.empty
+
+                        day0 : Time.Posix
+                        day0 =
+                            Time.millisToPosix 0
+
+                        day1 : Time.Posix
+                        day1 =
+                            Time.millisToPosix 86400000
+
+                        events : List WikiAuditLog.AuditEvent
+                        events =
+                            [ { kind = WikiAuditLog.TrustedPublishedNewPage { pageSlug = "A", markdown = "# A" }
+                              , at = day0
+                              , actorUsername = "alice"
+                              }
+                            , { kind = WikiAuditLog.TrustedPublishedNewPage { pageSlug = "B", markdown = "# B" }
+                              , at = day1
+                              , actorUsername = "alice"
+                              }
+                            ]
+
+                        asOf : Time.Posix
+                        asOf =
+                            Time.millisToPosix 86400000
+
+                        full : WikiStats.FromWiki
+                        full =
+                            WikiStats.buildFromWiki wikiSlug wiki Dict.empty events asOf
+
+                        patched : WikiStats.FromWiki
+                        patched =
+                            WikiStats.buildFromWikiWithoutDailySnapshots wikiSlug wiki
+                                |> WikiStats.withDailyAccumulatedSnapshots wikiSlug Dict.empty events asOf
+                    in
+                    Expect.equal full patched
             ]
         ]

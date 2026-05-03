@@ -183,14 +183,9 @@ withRebuiltAllSearchAndTodosCaches now model =
 withWikiStatsWikiCache : Wiki.Slug -> Wiki -> Time.Posix -> Model -> Model
 withWikiStatsWikiCache wikiSlug wiki now model =
     let
-        auditEvents : List WikiAuditLog.AuditEvent
-        auditEvents =
-            Dict.get wikiSlug model.wikiAuditEvents
-                |> Maybe.withDefault []
-
         fromWiki : WikiStats.FromWiki
         fromWiki =
-            WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents now
+            WikiStats.buildFromWikiWithoutDailySnapshots wikiSlug wiki
 
         partitions : WikiStatsPartitions
         partitions =
@@ -200,6 +195,11 @@ withWikiStatsWikiCache wikiSlug wiki now model =
 
                 Nothing ->
                     let
+                        auditEvents : List WikiAuditLog.AuditEvent
+                        auditEvents =
+                            Dict.get wikiSlug model.wikiAuditEvents
+                                |> Maybe.withDefault []
+
                         viewCounts : Dict Page.Slug Int
                         viewCounts =
                             Dict.get wikiSlug model.pageViewCounts
@@ -229,17 +229,7 @@ withWikiStatsAuditCache wikiSlug now model =
         partitions =
             case Dict.get wikiSlug model.wikiStatsCache of
                 Just existing ->
-                    let
-                        fromWiki : WikiStats.FromWiki
-                        fromWiki =
-                            case Dict.get wikiSlug model.wikis of
-                                Just wiki ->
-                                    WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents now
-
-                                Nothing ->
-                                    WikiStats.buildFromWiki wikiSlug (Wiki.wikiWithPages wikiSlug "" Dict.empty) model.submissions auditEvents now
-                    in
-                    { existing | fromAudit = fromAudit, fromWiki = fromWiki }
+                    { existing | fromAudit = fromAudit }
 
                 Nothing ->
                     let
@@ -252,10 +242,10 @@ withWikiStatsAuditCache wikiSlug now model =
                         fromWiki =
                             case Dict.get wikiSlug model.wikis of
                                 Just wiki ->
-                                    WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents now
+                                    WikiStats.buildFromWikiWithoutDailySnapshots wikiSlug wiki
 
                                 Nothing ->
-                                    WikiStats.buildFromWiki wikiSlug (Wiki.wikiWithPages wikiSlug "" Dict.empty) model.submissions auditEvents now
+                                    WikiStats.buildFromWikiWithoutDailySnapshots wikiSlug (Wiki.wikiWithPages wikiSlug "" Dict.empty)
                     in
                     { fromWiki = fromWiki
                     , fromAudit = fromAudit
@@ -310,10 +300,10 @@ withWikiStatsViewsCacheMiss wikiSlug now model =
         fromWiki =
             case Dict.get wikiSlug model.wikis of
                 Just wiki ->
-                    WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents now
+                    WikiStats.buildFromWikiWithoutDailySnapshots wikiSlug wiki
 
                 Nothing ->
-                    WikiStats.buildFromWiki wikiSlug (Wiki.wikiWithPages wikiSlug "" Dict.empty) model.submissions auditEvents now
+                    WikiStats.buildFromWikiWithoutDailySnapshots wikiSlug (Wiki.wikiWithPages wikiSlug "" Dict.empty)
 
         partitions : WikiStatsPartitions
         partitions =
@@ -344,7 +334,7 @@ withRebuiltAllWikiStatsCaches now model =
                                 Dict.get wikiSlug model.pageViewCounts
                                     |> Maybe.withDefault Dict.empty
                         in
-                        { fromWiki = WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents now
+                        { fromWiki = WikiStats.buildFromWikiWithoutDailySnapshots wikiSlug wiki
                         , fromAudit = WikiStats.buildFromAudit now auditEvents
                         , fromViews = WikiStats.buildFromViews viewCounts
                         }
@@ -873,6 +863,11 @@ updateFromFrontendWithTime sessionId clientId msg now model =
 
                             else
                                 let
+                                    auditEvents : List WikiAuditLog.AuditEvent
+                                    auditEvents =
+                                        Dict.get wikiSlug model.wikiAuditEvents
+                                            |> Maybe.withDefault []
+
                                     partitions : WikiStatsPartitions
                                     partitions =
                                         case Dict.get wikiSlug model.wikiStatsCache of
@@ -881,22 +876,21 @@ updateFromFrontendWithTime sessionId clientId msg now model =
 
                                             Nothing ->
                                                 let
-                                                    auditEvents : List WikiAuditLog.AuditEvent
-                                                    auditEvents =
-                                                        Dict.get wikiSlug model.wikiAuditEvents
-                                                            |> Maybe.withDefault []
-
                                                     viewCounts : Dict Page.Slug Int
                                                     viewCounts =
                                                         Dict.get wikiSlug model.pageViewCounts
                                                             |> Maybe.withDefault Dict.empty
                                                 in
-                                                { fromWiki = WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents now
+                                                { fromWiki = WikiStats.buildFromWikiWithoutDailySnapshots wikiSlug wiki
                                                 , fromAudit = WikiStats.buildFromAudit now auditEvents
                                                 , fromViews = WikiStats.buildFromViews viewCounts
                                                 }
+
+                                    fromWikiForSummary : WikiStats.FromWiki
+                                    fromWikiForSummary =
+                                        WikiStats.withDailyAccumulatedSnapshots wikiSlug model.submissions auditEvents now partitions.fromWiki
                                 in
-                                Just (WikiStats.merge partitions.fromWiki partitions.fromAudit partitions.fromViews)
+                                Just (WikiStats.merge fromWikiForSummary partitions.fromAudit partitions.fromViews)
             in
             case maybeKnownVersions of
                 Just knownVersions ->

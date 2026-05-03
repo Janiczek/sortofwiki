@@ -127,6 +127,16 @@ suite =
                     Wiki.publishedPageUrlPath "Demo" "home"
                         |> Expect.equal "/w/Demo/p/home"
             ]
+        , Test.describe "canonicalPublishedSlugIfOnWiki"
+            [ Test.test "returns stored spelling when query differs by case" <|
+                \() ->
+                    Wiki.canonicalPublishedSlugIfOnWiki "home" [ "About", "Home" ]
+                        |> Expect.equal (Just "Home")
+            , Test.test "Nothing when slug not published" <|
+                \() ->
+                    Wiki.canonicalPublishedSlugIfOnWiki "Ghost" [ "Home" ]
+                        |> Expect.equal Nothing
+            ]
         , Test.describe "submitNewPageUrlPath"
             [ Test.test "demo wiki new submission form" <|
                 \() ->

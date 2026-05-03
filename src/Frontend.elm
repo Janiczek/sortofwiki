@@ -384,6 +384,192 @@ publishedSlugExistsFromWikiDetails details refSlug =
     List.any (\s -> String.toLower s == String.toLower refSlug) details.pageSlugs
 
 
+maybeWikiSubmitNewToExistingPage : Route -> Url -> Store -> Maybe ( Route, String )
+maybeWikiSubmitNewToExistingPage route url store =
+    case route of
+        Route.WikiSubmitNew wikiSlug ->
+            case pageParamFromQuery url.query of
+                Just suggestedSlug ->
+                    case Store.get_ wikiSlug store.wikiDetails of
+                        Success details ->
+                            case Wiki.canonicalPublishedSlugIfOnWiki suggestedSlug details.pageSlugs of
+                                Just canonicalPageSlug ->
+                                    Just ( Route.WikiPage wikiSlug canonicalPageSlug, Wiki.publishedPageUrlPath wikiSlug canonicalPageSlug )
+
+                                Nothing ->
+                                    Nothing
+
+                        Failure _ ->
+                            Nothing
+
+                        Loading ->
+                            Nothing
+
+                        NotAsked ->
+                            Nothing
+
+                Nothing ->
+                    Nothing
+
+        _ ->
+            Nothing
+
+
+{-| When gated route is published page but the browser URL is still `/submit/new?...`, align model URL with the gated route (before `replaceUrl` runs).
+-}
+currentUrlAfterGatedRoute : Url -> Route -> Url
+currentUrlAfterGatedRoute incomingUrl gatedRoute =
+    case ( Route.fromUrl incomingUrl, gatedRoute ) of
+        ( Route.WikiSubmitNew wikiFromUrl, Route.WikiPage wikiPage pageSlug ) ->
+            if wikiFromUrl == wikiPage then
+                { incomingUrl
+                    | path = Wiki.publishedPageUrlPath wikiPage pageSlug
+                    , query = Nothing
+                    , fragment = Nothing
+                }
+
+            else
+                incomingUrl
+
+        _ ->
+            incomingUrl
+
+
+contributorGateRouteAndReplace : Dict Wiki.Slug ContributorWikiSession -> Url -> Route -> ( Route, Maybe String )
+contributorGateRouteAndReplace sessions url parsed =
+    case RouteAccess.contributorForcedRedirect sessions url parsed of
+        Just (RouteAccess.ToContributorLogin wikiSlug ret) ->
+            ( Route.WikiLogin wikiSlug (Just ret)
+            , Just (Wiki.loginUrlPathWithRedirect wikiSlug ret)
+            )
+
+        Just (RouteAccess.AwayFromMySubmissions wikiSlug) ->
+            ( Route.WikiHome wikiSlug
+            , Just (Wiki.wikiHomeUrlPath wikiSlug)
+            )
+
+        Nothing ->
+            ( parsed, Nothing )
+
+
+{-| After wiki details load, anonymous user on `/submit/new?page=` for a slug that is not published yet should hit the same login gate as when details were already known.
+-}
+maybeAnonSubmitNewLoginAfterDetailsLoaded : Wiki.Slug -> Model -> Maybe String
+maybeAnonSubmitNewLoginAfterDetailsLoaded responseWikiSlug model =
+    case model.route of
+        Route.WikiSubmitNew routeWiki ->
+            if routeWiki /= responseWikiSlug then
+                Nothing
+
+            else if contributorLoggedInOnWikiSlug routeWiki model then
+                Nothing
+
+            else
+                case pageParamFromQuery model.currentUrl.query of
+                    Just suggestedSlug ->
+                        case Store.get_ routeWiki model.store.wikiDetails of
+                            Success details ->
+                                case Wiki.canonicalPublishedSlugIfOnWiki suggestedSlug details.pageSlugs of
+                                    Just _ ->
+                                        Nothing
+
+                                    Nothing ->
+                                        Just (Wiki.loginUrlPathWithRedirect routeWiki (SecureRedirect.pathAndQuery model.currentUrl))
+
+                            Failure _ ->
+                                Just (Wiki.loginUrlPathWithRedirect routeWiki (SecureRedirect.pathAndQuery model.currentUrl))
+
+                            Loading ->
+                                Nothing
+
+                            NotAsked ->
+                                Nothing
+
+                    Nothing ->
+                        Nothing
+
+        Route.WikiList ->
+            Nothing
+
+        Route.HostAdmin _ ->
+            Nothing
+
+        Route.HostAdminWikis ->
+            Nothing
+
+        Route.HostAdminWikiNew ->
+            Nothing
+
+        Route.HostAdminWikiDetail _ ->
+            Nothing
+
+        Route.HostAdminAudit ->
+            Nothing
+
+        Route.HostAdminAuditDiff _ _ ->
+            Nothing
+
+        Route.HostAdminBackup ->
+            Nothing
+
+        Route.WikiHome _ ->
+            Nothing
+
+        Route.WikiTodos _ ->
+            Nothing
+
+        Route.WikiGraph _ ->
+            Nothing
+
+        Route.WikiSearch _ ->
+            Nothing
+
+        Route.WikiStats _ ->
+            Nothing
+
+        Route.WikiPage _ _ ->
+            Nothing
+
+        Route.WikiPageGraph _ _ ->
+            Nothing
+
+        Route.WikiRegister _ ->
+            Nothing
+
+        Route.WikiLogin _ _ ->
+            Nothing
+
+        Route.WikiSubmitEdit _ _ ->
+            Nothing
+
+        Route.WikiSubmitDelete _ _ ->
+            Nothing
+
+        Route.WikiSubmissionDetail _ _ ->
+            Nothing
+
+        Route.WikiMySubmissions _ ->
+            Nothing
+
+        Route.WikiReview _ ->
+            Nothing
+
+        Route.WikiReviewDetail _ _ ->
+            Nothing
+
+        Route.WikiAdminUsers _ ->
+            Nothing
+
+        Route.WikiAdminAudit _ ->
+            Nothing
+
+        Route.WikiAdminAuditDiff _ _ ->
+            Nothing
+
+        Route.NotFound _ ->
+            Nothing
+
+
 wikiPageMobileRightRailCollapsedOnUrlChange : Route -> Route -> Bool -> Bool
 wikiPageMobileRightRailCollapsedOnUrlChange oldRoute newRoute previousCollapsed =
     case ( oldRoute, newRoute ) of
@@ -1083,19 +1269,33 @@ batchScrollAfterUrlChange fragment ( m, c ) =
 
 anonGatedWikiRoute : Model -> Url -> Route -> ( Route, Maybe String )
 anonGatedWikiRoute model url parsed =
-    case RouteAccess.contributorForcedRedirect model.contributorWikiSessions url parsed of
-        Just (RouteAccess.ToContributorLogin wikiSlug ret) ->
-            ( Route.WikiLogin wikiSlug (Just ret)
-            , Just (Wiki.loginUrlPathWithRedirect wikiSlug ret)
-            )
-
-        Just (RouteAccess.AwayFromMySubmissions wikiSlug) ->
-            ( Route.WikiHome wikiSlug
-            , Just (Wiki.wikiHomeUrlPath wikiSlug)
-            )
+    case maybeWikiSubmitNewToExistingPage parsed url model.store of
+        Just ( targetRoute, targetPath ) ->
+            ( targetRoute, Just targetPath )
 
         Nothing ->
-            ( parsed, Nothing )
+            case parsed of
+                Route.WikiSubmitNew wikiSlug ->
+                    case pageParamFromQuery url.query of
+                        Just _ ->
+                            case Store.get_ wikiSlug model.store.wikiDetails of
+                                Success _ ->
+                                    contributorGateRouteAndReplace model.contributorWikiSessions url parsed
+
+                                Failure _ ->
+                                    contributorGateRouteAndReplace model.contributorWikiSessions url parsed
+
+                                Loading ->
+                                    ( parsed, Nothing )
+
+                                NotAsked ->
+                                    ( parsed, Nothing )
+
+                        Nothing ->
+                            contributorGateRouteAndReplace model.contributorWikiSessions url parsed
+
+                _ ->
+                    contributorGateRouteAndReplace model.contributorWikiSessions url parsed
 
 
 postLogoutNavigationCmd : Wiki.Slug -> Model -> Command FrontendOnly ToBackend Msg
@@ -2180,6 +2380,10 @@ update msg model =
                 ( route, maybeContributorReplace ) =
                     gatedWikiRoute model url
 
+                urlForModel : Url
+                urlForModel =
+                    currentUrlAfterGatedRoute url route
+
                 navCmd : Command FrontendOnly ToBackend Msg
                 navCmd =
                     maybeContributorReplace
@@ -2206,9 +2410,9 @@ update msg model =
                 baseNext : Model
                 baseNext =
                     { model
-                        | currentUrl = url
+                        | currentUrl = urlForModel
                         , route = route
-                        , navigationFragment = url.fragment
+                        , navigationFragment = urlForModel.fragment
                         , store = storeForRoute
                         , registerDraft = emptyRegisterDraft
                         , loginDraft = emptyLoginDraft
@@ -2219,13 +2423,13 @@ update msg model =
                         , wikiSearchPageQuery =
                             case route of
                                 Route.WikiSearch _ ->
-                                    searchParamFromQuery url.query
+                                    searchParamFromQuery urlForModel.query
 
                                 _ ->
                                     ""
                         , wikiSearchPageResults = []
                         , wikiSearchPagePending = Nothing
-                        , newPageSubmitDraft = newPageSubmitDraftForRoute route url
+                        , newPageSubmitDraft = newPageSubmitDraftForRoute route urlForModel
                         , pageEditSubmitDraft = pageEditSubmitDraftForRoute route storeForRoute
                         , pageDeleteSubmitDraft = emptyPageDeleteSubmitDraft
                         , reviewApproveDraft = emptyReviewApproveDraft
@@ -5236,8 +5440,69 @@ updateFromBackend msg model =
                         , contributorWikiSessions = nextContributorWikiSessions
                     }
             in
-            ( nextModel, contributorRouteRefreshCmd wikiSlug nextModel )
-                |> runRouteStoreActions
+            case maybeWikiSubmitNewToExistingPage nextModel.route nextModel.currentUrl nextModel.store of
+                Just ( targetRoute, targetPath ) ->
+                    let
+                        urlModel : Url
+                        urlModel =
+                            currentUrlAfterGatedRoute nextModel.currentUrl targetRoute
+
+                        redirected : Model
+                        redirected =
+                            { nextModel
+                                | route = targetRoute
+                                , currentUrl = urlModel
+                                , navigationFragment = urlModel.fragment
+                                , newPageSubmitDraft = newPageSubmitDraftForRoute targetRoute urlModel
+                                , pageEditSubmitDraft = pageEditSubmitDraftForRoute targetRoute nextModel.store
+                                , wikiPageMobileRightRailCollapsed =
+                                    wikiPageMobileRightRailCollapsedOnUrlChange nextModel.route targetRoute nextModel.wikiPageMobileRightRailCollapsed
+                            }
+                    in
+                    ( redirected
+                    , Command.batch
+                        [ contributorRouteRefreshCmd wikiSlug redirected
+                        , Effect.Browser.Navigation.replaceUrl nextModel.key targetPath
+                        ]
+                    )
+                        |> runRouteStoreActions
+
+                Nothing ->
+                    case maybeAnonSubmitNewLoginAfterDetailsLoaded wikiSlug nextModel of
+                        Just loginPath ->
+                            let
+                                returnPath : String
+                                returnPath =
+                                    SecureRedirect.pathAndQuery nextModel.currentUrl
+
+                                storeAfter : Store
+                                storeAfter =
+                                    nextModel.store
+
+                                loginModel : Model
+                                loginModel =
+                                    { nextModel
+                                        | route = Route.WikiLogin wikiSlug (Just returnPath)
+                                        , store =
+                                            { storeAfter
+                                                | wikiUsers = Dict.remove wikiSlug storeAfter.wikiUsers
+                                                , wikiAuditLogs = Dict.remove wikiSlug storeAfter.wikiAuditLogs
+                                            }
+                                        , registerDraft = emptyRegisterDraft
+                                        , loginDraft = emptyLoginDraft
+                                    }
+                            in
+                            ( loginModel
+                            , Command.batch
+                                [ contributorRouteRefreshCmd wikiSlug loginModel
+                                , Effect.Browser.Navigation.replaceUrl nextModel.key loginPath
+                                ]
+                            )
+                                |> runRouteStoreActions
+
+                        Nothing ->
+                            ( nextModel, contributorRouteRefreshCmd wikiSlug nextModel )
+                                |> runRouteStoreActions
 
         WikiTodosResponse wikiSlug version result ->
             let
