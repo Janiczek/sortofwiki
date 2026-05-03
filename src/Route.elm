@@ -71,6 +71,9 @@ navUrlPath route =
         WikiSearch wikiSlug ->
             Wiki.searchUrlPath wikiSlug
 
+        WikiStats wikiSlug ->
+            Wiki.statsUrlPath wikiSlug
+
         WikiPage wikiSlug pageSlug ->
             Wiki.publishedPageUrlPath wikiSlug pageSlug
 
@@ -178,6 +181,9 @@ canAccess ctx route =
         WikiSearch wikiSlug ->
             slugOk wikiSlug
 
+        WikiStats wikiSlug ->
+            slugOk wikiSlug
+
         WikiPage wikiSlug _ ->
             slugOk wikiSlug
 
@@ -253,6 +259,7 @@ type Route
     | WikiTodos Wiki.Slug
     | WikiGraph Wiki.Slug
     | WikiSearch Wiki.Slug
+    | WikiStats Wiki.Slug
     | WikiPage Wiki.Slug Page.Slug
     | WikiPageGraph Wiki.Slug Page.Slug
     | WikiLogin Wiki.Slug (Maybe String)
@@ -366,6 +373,13 @@ fromUrl url =
 
                     else
                         WikiSearch wikiSlug
+
+                [ "w", wikiSlug, "stats" ] ->
+                    if wikiSlug == "" then
+                        NotFound url
+
+                    else
+                        WikiStats wikiSlug
 
                 [ "w", wikiSlug, "p", pageSlug ] ->
                     if wikiSlug == "" || pageSlug == "" then
@@ -526,6 +540,9 @@ isWikiList route =
         WikiSearch _ ->
             False
 
+        WikiStats _ ->
+            False
+
         WikiPage _ _ ->
             False
 
@@ -610,6 +627,9 @@ storeActions route =
 
         WikiSearch slug ->
             [ AskForWikiCatalog, AskForWikiFrontendDetails slug ]
+
+        WikiStats slug ->
+            [ AskForWikiCatalog, AskForWikiFrontendDetails slug, AskForWikiStats slug ]
 
         WikiPage wikiSlug pageSlug ->
             [ AskForWikiCatalog

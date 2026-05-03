@@ -68,7 +68,7 @@ suite : Test
 suite =
     Test.describe "ModerationAudit"
         [ Test.describe "story 34 — backend moderation writes audit with moderator as actor"
-            [ Test.test "ApproveSubmission appends ApprovedSubmission for trusted session user" <|
+            [ Test.test "ApproveSubmission appends ApprovedPublishedNewPage for new-page submission" <|
                 \() ->
                     let
                         after : Backend.Model
@@ -84,36 +84,45 @@ suite =
                                 [ expectActorTrustedModerator
                                 , \e ->
                                     case e.kind of
-                                        WikiAuditLog.ApprovedSubmission { submissionId, pageSlug } ->
+                                        WikiAuditLog.ApprovedPublishedNewPage { submissionId, pageSlug } ->
                                             ( submissionId, pageSlug )
                                                 |> Expect.equal ( "sub_1", "QueueDemoPage" )
 
+                                        WikiAuditLog.ApprovedSubmission _ ->
+                                            Expect.fail "expected ApprovedPublishedNewPage (legacy ApprovedSubmission should not be created)"
+
                                         WikiAuditLog.RejectedSubmission _ ->
-                                            Expect.fail "expected ApprovedSubmission"
+                                            Expect.fail "expected ApprovedPublishedNewPage"
 
                                         WikiAuditLog.RequestedSubmissionChanges _ ->
-                                            Expect.fail "expected ApprovedSubmission"
+                                            Expect.fail "expected ApprovedPublishedNewPage"
 
                                         WikiAuditLog.PromotedContributorToTrusted _ ->
-                                            Expect.fail "expected ApprovedSubmission"
+                                            Expect.fail "expected ApprovedPublishedNewPage"
 
                                         WikiAuditLog.DemotedTrustedToContributor _ ->
-                                            Expect.fail "expected ApprovedSubmission"
+                                            Expect.fail "expected ApprovedPublishedNewPage"
 
                                         WikiAuditLog.GrantedWikiAdmin _ ->
-                                            Expect.fail "expected ApprovedSubmission"
+                                            Expect.fail "expected ApprovedPublishedNewPage"
 
                                         WikiAuditLog.RevokedWikiAdmin _ ->
-                                            Expect.fail "expected ApprovedSubmission"
+                                            Expect.fail "expected ApprovedPublishedNewPage"
 
                                         WikiAuditLog.TrustedPublishedNewPage _ ->
-                                            Expect.fail "expected ApprovedSubmission"
+                                            Expect.fail "expected ApprovedPublishedNewPage"
 
                                         WikiAuditLog.TrustedPublishedPageEdit _ ->
-                                            Expect.fail "expected ApprovedSubmission"
+                                            Expect.fail "expected ApprovedPublishedNewPage"
 
                                         WikiAuditLog.TrustedPublishedPageDelete _ ->
-                                            Expect.fail "expected ApprovedSubmission"
+                                            Expect.fail "expected ApprovedPublishedNewPage"
+
+                                        WikiAuditLog.ApprovedPublishedPageEdit _ ->
+                                            Expect.fail "expected ApprovedPublishedNewPage"
+
+                                        WikiAuditLog.ApprovedPublishedPageDelete _ ->
+                                            Expect.fail "expected ApprovedPublishedNewPage"
                                 ]
                                 ev
             , Test.test "RejectSubmission appends RejectedSubmission with moderator username" <|
@@ -164,6 +173,15 @@ suite =
 
                                         WikiAuditLog.TrustedPublishedPageDelete _ ->
                                             Expect.fail "expected RejectedSubmission"
+
+                                        WikiAuditLog.ApprovedPublishedNewPage _ ->
+                                            Expect.fail "expected RejectedSubmission"
+
+                                        WikiAuditLog.ApprovedPublishedPageEdit _ ->
+                                            Expect.fail "expected RejectedSubmission"
+
+                                        WikiAuditLog.ApprovedPublishedPageDelete _ ->
+                                            Expect.fail "expected RejectedSubmission"
                                 ]
                                 ev
             , Test.test "RequestSubmissionChanges appends RequestedSubmissionChanges" <|
@@ -213,6 +231,15 @@ suite =
                                             Expect.fail "expected RequestedSubmissionChanges"
 
                                         WikiAuditLog.TrustedPublishedPageDelete _ ->
+                                            Expect.fail "expected RequestedSubmissionChanges"
+
+                                        WikiAuditLog.ApprovedPublishedNewPage _ ->
+                                            Expect.fail "expected RequestedSubmissionChanges"
+
+                                        WikiAuditLog.ApprovedPublishedPageEdit _ ->
+                                            Expect.fail "expected RequestedSubmissionChanges"
+
+                                        WikiAuditLog.ApprovedPublishedPageDelete _ ->
                                             Expect.fail "expected RequestedSubmissionChanges"
                                 ]
                                 ev
@@ -304,6 +331,15 @@ suite =
                                             Expect.fail "expected TrustedPublishedNewPage"
 
                                         WikiAuditLog.TrustedPublishedPageDelete _ ->
+                                            Expect.fail "expected TrustedPublishedNewPage"
+
+                                        WikiAuditLog.ApprovedPublishedNewPage _ ->
+                                            Expect.fail "expected TrustedPublishedNewPage"
+
+                                        WikiAuditLog.ApprovedPublishedPageEdit _ ->
+                                            Expect.fail "expected TrustedPublishedNewPage"
+
+                                        WikiAuditLog.ApprovedPublishedPageDelete _ ->
                                             Expect.fail "expected TrustedPublishedNewPage"
                                 ]
                                 ev

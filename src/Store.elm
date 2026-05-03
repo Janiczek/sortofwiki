@@ -5,6 +5,7 @@ module Store exposing
     , empty
     , get
     , getWikiAuditLog
+    , getWikiStats
     , get_
     , perform
     )
@@ -19,6 +20,7 @@ import SubmissionReviewDetail
 import Wiki
 import WikiAdminUsers
 import WikiAuditLog
+import WikiStats
 import WikiTodos
 
 
@@ -43,6 +45,8 @@ type alias Store =
         Dict Wiki.Slug (Dict String (RemoteData () (Result WikiAuditLog.Error (List WikiAuditLog.AuditEvent))))
     , wikiTodos :
         Dict Wiki.Slug (RemoteData () (Result () (List WikiTodos.TableRow)))
+    , wikiStats :
+        Dict Wiki.Slug (RemoteData () (Maybe WikiStats.Summary))
     }
 
 
@@ -58,6 +62,7 @@ type Action
     | RefreshWikiAuditLog Wiki.Slug WikiAuditLog.AuditLogFilter
     | AskForSubmissionDetails Wiki.Slug String
     | AskForWikiTodos Wiki.Slug
+    | AskForWikiStats Wiki.Slug
 
 
 empty : Store
@@ -72,6 +77,7 @@ empty =
     , wikiUsers = Dict.empty
     , wikiAuditLogs = Dict.empty
     , wikiTodos = Dict.empty
+    , wikiStats = Dict.empty
     }
 
 
@@ -86,6 +92,7 @@ type alias Config toBackend =
     , requestWikiAuditLog : Wiki.Slug -> WikiAuditLog.AuditLogFilter -> toBackend
     , requestSubmissionDetails : Wiki.Slug -> String -> toBackend
     , requestWikiTodos : Wiki.Slug -> toBackend
+    , requestWikiStats : Wiki.Slug -> toBackend
     }
 
 
@@ -137,7 +144,9 @@ perform config action store =
             in
             case Dict.get wikiSlug store.wikiTodos |> join of
                 Success (Ok _) ->
-                    ( store, Command.none )
+                    ( store
+                    , Effect.Lamdera.sendToBackend (config.requestWikiTodos wikiSlug)
+                    )
 
                 Success (Err _) ->
                     startLoad
@@ -389,6 +398,32 @@ perform config action store =
             , Effect.Lamdera.sendToBackend (config.requestWikiAuditLog wikiSlug filter)
             )
 
+        AskForWikiStats wikiSlug ->
+            let
+                startLoad : ( Store, Command FrontendOnly toBackend msg )
+                startLoad =
+                    ( { store
+                        | wikiStats =
+                            Dict.insert wikiSlug Loading store.wikiStats
+                      }
+                    , Effect.Lamdera.sendToBackend (config.requestWikiStats wikiSlug)
+                    )
+            in
+            case Dict.get wikiSlug store.wikiStats |> join of
+                Loading ->
+                    ( store, Command.none )
+
+                Success _ ->
+                    ( store
+                    , Effect.Lamdera.sendToBackend (config.requestWikiStats wikiSlug)
+                    )
+
+                Failure _ ->
+                    startLoad
+
+                NotAsked ->
+                    startLoad
+
 
 getWikiAuditLog :
     Wiki.Slug
@@ -438,6 +473,12 @@ get_ key dict =
 
         Nothing ->
             NotAsked
+
+
+getWikiStats : Wiki.Slug -> Store -> RemoteData () (Maybe WikiStats.Summary)
+getWikiStats wikiSlug store =
+    Dict.get wikiSlug store.wikiStats
+        |> Maybe.withDefault NotAsked
 
 
 join : Maybe (RemoteData f b) -> RemoteData f b

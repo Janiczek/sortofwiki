@@ -21,7 +21,7 @@ Use `github.com/lamdera/program-test` for end-to-end unit tests. See `src/Progra
 - Effect.Task
 - Effect.Time
 
-All implemented user stories must have a program test (end-to-end unit test) present (numbered like in `spec/user-stories.md`.) When an user story is implemented, its checkbox must be checked in `spec/user-stories.md`.
+All implemented features must have a program test (end-to-end unit test) present.
 
 Domain types must live in their own modules together with their helper functions, not in `Types.elm`. Foo.barIsBaz, Foo.barFromString, Foo.barDecoder are an antipattern, and Bar (or Foo.Bar) should have its own module.
 

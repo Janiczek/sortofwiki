@@ -32,6 +32,7 @@ module Wiki exposing
     , reviewDetailUrlPath
     , reviewQueueUrlPath
     , searchUrlPath
+    , statsUrlPath
     , submissionDetailUrlPath
     , submitDeleteUrlPath
     , submitEditUrlPath
@@ -239,6 +240,11 @@ wikiHomeUrlPath wikiSlug =
 todosUrlPath : Slug -> String
 todosUrlPath wikiSlug =
     "/w/" ++ wikiSlug ++ "/todos"
+
+
+statsUrlPath : Slug -> String
+statsUrlPath wikiSlug =
+    "/w/" ++ wikiSlug ++ "/stats"
 
 
 graphUrlPath : Slug -> String

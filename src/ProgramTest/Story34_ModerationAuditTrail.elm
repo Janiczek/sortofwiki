@@ -69,7 +69,7 @@ endToEndTests =
                                     (ProgramTest.Query.withinId "wiki-admin-audit-list"
                                         (ProgramTest.Query.expectHasTexts
                                             [ "demo_trusted_publisher"
-                                            , "Approved submission"
+                                            , "Approved edit to"
                                             ]
                                         )
                                     )

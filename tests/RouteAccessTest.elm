@@ -139,5 +139,9 @@ suite =
                 \() ->
                     RouteAccess.contributorRestrictedReturnPath (Route.WikiAdminAudit "Demo")
                         |> Expect.equal Nothing
+            , Test.test "wiki stats yields nothing (public route)" <|
+                \() ->
+                    RouteAccess.contributorRestrictedReturnPath (Route.WikiStats "Demo")
+                        |> Expect.equal Nothing
             ]
         ]

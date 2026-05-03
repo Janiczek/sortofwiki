@@ -85,6 +85,10 @@ wikiNavLinks wikiSlug maybeRole =
               , linkRoute = Route.WikiGraph wikiSlug
               , linkEmphasized = False
               }
+            , { linkLabel = "Stats"
+              , linkRoute = Route.WikiStats wikiSlug
+              , linkEmphasized = False
+              }
             , { linkLabel = "TODOs"
               , linkRoute = Route.WikiTodos wikiSlug
               , linkEmphasized = False

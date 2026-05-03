@@ -202,6 +202,26 @@ suite =
                         |> List.any (\node -> node.id == pageSlug && node.href == Wiki.pageGraphUrlPath wikiSlug pageSlug)
                         |> Expect.equal True
             ]
+        , Test.describe "directedInOutCountsBySlug"
+            [ Test.test "counts wiki link and tag to same target as separate in/out edges" <|
+                \() ->
+                    WikiGraph.directedInOutCountsBySlug "Demo"
+                        (Dict.fromList [ ( "A", "[[B]]" ) ])
+                        (Dict.fromList [ ( "A", [ "B" ] ) ])
+                        |> Expect.equal
+                            { inByNormalizedTarget = Dict.fromList [ ( "b", 2 ) ]
+                            , outByNormalizedSource = Dict.fromList [ ( "a", 2 ) ]
+                            }
+            , Test.test "self wiki link and self tag each bump in and out once" <|
+                \() ->
+                    WikiGraph.directedInOutCountsBySlug "Demo"
+                        (Dict.fromList [ ( "A", "[[A]]" ) ])
+                        (Dict.fromList [ ( "A", [ "A" ] ) ])
+                        |> Expect.equal
+                            { inByNormalizedTarget = Dict.fromList [ ( "a", 2 ) ]
+                            , outByNormalizedSource = Dict.fromList [ ( "a", 2 ) ]
+                            }
+            ]
         ]
 
 

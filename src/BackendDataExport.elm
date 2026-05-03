@@ -53,6 +53,7 @@ type alias SnapshotFields =
     , contributorSessions : WikiUser.SessionTable
     , submissions : Dict String Submission.Submission
     , wikiAuditEvents : Dict Wiki.Slug (List WikiAuditLog.AuditEvent)
+    , pageViewCounts : Dict Wiki.Slug (Dict Page.Slug Int)
     }
 
 
@@ -120,6 +121,7 @@ encodeModelToJsonString model =
             , ( "contributorSessions", Encode.object [] )
             , ( "submissions", encodeSubmissions model.submissions )
             , ( "wikiAuditEvents", encodeWikiAuditEvents model.wikiAuditEvents )
+            , ( "pageViewCounts", encodePageViewCounts model.pageViewCounts )
             ]
         )
 
@@ -139,6 +141,8 @@ applySnapshotToBackendModel snapshot keptHostSessions =
     , wikiFrontendClients = WikiFrontendSubscription.emptyClientSets
     , wikiSearchIndexes = Dict.empty
     , wikiTodosCaches = Dict.empty
+    , pageViewCounts = snapshot.pageViewCounts
+    , wikiStatsCache = Dict.empty
     }
 
 
@@ -191,12 +195,17 @@ snapshotDecoder =
                                     Decode.fail ("unsupported version " ++ String.fromInt v)
 
                                 else
-                                    Decode.map5 SnapshotFields
+                                    Decode.map6 SnapshotFields
                                         (Decode.field "wikis" decodeWikis)
                                         (Decode.field "contributors" decodeContributors)
                                         decodeContributorSessionsImportIgnored
                                         (Decode.field "submissions" decodeSubmissions)
                                         (Decode.field "wikiAuditEvents" decodeWikiAuditEvents)
+                                        (Decode.oneOf
+                                            [ Decode.field "pageViewCounts" decodePageViewCounts
+                                            , Decode.succeed Dict.empty
+                                            ]
+                                        )
                             )
             )
 
@@ -580,6 +589,27 @@ encodeAuditKind kind =
                 , ( "reason", Encode.string reason )
                 ]
 
+        WikiAuditLog.ApprovedPublishedNewPage { submissionId, pageSlug } ->
+            Encode.object
+                [ ( "tag", Encode.string "approved_published_new_page" )
+                , ( "submissionId", Encode.string submissionId )
+                , ( "pageSlug", Encode.string pageSlug )
+                ]
+
+        WikiAuditLog.ApprovedPublishedPageEdit { submissionId, pageSlug } ->
+            Encode.object
+                [ ( "tag", Encode.string "approved_published_page_edit" )
+                , ( "submissionId", Encode.string submissionId )
+                , ( "pageSlug", Encode.string pageSlug )
+                ]
+
+        WikiAuditLog.ApprovedPublishedPageDelete { submissionId, pageSlug } ->
+            Encode.object
+                [ ( "tag", Encode.string "approved_published_page_delete" )
+                , ( "submissionId", Encode.string submissionId )
+                , ( "pageSlug", Encode.string pageSlug )
+                ]
+
 
 decodeWikiAuditEvents : Decoder (Dict Wiki.Slug (List WikiAuditLog.AuditEvent))
 decodeWikiAuditEvents =
@@ -689,8 +719,53 @@ decodeAuditKindFromTag tag =
                     ]
                 )
 
+        "approved_published_new_page" ->
+            Decode.map2
+                (\submissionId pageSlug ->
+                    WikiAuditLog.ApprovedPublishedNewPage { submissionId = submissionId, pageSlug = pageSlug }
+                )
+                (Decode.field "submissionId" Decode.string)
+                (Decode.field "pageSlug" Decode.string)
+
+        "approved_published_page_edit" ->
+            Decode.map2
+                (\submissionId pageSlug ->
+                    WikiAuditLog.ApprovedPublishedPageEdit { submissionId = submissionId, pageSlug = pageSlug }
+                )
+                (Decode.field "submissionId" Decode.string)
+                (Decode.field "pageSlug" Decode.string)
+
+        "approved_published_page_delete" ->
+            Decode.map2
+                (\submissionId pageSlug ->
+                    WikiAuditLog.ApprovedPublishedPageDelete { submissionId = submissionId, pageSlug = pageSlug }
+                )
+                (Decode.field "submissionId" Decode.string)
+                (Decode.field "pageSlug" Decode.string)
+
         _ ->
             Decode.fail ("unknown audit event tag: " ++ tag)
+
+
+encodePageViewCounts : Dict Wiki.Slug (Dict Page.Slug Int) -> Encode.Value
+encodePageViewCounts counts =
+    counts
+        |> Dict.toList
+        |> List.map
+            (\( wikiSlug, pageCounts ) ->
+                ( wikiSlug
+                , pageCounts
+                    |> Dict.toList
+                    |> List.map (\( pageSlug, n ) -> ( pageSlug, Encode.int n ))
+                    |> Encode.object
+                )
+            )
+        |> Encode.object
+
+
+decodePageViewCounts : Decode.Decoder (Dict Wiki.Slug (Dict Page.Slug Int))
+decodePageViewCounts =
+    Decode.dict (Decode.dict Decode.int)
 
 
 {-| JSON for a single wiki (host admin per-wiki backup). Same inner schema as full snapshot with one wiki key.
@@ -715,6 +790,7 @@ encodeWikiSnapshotValue declaredSlug snap =
         , ( "contributorSessions", Encode.object [] )
         , ( "submissions", encodeSubmissions snap.submissions )
         , ( "wikiAuditEvents", encodeWikiAuditEvents snap.wikiAuditEvents )
+        , ( "pageViewCounts", encodePageViewCounts snap.pageViewCounts )
         ]
 
 
@@ -742,6 +818,12 @@ extractWikiSnapshotFields wikiSlug model =
                     model.wikiAuditEvents
                         |> Dict.get wikiSlug
                         |> Maybe.withDefault []
+
+                viewCountsSlice : Dict Page.Slug Int
+                viewCountsSlice =
+                    model.pageViewCounts
+                        |> Dict.get wikiSlug
+                        |> Maybe.withDefault Dict.empty
             in
             Just
                 { wikis = Dict.singleton wikiSlug wiki
@@ -749,6 +831,7 @@ extractWikiSnapshotFields wikiSlug model =
                 , contributorSessions = WikiUser.emptySessions
                 , submissions = submissionsSlice
                 , wikiAuditEvents = Dict.singleton wikiSlug auditRows
+                , pageViewCounts = Dict.singleton wikiSlug viewCountsSlice
                 }
 
 
@@ -842,12 +925,17 @@ wikiSnapshotWithDeclaredSlugDecoder maybeExpectedSlug =
                                 else
                                     Decode.map2 Tuple.pair
                                         (Decode.field "wikiSlug" Decode.string)
-                                        (Decode.map5 SnapshotFields
+                                        (Decode.map6 SnapshotFields
                                             (Decode.field "wikis" decodeWikis)
                                             (Decode.field "contributors" decodeContributors)
                                             decodeContributorSessionsImportIgnored
                                             (Decode.field "submissions" decodeSubmissions)
                                             (Decode.field "wikiAuditEvents" decodeWikiAuditEvents)
+                                            (Decode.oneOf
+                                                [ Decode.field "pageViewCounts" decodePageViewCounts
+                                                , Decode.succeed Dict.empty
+                                                ]
+                                            )
                                         )
                                         |> Decode.andThen
                                             (\( declaredSlug, snap ) ->
@@ -997,6 +1085,11 @@ applyWikiSnapshotMerge wikiSlug snap model =
                                 PendingReviewCount.removeWikiSubscribers wikiSlug model.pendingReviewClients
                             , wikiFrontendClients =
                                 WikiFrontendSubscription.removeWikiSubscribers wikiSlug model.wikiFrontendClients
+                            , pageViewCounts =
+                                Dict.insert wikiSlug
+                                    (snap.pageViewCounts |> Dict.get wikiSlug |> Maybe.withDefault Dict.empty)
+                                    model.pageViewCounts
+                            , wikiStatsCache = Dict.remove wikiSlug model.wikiStatsCache
                         }
 
 
@@ -1082,3 +1175,12 @@ remapAuditKindSubmissionIds idMap kind =
 
         WikiAuditLog.TrustedPublishedPageDelete r ->
             WikiAuditLog.TrustedPublishedPageDelete r
+
+        WikiAuditLog.ApprovedPublishedNewPage r ->
+            WikiAuditLog.ApprovedPublishedNewPage r
+
+        WikiAuditLog.ApprovedPublishedPageEdit r ->
+            WikiAuditLog.ApprovedPublishedPageEdit r
+
+        WikiAuditLog.ApprovedPublishedPageDelete r ->
+            WikiAuditLog.ApprovedPublishedPageDelete r

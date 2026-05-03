@@ -69,6 +69,12 @@ suite =
                         |> List.map .linkRoute
                         |> List.member (Route.WikiAdminAudit "Demo")
                         |> Expect.equal True
+            , Test.test "anonymous wiki nav includes public stats page" <|
+                \() ->
+                    SideNavMenu.wikiNavLinks "Demo" Nothing
+                        |> List.map .linkRoute
+                        |> List.member (Route.WikiStats "Demo")
+                        |> Expect.equal True
             ]
         , Test.describe "sidebar link access"
             [ Test.fuzz

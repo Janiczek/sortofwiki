@@ -18,7 +18,7 @@ import Set
 import Submission
 import SubmissionReviewDetail
 import Time
-import Types exposing (BackendModel, BackendMsg(..), ToBackend(..), ToFrontend(..))
+import Types exposing (BackendModel, BackendMsg(..), ToBackend(..), ToFrontend(..), WikiStatsPartitions)
 import Wiki exposing (Wiki)
 import WikiAdminUsers
 import WikiAuditLog
@@ -26,8 +26,9 @@ import WikiContributors
 import WikiFrontendSubscription
 import WikiRole
 import WikiSearch
-import WikiUser
+import WikiStats
 import WikiTodos
+import WikiUser
 
 
 type alias Model =
@@ -53,6 +54,17 @@ applyHostedWikiSlugRename oldSlug newSlug nextWiki model =
                     model.wikiAuditEvents
                         |> Dict.remove oldSlug
                         |> Dict.insert newSlug events
+
+        nextPageViewCounts : Dict Wiki.Slug (Dict Page.Slug Int)
+        nextPageViewCounts =
+            case Dict.get oldSlug model.pageViewCounts of
+                Nothing ->
+                    Dict.remove oldSlug model.pageViewCounts
+
+                Just counts ->
+                    model.pageViewCounts
+                        |> Dict.remove oldSlug
+                        |> Dict.insert newSlug counts
     in
     { model
         | wikis =
@@ -78,6 +90,8 @@ applyHostedWikiSlugRename oldSlug newSlug nextWiki model =
                 |> Dict.remove oldSlug
                 |> Dict.insert newSlug
                     (WikiTodos.tableRows newSlug (Wiki.frontendDetails nextWiki).publishedPageMarkdownSources)
+        , pageViewCounts = nextPageViewCounts
+        , wikiStatsCache = Dict.remove oldSlug model.wikiStatsCache
     }
 
 
@@ -112,6 +126,7 @@ withWikiSearchAndTodosCaches wikiSlug wiki model =
     model
         |> withWikiSearchIndex wikiSlug wiki
         |> withWikiTodosCache wikiSlug wiki
+        |> withWikiStatsWikiCache wikiSlug wiki
 
 
 withRebuiltAllWikiSearchIndexes : Model -> Model
@@ -137,6 +152,180 @@ withRebuiltAllSearchAndTodosCaches model =
     model
         |> withRebuiltAllWikiSearchIndexes
         |> withRebuiltAllWikiTodosCaches
+        |> withRebuiltAllWikiStatsCaches
+
+
+withWikiStatsWikiCache : Wiki.Slug -> Wiki -> Model -> Model
+withWikiStatsWikiCache wikiSlug wiki model =
+    let
+        auditEvents : List WikiAuditLog.AuditEvent
+        auditEvents =
+            Dict.get wikiSlug model.wikiAuditEvents
+                |> Maybe.withDefault []
+
+        fromWiki : WikiStats.FromWiki
+        fromWiki =
+            WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents
+
+        partitions : WikiStatsPartitions
+        partitions =
+            case Dict.get wikiSlug model.wikiStatsCache of
+                Just existing ->
+                    { existing | fromWiki = fromWiki }
+
+                Nothing ->
+                    let
+                        viewCounts : Dict Page.Slug Int
+                        viewCounts =
+                            Dict.get wikiSlug model.pageViewCounts
+                                |> Maybe.withDefault Dict.empty
+                    in
+                    { fromWiki = fromWiki
+                    , fromAudit = WikiStats.buildFromAudit auditEvents
+                    , fromViews = WikiStats.buildFromViews viewCounts
+                    }
+    in
+    { model | wikiStatsCache = Dict.insert wikiSlug partitions model.wikiStatsCache }
+
+
+withWikiStatsAuditCache : Wiki.Slug -> Model -> Model
+withWikiStatsAuditCache wikiSlug model =
+    let
+        auditEvents : List WikiAuditLog.AuditEvent
+        auditEvents =
+            Dict.get wikiSlug model.wikiAuditEvents
+                |> Maybe.withDefault []
+
+        fromAudit : WikiStats.FromAudit
+        fromAudit =
+            WikiStats.buildFromAudit auditEvents
+
+        partitions : WikiStatsPartitions
+        partitions =
+            case Dict.get wikiSlug model.wikiStatsCache of
+                Just existing ->
+                    let
+                        fromWiki : WikiStats.FromWiki
+                        fromWiki =
+                            case Dict.get wikiSlug model.wikis of
+                                Just wiki ->
+                                    WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents
+
+                                Nothing ->
+                                    WikiStats.buildFromWiki wikiSlug (Wiki.wikiWithPages wikiSlug "" Dict.empty) model.submissions auditEvents
+                    in
+                    { existing | fromAudit = fromAudit, fromWiki = fromWiki }
+
+                Nothing ->
+                    let
+                        viewCounts : Dict Page.Slug Int
+                        viewCounts =
+                            Dict.get wikiSlug model.pageViewCounts
+                                |> Maybe.withDefault Dict.empty
+
+                        fromWiki : WikiStats.FromWiki
+                        fromWiki =
+                            case Dict.get wikiSlug model.wikis of
+                                Just wiki ->
+                                    WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents
+
+                                Nothing ->
+                                    WikiStats.buildFromWiki wikiSlug (Wiki.wikiWithPages wikiSlug "" Dict.empty) model.submissions auditEvents
+                    in
+                    { fromWiki = fromWiki
+                    , fromAudit = fromAudit
+                    , fromViews = WikiStats.buildFromViews viewCounts
+                    }
+    in
+    { model | wikiStatsCache = Dict.insert wikiSlug partitions model.wikiStatsCache }
+
+
+withWikiStatsViewsCache : Wiki.Slug -> Model -> Model
+withWikiStatsViewsCache wikiSlug model =
+    let
+        viewCounts : Dict Page.Slug Int
+        viewCounts =
+            Dict.get wikiSlug model.pageViewCounts
+                |> Maybe.withDefault Dict.empty
+
+        fromViews : WikiStats.FromViews
+        fromViews =
+            WikiStats.buildFromViews viewCounts
+
+        partitions : WikiStatsPartitions
+        partitions =
+            case Dict.get wikiSlug model.wikiStatsCache of
+                Just existing ->
+                    { existing | fromViews = fromViews }
+
+                Nothing ->
+                    let
+                        auditEvents : List WikiAuditLog.AuditEvent
+                        auditEvents =
+                            Dict.get wikiSlug model.wikiAuditEvents
+                                |> Maybe.withDefault []
+
+                        fromWiki : WikiStats.FromWiki
+                        fromWiki =
+                            case Dict.get wikiSlug model.wikis of
+                                Just wiki ->
+                                    WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents
+
+                                Nothing ->
+                                    WikiStats.buildFromWiki wikiSlug (Wiki.wikiWithPages wikiSlug "" Dict.empty) model.submissions auditEvents
+                    in
+                    { fromWiki = fromWiki
+                    , fromAudit = WikiStats.buildFromAudit auditEvents
+                    , fromViews = fromViews
+                    }
+    in
+    { model | wikiStatsCache = Dict.insert wikiSlug partitions model.wikiStatsCache }
+
+
+withRebuiltAllWikiStatsCaches : Model -> Model
+withRebuiltAllWikiStatsCaches model =
+    let
+        nextCache : Dict Wiki.Slug WikiStatsPartitions
+        nextCache =
+            model.wikis
+                |> Dict.map
+                    (\wikiSlug wiki ->
+                        let
+                            auditEvents : List WikiAuditLog.AuditEvent
+                            auditEvents =
+                                Dict.get wikiSlug model.wikiAuditEvents
+                                    |> Maybe.withDefault []
+
+                            viewCounts : Dict Page.Slug Int
+                            viewCounts =
+                                Dict.get wikiSlug model.pageViewCounts
+                                    |> Maybe.withDefault Dict.empty
+                        in
+                        { fromWiki = WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents
+                        , fromAudit = WikiStats.buildFromAudit auditEvents
+                        , fromViews = WikiStats.buildFromViews viewCounts
+                        }
+                    )
+    in
+    { model | wikiStatsCache = nextCache }
+
+
+incrementPageView : Wiki.Slug -> Page.Slug -> Model -> Model
+incrementPageView wikiSlug pageSlug model =
+    let
+        wikiCounts : Dict Page.Slug Int
+        wikiCounts =
+            Dict.get wikiSlug model.pageViewCounts
+                |> Maybe.withDefault Dict.empty
+
+        newWikiCounts : Dict Page.Slug Int
+        newWikiCounts =
+            Dict.update pageSlug
+                (\mv -> Just (Maybe.withDefault 0 mv + 1))
+                wikiCounts
+    in
+    { model | pageViewCounts = Dict.insert wikiSlug newWikiCounts model.pageViewCounts }
+        |> withWikiStatsViewsCache wikiSlug
 
 
 pendingCountForWiki : Wiki.Slug -> Model -> Int
@@ -305,11 +494,15 @@ recordAudit now wikiSlug actorId kind model =
         actor =
             WikiContributors.displayUsernameForAccount wikiSlug actorId model.contributors
                 |> Maybe.withDefault "unknown"
+
+        nextModel : Model
+        nextModel =
+            { model
+                | wikiAuditEvents =
+                    WikiAuditLog.append wikiSlug now actor kind model.wikiAuditEvents
+            }
     in
-    { model
-        | wikiAuditEvents =
-            WikiAuditLog.append wikiSlug now actor kind model.wikiAuditEvents
-    }
+    withWikiStatsAuditCache wikiSlug nextModel
 
 
 {-| Push fresh `Wiki.frontendDetails` so all clients keep tag maps and link sources aligned after publish/delete.
@@ -349,6 +542,8 @@ init =
       , wikiFrontendClients = WikiFrontendSubscription.emptyClientSets
       , wikiSearchIndexes = Dict.empty
       , wikiTodosCaches = Dict.empty
+      , pageViewCounts = Dict.empty
+      , wikiStatsCache = Dict.empty
       }
     , Command.none
     )
@@ -480,11 +675,10 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                 respond nextModel rows
 
         RequestPageFrontendDetails wikiSlug pageSlug ->
-            ( model
-            , Effect.Lamdera.sendToFrontend clientId
-                (PageFrontendDetailsResponse wikiSlug
-                    pageSlug
-                    (model.wikis
+            let
+                maybeDetails : Maybe Page.FrontendDetails
+                maybeDetails =
+                    model.wikis
                         |> Dict.get wikiSlug
                         |> Maybe.andThen
                             (\w ->
@@ -494,8 +688,62 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                 else
                                     Nothing
                             )
-                    )
-                )
+
+                nextModel : Model
+                nextModel =
+                    case maybeDetails of
+                        Just _ ->
+                            incrementPageView wikiSlug pageSlug model
+
+                        Nothing ->
+                            model
+            in
+            ( nextModel
+            , Effect.Lamdera.sendToFrontend clientId
+                (PageFrontendDetailsResponse wikiSlug pageSlug maybeDetails)
+            )
+
+        RequestWikiStats wikiSlug ->
+            let
+                maybeSummary : Maybe WikiStats.Summary
+                maybeSummary =
+                    case Dict.get wikiSlug model.wikis of
+                        Nothing ->
+                            Nothing
+
+                        Just wiki ->
+                            if not wiki.active then
+                                Nothing
+
+                            else
+                                let
+                                    partitions : WikiStatsPartitions
+                                    partitions =
+                                        case Dict.get wikiSlug model.wikiStatsCache of
+                                            Just cached ->
+                                                cached
+
+                                            Nothing ->
+                                                let
+                                                    auditEvents : List WikiAuditLog.AuditEvent
+                                                    auditEvents =
+                                                        Dict.get wikiSlug model.wikiAuditEvents
+                                                            |> Maybe.withDefault []
+
+                                                    viewCounts : Dict Page.Slug Int
+                                                    viewCounts =
+                                                        Dict.get wikiSlug model.pageViewCounts
+                                                            |> Maybe.withDefault Dict.empty
+                                                in
+                                                { fromWiki = WikiStats.buildFromWiki wikiSlug wiki model.submissions auditEvents
+                                                , fromAudit = WikiStats.buildFromAudit auditEvents
+                                                , fromViews = WikiStats.buildFromViews viewCounts
+                                                }
+                                in
+                                Just (WikiStats.merge partitions.fromWiki partitions.fromAudit partitions.fromViews)
+            in
+            ( model
+            , Effect.Lamdera.sendToFrontend clientId (WikiStatsResponse wikiSlug maybeSummary)
             )
 
         RequestWikiSearch wikiSlug rawQuery ->
@@ -2308,17 +2556,34 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                                                 }
                                                                     |> withWikiSearchAndTodosCaches wikiSlug approved.wiki
 
+                                                            approvedAuditKind : WikiAuditLog.AuditEventKind
+                                                            approvedAuditKind =
+                                                                case sub.kind of
+                                                                    Submission.NewPage _ ->
+                                                                        WikiAuditLog.ApprovedPublishedNewPage
+                                                                            { submissionId = submissionId
+                                                                            , pageSlug = pageSlug
+                                                                            }
+
+                                                                    Submission.EditPage _ ->
+                                                                        WikiAuditLog.ApprovedPublishedPageEdit
+                                                                            { submissionId = submissionId
+                                                                            , pageSlug = pageSlug
+                                                                            }
+
+                                                                    Submission.DeletePage _ ->
+                                                                        WikiAuditLog.ApprovedPublishedPageDelete
+                                                                            { submissionId = submissionId
+                                                                            , pageSlug = pageSlug
+                                                                            }
+
                                                             nextModel : Model
                                                             nextModel =
                                                                 withPendingMutation wikiSlug
                                                                     (recordAudit now
                                                                         wikiSlug
                                                                         accountId
-                                                                        (WikiAuditLog.ApprovedSubmission
-                                                                            { submissionId = submissionId
-                                                                            , pageSlug = pageSlug
-                                                                            }
-                                                                        )
+                                                                        approvedAuditKind
                                                                         nextModel0
                                                                     )
                                                         in
@@ -2875,6 +3140,9 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                         , wikiFrontendClients =
                                             WikiFrontendSubscription.removeWikiSubscribers wikiSlug model.wikiFrontendClients
                                         , wikiSearchIndexes = Dict.remove wikiSlug model.wikiSearchIndexes
+                                        , wikiTodosCaches = Dict.remove wikiSlug model.wikiTodosCaches
+                                        , pageViewCounts = Dict.remove wikiSlug model.pageViewCounts
+                                        , wikiStatsCache = Dict.remove wikiSlug model.wikiStatsCache
                                     }
                             in
                             ( nextModel

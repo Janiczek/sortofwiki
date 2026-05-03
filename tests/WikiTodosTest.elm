@@ -46,7 +46,7 @@ suite =
                         |> Expect.equal []
             ]
         , Test.describe "tableRows"
-            [ Test.test "matches concatenated todos then sorted missing pages" <|
+            [ Test.test "matches sorted missing pages then todos" <|
                 \() ->
                     let
                         sources =
@@ -57,7 +57,12 @@ suite =
                     in
                     WikiTodos.tableRows "Demo" sources
                         |> Expect.equal
-                            [ { itemText = "explain roles"
+                            [ { itemText = "TodoGap"
+                              , usedInPageSlugs = [ "About", "Guides" ]
+                              , maybeTodoText = Nothing
+                              , maybeMissingPageSlug = Just "TodoGap"
+                              }
+                            , { itemText = "explain roles"
                               , usedInPageSlugs = [ "About" ]
                               , maybeTodoText = Just "explain roles"
                               , maybeMissingPageSlug = Nothing
@@ -66,11 +71,6 @@ suite =
                               , usedInPageSlugs = [ "Guides" ]
                               , maybeTodoText = Just "add examples"
                               , maybeMissingPageSlug = Nothing
-                              }
-                            , { itemText = "TodoGap"
-                              , usedInPageSlugs = [ "About", "Guides" ]
-                              , maybeTodoText = Nothing
-                              , maybeMissingPageSlug = Just "TodoGap"
                               }
                             ]
             ]

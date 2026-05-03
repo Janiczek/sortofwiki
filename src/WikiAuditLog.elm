@@ -41,6 +41,9 @@ type alias AuditEvent =
 
 type AuditEventKind
     = ApprovedSubmission { submissionId : String, pageSlug : String }
+    | ApprovedPublishedNewPage { submissionId : String, pageSlug : String }
+    | ApprovedPublishedPageEdit { submissionId : String, pageSlug : String }
+    | ApprovedPublishedPageDelete { submissionId : String, pageSlug : String }
     | RejectedSubmission { submissionId : String, pageSlug : String }
     | RequestedSubmissionChanges { submissionId : String, pageSlug : String }
     | PromotedContributorToTrusted { targetUsername : String }
@@ -56,6 +59,9 @@ type AuditEventKind
 -}
 type AuditEventKindFilterTag
     = ApprovedSubmissionKind
+    | ApprovedPublishedNewPageKind
+    | ApprovedPublishedPageEditKind
+    | ApprovedPublishedPageDeleteKind
     | RejectedSubmissionKind
     | RequestedSubmissionChangesKind
     | PromotedContributorToTrustedKind
@@ -108,6 +114,15 @@ eventKindFilterTagToString tag =
         ApprovedSubmissionKind ->
             "approved_submission"
 
+        ApprovedPublishedNewPageKind ->
+            "approved_published_new_page"
+
+        ApprovedPublishedPageEditKind ->
+            "approved_published_page_edit"
+
+        ApprovedPublishedPageDeleteKind ->
+            "approved_published_page_delete"
+
         RejectedSubmissionKind ->
             "rejected_submission"
 
@@ -138,7 +153,10 @@ eventKindFilterTagToString tag =
 
 eventKindFilterTagOptions : List ( AuditEventKindFilterTag, String )
 eventKindFilterTagOptions =
-    [ ( ApprovedSubmissionKind, "Approved submission" )
+    [ ( ApprovedSubmissionKind, "Approved submission (legacy)" )
+    , ( ApprovedPublishedNewPageKind, "Approved: new page" )
+    , ( ApprovedPublishedPageEditKind, "Approved: edit" )
+    , ( ApprovedPublishedPageDeleteKind, "Approved: delete" )
     , ( RejectedSubmissionKind, "Rejected submission" )
     , ( RequestedSubmissionChangesKind, "Requested changes" )
     , ( PromotedContributorToTrustedKind, "Promoted to trusted" )
@@ -155,6 +173,15 @@ relatedPageSlugForKind : AuditEventKind -> Maybe String
 relatedPageSlugForKind kind =
     case kind of
         ApprovedSubmission { pageSlug } ->
+            Just pageSlug
+
+        ApprovedPublishedNewPage { pageSlug } ->
+            Just pageSlug
+
+        ApprovedPublishedPageEdit { pageSlug } ->
+            Just pageSlug
+
+        ApprovedPublishedPageDelete { pageSlug } ->
             Just pageSlug
 
         RejectedSubmission { pageSlug } ->
@@ -189,6 +216,15 @@ kindMatchesFilterTag : AuditEventKind -> AuditEventKindFilterTag -> Bool
 kindMatchesFilterTag kind tag =
     case ( kind, tag ) of
         ( ApprovedSubmission _, ApprovedSubmissionKind ) ->
+            True
+
+        ( ApprovedPublishedNewPage _, ApprovedPublishedNewPageKind ) ->
+            True
+
+        ( ApprovedPublishedPageEdit _, ApprovedPublishedPageEditKind ) ->
+            True
+
+        ( ApprovedPublishedPageDelete _, ApprovedPublishedPageDeleteKind ) ->
             True
 
         ( RejectedSubmission _, RejectedSubmissionKind ) ->
@@ -520,6 +556,27 @@ eventKindUserText kind =
                 ++ submissionId
                 ++ " (page "
                 ++ pageSlug
+                ++ ")"
+
+        ApprovedPublishedNewPage { submissionId, pageSlug } ->
+            "Approved new page "
+                ++ pageSlug
+                ++ " (submission "
+                ++ submissionId
+                ++ ")"
+
+        ApprovedPublishedPageEdit { submissionId, pageSlug } ->
+            "Approved edit to "
+                ++ pageSlug
+                ++ " (submission "
+                ++ submissionId
+                ++ ")"
+
+        ApprovedPublishedPageDelete { submissionId, pageSlug } ->
+            "Approved deletion of "
+                ++ pageSlug
+                ++ " (submission "
+                ++ submissionId
                 ++ ")"
 
         RejectedSubmission { submissionId, pageSlug } ->

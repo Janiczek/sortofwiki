@@ -79,6 +79,7 @@ suite =
                             , wikiUsers = Dict.empty
                             , wikiAuditLogs = Dict.empty
                             , wikiTodos = Dict.empty
+                            , wikiStats = Dict.empty
                             }
                     in
                     store
@@ -107,6 +108,7 @@ suite =
                             , wikiUsers = Dict.empty
                             , wikiAuditLogs = Dict.empty
                             , wikiTodos = Dict.empty
+                            , wikiStats = Dict.empty
                             }
                     in
                     store
@@ -144,8 +146,79 @@ suite =
                               , wikiAuditLogs = Dict.empty
                               , wikiTodos =
                                     Dict.singleton "demo" RemoteData.Loading
+                              , wikiStats = Dict.empty
                               }
                             , Effect.Lamdera.sendToBackend (RequestWikiTodos "demo")
+                            )
+            , Test.test "AskForWikiTodos refetches when already Success Ok" <|
+                \() ->
+                    let
+                        store : Store
+                        store =
+                            { wikiCatalog = RemoteData.NotAsked
+                            , wikiDetails = Dict.empty
+                            , publishedPages = Dict.empty
+                            , reviewQueues = Dict.empty
+                            , myPendingSubmissions = Dict.empty
+                            , submissionDetails = Dict.empty
+                            , reviewSubmissionDetails = Dict.empty
+                            , wikiUsers = Dict.empty
+                            , wikiAuditLogs = Dict.empty
+                            , wikiTodos =
+                                Dict.singleton "demo" (RemoteData.succeed (Ok []))
+                            , wikiStats = Dict.empty
+                            }
+                    in
+                    store
+                        |> Store.perform Frontend.storeConfig (Store.AskForWikiTodos "demo")
+                        |> Expect.equal
+                            ( store
+                            , Effect.Lamdera.sendToBackend (RequestWikiTodos "demo")
+                            )
+            , Test.test "AskForWikiStats starts load from empty" <|
+                \() ->
+                    Store.empty
+                        |> Store.perform Frontend.storeConfig (Store.AskForWikiStats "demo")
+                        |> Expect.equal
+                            ( { wikiCatalog = RemoteData.NotAsked
+                              , wikiDetails = Dict.empty
+                              , publishedPages = Dict.empty
+                              , reviewQueues = Dict.empty
+                              , myPendingSubmissions = Dict.empty
+                              , submissionDetails = Dict.empty
+                              , reviewSubmissionDetails = Dict.empty
+                              , wikiUsers = Dict.empty
+                              , wikiAuditLogs = Dict.empty
+                              , wikiTodos = Dict.empty
+                              , wikiStats =
+                                    Dict.singleton "demo" RemoteData.Loading
+                              }
+                            , Effect.Lamdera.sendToBackend (RequestWikiStats "demo")
+                            )
+            , Test.test "AskForWikiStats refetches when already Success (stale view counts)" <|
+                \() ->
+                    let
+                        store : Store
+                        store =
+                            { wikiCatalog = RemoteData.NotAsked
+                            , wikiDetails = Dict.empty
+                            , publishedPages = Dict.empty
+                            , reviewQueues = Dict.empty
+                            , myPendingSubmissions = Dict.empty
+                            , submissionDetails = Dict.empty
+                            , reviewSubmissionDetails = Dict.empty
+                            , wikiUsers = Dict.empty
+                            , wikiAuditLogs = Dict.empty
+                            , wikiTodos = Dict.empty
+                            , wikiStats =
+                                Dict.singleton "demo" (RemoteData.succeed Nothing)
+                            }
+                    in
+                    store
+                        |> Store.perform Frontend.storeConfig (Store.AskForWikiStats "demo")
+                        |> Expect.equal
+                            ( store
+                            , Effect.Lamdera.sendToBackend (RequestWikiStats "demo")
                             )
             , Test.test "AskForSubmissionDetails starts load from empty" <|
                 \() ->
@@ -163,6 +236,7 @@ suite =
                               , wikiUsers = Dict.empty
                               , wikiAuditLogs = Dict.empty
                               , wikiTodos = Dict.empty
+                            , wikiStats = Dict.empty
                               }
                             , Effect.Lamdera.sendToBackend (RequestSubmissionDetails "demo" "sub_1")
                             )
@@ -183,6 +257,7 @@ suite =
                             , wikiUsers = Dict.empty
                             , wikiAuditLogs = Dict.empty
                             , wikiTodos = Dict.empty
+                            , wikiStats = Dict.empty
                             }
                     in
                     store
@@ -225,6 +300,7 @@ suite =
                             , wikiUsers = Dict.empty
                             , wikiAuditLogs = Dict.empty
                             , wikiTodos = Dict.empty
+                            , wikiStats = Dict.empty
                             }
                     in
                     store
@@ -269,6 +345,7 @@ suite =
                             , wikiUsers = Dict.empty
                             , wikiAuditLogs = Dict.empty
                             , wikiTodos = Dict.empty
+                            , wikiStats = Dict.empty
                             }
                     in
                     store
@@ -306,6 +383,7 @@ suite =
                             , wikiUsers = Dict.empty
                             , wikiAuditLogs = Dict.empty
                             , wikiTodos = Dict.empty
+                            , wikiStats = Dict.empty
                             }
                     in
                     store
@@ -328,6 +406,7 @@ suite =
                             , wikiUsers = Dict.empty
                             , wikiAuditLogs = Dict.empty
                             , wikiTodos = Dict.empty
+                            , wikiStats = Dict.empty
                             }
                     in
                     store
@@ -370,6 +449,7 @@ suite =
                             , wikiUsers = Dict.empty
                             , wikiAuditLogs = Dict.empty
                             , wikiTodos = Dict.empty
+                            , wikiStats = Dict.empty
                             }
                     in
                     store
@@ -392,6 +472,7 @@ suite =
                             , wikiUsers = Dict.empty
                             , wikiAuditLogs = Dict.empty
                             , wikiTodos = Dict.empty
+                            , wikiStats = Dict.empty
                             }
                     in
                     store
@@ -418,6 +499,7 @@ suite =
                               , wikiUsers = Dict.empty
                               , wikiAuditLogs = Dict.empty
                               , wikiTodos = Dict.empty
+                            , wikiStats = Dict.empty
                               }
                             , Effect.Lamdera.sendToBackend (RequestReviewSubmissionDetail "demo" "sub_1")
                             )
@@ -438,6 +520,7 @@ suite =
                             , wikiUsers = Dict.empty
                             , wikiAuditLogs = Dict.empty
                             , wikiTodos = Dict.empty
+                            , wikiStats = Dict.empty
                             }
                     in
                     store
@@ -474,6 +557,7 @@ suite =
                             , wikiUsers = Dict.empty
                             , wikiAuditLogs = Dict.empty
                             , wikiTodos = Dict.empty
+                            , wikiStats = Dict.empty
                             }
                     in
                     store
@@ -494,6 +578,7 @@ suite =
                               , wikiUsers = Dict.singleton "demo" RemoteData.Loading
                               , wikiAuditLogs = Dict.empty
                               , wikiTodos = Dict.empty
+                            , wikiStats = Dict.empty
                               }
                             , Effect.Lamdera.sendToBackend (RequestWikiUsers "demo")
                             )
@@ -514,6 +599,7 @@ suite =
                                     (RemoteData.succeed (Ok []))
                             , wikiAuditLogs = Dict.empty
                             , wikiTodos = Dict.empty
+                            , wikiStats = Dict.empty
                             }
                     in
                     store
@@ -536,6 +622,7 @@ suite =
                                     (RemoteData.succeed (Err WikiAdminUsers.Forbidden))
                             , wikiAuditLogs = Dict.empty
                             , wikiTodos = Dict.empty
+                            , wikiStats = Dict.empty
                             }
                     in
                     store
@@ -563,6 +650,7 @@ suite =
                                     Dict.singleton "demo"
                                         (Dict.singleton emptyAuditFilterCacheKey RemoteData.Loading)
                               , wikiTodos = Dict.empty
+                            , wikiStats = Dict.empty
                               }
                             , Effect.Lamdera.sendToBackend (RequestWikiAuditLog "demo" WikiAuditLog.emptyAuditLogFilter)
                             )
@@ -583,6 +671,7 @@ suite =
                                 Dict.singleton "demo"
                                     (Dict.singleton emptyAuditFilterCacheKey (RemoteData.succeed (Ok [])))
                             , wikiTodos = Dict.empty
+                            , wikiStats = Dict.empty
                             }
                     in
                     store
@@ -605,6 +694,7 @@ suite =
                                 Dict.singleton "demo"
                                     (Dict.singleton emptyAuditFilterCacheKey (RemoteData.succeed (Err WikiAuditLog.Forbidden)))
                             , wikiTodos = Dict.empty
+                            , wikiStats = Dict.empty
                             }
                     in
                     store
@@ -634,6 +724,7 @@ suite =
                                 Dict.singleton "demo"
                                     (Dict.singleton emptyAuditFilterCacheKey (RemoteData.succeed (Ok [])))
                             , wikiTodos = Dict.empty
+                            , wikiStats = Dict.empty
                             }
                     in
                     store

@@ -60,7 +60,7 @@ summary wikiSlug publishedPageMarkdownSources =
     }
 
 
-{-| Pre-sorted list for the wiki TODOs table (todos first, then missing pages with `sortMissingPagesForDisplay`).
+{-| Pre-sorted list for the wiki TODOs table (missing pages with `sortMissingPagesForDisplay`, then todos).
 -}
 tableRows : Wiki.Slug -> Dict Page.Slug String -> List TableRow
 tableRows wikiSlug publishedPageMarkdownSources =
@@ -70,16 +70,7 @@ tableRows wikiSlug publishedPageMarkdownSources =
             summary wikiSlug publishedPageMarkdownSources
     in
     List.concat
-        [ todoSummary.todos
-            |> List.map
-                (\row ->
-                    { itemText = row.todoText
-                    , usedInPageSlugs = [ row.pageSlug ]
-                    , maybeTodoText = Just row.todoText
-                    , maybeMissingPageSlug = Nothing
-                    }
-                )
-        , todoSummary.missingPages
+        [ todoSummary.missingPages
             |> sortMissingPagesForDisplay
             |> List.map
                 (\row ->
@@ -87,6 +78,15 @@ tableRows wikiSlug publishedPageMarkdownSources =
                     , usedInPageSlugs = row.linkedFromPageSlugs
                     , maybeTodoText = Nothing
                     , maybeMissingPageSlug = Just row.missingPageSlug
+                    }
+                )
+        , todoSummary.todos
+            |> List.map
+                (\row ->
+                    { itemText = row.todoText
+                    , usedInPageSlugs = [ row.pageSlug ]
+                    , maybeTodoText = Just row.todoText
+                    , maybeMissingPageSlug = Nothing
                     }
                 )
         ]

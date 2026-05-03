@@ -69,6 +69,7 @@ import UI.SidebarSection
 import UI.StatusBadge
 import UI.SubmissionActions
 import UI.Textarea
+import UI.WikiStatsCharts
 import UI.ZIndex
 import Url exposing (Url)
 import Url.Builder as UrlBuilder
@@ -79,6 +80,7 @@ import WikiGraph
 import WikiMarkdownEditorPane exposing (WikiMarkdownEditorPane(..))
 import WikiRole exposing (WikiRole)
 import WikiSearch
+import WikiStats
 import WikiTodos
 
 
@@ -184,6 +186,7 @@ storeConfig =
     , requestWikiUsers = RequestWikiUsers
     , requestWikiAuditLog = RequestWikiAuditLog
     , requestSubmissionDetails = RequestSubmissionDetails
+    , requestWikiStats = RequestWikiStats
     }
 
 
@@ -419,6 +422,9 @@ wikiSideNavSlugIfActive model =
                     Just s
 
                 Route.WikiSearch s ->
+                    Just s
+
+                Route.WikiStats s ->
                     Just s
 
                 Route.WikiRegister s ->
@@ -787,6 +793,9 @@ runRouteStoreActions ( model, cmd ) =
 
                 Route.WikiSearch _ ->
                     requestWikiSearchCmd model.wikiSearchPageQuery model.route
+
+                Route.WikiStats _ ->
+                    Command.none
 
                 Route.WikiRegister _ ->
                     Command.none
@@ -1446,6 +1455,7 @@ init url key =
             , sideNavOpen = False
             , wikiPageMobileRightRailCollapsed = False
             , wikiMarkdownEditorPane = EditorWrite
+            , wikiStatsDailyActivityHover = Nothing
             , navigationFragment = Nothing
             }
 
@@ -1546,6 +1556,7 @@ init url key =
             , sideNavOpen = False
             , wikiPageMobileRightRailCollapsed = False
             , wikiMarkdownEditorPane = EditorWrite
+            , wikiStatsDailyActivityHover = Nothing
             , navigationFragment = url.fragment
             }
     in
@@ -1607,6 +1618,9 @@ routeUsesAuditLogFillLayout route =
             False
 
         Route.WikiSearch _ ->
+            False
+
+        Route.WikiStats _ ->
             False
 
         Route.WikiLogin _ _ ->
@@ -1713,6 +1727,9 @@ applyWikiAdminAuditFilterFromModel model =
         Route.WikiSearch _ ->
             ( model, Command.none )
 
+        Route.WikiStats _ ->
+            ( model, Command.none )
+
         Route.WikiLogin _ _ ->
             ( model, Command.none )
 
@@ -1808,6 +1825,9 @@ applyHostAdminAuditFilterFromModel model =
             ( model, Command.none )
 
         Route.WikiSearch _ ->
+            ( model, Command.none )
+
+        Route.WikiStats _ ->
             ( model, Command.none )
 
         Route.WikiLogin _ _ ->
@@ -2156,6 +2176,9 @@ update msg model =
                                 Route.WikiSearch _ ->
                                     RemoteData.NotAsked
 
+                                Route.WikiStats _ ->
+                                    RemoteData.NotAsked
+
                                 Route.WikiRegister _ ->
                                     RemoteData.NotAsked
 
@@ -2220,6 +2243,7 @@ update msg model =
                         , hostAdminWikisNotice = Nothing
                         , sideNavOpen = False
                         , wikiMarkdownEditorPane = EditorWrite
+                        , wikiStatsDailyActivityHover = Nothing
                         , wikiPageMobileRightRailCollapsed =
                             wikiPageMobileRightRailCollapsedOnUrlChange model.route route model.wikiPageMobileRightRailCollapsed
                     }
@@ -2275,6 +2299,11 @@ update msg model =
             , Command.none
             )
 
+        WikiStatsDailyActivityHoverChanged maybeHover ->
+            ( { model | wikiStatsDailyActivityHover = maybeHover }
+            , Command.none
+            )
+
         ContributorLogoutWiki wikiSlug ->
             ( model, Effect.Lamdera.sendToBackend (LogoutContributor wikiSlug) )
 
@@ -2319,6 +2348,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiSearch _ ->
+                    ( model, Command.none )
+
+                Route.WikiStats _ ->
                     ( model, Command.none )
 
                 Route.WikiLogin _ _ ->
@@ -2631,6 +2663,9 @@ update msg model =
                 Route.WikiSearch _ ->
                     ( model, Command.none )
 
+                Route.WikiStats _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -2856,6 +2891,9 @@ update msg model =
                 Route.WikiSearch _ ->
                     ( model, Command.none )
 
+                Route.WikiStats _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -3044,6 +3082,9 @@ update msg model =
                 Route.WikiSearch _ ->
                     ( model, Command.none )
 
+                Route.WikiStats _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -3218,6 +3259,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiSearch _ ->
+                    ( model, Command.none )
+
+                Route.WikiStats _ ->
                     ( model, Command.none )
 
                 Route.WikiLogin _ _ ->
@@ -3618,6 +3662,9 @@ update msg model =
                 Route.WikiSearch _ ->
                     ( model, Command.none )
 
+                Route.WikiStats _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -3723,6 +3770,9 @@ update msg model =
                 Route.WikiSearch _ ->
                     ( model, Command.none )
 
+                Route.WikiStats _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -3806,6 +3856,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiSearch _ ->
+                    ( model, Command.none )
+
+                Route.WikiStats _ ->
                     ( model, Command.none )
 
                 Route.WikiLogin _ _ ->
@@ -3893,6 +3946,9 @@ update msg model =
                 Route.WikiSearch _ ->
                     ( model, Command.none )
 
+                Route.WikiStats _ ->
+                    ( model, Command.none )
+
                 Route.WikiLogin _ _ ->
                     ( model, Command.none )
 
@@ -3976,6 +4032,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiSearch _ ->
+                    ( model, Command.none )
+
+                Route.WikiStats _ ->
                     ( model, Command.none )
 
                 Route.WikiLogin _ _ ->
@@ -4343,6 +4402,9 @@ update msg model =
                 Route.WikiSearch _ ->
                     ( model, Command.none )
 
+                Route.WikiStats _ ->
+                    ( model, Command.none )
+
                 Route.WikiRegister _ ->
                     ( model, Command.none )
 
@@ -4520,6 +4582,9 @@ update msg model =
                     ( model, Command.none )
 
                 Route.WikiSearch _ ->
+                    ( model, Command.none )
+
+                Route.WikiStats _ ->
                     ( model, Command.none )
 
                 Route.WikiRegister _ ->
@@ -4725,6 +4790,9 @@ update msg model =
                 Route.WikiSearch _ ->
                     ( model, Command.none )
 
+                Route.WikiStats _ ->
+                    ( model, Command.none )
+
                 Route.WikiRegister _ ->
                     ( model, Command.none )
 
@@ -4841,6 +4909,21 @@ updateFromBackend msg model =
                     { store
                         | wikiTodos =
                             Dict.insert wikiSlug (RemoteData.succeed result) store.wikiTodos
+                    }
+            in
+            ( { model | store = nextStore }, Command.none )
+
+        WikiStatsResponse wikiSlug maybeSummary ->
+            let
+                store : Store
+                store =
+                    model.store
+
+                nextStore : Store
+                nextStore =
+                    { store
+                        | wikiStats =
+                            Dict.insert wikiSlug (RemoteData.succeed maybeSummary) store.wikiStats
                     }
             in
             ( { model | store = nextStore }, Command.none )
@@ -7659,6 +7742,11 @@ appHeaderTitle ({ store, route } as model) =
                 \summary ->
                     wikiLoadedHeaderTitle summary (Just (AppHeaderSecondaryPlain "Search"))
 
+        Route.WikiStats slug ->
+            wikiScopeHeaderTitle store slug <|
+                \summary ->
+                    wikiLoadedHeaderTitle summary (Just (AppHeaderSecondaryPlain "Stats"))
+
         Route.WikiPage wikiSlug pageSlug ->
             wikiScopeHeaderTitle store wikiSlug <|
                 \summary ->
@@ -7885,6 +7973,9 @@ wikiSlugForRoute route =
             Just slug
 
         Route.WikiSearch slug ->
+            Just slug
+
+        Route.WikiStats slug ->
             Just slug
 
         Route.WikiPage wikiSlug _ ->
@@ -9426,6 +9517,20 @@ documentTitle ({ store, route } as model) =
             case Store.get wikiSlug store.wikiCatalog of
                 RemoteData.Success summary ->
                     "Search — " ++ summary.name ++ " — SortOfWiki"
+
+                RemoteData.Failure _ ->
+                    "404 — SortOfWiki"
+
+                RemoteData.Loading ->
+                    "Loading - SortOfWiki"
+
+                RemoteData.NotAsked ->
+                    "Loading - SortOfWiki"
+
+        Route.WikiStats wikiSlug ->
+            case Store.get wikiSlug store.wikiCatalog of
+                RemoteData.Success summary ->
+                    "Stats — " ++ summary.name ++ " — SortOfWiki"
 
                 RemoteData.Failure _ ->
                     "404 — SortOfWiki"
@@ -13282,6 +13387,199 @@ viewWikiSearchRoute model wikiSlug =
                         ]
 
 
+viewWikiStatsRoute : Model -> Wiki.Slug -> Html Msg
+viewWikiStatsRoute model wikiSlug =
+    case Store.get_ wikiSlug model.store.wikiDetails of
+        RemoteData.NotAsked ->
+            viewWikiHomeLoading
+
+        RemoteData.Loading ->
+            viewWikiHomeLoading
+
+        RemoteData.Failure _ ->
+            viewNotFound
+
+        RemoteData.Success _ ->
+            case Store.get wikiSlug model.store.wikiCatalog of
+                RemoteData.NotAsked ->
+                    viewWikiHomeLoading
+
+                RemoteData.Loading ->
+                    viewWikiHomeLoading
+
+                RemoteData.Failure _ ->
+                    viewNotFound
+
+                RemoteData.Success _ ->
+                    viewWikiStatsPage wikiSlug model
+
+
+viewWikiStatsPage : Wiki.Slug -> Model -> Html Msg
+viewWikiStatsPage wikiSlug model =
+    case Store.getWikiStats wikiSlug model.store of
+        RemoteData.NotAsked ->
+            viewWikiHomeLoading
+
+        RemoteData.Loading ->
+            viewWikiHomeLoading
+
+        RemoteData.Failure _ ->
+            viewNotFound
+
+        RemoteData.Success maybeStats ->
+            case maybeStats of
+                Nothing ->
+                    viewNotFound
+
+                Just stats ->
+                    viewWikiStatsSummary wikiSlug stats model
+
+
+viewWikiStatsSummary : Wiki.Slug -> WikiStats.Summary -> Model -> Html Msg
+viewWikiStatsSummary wikiSlug stats model =
+    Html.div
+        [ Attr.id "wiki-stats-page"
+        , Attr.attribute "data-wiki-slug" wikiSlug
+        ]
+        [ Html.div [ UI.classAttr "space-y-6" ]
+            [ Html.section [ UI.classAttr "space-y-3" ]
+                [ Html.h2 [ UI.classAttr "text-[1rem] font-semibold" ] [ Html.text "Overview" ]
+                , Html.dl [ UI.classAttr "grid grid-cols-1 gap-2 sm:gap-3 md:grid-cols-5" ]
+                    [ viewStatItem "Published pages" (String.fromInt stats.publishedPageCount)
+                    , viewStatItem "Missing pages" (String.fromInt stats.missingPageCount)
+                    , viewStatItem "Total links" (String.fromInt stats.totalPublishedLinks)
+                    , viewStatItem "Total tags" (String.fromInt stats.totalTags)
+                    , viewStatItem "Avg revisions/page" (String.fromFloat (toFloat (round (stats.avgRevisionPerPage * 10)) / 10))
+                    ]
+                ]
+            , Html.div
+                [ UI.classAttr "grid grid-cols-1 gap-6 md:grid-cols-3 md:gap-4" ]
+                [ Html.section [ UI.classAttr "min-w-0 space-y-3" ]
+                    [ Html.h2 [ UI.classAttr "text-[1rem] font-semibold" ] [ Html.text "Top pages by revision count" ]
+                    , viewRankedList
+                        stats.topPagesByRevision
+                        (\r ->
+                            { slug = r.pageSlug
+                            , count = r.revision
+                            , unit = "revisions"
+                            }
+                        )
+                        wikiSlug
+                    ]
+                , Html.section [ UI.classAttr "min-w-0 space-y-3" ]
+                    [ Html.h2 [ UI.classAttr "text-[1rem] font-semibold" ] [ Html.text "Top pages by edit events" ]
+                    , viewRankedList
+                        stats.topPagesByEditEvents
+                        (\r ->
+                            { slug = r.pageSlug
+                            , count = r.editCount
+                            , unit = "edits"
+                            }
+                        )
+                        wikiSlug
+                    ]
+                , Html.section [ UI.classAttr "min-w-0 space-y-3" ]
+                    [ Html.h2 [ UI.classAttr "text-[1rem] font-semibold" ] [ Html.text "Top pages by views" ]
+                    , viewRankedList
+                        stats.topPagesByViews
+                        (\r ->
+                            { slug = r.pageSlug
+                            , count = r.viewCount
+                            , unit = "views"
+                            }
+                        )
+                        wikiSlug
+                    ]
+                , Html.section [ UI.classAttr "min-w-0 space-y-3" ]
+                    [ Html.h2 [ UI.classAttr "text-[1rem] font-semibold" ] [ Html.text "Top pages by in-links" ]
+                    , viewRankedList
+                        stats.topPagesByInLinks
+                        (\r ->
+                            { slug = r.pageSlug
+                            , count = r.inLinkCount
+                            , unit = "in-links"
+                            }
+                        )
+                        wikiSlug
+                    ]
+                , Html.section [ UI.classAttr "min-w-0 space-y-3" ]
+                    [ Html.h2 [ UI.classAttr "text-[1rem] font-semibold" ] [ Html.text "Top pages by out-links" ]
+                    , viewRankedList
+                        stats.topPagesByOutLinks
+                        (\r ->
+                            { slug = r.pageSlug
+                            , count = r.outLinkCount
+                            , unit = "out-links"
+                            }
+                        )
+                        wikiSlug
+                    ]
+                ]
+            , Html.section [ UI.classAttr "space-y-3" ]
+                [ Html.h2 [ UI.classAttr "text-[1rem] font-semibold" ] [ Html.text "Daily activity" ]
+                , if List.isEmpty stats.dailyActivityCounts then
+                    Html.p [ UI.classAttr "text-[0.8125rem] text-[var(--fg-subtle)]" ] [ Html.text "No activity recorded yet." ]
+
+                  else
+                    UI.WikiStatsCharts.viewDailyActivityCharts
+                        { hoveredBar = model.wikiStatsDailyActivityHover
+                        , onHoverChange = WikiStatsDailyActivityHoverChanged
+                        }
+                        stats.dailyActivityCounts
+                ]
+            , Html.section [ UI.classAttr "space-y-3" ]
+                [ Html.h2 [ UI.classAttr "text-[1rem] font-semibold" ] [ Html.text "Totals over time" ]
+                , Html.p [ UI.classAttr "text-[0.8125rem] text-[var(--fg-subtle)]" ]
+                    [ Html.text "End-of-day totals replayed from the audit log (last 30 UTC days that have any audit activity)." ]
+                , if List.isEmpty stats.dailyAccumulatedSnapshots then
+                    Html.p [ UI.classAttr "text-[0.8125rem] text-[var(--fg-subtle)]" ] [ Html.text "No audit-based history to chart yet." ]
+
+                  else
+                    UI.WikiStatsCharts.viewDailyAccumulatedCharts
+                        { hoveredBar = model.wikiStatsDailyActivityHover
+                        , onHoverChange = WikiStatsDailyActivityHoverChanged
+                        }
+                        stats.dailyAccumulatedSnapshots
+                ]
+            ]
+        ]
+
+
+viewStatItem : String -> String -> Html Msg
+viewStatItem label value =
+    Html.div [ UI.classAttr "min-w-0 rounded border border-[var(--border-subtle)] p-2 sm:p-3" ]
+        [ Html.dt [ UI.classAttr "text-[0.6875rem] sm:text-[0.75rem] text-[var(--fg-subtle)] mb-1 leading-snug" ] [ Html.text label ]
+        , Html.dd [ UI.classAttr "text-[1rem] sm:text-[1.125rem] font-semibold tabular-nums leading-tight" ] [ Html.text value ]
+        ]
+
+
+viewRankedList : List a -> (a -> { slug : String, count : Int, unit : String }) -> Wiki.Slug -> Html Msg
+viewRankedList items toRow wikiSlug =
+    if List.isEmpty items then
+        Html.p [ UI.classAttr "text-[0.8125rem] text-[var(--fg-subtle)]" ] [ Html.text "No data yet." ]
+
+    else
+        Html.ol [ UI.classAttr "space-y-1" ]
+            (items
+                |> List.indexedMap
+                    (\idx item ->
+                        let
+                            row : { slug : String, count : Int, unit : String }
+                            row =
+                                toRow item
+                        in
+                        Html.li [ UI.classAttr "grid grid-cols-[2.25rem_minmax(0,1fr)_auto_auto] items-baseline gap-x-2 text-[0.8125rem]" ]
+                            [ Html.span [ UI.classAttr "text-[var(--fg-subtle)] text-right tabular-nums" ] [ Html.text (String.fromInt (idx + 1) ++ ".") ]
+                            , UI.Link.contentLink
+                                [ Attr.href (Wiki.publishedPageUrlPath wikiSlug row.slug) ]
+                                [ Html.text row.slug ]
+                            , Html.span [ UI.classAttr "text-[var(--fg-subtle)] text-right tabular-nums" ] [ Html.text (String.fromInt row.count) ]
+                            , Html.span [ UI.classAttr "text-[var(--fg-subtle)]" ] [ Html.text row.unit ]
+                            ]
+                    )
+            )
+
+
 viewWikiGraphRoute : Model -> Wiki.Slug -> Html Msg
 viewWikiGraphRoute model wikiSlug =
     case Store.get_ wikiSlug model.store.wikiDetails of
@@ -13480,6 +13778,9 @@ viewBody model =
 
         Route.WikiSearch wikiSlug ->
             viewWikiSearchRoute model wikiSlug
+
+        Route.WikiStats wikiSlug ->
+            viewWikiStatsRoute model wikiSlug
 
         Route.WikiPage wikiSlug pageSlug ->
             viewPublishedPageRoute model wikiSlug pageSlug

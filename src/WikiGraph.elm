@@ -1,4 +1,4 @@
-module WikiGraph exposing (Edge, EdgeDirection(..), EdgeKind(..), Summary, graph, graphFromSummary, summary)
+module WikiGraph exposing (Edge, EdgeDirection(..), EdgeKind(..), Summary, directedInOutCountsBySlug, graph, graphFromSummary, summary)
 
 import Dict exposing (Dict)
 import GraphData
@@ -36,14 +36,19 @@ type alias Summary =
     }
 
 
-summary : Wiki.Slug -> Dict Page.Slug String -> Dict Page.Slug (List Page.Slug) -> Summary
-summary wikiSlug publishedPageMarkdownSources publishedPageTags =
+{-| Directed wiki-link and tag edges (markdown `[[…]]` / links + `page.tags`), before graph normalization.
+-}
+rawDirectedWikiAndTagEdges :
+    Wiki.Slug
+    -> Dict Page.Slug String
+    -> Dict Page.Slug (List Page.Slug)
+    -> List Edge
+rawDirectedWikiAndTagEdges wikiSlug publishedPageMarkdownSources publishedPageTags =
     let
         publishedPageSlugs : List Page.Slug
         publishedPageSlugs =
             publishedPageMarkdownSources
                 |> Dict.keys
-                |> List.sortBy String.toLower
 
         publishedSlugSet : Set.Set String
         publishedSlugSet =
@@ -90,10 +95,67 @@ summary wikiSlug publishedPageMarkdownSources publishedPageTags =
                                     }
                                 )
                     )
+    in
+    List.append wikiLinkEdges tagEdges
+
+
+{-| Counts each directed edge once: in-degree by target slug, out-degree by source slug (normalized keys).
+Wiki links and tags both count. Self-links increment that page’s in and out by one each.
+-}
+directedInOutCountsBySlug :
+    Wiki.Slug
+    -> Dict Page.Slug String
+    -> Dict Page.Slug (List Page.Slug)
+    -> { inByNormalizedTarget : Dict String Int, outByNormalizedSource : Dict String Int }
+directedInOutCountsBySlug wikiSlug publishedPageMarkdownSources publishedPageTags =
+    let
+        bump : String -> Dict String Int -> Dict String Int
+        bump key dict =
+            Dict.update key
+                (\mv ->
+                    case mv of
+                        Just n ->
+                            Just (n + 1)
+
+                        Nothing ->
+                            Just 1
+                )
+                dict
+
+        step : Edge -> ( Dict String Int, Dict String Int ) -> ( Dict String Int, Dict String Int )
+        step edge ( ins, outs ) =
+            let
+                nf : String
+                nf =
+                    String.toLower edge.fromPageSlug
+
+                nt : String
+                nt =
+                    String.toLower edge.toPageSlug
+            in
+            ( bump nt ins, bump nf outs )
+    in
+    rawDirectedWikiAndTagEdges wikiSlug publishedPageMarkdownSources publishedPageTags
+        |> List.foldl step ( Dict.empty, Dict.empty )
+        |> (\( ins, outs ) -> { inByNormalizedTarget = ins, outByNormalizedSource = outs })
+
+
+summary : Wiki.Slug -> Dict Page.Slug String -> Dict Page.Slug (List Page.Slug) -> Summary
+summary wikiSlug publishedPageMarkdownSources publishedPageTags =
+    let
+        publishedPageSlugs : List Page.Slug
+        publishedPageSlugs =
+            publishedPageMarkdownSources
+                |> Dict.keys
+                |> List.sortBy String.toLower
+
+        rawEdges : List Edge
+        rawEdges =
+            rawDirectedWikiAndTagEdges wikiSlug publishedPageMarkdownSources publishedPageTags
 
         edges : List Edge
         edges =
-            List.append wikiLinkEdges tagEdges
+            rawEdges
                 |> GraphData.normalizeEdges
                     { fromSlug = .fromPageSlug
                     , toSlug = .toPageSlug
@@ -115,7 +177,7 @@ summary wikiSlug publishedPageMarkdownSources publishedPageTags =
                 { fromSlug = .fromPageSlug
                 , toSlug = .toPageSlug
                 }
-                (List.append wikiLinkEdges tagEdges)
+                rawEdges
 
         missingPageSlugs : List Page.Slug
         missingPageSlugs =

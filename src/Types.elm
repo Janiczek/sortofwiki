@@ -25,6 +25,7 @@ module Types exposing
     , ToBackend(..)
     , ToFrontend(..)
     , UpdateHostedWikiMetadataPayload
+    , WikiStatsPartitions
     , emptySubmissionDetailEditDraft
     )
 
@@ -48,14 +49,15 @@ import SubmissionReviewDetail
 import Time
 import Url exposing (Url)
 import Wiki exposing (Wiki)
-import WikiMarkdownEditorPane exposing (WikiMarkdownEditorPane)
-import WikiTodos
 import WikiAdminUsers
 import WikiAuditLog
 import WikiContributors
 import WikiFrontendSubscription
+import WikiMarkdownEditorPane exposing (WikiMarkdownEditorPane)
 import WikiRole
 import WikiSearch
+import WikiStats
+import WikiTodos
 import WikiUser
 
 
@@ -107,6 +109,7 @@ type alias RequestSubmissionChangesPayload =
 
 type ToBackend
     = RequestWikiCatalog
+    | RequestWikiStats Wiki.Slug
     | RequestWikiFrontendDetails Wiki.Slug
     | RequestWikiTodos Wiki.Slug
     | RequestPageFrontendDetails Wiki.Slug Page.Slug
@@ -155,6 +158,7 @@ type ToBackend
 
 type ToFrontend
     = WikiCatalogResponse (Dict Wiki.Slug Wiki.CatalogEntry)
+    | WikiStatsResponse Wiki.Slug (Maybe WikiStats.Summary)
     | PendingReviewCountUpdated Wiki.Slug Int
     | WikiFrontendDetailsResponse Wiki.Slug (Maybe Wiki.FrontendDetails)
     | WikiTodosResponse Wiki.Slug (Result () (List WikiTodos.TableRow))
@@ -202,6 +206,13 @@ type ToFrontend
     | HostAdminWikiDataImportAutoResponse (Result HostAdmin.WikiDataImportError Wiki.Slug)
 
 
+type alias WikiStatsPartitions =
+    { fromWiki : WikiStats.FromWiki
+    , fromAudit : WikiStats.FromAudit
+    , fromViews : WikiStats.FromViews
+    }
+
+
 type alias BackendModel =
     { wikis : Dict Wiki.Slug Wiki
     , contributors : WikiContributors.Registry
@@ -215,6 +226,8 @@ type alias BackendModel =
     , wikiFrontendClients : WikiFrontendSubscription.WikiFrontendClientSets
     , wikiSearchIndexes : Dict Wiki.Slug WikiSearch.PrefixIndex
     , wikiTodosCaches : Dict Wiki.Slug (List WikiTodos.TableRow)
+    , pageViewCounts : Dict Wiki.Slug (Dict Page.Slug Int)
+    , wikiStatsCache : Dict Wiki.Slug WikiStatsPartitions
     }
 
 
@@ -418,6 +431,7 @@ type alias FrontendModel =
     , sideNavOpen : Bool
     , wikiPageMobileRightRailCollapsed : Bool
     , wikiMarkdownEditorPane : WikiMarkdownEditorPane
+    , wikiStatsDailyActivityHover : Maybe { metric : String, day : String, count : Int }
     }
 
 
@@ -504,3 +518,4 @@ type FrontendMsg
     | SideNavOpened
     | SideNavClosed
     | WikiMarkdownEditorPaneSelected WikiMarkdownEditorPane
+    | WikiStatsDailyActivityHoverChanged (Maybe { metric : String, day : String, count : Int })

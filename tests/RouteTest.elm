@@ -21,6 +21,7 @@ suite =
             , ( "https://example.com/w/Demo/todos", Route.WikiTodos "Demo" )
             , ( "https://example.com/w/Demo/graph", Route.WikiGraph "Demo" )
             , ( "https://example.com/w/Demo/search", Route.WikiSearch "Demo" )
+            , ( "https://example.com/w/Demo/stats", Route.WikiStats "Demo" )
             , ( "https://example.com/w/Demo/p/guides", Route.WikiPage "Demo" "guides" )
             , ( "https://example.com/w/Demo/p/N%C3%A1vs%C3%AD", Route.WikiPage "Demo" "Návsí" )
             , ( "https://example.com/w/Demo/pg/guides", Route.WikiPageGraph "Demo" "guides" )
@@ -298,6 +299,9 @@ suite =
                                             False
 
                                         Route.WikiSearch _ ->
+                                            False
+
+                                        Route.WikiStats _ ->
                                             False
 
                                         Route.WikiPage _ _ ->
