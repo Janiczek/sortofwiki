@@ -316,8 +316,8 @@ compactSignedMetricChart title data maybeHover onHoverChange =
             [ C.chart
                 [ CA.width (toFloat chartWidth)
                 , CA.height 168
-                , CA.margin { top = 4, right = 14, bottom = 58, left = 26 }
-                , CA.padding { top = 4, right = 2, bottom = 4, left = 4 }
+                , CA.margin { top = 4, right = 14, bottom = 58, left = 36 }
+                , CA.padding { top = 4, right = 2, bottom = 4, left = 6 }
                 , CA.domain
                     [ CA.lowest yMin CA.exactly
                     , CA.highest yMax CA.exactly
@@ -441,8 +441,8 @@ compactMetricChart title color yMax data maybeHover onHoverChange =
             [ C.chart
                 [ CA.width (toFloat chartWidth)
                 , CA.height 168
-                , CA.margin { top = 4, right = 14, bottom = 58, left = 26 }
-                , CA.padding { top = 4, right = 2, bottom = 4, left = 4 }
+                , CA.margin { top = 4, right = 14, bottom = 58, left = 36 }
+                , CA.padding { top = 4, right = 2, bottom = 4, left = 6 }
                 , CA.domain
                     [ CA.lowest 0 CA.exactly
                     , CA.highest yMax CA.exactly
