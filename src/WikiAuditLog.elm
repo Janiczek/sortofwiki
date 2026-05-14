@@ -33,9 +33,9 @@ module WikiAuditLog exposing
     , filterScopedEvents
     , formatEventRowText
     , hostAuditDiffCacheKey
+    , hostAuditLogFilterCacheKey
     , scopedAuditEventByAtMillisWhenWikiUnambiguous
     , scopedAuditEventByWikiAndAtMillis
-    , hostAuditLogFilterCacheKey
     , scopedEventMatchesFilter
     , scopedEventSummaryFromScoped
     , test_posixAtUniqueAmongWikiEvents
@@ -525,8 +525,15 @@ type alias ScopedAuditEventSummary =
 {-| Trusted direct-publish diff payload (fetched separately from list metadata).
 -}
 type TrustedPublishAuditDiff
-    = TrustedPublishNewPageDiff { pageSlug : String, markdown : String }
-    | TrustedPublishPageEditDiff { pageSlug : String, beforeMarkdown : String, afterMarkdown : String }
+    = TrustedPublishNewPageDiff
+        { pageSlug : String
+        , markdown : String
+        }
+    | TrustedPublishPageEditDiff
+        { pageSlug : String
+        , beforeMarkdown : String
+        , afterMarkdown : String
+        }
 
 
 type EventDiffError
