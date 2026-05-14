@@ -1118,13 +1118,13 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                 |> Ok
                                 |> respond
 
-        RequestWikiAuditEventDiff wikiSlug filter rowIndex ->
+        RequestWikiAuditEventDiff wikiSlug atMillis ->
             let
                 respondDiff : Result WikiAuditLog.EventDiffError WikiAuditLog.TrustedPublishAuditDiff -> ( Model, Command BackendOnly ToFrontend Msg )
                 respondDiff res =
                     ( model
                     , Effect.Lamdera.sendToFrontend clientId
-                        (WikiAuditEventDiffResponse wikiSlug filter rowIndex res)
+                        (WikiAuditEventDiffResponse wikiSlug atMillis res)
                     )
             in
             case Dict.get wikiSlug model.wikis of
@@ -1142,13 +1142,12 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                                 model.wikiAuditEvents
                                     |> Dict.get wikiSlug
                                     |> Maybe.withDefault []
-                                    |> WikiAuditLog.filterEvents filter
                         in
-                        case List.drop rowIndex events of
-                            [] ->
+                        case WikiAuditLog.auditEventByAtMillisInList atMillis events of
+                            Nothing ->
                                 respondDiff (Err WikiAuditLog.DiffRowNotFound)
 
-                            ev :: _ ->
+                            Just ev ->
                                 case WikiAuditLog.trustedPublishDiffFromKind ev.kind of
                                     Nothing ->
                                         respondDiff (Err WikiAuditLog.DiffRowNotDiffable)
@@ -3091,7 +3090,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
             else
                 respond (Err HostAdmin.NotHostAuthenticated)
 
-        RequestHostAuditEventDiff filter rowIndex ->
+        RequestHostAuditEventDiff rowWikiSlug atMillis ->
             let
                 sessionKey : String
                 sessionKey =
@@ -3102,7 +3101,7 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                     -> ( Model, Command BackendOnly ToFrontend Msg )
                 respond res =
                     ( model
-                    , Effect.Lamdera.sendToFrontend clientId (HostAuditEventDiffResponse filter rowIndex res)
+                    , Effect.Lamdera.sendToFrontend clientId (HostAuditEventDiffResponse rowWikiSlug atMillis res)
                     )
             in
             if Set.member sessionKey model.hostSessions then
@@ -3111,13 +3110,20 @@ updateFromFrontendWithTime sessionId clientId msg now model =
                     scoped =
                         model.wikiAuditEvents
                             |> WikiAuditLog.allScopedEventsFromDict
-                            |> WikiAuditLog.filterScopedEvents filter
+
+                    evMaybe : Maybe WikiAuditLog.ScopedAuditEvent
+                    evMaybe =
+                        if rowWikiSlug == "" then
+                            WikiAuditLog.scopedAuditEventByAtMillisWhenWikiUnambiguous atMillis scoped
+
+                        else
+                            WikiAuditLog.scopedAuditEventByWikiAndAtMillis rowWikiSlug atMillis scoped
                 in
-                case List.drop rowIndex scoped of
-                    [] ->
+                case evMaybe of
+                    Nothing ->
                         respond (Ok (Err WikiAuditLog.DiffRowNotFound))
 
-                    ev :: _ ->
+                    Just ev ->
                         case WikiAuditLog.trustedPublishDiffFromKind ev.kind of
                             Nothing ->
                                 respond (Ok (Err WikiAuditLog.DiffRowNotDiffable))

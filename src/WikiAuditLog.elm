@@ -15,6 +15,7 @@ module WikiAuditLog exposing
     , allScopedEventsFromDict
     , append
     , auditDiffCacheKey
+    , auditEventByAtMillisInList
     , auditLogFilterCacheKey
     , emptyAuditLogFilter
     , emptyHostAuditLogFilter
@@ -32,19 +33,53 @@ module WikiAuditLog exposing
     , filterScopedEvents
     , formatEventRowText
     , hostAuditDiffCacheKey
+    , scopedAuditEventByAtMillisWhenWikiUnambiguous
+    , scopedAuditEventByWikiAndAtMillis
     , hostAuditLogFilterCacheKey
     , scopedEventMatchesFilter
     , scopedEventSummaryFromScoped
+    , test_posixAtUniqueAmongWikiEvents
     , trustedPublishDiffFromKind
     )
 
 import Dict exposing (Dict)
+import Set exposing (Set)
 import Time
 import Wiki
 
 
-{-| Single append-only audit row for a wiki.
+{-| Find `Time.Posix` for a new audit row on one wiki: same as `requestedAt` if no row uses that millis yet; otherwise the smallest `requestedAt + k` ms (k ≥ 1) not already used in `existing`.
 -}
+posixAtUniqueAmongWikiEvents : List AuditEvent -> Time.Posix -> Time.Posix
+posixAtUniqueAmongWikiEvents existing requestedAt =
+    let
+        usedMillis : Set Int
+        usedMillis =
+            existing
+                |> List.map (.at >> Time.posixToMillis)
+                |> Set.fromList
+
+        firstUnusedFrom : Int -> Int
+        firstUnusedFrom candidate =
+            if Set.member candidate usedMillis then
+                firstUnusedFrom (candidate + 1)
+
+            else
+                candidate
+    in
+    requestedAt
+        |> Time.posixToMillis
+        |> firstUnusedFrom
+        |> Time.millisToPosix
+
+
+{-| Test-only alias for [`posixAtUniqueAmongWikiEvents`](#posixAtUniqueAmongWikiEvents); do not use outside tests.
+-}
+test_posixAtUniqueAmongWikiEvents : List AuditEvent -> Time.Posix -> Time.Posix
+test_posixAtUniqueAmongWikiEvents =
+    posixAtUniqueAmongWikiEvents
+
+
 type alias AuditEvent =
     { at : Time.Posix
     , actorUsername : String
@@ -505,22 +540,60 @@ type alias AuditDiffCacheKey =
     String
 
 
-auditDiffCacheKey : Wiki.Slug -> AuditLogFilter -> Int -> AuditDiffCacheKey
-auditDiffCacheKey wikiSlug filter rowIndex =
+{-| Stable client cache key for wiki audit diff: wiki slug and event UTC millis (see [`auditEventByAtMillisInList`](#auditEventByAtMillisInList)).
+-}
+auditDiffCacheKey : Wiki.Slug -> Int -> AuditDiffCacheKey
+auditDiffCacheKey wikiSlug eventAtMillis =
     wikiSlug
         ++ "\u{001E}"
-        ++ auditLogFilterCacheKey filter
-        ++ "\u{001E}"
-        ++ String.fromInt rowIndex
+        ++ String.fromInt eventAtMillis
 
 
-hostAuditDiffCacheKey : HostAuditLogFilter -> Int -> AuditDiffCacheKey
-hostAuditDiffCacheKey filter rowIndex =
+{-| Stable client cache key for host-admin audit diff: wiki slug and event UTC millis.
+-}
+hostAuditDiffCacheKey : Wiki.Slug -> Int -> AuditDiffCacheKey
+hostAuditDiffCacheKey wikiSlug eventAtMillis =
     "host"
         ++ "\u{001E}"
-        ++ hostAuditLogFilterCacheKey filter
+        ++ wikiSlug
         ++ "\u{001E}"
-        ++ String.fromInt rowIndex
+        ++ String.fromInt eventAtMillis
+
+
+{-| Find audit row in one wiki’s full stored list by `Time.posixToMillis` of `at`.
+If legacy data contains duplicate millis for one wiki, the last list element wins.
+-}
+auditEventByAtMillisInList : Int -> List AuditEvent -> Maybe AuditEvent
+auditEventByAtMillisInList targetMillis events =
+    events
+        |> List.filter (\e -> Time.posixToMillis e.at == targetMillis)
+        |> List.reverse
+        |> List.head
+
+
+{-| Scoped stream lookup for host diff when URL includes wiki slug.
+-}
+scopedAuditEventByWikiAndAtMillis : Wiki.Slug -> Int -> List ScopedAuditEvent -> Maybe ScopedAuditEvent
+scopedAuditEventByWikiAndAtMillis wikiSlug targetMillis scoped =
+    scoped
+        |> List.filter (\e -> e.wikiSlug == wikiSlug && Time.posixToMillis e.at == targetMillis)
+        |> List.reverse
+        |> List.head
+
+
+{-| Legacy host URL without wiki slug: only succeeds when exactly one wiki has an event at that millis.
+-}
+scopedAuditEventByAtMillisWhenWikiUnambiguous : Int -> List ScopedAuditEvent -> Maybe ScopedAuditEvent
+scopedAuditEventByAtMillisWhenWikiUnambiguous targetMillis scoped =
+    case
+        scoped
+            |> List.filter (\e -> Time.posixToMillis e.at == targetMillis)
+    of
+        [ one ] ->
+            Just one
+
+        _ ->
+            Nothing
 
 
 {-| Like [`AuditLogFilter`](#AuditLogFilter) plus optional wiki slug substring (case-insensitive).
@@ -639,6 +712,7 @@ errorToUserText err =
 
 
 {-| Append one event for a wiki (chronological: older events stay earlier in the list).
+If another row on the same wiki already uses `at`’s epoch millis, stores the new row at the next free millis (`+1`, `+2`, …) so each row has a unique timestamp within that wiki.
 -}
 append :
     Wiki.Slug
@@ -649,9 +723,18 @@ append :
     -> Dict Wiki.Slug (List AuditEvent)
 append wikiSlug at actorUsername kind dict =
     let
+        existing : List AuditEvent
+        existing =
+            Dict.get wikiSlug dict
+                |> Maybe.withDefault []
+
+        atUnique : Time.Posix
+        atUnique =
+            posixAtUniqueAmongWikiEvents existing at
+
         ev : AuditEvent
         ev =
-            { at = at
+            { at = atUnique
             , actorUsername = actorUsername
             , kind = kind
             }

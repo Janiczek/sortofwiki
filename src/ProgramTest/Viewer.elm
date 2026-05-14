@@ -28,6 +28,7 @@ import ProgramTest.Story23_GrantWikiAdmin as Story23
 import ProgramTest.Story24_RevokeWikiAdmin as Story24
 import ProgramTest.Story25_AuditLog as Story25
 import ProgramTest.Story26_AuditLogFilters as Story26
+import ProgramTest.Story61_AuditDiffByMillis as Story61
 import ProgramTest.Story27_HostAdminLogin as Story27
 import ProgramTest.Story28_HostWikiList as Story28
 import ProgramTest.Story29_CreateHostedWiki as Story29
@@ -85,6 +86,7 @@ main =
     , Story24.endToEndTests
     , Story25.endToEndTests
     , Story26.endToEndTests
+    , Story61.endToEndTests
     , Story27.endToEndTests
     , Story28.endToEndTests
     , Story29.endToEndTests

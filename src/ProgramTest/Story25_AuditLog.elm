@@ -58,13 +58,6 @@ endToEndTests =
                                     ]
                                 )
                             )
-                      , client.clickLink 100 (Wiki.adminAuditDiffUrlPath "Demo" 8)
-                      , client.checkView 600
-                            (ProgramTest.Query.withinId "wiki-admin-audit-diff-page"
-                                (ProgramTest.Query.withinId "wiki-review-diff-new-preview"
-                                    (ProgramTest.Query.expectHasText "Body from trusted direct publish")
-                                )
-                            )
                       ]
                     ]
         }

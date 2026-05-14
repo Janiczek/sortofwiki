@@ -36,6 +36,8 @@ suite =
             , ( "https://example.com/w/Demo/review/sub_queue_demo", Route.WikiReviewDetail "Demo" "sub_queue_demo" )
             , ( "https://example.com/w/Demo/admin/users", Route.WikiAdminUsers "Demo" )
             , ( "https://example.com/w/Demo/admin/audit", Route.WikiAdminAudit "Demo" )
+            , ( "https://example.com/w/Demo/admin/audit/diff/1704067200000", Route.WikiAdminAuditDiff "Demo" 1704067200000 )
+            , ( "https://example.com/admin/audit/diff/Demo/1704067200000", Route.HostAdminAuditDiff "Demo" 1704067200000 )
             , ( "https://example.com/admin", Route.HostAdmin Nothing )
             , ( "https://example.com/admin/wikis", Route.HostAdminWikis )
             , ( "https://example.com/admin/wikis/new", Route.HostAdminWikiNew )

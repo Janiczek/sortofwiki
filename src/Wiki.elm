@@ -347,11 +347,11 @@ adminAuditUrlPath wikiSlug =
     "/w/" ++ wikiSlug ++ "/admin/audit"
 
 
-{-| Wiki admin audit diff detail. Path: `/w/:wikiSlug/admin/audit/diff/:eventIndex`.
+{-| Wiki admin audit diff detail. Path: `/w/:wikiSlug/admin/audit/diff/:eventAtMillis` (`eventAtMillis` = `Time.posixToMillis` of event `at`).
 -}
 adminAuditDiffUrlPath : Slug -> Int -> String
-adminAuditDiffUrlPath wikiSlug eventIndex =
-    "/w/" ++ wikiSlug ++ "/admin/audit/diff/" ++ String.fromInt eventIndex
+adminAuditDiffUrlPath wikiSlug eventAtMillis =
+    "/w/" ++ wikiSlug ++ "/admin/audit/diff/" ++ String.fromInt eventAtMillis
 
 
 {-| Contributor list of submissions waiting for review. Path: `/w/:wikiSlug/submissions`.
@@ -417,11 +417,11 @@ hostAdminAuditUrlPath =
     "/admin/audit"
 
 
-{-| Platform host-admin audit diff detail. Path: `/admin/audit/diff/:wikiSlug/:eventIndex`.
+{-| Platform host-admin audit diff detail. Path: `/admin/audit/diff/:wikiSlug/:eventAtMillis`.
 -}
 hostAdminAuditDiffUrlPath : Slug -> Int -> String
-hostAdminAuditDiffUrlPath wikiSlug eventIndex =
-    "/admin/audit/diff/" ++ wikiSlug ++ "/" ++ String.fromInt eventIndex
+hostAdminAuditDiffUrlPath wikiSlug eventAtMillis =
+    "/admin/audit/diff/" ++ wikiSlug ++ "/" ++ String.fromInt eventAtMillis
 
 
 {-| Platform host-admin wiki detail. Path: `/admin/wikis/:wikiSlug`.

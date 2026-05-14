@@ -2,6 +2,7 @@ module WikiAuditLogTest exposing (suite)
 
 import Dict
 import Expect
+import Fuzz
 import Test exposing (Test)
 import Time
 import WikiAuditLog
@@ -161,6 +162,88 @@ suite =
                         |> Dict.get "w"
                         |> Maybe.map (List.map .actorUsername)
                         |> Expect.equal (Just [ "a", "b" ])
+            , Test.test "bumps millis when two appends share same wall clock on one wiki" <|
+                \() ->
+                    let
+                        t : Time.Posix
+                        t =
+                            Time.millisToPosix 100
+                    in
+                    Dict.empty
+                        |> WikiAuditLog.append "w" t "a" (WikiAuditLog.GrantedWikiAdmin { targetUsername = "x" })
+                        |> WikiAuditLog.append "w" t "b" (WikiAuditLog.RevokedWikiAdmin { targetUsername = "x" })
+                        |> Dict.get "w"
+                        |> Maybe.map (List.map (.at >> Time.posixToMillis))
+                        |> Expect.equal (Just [ 100, 101 ])
+            , Test.fuzz (Fuzz.intRange 0 500000) "three appends at identical requested time get sequential millis" <|
+                \baseMillis ->
+                    let
+                        t : Time.Posix
+                        t =
+                            Time.millisToPosix baseMillis
+
+                        kind1 : WikiAuditLog.AuditEventKind
+                        kind1 =
+                            WikiAuditLog.GrantedWikiAdmin { targetUsername = "x" }
+
+                        kind2 : WikiAuditLog.AuditEventKind
+                        kind2 =
+                            WikiAuditLog.RevokedWikiAdmin { targetUsername = "x" }
+
+                        kind3 : WikiAuditLog.AuditEventKind
+                        kind3 =
+                            WikiAuditLog.PromotedContributorToTrusted { targetUsername = "y" }
+                    in
+                    Dict.empty
+                        |> WikiAuditLog.append "w" t "a" kind1
+                        |> WikiAuditLog.append "w" t "b" kind2
+                        |> WikiAuditLog.append "w" t "c" kind3
+                        |> Dict.get "w"
+                        |> Maybe.map (List.map (.at >> Time.posixToMillis))
+                        |> Expect.equal (Just [ baseMillis, baseMillis + 1, baseMillis + 2 ])
+            ]
+        , Test.describe "test_posixAtUniqueAmongWikiEvents"
+            [ Test.test "returns requested time when millis unused" <|
+                \() ->
+                    WikiAuditLog.test_posixAtUniqueAmongWikiEvents [] (Time.millisToPosix 7)
+                        |> Time.posixToMillis
+                        |> Expect.equal 7
+            , Test.test "uses next free millis when requested slot taken" <|
+                \() ->
+                    let
+                        existing : List WikiAuditLog.AuditEvent
+                        existing =
+                            [ { at = Time.millisToPosix 10
+                              , actorUsername = "a"
+                              , kind = WikiAuditLog.GrantedWikiAdmin { targetUsername = "x" }
+                              }
+                            , { at = Time.millisToPosix 12
+                              , actorUsername = "b"
+                              , kind = WikiAuditLog.RevokedWikiAdmin { targetUsername = "x" }
+                              }
+                            ]
+                    in
+                    WikiAuditLog.test_posixAtUniqueAmongWikiEvents existing (Time.millisToPosix 10)
+                        |> Time.posixToMillis
+                        |> Expect.equal 11
+            , Test.test "bumps past a contiguous block of taken millis" <|
+                \() ->
+                    let
+                        existing : List WikiAuditLog.AuditEvent
+                        existing =
+                            [ { at = Time.millisToPosix 2
+                              , actorUsername = "a"
+                              , kind = WikiAuditLog.GrantedWikiAdmin { targetUsername = "x" }
+                              }
+                            , { at = Time.millisToPosix 3
+                              , actorUsername = "b"
+                              , kind = WikiAuditLog.RevokedWikiAdmin { targetUsername = "x" }
+                              }
+                            ]
+                    in
+                    WikiAuditLog.test_posixAtUniqueAmongWikiEvents existing (Time.millisToPosix 2)
+                        |> Time.posixToMillis
+                        |> Expect.equal 4
             ]
         , Test.describe "eventMatchesFilter"
             [ Test.test "empty filter matches any event" <|
@@ -273,6 +356,127 @@ suite =
                     in
                     WikiAuditLog.eventMatchesFilter f ev
                         |> Expect.equal False
+            ]
+        , Test.describe "auditEventByAtMillisInList"
+            [ Test.test "finds single row" <|
+                \() ->
+                    let
+                        ev : WikiAuditLog.AuditEvent
+                        ev =
+                            { at = Time.millisToPosix 4242
+                            , actorUsername = "u"
+                            , kind = WikiAuditLog.GrantedWikiAdmin { targetUsername = "x" }
+                            }
+                    in
+                    WikiAuditLog.auditEventByAtMillisInList 4242 [ ev ]
+                        |> Expect.equal (Just ev)
+            , Test.test "when several rows share millis, returns last in list" <|
+                \() ->
+                    let
+                        first : WikiAuditLog.AuditEvent
+                        first =
+                            { at = Time.millisToPosix 1
+                            , actorUsername = "a"
+                            , kind = WikiAuditLog.GrantedWikiAdmin { targetUsername = "x" }
+                            }
+
+                        second : WikiAuditLog.AuditEvent
+                        second =
+                            { at = Time.millisToPosix 1
+                            , actorUsername = "b"
+                            , kind = WikiAuditLog.RevokedWikiAdmin { targetUsername = "x" }
+                            }
+                    in
+                    WikiAuditLog.auditEventByAtMillisInList 1 [ first, second ]
+                        |> Expect.equal (Just second)
+            , Test.fuzz (Fuzz.intRange 1 500000) "recovers row when millis are unique in list" <|
+                \m ->
+                    let
+                        ev : WikiAuditLog.AuditEvent
+                        ev =
+                            { at = Time.millisToPosix m
+                            , actorUsername = "f"
+                            , kind = WikiAuditLog.PromotedContributorToTrusted { targetUsername = "u" }
+                            }
+                    in
+                    WikiAuditLog.auditEventByAtMillisInList m [ ev ]
+                        |> Expect.equal (Just ev)
+            ]
+        , Test.describe "auditDiffCacheKey"
+            [ Test.test "uses wiki slug and millis only" <|
+                \() ->
+                    WikiAuditLog.auditDiffCacheKey "Demo" 1704067200000
+                        |> Expect.equal "Demo\u{001E}1704067200000"
+            ]
+        , Test.describe "hostAuditDiffCacheKey"
+            [ Test.test "uses host prefix, wiki slug, and millis" <|
+                \() ->
+                    WikiAuditLog.hostAuditDiffCacheKey "ElmTips" 42
+                        |> Expect.equal "host\u{001E}ElmTips\u{001E}42"
+            ]
+        , Test.describe "scopedAuditEventByWikiAndAtMillis"
+            [ Test.test "matches wiki and millis" <|
+                \() ->
+                    let
+                        ev : WikiAuditLog.ScopedAuditEvent
+                        ev =
+                            { wikiSlug = "Demo"
+                            , at = Time.millisToPosix 7
+                            , actorUsername = "a"
+                            , kind = WikiAuditLog.GrantedWikiAdmin { targetUsername = "x" }
+                            }
+                    in
+                    WikiAuditLog.scopedAuditEventByWikiAndAtMillis "Demo" 7 [ ev ]
+                        |> Expect.equal (Just ev)
+            , Test.test "wrong wiki slug yields Nothing" <|
+                \() ->
+                    let
+                        ev : WikiAuditLog.ScopedAuditEvent
+                        ev =
+                            { wikiSlug = "Demo"
+                            , at = Time.millisToPosix 7
+                            , actorUsername = "a"
+                            , kind = WikiAuditLog.GrantedWikiAdmin { targetUsername = "x" }
+                            }
+                    in
+                    WikiAuditLog.scopedAuditEventByWikiAndAtMillis "ElmTips" 7 [ ev ]
+                        |> Expect.equal Nothing
+            ]
+        , Test.describe "scopedAuditEventByAtMillisWhenWikiUnambiguous"
+            [ Test.test "returns Just when exactly one wiki matches millis" <|
+                \() ->
+                    let
+                        ev : WikiAuditLog.ScopedAuditEvent
+                        ev =
+                            { wikiSlug = "Demo"
+                            , at = Time.millisToPosix 9
+                            , actorUsername = "a"
+                            , kind = WikiAuditLog.GrantedWikiAdmin { targetUsername = "x" }
+                            }
+                    in
+                    WikiAuditLog.scopedAuditEventByAtMillisWhenWikiUnambiguous 9 [ ev ]
+                        |> Expect.equal (Just ev)
+            , Test.test "returns Nothing when two wikis share millis" <|
+                \() ->
+                    let
+                        a : WikiAuditLog.ScopedAuditEvent
+                        a =
+                            { wikiSlug = "Demo"
+                            , at = Time.millisToPosix 3
+                            , actorUsername = "a"
+                            , kind = WikiAuditLog.GrantedWikiAdmin { targetUsername = "x" }
+                            }
+
+                        b : WikiAuditLog.ScopedAuditEvent
+                        b =
+                            { wikiSlug = "ElmTips"
+                            , at = Time.millisToPosix 3
+                            , actorUsername = "b"
+                            , kind = WikiAuditLog.GrantedWikiAdmin { targetUsername = "y" }
+                            }
+                    in
+                    WikiAuditLog.scopedAuditEventByAtMillisWhenWikiUnambiguous 3 [ a, b ]
+                        |> Expect.equal Nothing
             ]
         , Test.describe "allScopedEventsFromDict"
             [ Test.test "merges wikis and sorts by time" <|

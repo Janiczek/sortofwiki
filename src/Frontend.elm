@@ -964,13 +964,11 @@ remapAuditDiffWikiSlugKeys oldSlug newSlug dict =
 auditDiffFetchCmdForRoute : Model -> Command FrontendOnly ToBackend Msg
 auditDiffFetchCmdForRoute model =
     case model.route of
-        Route.WikiAdminAuditDiff wikiSlug rowIdx ->
-            Effect.Lamdera.sendToBackend
-                (RequestWikiAuditEventDiff wikiSlug model.wikiAdminAuditAppliedFilter rowIdx)
+        Route.WikiAdminAuditDiff wikiSlug atMillis ->
+            Effect.Lamdera.sendToBackend (RequestWikiAuditEventDiff wikiSlug atMillis)
 
-        Route.HostAdminAuditDiff _ rowIdx ->
-            Effect.Lamdera.sendToBackend
-                (RequestHostAuditEventDiff model.hostAdminAuditAppliedFilter rowIdx)
+        Route.HostAdminAuditDiff rowWikiSlug atMillis ->
+            Effect.Lamdera.sendToBackend (RequestHostAuditEventDiff rowWikiSlug atMillis)
 
         _ ->
             Command.none
@@ -1004,11 +1002,11 @@ runRouteStoreActions ( model, cmd ) =
 
         ( diffPatchedModel, auditDiffCmd ) =
             case baseModel.route of
-                Route.WikiAdminAuditDiff wikiSlug rowIdx ->
+                Route.WikiAdminAuditDiff wikiSlug atMillis ->
                     let
                         k : WikiAuditLog.AuditDiffCacheKey
                         k =
-                            WikiAuditLog.auditDiffCacheKey wikiSlug baseModel.wikiAdminAuditAppliedFilter rowIdx
+                            WikiAuditLog.auditDiffCacheKey wikiSlug atMillis
                     in
                     if shouldSkipAuditDiffFetch k baseModel then
                         ( baseModel, Command.none )
@@ -1021,11 +1019,11 @@ runRouteStoreActions ( model, cmd ) =
                         , auditDiffFetchCmdForRoute baseModel
                         )
 
-                Route.HostAdminAuditDiff _ rowIdx ->
+                Route.HostAdminAuditDiff rowWikiSlug atMillis ->
                     let
                         k : WikiAuditLog.AuditDiffCacheKey
                         k =
-                            WikiAuditLog.hostAuditDiffCacheKey baseModel.hostAdminAuditAppliedFilter rowIdx
+                            WikiAuditLog.hostAuditDiffCacheKey rowWikiSlug atMillis
                     in
                     if shouldSkipAuditDiffFetch k baseModel then
                         ( baseModel, Command.none )
@@ -5780,11 +5778,11 @@ updateFromBackend msg model =
             ( { model | store = nextStore, auditTrustedPublishDiffByKey = nextDiffCache }, Command.none )
                 |> runRouteStoreActions
 
-        WikiAuditEventDiffResponse wikiSlug filter rowIndex result ->
+        WikiAuditEventDiffResponse wikiSlug atMillis result ->
             let
                 k : WikiAuditLog.AuditDiffCacheKey
                 k =
-                    WikiAuditLog.auditDiffCacheKey wikiSlug filter rowIndex
+                    WikiAuditLog.auditDiffCacheKey wikiSlug atMillis
             in
             ( { model
                 | auditTrustedPublishDiffByKey =
@@ -7530,11 +7528,11 @@ updateFromBackend msg model =
                 _ ->
                     ( model, Command.none )
 
-        HostAuditEventDiffResponse filter rowIndex hostResult ->
+        HostAuditEventDiffResponse rowWikiSlug atMillis hostResult ->
             let
                 k : WikiAuditLog.AuditDiffCacheKey
                 k =
-                    WikiAuditLog.hostAuditDiffCacheKey filter rowIndex
+                    WikiAuditLog.hostAuditDiffCacheKey rowWikiSlug atMillis
             in
             case hostResult of
                 Err HostAdmin.NotHostAuthenticated ->
@@ -9515,7 +9513,7 @@ viewAuditEventsTable config rows =
                                   else
                                     []
                                 , [ UI.tableTd UI.TableAlignTop [] [ Html.text row.actorUsername ]
-                                  , UI.tableTd UI.TableAlignTop [] [ viewAuditEventKindCell config.isHostAuditView i row.wikiSlug row.kind ]
+                                  , UI.tableTd UI.TableAlignTop [] [ viewAuditEventKindCell config.isHostAuditView (Time.posixToMillis row.at) row.wikiSlug row.kind ]
                                   ]
                                 ]
                             )
@@ -9573,17 +9571,17 @@ viewHostAdminAuditBody remote =
 
 
 viewAuditEventKindCell : Bool -> Int -> Wiki.Slug -> WikiAuditLog.AuditEventKindSummary -> Html Msg
-viewAuditEventKindCell isHostAuditView eventIndex wikiSlug kind =
+viewAuditEventKindCell isHostAuditView eventAtMillis wikiSlug kind =
     case kind of
         WikiAuditLog.TrustedPublishedNewPageSummary { pageSlug } ->
             let
                 diffHref : String
                 diffHref =
                     if isHostAuditView then
-                        Wiki.hostAdminAuditDiffUrlPath wikiSlug eventIndex
+                        Wiki.hostAdminAuditDiffUrlPath wikiSlug eventAtMillis
 
                     else
-                        Wiki.adminAuditDiffUrlPath wikiSlug eventIndex
+                        Wiki.adminAuditDiffUrlPath wikiSlug eventAtMillis
             in
             Html.span
                 [ UI.viewDiffKindInlineAttr ]
@@ -9600,10 +9598,10 @@ viewAuditEventKindCell isHostAuditView eventIndex wikiSlug kind =
                 diffHref : String
                 diffHref =
                     if isHostAuditView then
-                        Wiki.hostAdminAuditDiffUrlPath wikiSlug eventIndex
+                        Wiki.hostAdminAuditDiffUrlPath wikiSlug eventAtMillis
 
                     else
-                        Wiki.adminAuditDiffUrlPath wikiSlug eventIndex
+                        Wiki.adminAuditDiffUrlPath wikiSlug eventAtMillis
             in
             Html.span
                 [ UI.viewDiffKindInlineAttr ]
@@ -12501,11 +12499,11 @@ trustedPublishAuditDiffToTrustedAuditDiffBody d =
 
 
 viewWikiAdminAuditDiffRoute : Wiki.Slug -> Wiki.FrontendDetails -> Int -> Model -> Html Msg
-viewWikiAdminAuditDiffRoute wikiSlug wikiDetails eventIndex model =
+viewWikiAdminAuditDiffRoute wikiSlug wikiDetails eventAtMillis model =
     let
         cacheKey : WikiAuditLog.AuditDiffCacheKey
         cacheKey =
-            WikiAuditLog.auditDiffCacheKey wikiSlug model.wikiAdminAuditAppliedFilter eventIndex
+            WikiAuditLog.auditDiffCacheKey wikiSlug eventAtMillis
 
         remote : RemoteData () (Result WikiAuditLog.EventDiffError WikiAuditLog.TrustedPublishAuditDiff)
         remote =
@@ -12563,11 +12561,11 @@ viewWikiAdminAuditDiffRoute wikiSlug wikiDetails eventIndex model =
 
 
 viewHostAdminAuditDiffRoute : Wiki.Slug -> Int -> Model -> Html Msg
-viewHostAdminAuditDiffRoute rowWikiSlug eventIndex model =
+viewHostAdminAuditDiffRoute rowWikiSlug eventAtMillis model =
     let
         cacheKey : WikiAuditLog.AuditDiffCacheKey
         cacheKey =
-            WikiAuditLog.hostAuditDiffCacheKey model.hostAdminAuditAppliedFilter eventIndex
+            WikiAuditLog.hostAuditDiffCacheKey rowWikiSlug eventAtMillis
 
         remote : RemoteData () (Result WikiAuditLog.EventDiffError WikiAuditLog.TrustedPublishAuditDiff)
         remote =

@@ -120,7 +120,7 @@ type ToBackend
     | RequestReviewSubmissionDetail Wiki.Slug String
     | RequestWikiUsers Wiki.Slug
     | RequestWikiAuditLog Wiki.Slug WikiAuditLog.AuditLogFilter (Maybe Int)
-    | RequestWikiAuditEventDiff Wiki.Slug WikiAuditLog.AuditLogFilter Int
+    | RequestWikiAuditEventDiff Wiki.Slug Int
     | PromoteContributorToTrusted Wiki.Slug String
     | DemoteTrustedToContributor Wiki.Slug String
     | GrantWikiAdmin Wiki.Slug String
@@ -145,7 +145,7 @@ type ToBackend
     | HostAdminLogin String
     | RequestHostWikiList
     | RequestHostAuditLog WikiAuditLog.HostAuditLogFilter
-    | RequestHostAuditEventDiff WikiAuditLog.HostAuditLogFilter Int
+    | RequestHostAuditEventDiff Wiki.Slug Int
     | RequestHostWikiDetail Wiki.Slug
     | CreateHostedWiki CreateHostedWikiPayload
     | UpdateHostedWikiMetadata Wiki.Slug UpdateHostedWikiMetadataPayload
@@ -176,7 +176,7 @@ type ToFrontend
     | ReviewSubmissionDetailResponse Wiki.Slug String (Result SubmissionReviewDetail.ReviewSubmissionDetailError SubmissionReviewDetail.SubmissionReviewDetail)
     | WikiUsersResponse Wiki.Slug (Result WikiAdminUsers.Error (List WikiAdminUsers.ListedUser))
     | WikiAuditLogResponse Wiki.Slug WikiAuditLog.AuditLogFilter Int (Result WikiAuditLog.Error (List WikiAuditLog.AuditEventSummary))
-    | WikiAuditEventDiffResponse Wiki.Slug WikiAuditLog.AuditLogFilter Int (Result WikiAuditLog.EventDiffError WikiAuditLog.TrustedPublishAuditDiff)
+    | WikiAuditEventDiffResponse Wiki.Slug Int (Result WikiAuditLog.EventDiffError WikiAuditLog.TrustedPublishAuditDiff)
     | WikiAuditLogUnchanged Wiki.Slug
     | PromoteContributorToTrustedResponse Wiki.Slug (Result WikiAdminUsers.PromoteContributorError ())
     | DemoteTrustedToContributorResponse Wiki.Slug (Result WikiAdminUsers.DemoteTrustedError ())
@@ -202,7 +202,7 @@ type ToFrontend
     | HostAdminLoginResponse (Result HostAdmin.LoginError ())
     | HostAdminWikiListResponse (Result HostAdmin.ProtectedError (List Wiki.CatalogEntry))
     | HostAuditLogResponse WikiAuditLog.HostAuditLogFilter (Result HostAdmin.ProtectedError (List WikiAuditLog.ScopedAuditEventSummary))
-    | HostAuditEventDiffResponse WikiAuditLog.HostAuditLogFilter Int (Result HostAdmin.ProtectedError (Result WikiAuditLog.EventDiffError WikiAuditLog.TrustedPublishAuditDiff))
+    | HostAuditEventDiffResponse Wiki.Slug Int (Result HostAdmin.ProtectedError (Result WikiAuditLog.EventDiffError WikiAuditLog.TrustedPublishAuditDiff))
     | CreateHostedWikiResponse (Result HostAdmin.CreateHostedWikiError Wiki.CatalogEntry)
     | HostWikiDetailResponse Wiki.Slug (Result HostAdmin.HostWikiDetailError Wiki.CatalogEntry)
     | UpdateHostedWikiMetadataResponse Wiki.Slug (Result HostAdmin.UpdateHostedWikiMetadataError Wiki.CatalogEntry)
